@@ -9,6 +9,8 @@ final class CandidatePanelController {
     private let view = CandidateView()
     private let branchView = BranchView()
     private let backdrop = GlassBackdrop()
+    /// 語の意味の吹き出し(候補の窓の子の窓)
+    private let bubble = MeaningBubbleController()
     private var fadeTimer: Timer?
     private var lastAnnounced: String?
     /// 前に出した一覧と分岐図．あとから届いた候補で中身だけが変わったか(選んでいるものは同じか)を見分ける
@@ -49,7 +51,15 @@ final class CandidatePanelController {
         // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，縁を動かさずにすぐ変える．
         // 窓は入力位置に寄せて置き直す
         let choosing = panel.selectedEntry != nil
-        present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme, crossfades: arrived, animatesFrame: choosing, holdsEdges: choosing)
+        let frame = present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme, crossfades: arrived, animatesFrame: choosing, holdsEdges: choosing)
+        // 語の意味は，候補の右に出す設定なら窓の外の吹き出しに出す(候補の窓の大きさは意味の有無で変えない)
+        if panel.meaningPlacement == .side, let note = panel.homophone, let row = view.selectedRowRect(size: frame.size) {
+            bubble.show(note, others: note.others, theme: view.theme, row: Self.screenRect(row, in: frame), anchor: frame,
+                        obstacles: view.bubbleObstacles(size: frame.size).map { Self.screenRect($0, in: frame) } + [Self.caretLine(caret)],
+                        screen: FloatingPanel.visibleFrame(for: caret), parent: window)
+        } else {
+            bubble.hide()
+        }
         announceSelection(panel)
     }
 
@@ -67,7 +77,15 @@ final class CandidatePanelController {
         shownLattice = panel
         shownList = nil
         branchView.panel = panel
-        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived, holdsEdges: true)
+        let frame = present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived, holdsEdges: true)
+        if panel.meaningPlacement == .side, let column = panel.columns.first(where: \.isFocused), let note = column.homophone,
+           let row = branchView.selectedRowRect() {
+            bubble.show(note, others: BranchView.others(of: note, in: column), theme: branchView.theme, row: Self.screenRect(row, in: frame),
+                        anchor: frame, obstacles: branchView.bubbleObstacles().map { Self.screenRect($0, in: frame) } + [Self.caretLine(caret)],
+                        screen: FloatingPanel.visibleFrame(for: caret), parent: window)
+        } else {
+            bubble.hide()
+        }
         if let focused = panel.columns.first(where: \.isFocused) {
             // コマンドの候補を選んでいれば，その名前を「コマンド」と続けて読む(幹の文字には印が付いている)
             let command = focused.selectedAlternative.flatMap { index in
@@ -81,6 +99,17 @@ final class CandidatePanelController {
         }
     }
 
+    /// 候補の窓の中の rect(上下が反転した view の座標)を，枠 frame の窓の画面の座標にする
+    private static func screenRect(_ rect: NSRect, in frame: NSRect) -> NSRect {
+        NSRect(x: frame.minX + rect.minX, y: frame.maxY - rect.maxY, width: rect.width, height: rect.height)
+    }
+
+    /// 入力中の文字の行(画面の幅いっぱい)．吹き出しはこれを覆わない
+    private static func caretLine(_ caret: NSRect) -> NSRect {
+        let screen = FloatingPanel.visibleFrame(for: caret)
+        return NSRect(x: screen.minX, y: caret.minY, width: screen.width, height: max(caret.height, 1))
+    }
+
     /// 窓の幅の上限．トークンの上限(候補を表に広げていれば表の上限)と，入力位置がある画面の幅(左右に余白を空ける)の狭い方
     private static func maximumWidth(caret: NSRect, grid: Bool = false) -> CGFloat {
         let screen = FloatingPanel.visibleFrame(for: caret).width - DesignTokens.Size.Candidate.screenMargin * 2
@@ -91,7 +120,10 @@ final class CandidatePanelController {
     /// 出ている窓の大きさが変わるときは縁を滑らかに動かし(候補が増えた・文節を移った)，crossfades ならあとから届いた中身を重ねて変える．
     /// 「視差効果を減らす」が有効なら，大きさはすぐ変え，重ね変わりだけにする(Apple のヒューマンインターフェイスガイドラインの動きの決まり)．
     /// holdsEdges なら，前も選んでいたときに置いた窓から候補が並び始める辺(上と左)を動かさない(PanelPlacement.place)
-    private func present(_ content: NSView, size: NSSize, caret: NSRect, theme: ResolvedTheme, crossfades: Bool = false, animatesFrame: Bool = true, holdsEdges: Bool) {
+    /// 返すのは窓の新しい枠(動かしている途中でも，動き終えたときの枠)
+    @discardableResult
+    private func present(_ content: NSView, size: NSSize, caret: NSRect, theme: ResolvedTheme, crossfades: Bool = false, animatesFrame: Bool = true,
+                         holdsEdges: Bool) -> NSRect {
         let glass = theme.isRounded
         backdrop.cornerRadius = theme.cornerRadius
         // 一覧と分岐図を切り替えたときも，窓が出たままなら同じ側に置く
@@ -145,6 +177,7 @@ final class CandidatePanelController {
             startRestFadeIn()
             window.orderFrontRegardless()
         }
+        return frame
     }
 
     func hide() {
@@ -155,6 +188,7 @@ final class CandidatePanelController {
         shownLattice = nil
         side = nil
         held = nil
+        bubble.hide()
         window.orderOut(nil)
     }
 

@@ -3,15 +3,15 @@ import CoreText
 import HajimeApplication
 import HajimeDomain
 
-/// 語の意味(R-08)を描く．一覧(CandidateView)と分岐図(BranchView)で同じものを使う．
+/// 語の意味(R-08)の中身を描く．吹き出し(MeaningBubbleView)と，候補の下に出す設定の一覧(CandidateView)・分岐図(BranchView)で同じものを使う．
 ///
-/// 箱は描かず，候補の列(分岐図では候補の枝)の続きとして置く．配置は core の MeaningCardLayout が決める．
+/// 箱は描かない(吹き出しの形は MeaningBubbleView が描く)．配置は core の MeaningCardLayout が決める．
 /// ここでは意味と例を幅で折り返し(CoreText の行分けで，句読点や小さいかなを行の頭に置かない)，配置のとおりに描く．
 /// 文字は配置のベースラインに書く(行の箱の中で上下にずれないように)．
-/// - 意味が 2 つ以上なら，目印の列に角丸の四角の番号を付ける(候補の番号の丸と形を変え，番号キーで選ぶものと見分ける)
+/// - 意味が 2 つ以上なら，目印の列に枠線だけの丸の番号を付ける(候補の番号の塗った丸と形を変え，番号キーで選ぶものと見分ける)
 /// - 使い方の例は左に縦の線を引いて控えめな色で出し，例の中の見出しの語だけを強める
 /// - 同音語は区切りの線の下に，耳のアイコンとタグだけで並べる
-/// - アクセントの色は，選んでいる候補とつなぐ線(drawConnector)だけに使う．アイコンは控えめな色，タグは文字の色を薄く敷いた地に文字の色の字
+/// - アクセントの色は使わない．アイコン・番号・品詞は控えめな色
 ///
 /// 折り返しは重いので，同じ注釈と幅の配置は覚えておいて使い回す(ふわっと出すあいだ 1 秒に 60 回描き直すため)
 @MainActor
@@ -81,56 +81,6 @@ enum MeaningCardDrawing {
         MeaningCardLayout.headerHeight(measuring: Measuring(theme: theme), metrics: .tokens)
     }
 
-    // MARK: - 空いた場所
-
-    /// 意味の無い候補を選んでいるとき．場所は空けたまま(窓の大きさを変えない)，見出しの辞書のアイコンだけを薄く出す
-    static func drawEmpty(in rect: NSRect, placement: MeaningCardLayout.Placement, theme: ResolvedTheme) {
-        let color = theme.textMuted.withAlphaComponent(DesignTokens.Opacity.Glass.meaningEmptyIcon)
-        guard let image = symbol(bookSymbols, pointSize: Meaning.iconSize, color: color) else { return }
-        drawCentered(image, at: NSPoint(x: rect.minX + placement.left + Meaning.markerWidth / 2, y: rect.minY + placement.headerMidY))
-    }
-
-    /// つなぐ線の終わりの x．見出しのアイコンの手前で止める(rect は語の意味の場所)
-    static func connectorEndX(in rect: NSRect, placement: MeaningCardLayout.Placement) -> CGFloat {
-        rect.minX + placement.left - DesignTokens.Size.Space.xs
-    }
-
-    /// 選んでいる候補の行の右の端(from)から語の意味の見出し(to)へ引く線．端に丸を付ける．
-    /// 枝(BranchLineDrawing)と同じ半径の曲がり角でつなぐ．直線の枝のテーマは直角に曲がる
-    static func drawConnector(from start: NSPoint, to end: NSPoint, theme: ResolvedTheme) {
-        // 枝と同じ形: 水平に出て，真ん中で枝と同じ半径の 4 分の 1 の円で曲がり，縦に進んでまた曲がり，水平に見出しへ入る．
-        // 直線の枝のテーマは直角に曲がる．高さの差が小さければ半径を縮める
-        let middle = ((start.x + end.x) / 2).rounded()
-        let curved = theme.isRounded && !theme.straightBranches
-        let rise = end.y - start.y
-        let radius = min(curved ? DesignTokens.Size.Glass.branchTurnRadius : 0, abs(rise) / 2, middle - start.x, end.x - middle)
-        let direction: CGFloat = rise < 0 ? -1 : 1
-        let path = NSBezierPath()
-        path.move(to: start)
-        if rise == 0 {
-            path.line(to: end)
-        } else if radius > 0 {
-            path.line(to: NSPoint(x: middle - radius, y: start.y))
-            path.appendArc(from: NSPoint(x: middle, y: start.y), to: NSPoint(x: middle, y: end.y), radius: radius)
-            path.line(to: NSPoint(x: middle, y: end.y - direction * radius))
-            path.appendArc(from: NSPoint(x: middle, y: end.y), to: end, radius: radius)
-            path.line(to: end)
-        } else {
-            path.line(to: NSPoint(x: middle, y: start.y))
-            path.line(to: NSPoint(x: middle, y: end.y))
-            path.line(to: end)
-        }
-        path.lineWidth = theme.isRounded ? DesignTokens.Size.Glass.lineWidthSelected : DesignTokens.Size.Branch.lineWidthSelected
-        // 枝の線(BranchLineDrawing)と同じく，端は平らにし直角の角は尖らせる
-        path.lineCapStyle = .butt
-        path.lineJoinStyle = .miter
-        theme.selection.setStroke()
-        path.stroke()
-        let dot = Meaning.dotSize
-        theme.selection.setFill()
-        NSBezierPath(ovalIn: NSRect(x: end.x - dot / 2, y: end.y - dot / 2, width: dot, height: dot)).fill()
-    }
-
     // MARK: - 中身
 
     /// rect(語の意味の場所．箱は描かない)の中に，配置のとおりに見出し・意味・例・同音語を描く
@@ -152,25 +102,25 @@ enum MeaningCardDrawing {
         let headword = placed.headword
         draw(NSAttributedString(string: headword.text, attributes: [.font: font(.headword, theme), .foregroundColor: theme.text]),
              x: headword.line.x, baseline: headword.line.baseline)
-        // タグ(品詞・番号・同音語)は，パレットの説明のカードと同じく文字の色を薄く敷いた地に文字の色の字
-        // (控えめな色の字では地との差が足りないテーマがある)．アクセントの色は選んでいる候補とつなぐ線だけに使う
+        // アクセントの色は使わない．番号は枠線だけの丸，品詞は枠線だけのタグにし，字は控えめな色(背景を塗らないので背景との差が保てる)．
+        // 同音語のタグは，パレットの説明のタグと同じく文字の色を薄く敷いた背景に文字の色の字．タグの形は 1 種類(角の丸み part.tagRadius)
+        let tagRadius = theme.isRounded ? DesignTokens.Size.Part.tagRadius : 0
+        let stroke = DesignTokens.Size.Part.stroke
         if let chip = placed.partOfSpeech {
-            let frame = box(chip.frame)
-            let radius = theme.isRounded ? frame.height / 2 : 0
-            theme.badge.setFill()
-            NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius).fill()
-            draw(NSAttributedString(string: chip.text, attributes: [.font: font(.partOfSpeech, theme), .foregroundColor: theme.text]),
+            let frame = box(chip.frame).insetBy(dx: stroke / 2, dy: stroke / 2)
+            outline(NSBezierPath(roundedRect: frame, xRadius: tagRadius, yRadius: tagRadius), color: theme.line, width: stroke)
+            draw(NSAttributedString(string: chip.text, attributes: [.font: font(.partOfSpeech, theme), .foregroundColor: theme.textMuted]),
                  x: chip.textX, baseline: chip.baseline)
         }
 
         // 意味と例
         for (index, sense) in placed.senses.enumerated() {
             if let badge = sense.badge, let number = sense.number {
-                let frame = box(badge)
-                let radius = theme.isRounded ? Meaning.numberRadius : 0
-                theme.badge.setFill()
-                NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius).fill()
-                draw(NSAttributedString(string: number.text, attributes: [.font: font(.number, theme), .foregroundColor: theme.text]),
+                // 番号は枠線だけの丸(候補の番号の塗った丸と形を変え，番号キーで選ぶものと見分ける)
+                let frame = box(badge).insetBy(dx: stroke / 2, dy: stroke / 2)
+                let path = theme.isRounded ? NSBezierPath(ovalIn: frame) : NSBezierPath(rect: frame)
+                outline(path, color: theme.line, width: stroke)
+                draw(NSAttributedString(string: number.text, attributes: [.font: font(.number, theme), .foregroundColor: theme.textMuted]),
                      x: number.line.x, baseline: number.line.baseline)
             }
             for (line, text) in zip(sense.meaning, layout.meaning[index]) {
@@ -198,13 +148,19 @@ enum MeaningCardDrawing {
         for tag in placed.tags {
             let frame = box(tag.frame)
             theme.badge.setFill()
-            let radius = theme.isRounded ? DesignTokens.Size.Glass.tagRadius : 0
-            NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius).fill()
+            NSBezierPath(roundedRect: frame, xRadius: tagRadius, yRadius: tagRadius).fill()
             draw(NSAttributedString(string: tag.text, attributes: tagText), x: tag.textX, baseline: tag.baseline)
         }
         if let more = placed.more {
             draw(NSAttributedString(string: more.text, attributes: muted), x: more.line.x, baseline: more.line.baseline)
         }
+    }
+
+    /// 枠線だけの形
+    private static func outline(_ path: NSBezierPath, color: NSColor, width: CGFloat) {
+        color.setStroke()
+        path.lineWidth = width
+        path.stroke()
     }
 
     /// 画像を center を中心に，デバイスのピクセルにそろえて描く

@@ -131,7 +131,8 @@ pub(super) struct CardLayout {
 }
 
 impl CardLayout {
-    /// 見出しの行の縦の真ん中(カードの上の端から)．分岐図で候補からつなぐ線はここへ引く
+    /// 見出しの行の縦の真ん中(カードの上の端から)
+    #[cfg(test)]
     pub fn header_mid_y(&self) -> f32 {
         self.book_icon.mid_y()
     }

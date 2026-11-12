@@ -7,6 +7,7 @@
 mod association;
 mod branch;
 mod branch_lines;
+pub mod bubble;
 mod card_layout;
 pub(crate) mod fitting;
 mod list;
@@ -22,7 +23,6 @@ pub use crate::geometry::{Frame, Point};
 pub use crate::theme::{Color, Font, ResolvedTheme};
 pub use branch::branch_map;
 pub use list::candidate_list;
-pub use meaning::CardReservation;
 pub use small::{mode, note, prediction};
 
 use crate::keys::Icon;
@@ -35,7 +35,7 @@ pub enum Draw {
         frame: Frame,
         color: Color,
     },
-    /// 角丸の長方形を塗る・縁取る．縁は stroke の太さの線で，frame の上をなぞる
+    /// 角丸の長方形を塗り，枠線を引く．枠線は stroke の太さの線で，frame の上をなぞる
     RoundRect {
         frame: Frame,
         radius: f32,
@@ -66,6 +66,12 @@ pub enum Draw {
         figures: Vec<Figure>,
         color: Color,
         width: f32,
+    },
+    /// 閉じた図形(吹き出しの形)を塗る・枠線を引く．figure の終わりから始まりへ閉じる．枠線は stroke の太さの線で図形の上をなぞる
+    Shape {
+        figure: Figure,
+        fill: Option<Color>,
+        stroke: Option<(Color, f32)>,
     },
     /// 直線(端は丸い)．dot_pitch があれば，その間隔の丸い点にする
     Line {
@@ -206,6 +212,15 @@ impl Draw {
                 color,
                 width,
             },
+            Self::Shape {
+                figure,
+                fill,
+                stroke,
+            } => Self::Shape {
+                figure: figure.offset(dx, dy),
+                fill,
+                stroke,
+            },
             Self::Line {
                 from,
                 to,
@@ -268,7 +283,8 @@ impl Draw {
 }
 
 /// 描く部品の並び．width・height はウィンドウの大きさ，body はその中の候補ウィンドウの本体(影や余白を除いた部分)．
-/// hits はマウスで押せる範囲と押したときの対象．描く位置と同じ計算で決める
+/// hits はマウスで押せる範囲と押したときの対象．描く位置と同じ計算で決める．
+/// keep_clear は語の意味の吹き出しに覆わせない範囲(選んでいない候補・幹の文節・足元の案内など)
 #[derive(Debug, Clone, PartialEq)]
 pub struct Scene {
     pub width: f32,
@@ -276,6 +292,7 @@ pub struct Scene {
     pub body: Frame,
     pub draws: Vec<Draw>,
     pub hits: Vec<Hit>,
+    pub keep_clear: Vec<Frame>,
 }
 
 /// マウスで押せる範囲と，押したときの対象(macOS の BranchView・CandidateView の target(at:) と同じ)
@@ -378,9 +395,6 @@ pub struct Look<'a> {
     /// 窓の大きさ(影の分を含む)を外から決める．窓の大きさが変わる途中に，地と縁をその大きさで描く．
     /// 中身は中身に合わせた配置のまま描き，はみ出した分は窓で切れる．None なら中身に合わせる
     pub size: Option<(f32, f32)>,
-    /// 候補の右に空けておく語の意味のカードの高さ(CardReservation が前の窓から決める)．
-    /// 意味の無い候補を選んでいても，この高さの空いたカードを出して窓の大きさを変えない．None なら空けない
-    pub reserved_card: Option<f32>,
     /// 1 ドットあたりのデバイスのピクセル数(画面の DPI の倍率)．枝の線の縁をデバイスのピクセルの境にそろえるのに使う
     pub pixel_scale: f32,
     /// 候補の一覧の足元の行(案内と位置)を出すか．設定の画面の見本では出さない
@@ -397,7 +411,6 @@ impl<'a> Look<'a> {
             ),
             rest_opacity: 1.0,
             size: None,
-            reserved_card: None,
             pixel_scale: 1.0,
             shows_footer: true,
         }
@@ -472,6 +485,11 @@ pub fn surround(scene: Scene, theme: &ResolvedTheme, surround: Surround) -> Scen
                 frame: hit.frame.offset(margin_x, margin_top),
                 target: hit.target,
             })
+            .collect(),
+        keep_clear: scene
+            .keep_clear
+            .into_iter()
+            .map(|frame| frame.offset(margin_x, margin_top))
             .collect(),
     }
 }

@@ -307,7 +307,7 @@ pub mod size {
         pub const STROKE: f32 = 1.0;
     }
     pub mod candidate {
-        pub const ROW_HEIGHT: f32 = 22.0;
+        pub const ROW_HEIGHT: f32 = 28.0;
         pub const FONT_SIZE: f32 = 15.0;
         pub const FONT_SIZE_MIN: f32 = 12.0;
         pub const FONT_SIZE_MAX: f32 = 24.0;
@@ -326,6 +326,7 @@ pub mod size {
         pub const SCREEN_MARGIN: f32 = 16.0;
         pub const TRUNCATION_CONTEXT: f32 = 4.0;
         pub const DETAIL_GAP: f32 = 8.0;
+        pub const COLUMN_GAP: f32 = 8.0;
     }
     pub mod mode_indicator {
         pub const FONT_SIZE: f32 = 14.0;
@@ -389,22 +390,22 @@ pub mod size {
     }
     pub mod glass {
         pub const CORNER_RADIUS: f32 = 12.0;
-        pub const WINDOW_PADDING: f32 = 8.0;
+        pub const WINDOW_PADDING: f32 = 12.0;
         pub const COMPACT_PADDING_X: f32 = 8.0;
         pub const COMPACT_PADDING_Y: f32 = 4.0;
-        pub const SEPARATOR_GAP: f32 = 8.0;
+        pub const SEPARATOR_GAP: f32 = 12.0;
         pub const ROW_PADDING_X: f32 = 4.0;
         pub const HEADER_HEIGHT: f32 = 20.0;
         pub const ROW_HEIGHT: f32 = 28.0;
         pub const LABEL_FONT_SIZE: f32 = 11.5;
         pub const KEY_FONT_SIZE: f32 = 10.5;
-        pub const BADGE_SIZE: f32 = 17.0;
+        pub const BADGE_SIZE: f32 = 16.0;
         pub const SELECTION_RADIUS: f32 = 7.0;
         pub const KEYCAP_RADIUS: f32 = 4.0;
         pub const KEYCAP_PADDING_X: f32 = 4.0;
         pub const KEYCAP_PADDING_Y: f32 = 3.0;
-        pub const KEYCAP_HEIGHT: f32 = 17.0;
-        pub const HINT_GAP: f32 = 12.0;
+        pub const KEYCAP_HEIGHT: f32 = 16.0;
+        pub const HINT_GAP: f32 = 8.0;
         pub const FOOTER_HEIGHT: f32 = 28.0;
         pub const TRUNK_GAP: f32 = 8.0;
         pub const BRANCH_INDENT: f32 = 28.0;
@@ -412,7 +413,7 @@ pub mod size {
         pub const LINE_WIDTH: f32 = 1.5;
         pub const LINE_WIDTH_SELECTED: f32 = 2.0;
         pub const UNDERLINE_OFFSET: f32 = 4.0;
-        pub const MODE_INDICATOR_SIZE: f32 = 34.0;
+        pub const MODE_INDICATOR_SIZE: f32 = 32.0;
         pub const MODE_INDICATOR_FONT_SIZE: f32 = 17.0;
         pub const SELECTION_INSET_Y: f32 = 2.0;
         pub const BRANCH_TURN_RADIUS: f32 = 8.0;
@@ -422,39 +423,35 @@ pub mod size {
         pub const SHADOW_RADIUS: f32 = 12.0;
         pub const SHADOW_OFFSET_Y: f32 = 3.0;
         pub const TAG_HEIGHT: f32 = 16.0;
-        pub const TAG_PADDING_X: f32 = 8.0;
-        pub const TAG_RADIUS: f32 = 8.0;
-        pub const NOTE_ICON_SIZE: f32 = 17.0;
+        pub const TAG_PADDING_X: f32 = 4.0;
+        pub const TAG_RADIUS: f32 = 4.0;
+        pub const NOTE_ICON_SIZE: f32 = 16.0;
         pub const COMMAND_ICON_SIZE: f32 = 18.0;
         pub const COMMAND_ICON_RADIUS: f32 = 5.0;
         pub const NOTE_GAP: f32 = 8.0;
     }
     pub mod meaning {
-        pub const CARD_GAP: f32 = 16.0;
         pub const MARKER_WIDTH: f32 = 16.0;
-        pub const MARKER_GAP: f32 = 8.0;
+        pub const MARKER_GAP: f32 = 4.0;
         pub const HEADER_GAP: f32 = 8.0;
         pub const SENSE_GAP: f32 = 8.0;
         pub const EXAMPLE_GAP: f32 = 4.0;
         pub const EXAMPLE_INDENT: f32 = 12.0;
         pub const EXAMPLE_BAR_WIDTH: f32 = 2.0;
         pub const MEANING_PITCH: f32 = 20.0;
-        pub const EXAMPLE_PITCH: f32 = 18.0;
+        pub const EXAMPLE_PITCH: f32 = 16.0;
         pub const OTHERS_GAP: f32 = 12.0;
-        pub const PART_OF_SPEECH_GAP: f32 = 8.0;
+        pub const PART_OF_SPEECH_GAP: f32 = 4.0;
         pub const PART_OF_SPEECH_HEIGHT: f32 = 16.0;
-        pub const PART_OF_SPEECH_PADDING_X: f32 = 8.0;
+        pub const PART_OF_SPEECH_PADDING_X: f32 = 4.0;
         pub const TAG_GAP: f32 = 4.0;
         pub const HEADWORD_FONT_SIZE: f32 = 15.0;
         pub const BODY_FONT_SIZE: f32 = 13.0;
-        pub const EXAMPLE_FONT_SIZE: f32 = 12.0;
-        pub const PART_OF_SPEECH_FONT_SIZE: f32 = 10.5;
-        pub const NUMBER_FONT_SIZE: f32 = 10.5;
-        pub const NUMBER_RADIUS: f32 = 4.0;
+        pub const EXAMPLE_FONT_SIZE: f32 = 11.0;
+        pub const PART_OF_SPEECH_FONT_SIZE: f32 = 10.0;
+        pub const NUMBER_FONT_SIZE: f32 = 10.0;
         pub const ICON_SIZE: f32 = 13.0;
-        pub const DOT_SIZE: f32 = 6.0;
         pub const LIST_WIDTH: f32 = 288.0;
-        pub const BRANCH_WIDTH: f32 = 300.0;
         pub const MEANING_LINES: f32 = 3.0;
         pub const EXAMPLE_LINES: f32 = 2.0;
     }
@@ -695,6 +692,15 @@ pub mod size {
         pub const SLIDER_RAIL: f32 = 4.0;
         pub const BUTTON_MIN_WIDTH: f32 = 64.0;
     }
+    pub mod bubble {
+        pub const WIDTH: f32 = 288.0;
+        pub const PADDING: f32 = 12.0;
+        pub const RADIUS: f32 = 12.0;
+        pub const POINTER_LENGTH: f32 = 8.0;
+        pub const POINTER_WIDTH: f32 = 16.0;
+        pub const GAP: f32 = 4.0;
+        pub const SCREEN_MARGIN: f32 = 12.0;
+    }
 }
 
 pub mod motion {
@@ -754,7 +760,6 @@ pub mod opacity {
         pub const CORRECTION_TAG_CONTRAST: f32 = 0.3;
         pub const COMMAND_TAG: f32 = 0.16;
         pub const COMMAND_TAG_CONTRAST: f32 = 0.3;
-        pub const MEANING_EMPTY_ICON: f32 = 0.25;
     }
     pub mod rounded {
         pub const BADGE: f32 = 0.12;
@@ -806,5 +811,8 @@ pub mod opacity {
         pub const PREVIEW_CHIP: f32 = 0.06;
         pub const TABLE_STRIPE: f32 = 0.035;
         pub const SMOKE: f32 = 0.3;
+    }
+    pub mod candidate {
+        pub const UNSELECTABLE_NUMBER: f32 = 0.4;
     }
 }

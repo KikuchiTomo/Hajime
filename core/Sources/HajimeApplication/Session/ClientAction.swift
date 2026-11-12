@@ -190,6 +190,16 @@ public struct CandidatePanel: Sendable, Equatable {
         return selectedEntry / columnLength
     }
 
+    /// entries の index 番目の候補の番号の列に出す番号(1 から)と，番号キーで選べるか．
+    /// 番号の列はどの候補でも取るので，選べない番号(表のほかの列，選び始める前の入力中の候補の窓)も出して列を空に見せない．
+    /// 選べないことは描く側が薄さで示す
+    public func displayedNumber(ofEntry index: Int) -> (number: Int, selectable: Bool)? {
+        guard entries.indices.contains(index) else { return nil }
+        if let number = number(ofEntry: index) { return (number, true) }
+        guard let columnLength, columnLength > 0 else { return (index + 1, false) }
+        return (index % columnLength + 1, false)
+    }
+
     /// entries の index 番目の候補に振る番号(1 から)．番号を振らない候補なら nil
     public func number(ofEntry index: Int) -> Int? {
         guard showsNumbers, entries.indices.contains(index) else { return nil }
