@@ -331,48 +331,39 @@ private struct Planner<Measuring: PalettePreviewMeasuring> {
         var y = area.y + rows.heading.height
         let valueX = valueX
         let valueWidth = area.maxX - valueX
-        // 行は出す項目ごとに決まった高さ(Unicode の名前は unicodeLines 行，ほかは 1 行)を取り，値が短くても空でも詰めない．
-        // 同じ種類の中では最後の行の位置が変わらず，欄の下の端までの間隔がそろう(札が何行にもなるときだけ伸びる)
+        // 行は中身どおりに上から詰め(行の間はどこも rowGap)，値の無い項目の行は出さない．同じ種類の中で窓の大きさを変えないために
+        // 取っておく高さ(Unicode の名前が 1 行のときの 2 行目の分など)は，表の最後の行の下に残る
         // Unicode の名前(並びは英語の名前)．値の x にそろえて折り返す
-        if options.unicodeName, fields.unicodeName {
+        if options.unicodeName, fields.unicodeName, !preview.unicodeName.isEmpty {
             y += metrics.rowGap
-            if !preview.unicodeName.isEmpty {
-                let label = preview.unicodeNameSource == PaletteStrings.unicodeSource ? labels.unicode : labels.english
-                let lines = PreviewLineBreaking.wrapped(preview.unicodeName, width: valueWidth, maxLines: options.unicodeLines) { measuring.width($0, .value) }
-                for (index, line) in lines.enumerated() {
-                    let baseline = y + rows.text.ascent + rows.text.pitch * Double(index)
-                    if index == 0 { texts.append(labelText(label, baseline: baseline)) }
-                    texts.append(.init(text: line, role: .value, x: valueX, baseline: baseline, width: measuring.width(line, .value)))
-                }
+            let label = preview.unicodeNameSource == PaletteStrings.unicodeSource ? labels.unicode : labels.english
+            let lines = PreviewLineBreaking.wrapped(preview.unicodeName, width: valueWidth, maxLines: options.unicodeLines) { measuring.width($0, .value) }
+            for (index, line) in lines.enumerated() {
+                let baseline = y + rows.text.ascent + rows.text.pitch * Double(index)
+                if index == 0 { texts.append(labelText(label, baseline: baseline)) }
+                texts.append(.init(text: line, role: .value, x: valueX, baseline: baseline, width: measuring.width(line, .value)))
             }
-            y += rows.text.height(lines: options.unicodeLines)
+            y += rows.text.height(lines: lines.count)
         }
         // 読み．入る数だけ「、」でつなぎ，残りの数を添える
-        if options.readings, fields.readings {
+        if options.readings, fields.readings, !preview.readings.isEmpty {
             y += metrics.rowGap
-            if !preview.readings.isEmpty {
-                let baseline = y + rows.text.ascent
-                texts.append(labelText(labels.readings, baseline: baseline))
-                let (shown, rest) = fittingReadings(width: valueWidth)
-                let width = measuring.width(shown, .value)
-                texts.append(.init(text: shown, role: .value, x: valueX, baseline: baseline, width: width))
-                if rest > 0 {
-                    let more = labels.more(rest)
-                    texts.append(.init(text: more, role: .more, x: valueX + width + metrics.chipGap, baseline: baseline,
-                                       width: measuring.width(more, .more)))
-                }
+            let baseline = y + rows.text.ascent
+            texts.append(labelText(labels.readings, baseline: baseline))
+            let (shown, rest) = fittingReadings(width: valueWidth)
+            let width = measuring.width(shown, .value)
+            texts.append(.init(text: shown, role: .value, x: valueX, baseline: baseline, width: width))
+            if rest > 0 {
+                let more = labels.more(rest)
+                texts.append(.init(text: more, role: .more, x: valueX + width + metrics.chipGap, baseline: baseline, width: measuring.width(more, .more)))
             }
             y += rows.text.height(lines: 1)
         }
         // ショートコードとコードポイントの札
         // 出さない設定の項目は，値があっても出さない(PalettePanel.Preview(item:) は空にして渡す)
         for (label, values, shown) in [(labels.shortcodes, preview.shortcodes, fields.shortcodes), (labels.codePoints, preview.codePoints, fields.codePoints)]
-            where shown {
+            where shown && !values.isEmpty {
             y += metrics.rowGap
-            guard !values.isEmpty else {
-                y += rows.chip.height(lines: 1)
-                continue
-            }
             texts.append(labelText(label, baseline: y + rows.chip.ascent))
             let (placed, lines) = flowChips(values, top: y, x: valueX, width: valueWidth)
             chips += placed

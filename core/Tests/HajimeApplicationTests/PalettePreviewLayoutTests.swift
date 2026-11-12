@@ -116,7 +116,7 @@ struct PalettePreviewLayoutTests {
         #expect(layout.texts.first { $0.role == .source }?.text == "CLDR")
     }
 
-    @Test("R-26: 欄の高さは設定で出る行がすべて出たときの高さで，行は項目ごとに決まった高さを取り，最後の行の下に空きを残さない")
+    @Test("R-26: 欄の高さは設定で出る行がすべて出たときの高さで，行は中身どおりに上から詰め，典型の絵文字では最後の行の下に空きを残さない")
     func height() throws {
         let placed = place(Self.smile)
         let bottom = placed.layout.frames(Measuring()).map(\.maxY).max() ?? 0
@@ -142,24 +142,18 @@ struct PalettePreviewLayoutTests {
         #expect(kaomoji == 48)
         // 選んでいる文字が変わっても値の x は同じ
         #expect(place(Self.flag).layout.valueX == placed.layout.valueX)
-        // 行は項目ごとに決まった高さを取る．Unicode の名前が 1 行でも 2 行分を取り，最後の行(コードポイント)は欄の下の端に付く
+        // 行は中身どおりに上から詰める(行の間はどこも 4)．Unicode の名前が 1 行の記号は，取っておいた 2 行目の分が最後の行の下に残る
         let arrow = PaletteItem(kind: .symbol, category: .arrows, text: "⇒", japaneseName: "右向き二重矢印", readings: ["やじるし"])
         let symbolPlaced = place(arrow)
         expectAligned(symbolPlaced)
-        func labels(_ placed: Placed) -> [String: Double] {
-            Dictionary(placed.layout.texts.filter { $0.role == .label }.map { ($0.text, $0.baseline) }, uniquingKeysWith: { first, _ in first })
+        let valueLines = symbolPlaced.layout.texts.filter { $0.role == .value }.map(\.baseline)
+        let labelBaselines = symbolPlaced.layout.texts.filter { $0.role == .label }.map(\.baseline)
+        let row: Double = 16 + 4
+        for (upper, lower) in zip(labelBaselines, labelBaselines.dropFirst()) {
+            let lines = Double(valueLines.filter { $0 >= upper && $0 < lower }.count)
+            #expect(lower - upper == row + 16 * (lines - 1))
         }
-        let arrowLabels = labels(symbolPlaced)
-        #expect(placed.layout.texts.filter { $0.role == .value }.count >= 2)
-        #expect(symbolPlaced.layout.texts.filter { $0.role == .value && $0.baseline == arrowLabels["Unicode"] }.count == 1)
-        let unicodeBaseline: Double = try #require(arrowLabels["Unicode"])
-        let readingsBaseline: Double = try #require(arrowLabels["読み"])
-        let slot: Double = 16 * 2 + 4
-        #expect(readingsBaseline - unicodeBaseline == slot)
-        let smileLabels = labels(placed)
-        let arrowLast: Double = try #require(arrowLabels["コードポイント"])
-        let smileLast: Double = try #require(smileLabels["コードポイント"])
-        #expect(symbolPlaced.area.maxY - arrowLast == placed.area.maxY - smileLast)
+
     }
 
     @Test("R-26: 並びの英語の名前は「英語」の行に出し，「CLDR」は見出しの 1 か所だけ")
