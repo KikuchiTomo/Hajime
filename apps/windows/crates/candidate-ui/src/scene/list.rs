@@ -354,7 +354,12 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
                 cell_width,
                 metrics.row_height,
             ),
-            None => Frame::new(content.x, y, list_width, metrics.row_height),
+            None => Frame::new(
+                content.x,
+                entries_top + index as f32 * metrics.row_height,
+                list_width,
+                metrics.row_height,
+            ),
         };
         // コメントの札は行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
         // 札を押すと候補の代わりにコメントを入れる
