@@ -2,6 +2,9 @@ import HajimeApplication
 import HajimeDomain
 import SwiftUI
 
+private typealias Space = DesignTokens.Size.Space
+private typealias Part = DesignTokens.Size.Part
+
 /// 初期設定の画面．左に実演の舞台，右にページ(題・説明・選択肢)と進み具合
 struct OnboardingView: View {
     private typealias Size = DesignTokens.Size.Onboarding
@@ -19,7 +22,8 @@ struct OnboardingView: View {
                 header
                 ScrollView {
                     content
-                        .padding(.vertical, Size.cardGap / 2)
+                        // カードの縁の線がスクロールの端で切れないように空ける
+                        .padding(.vertical, Space.inset)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 // 窓が低くて入らないときは，スクロールできることが分かるようにする
@@ -64,16 +68,18 @@ struct OnboardingView: View {
 
     private var header: some View {
         let index = (OnboardingPage.allCases.firstIndex(of: model.page) ?? 0) + 1
-        return VStack(alignment: .leading, spacing: Size.cardGap / 2) {
+        return VStack(alignment: .leading, spacing: Space.stack) {
             Text(UIStrings.Onboarding.step(index, of: OnboardingPage.allCases.count))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.accentColor)
             Text(model.page.title)
                 .font(.largeTitle.weight(.bold))
-            Text(model.page.detail)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if let detail = model.page.detail {
+                Text(detail)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .id(model.page)
     }
@@ -97,7 +103,7 @@ struct OnboardingView: View {
     private var modeSwitch: some View {
         VStack(spacing: Size.cardGap) {
             ForEach(ModeSwitchStyle.allCases, id: \.self) { style in
-                OptionCard(title: UIStrings.Onboarding.label(for: style), detail: UIStrings.Onboarding.detail(for: style),
+                OptionCard(title: UIStrings.Onboarding.label(for: style), detail: nil,
                            recommended: style == ModeSwitchStyle.recommended, selected: model.modeSwitchStyle == style) {
                     model.modeSwitchStyle = style
                 }
@@ -109,8 +115,7 @@ struct OnboardingView: View {
     private var appModes: some View {
         VStack(spacing: Size.cardGap) {
             ForEach([AppProfile.imeOff, .imeOn, .remembersMode], id: \.self) { profile in
-                InfoCard(mark: Self.mark(for: profile), title: UIStrings.Settings.label(for: profile),
-                         detail: UIStrings.Onboarding.appModeDetail(for: profile))
+                InfoCard(mark: Self.mark(for: profile), title: UIStrings.Settings.label(for: profile))
             }
         }
     }
@@ -163,7 +168,6 @@ struct OnboardingView: View {
             }
             SecondsSlider(title: UIStrings.Onboarding.liveDelay, value: model.binding(\.liveConversionDelay),
                           range: DefaultSettings.liveConversionDelayRange)
-                .padding(.top, Size.cardGap / 2)
                 .disabled(!model.draft.liveConversion)
         }
     }
@@ -185,7 +189,6 @@ struct OnboardingView: View {
                 .labelsHidden()
                 .fixedSize()
             }
-            .padding(.top, Size.cardGap / 2)
         }
     }
 
@@ -214,10 +217,6 @@ struct OnboardingView: View {
                     model.spotlight = item
                 }
             }
-            Label(UIStrings.Onboarding.spotlightHint, systemImage: "cursorarrow.rays")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, Size.cardGap / 2)
         }
     }
 
@@ -267,8 +266,8 @@ private struct OptionCard: View {
                 Image(systemName: selected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
                     .foregroundStyle(selected ? Color.accentColor : Color.secondary)
-                VStack(alignment: .leading, spacing: Size.cardGap / 3) {
-                    HStack(spacing: Size.cardGap / 2) {
+                VStack(alignment: .leading, spacing: Space.stack) {
+                    HStack(spacing: Space.inline) {
                         Text(title).font(.headline)
                         if recommended { RecommendedBadge() }
                     }
@@ -301,8 +300,8 @@ private struct RecommendedBadge: View {
         Text(UIStrings.Onboarding.recommended)
             .font(.caption2.weight(.bold))
             .foregroundStyle(.white)
-            .padding(.horizontal, Size.cardPadding / 2)
-            .padding(.vertical, Size.dotGap / 3)
+            .padding(.horizontal, Part.tagPaddingX)
+            .padding(.vertical, Part.tagPaddingY)
             .background(RoundedRectangle(cornerRadius: Size.badgeRadius, style: .continuous).fill(Color.accentColor))
     }
 }
@@ -320,24 +319,24 @@ private struct ThemeTile: View {
     var body: some View {
         let theme = ResolvedTheme.resolve(preference, appearance: NSAppearance(named: colorScheme == .dark ? .darkAqua : .aqua))
         Button(action: action) {
-            VStack(alignment: .leading, spacing: Size.cardGap / 2) {
+            VStack(alignment: .leading, spacing: Space.stack) {
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: Size.cardRadius / 2, style: .continuous).fill(Color(nsColor: theme.surface))
                     VStack(alignment: .leading, spacing: Size.dotGap) {
-                        Capsule().fill(Color(nsColor: theme.selection)).frame(width: Size.cardPadding * 4, height: Size.dotSize * 1.6)
-                        Capsule().fill(Color(nsColor: theme.text).opacity(0.7)).frame(width: Size.cardPadding * 3, height: Size.dotSize / 1.5)
-                        Capsule().fill(Color(nsColor: theme.correction)).frame(width: Size.cardPadding * 2, height: Size.dotSize / 2)
+                        Capsule().fill(Color(nsColor: theme.selection)).frame(width: Size.themeSampleWidth, height: Size.dotSize * 1.6)
+                        Capsule().fill(Color(nsColor: theme.text).opacity(0.7)).frame(width: Size.themeSampleWidth * 0.75, height: Size.dotSize / 1.5)
+                        Capsule().fill(Color(nsColor: theme.correction)).frame(width: Size.themeSampleWidth * 0.5, height: Size.dotSize / 2)
                     }
-                    .padding(Size.cardPadding / 1.5)
+                    .padding(Space.group)
                 }
                 .frame(height: Size.fieldHeight * 1.3)
                 .overlay(RoundedRectangle(cornerRadius: Size.cardRadius / 2, style: .continuous).strokeBorder(Color(nsColor: theme.frame).opacity(0.6), lineWidth: 1))
-                HStack(spacing: Size.cardGap / 2) {
+                HStack(spacing: Space.inline) {
                     Text(UIStrings.Choice.label(for: preference)).font(.callout.weight(.medium))
                     if preference == .automatic { RecommendedBadge() }
                 }
             }
-            .padding(Size.cardPadding / 1.5)
+            .padding(Size.cardPadding)
             .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
                 .fill(selected ? Color.accentColor.opacity(Opacity.cardSelected) : Color.primary.opacity(Opacity.cardIdle)))
             .overlay(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
@@ -369,22 +368,21 @@ private struct CharacterRow<Value: Hashable & CaseIterable>: View where Value.Al
             .fixedSize()
         }
         .padding(.horizontal, Size.cardPadding)
-        .padding(.vertical, Size.cardPadding / 2)
+        .padding(.vertical, Space.group)
         .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous).fill(Color.primary.opacity(Opacity.cardIdle)))
     }
 }
 
-/// 説明だけのカード．入力モードの札と名前と説明を並べる
+/// 紹介だけのカード．入力モードの札と名前を並べる(どう動くかは左の舞台の実演で見せる)
 private struct InfoCard: View {
     private typealias Size = DesignTokens.Size.Onboarding
     private typealias Opacity = DesignTokens.Opacity.Onboarding
 
     let mark: String
     let title: String
-    let detail: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: Size.cardGap) {
+        HStack(spacing: Size.cardGap) {
             Text(mark)
                 .font(.callout.weight(.semibold))
                 .foregroundStyle(Color.accentColor)
@@ -394,10 +392,7 @@ private struct InfoCard: View {
                 .frame(width: Size.infoSymbolWidth * 2, height: Size.infoSymbolWidth)
                 .overlay(RoundedRectangle(cornerRadius: Size.cardRadius / 2, style: .continuous).stroke(Color.accentColor, lineWidth: 1.5))
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Size.cardGap / 3) {
-                Text(title).font(.headline)
-                Text(detail).font(.callout).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-            }
+            Text(title).font(.headline)
             Spacer(minLength: 0)
         }
         .padding(Size.cardPadding)
@@ -428,7 +423,7 @@ private struct SpotlightRow: View {
             Toggle(item.title, isOn: isOn).labelsHidden().toggleStyle(.switch)
         }
         .padding(.horizontal, Size.cardPadding)
-        .padding(.vertical, Size.cardPadding * 0.7)
+        .padding(.vertical, Space.group)
         .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
             .fill(highlighted ? Color.accentColor.opacity(Opacity.cardSelected) : Color.primary.opacity(Opacity.cardIdle)))
         .overlay(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
@@ -457,7 +452,7 @@ private struct SpotlightCaption: View {
                 .background(Circle().fill(Color.accentColor))
                 .symbolEffect(.bounce, value: spotlight)
                 .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: Size.cardGap / 3) {
+            VStack(alignment: .leading, spacing: Space.stack) {
                 Text(spotlight.title).font(.headline)
                 Text(spotlight.detail)
                     .font(.callout)

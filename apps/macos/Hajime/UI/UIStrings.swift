@@ -632,38 +632,22 @@ enum UIStrings {
 
         // a. 英数とかなの切り替え
         static let modeTitle = "英数とかなの切り替え"
-        static let modeDetail = "日本語と英数を切り替えるキーを選びます。"
         static func label(for style: ModeSwitchStyle) -> String {
             switch style {
             case .separate: "英数キーとかなキーで分ける"
             case .single: "1 つのキーで切り替え"
             }
         }
-        static func detail(for style: ModeSwitchStyle) -> String {
-            switch style {
-            case .separate: "英数キーで英数、かなキーで日本語になります。"
-            case .single: "英数キーとかなキーのどちらでも、押すたびに切り替わります。"
-            }
-        }
 
         // アプリごとの入力モード
         static let appModesTitle = "アプリごとの入力モード"
-        static let appModesDetail = "アプリを切り替えたときに、IME をオンにするかオフにするかをアプリごとに決められます。除外設定でアプリを追加して選びます。"
-        static func appModeDetail(for profile: AppProfile) -> String {
-            switch profile {
-            case .imeOff: "そのアプリに切り替えるたびに英数にします。あとから日本語入力にも切り替えられます。"
-            case .imeOn: "そのアプリに切り替えるたびに日本語入力にします。"
-            case .remembersMode: "そのアプリで最後に使った入力モードに戻します。"
-            case .standard, .programming, .terminal, .direct: ""
-            }
-        }
+        static let appModesDetail = "除外設定でアプリを追加して選びます。"
         /// 実演でアプリを切り替えるときに出す名前
         static let demoNotes = "メモ"
         static let demoTerminal = "ターミナル"
 
         // b. 自動補正
         static let correctionTitle = "自動補正"
-        static let correctionDetail = "打ち間違いを、文の流れから見つけて直します。直したところには点線が付き、Esc で打ったままに戻せます。"
         static let correctionOff = "直さない"
         static func detail(for sensitivity: CorrectionSensitivity) -> String {
             switch sensitivity {
@@ -675,21 +659,19 @@ enum UIStrings {
 
         // c. 外観
         static let themeTitle = "外観"
-        static let themeDetail = "候補ウィンドウの見た目を選びます。あとから設定の画面で、色や書体を自由に変えられます。"
+        static let themeDetail = "色や書体は、あとから設定の画面で変えられます。"
 
         // d. ライブ変換
         static let liveTitle = "ライブ変換"
-        static let liveDetail = "打ちながら漢字に変換して見せます。Space を押さずに、そのまま Enter で確定できます。"
         static let liveOn = "ライブ変換を使う"
         static let liveOff = "使わない"
         static let liveDelay = "漢字にするまでの時間"
 
         // e. 候補の出し方
         static let presentationTitle = "候補の出し方"
-        static let presentationDetail = "Space を押したときの候補の並べ方と、最初に選ぶ文節を選びます。"
         static func detail(for presentation: CandidatePresentation) -> String {
             switch presentation {
-            case .automatic: "文節ごとに候補が枝分かれします。文全体を見渡しながら、直したい文節だけを選び直せます。"
+            case .automatic: "文節ごとに候補を枝分かれさせます。"
             case .segmentList: "選んでいる文節の候補を縦に並べます。"
             case .list: "文全体の候補を縦に並べます。"
             }
@@ -698,13 +680,11 @@ enum UIStrings {
 
         // f. 入力する文字
         static let charactersTitle = "入力する文字"
-        static let charactersDetail = "句読点や括弧など、キーを押したときに入る文字を選びます。"
 
         // g. 機能の紹介
         static let featuresTitle = "便利な機能"
-        static let featuresDetail = "変換の候補に、関連する語や計算の結果などを出します。"
         static let extrasTitle = "試験的な機能"
-        static let extrasDetail = "既定ではオフの機能です。あとから設定の画面でも変えられます。"
+        static let extrasDetail = "既定ではオフの機能です。"
         static let macros = "変換マクロ"
         static let macrosDetail = "連想変換と同じ Shift + Space で、選んでいる語を「」で囲む・ルビを付けるなどした形を出します。"
         static let dynamicDictionary = "動的なユーザー辞書"
@@ -712,7 +692,6 @@ enum UIStrings {
         static let commands = "コマンド"
         static let commandsDetail = "読みでアプリや Web ページを開きます。候補から選んだときだけ動きます。設定の「コマンド」で登録します。"
         static let commandsExample = "Claude を開く"
-        static let spotlightHint = "項目にポインタを置くと、左に使い方を出します。"
         static let association = "連想変換"
         static let associationDetail = "Shift + Space で、似た意味の語を出します。"
         static let calculation = "計算"

@@ -1024,32 +1024,23 @@ pub mod wizard {
     }
 
     pub const MODE_TITLE: &str = "英数とかなの切り替え";
-    pub const MODE_DETAIL: &str = "日本語と英数を切り替えるキーを選びます。";
     pub const APP_MODES_TITLE: &str = "アプリごとの入力モード";
-    pub const APP_MODES_DETAIL: &str = "アプリを切り替えたときに、IME をオンにするかオフにするかをアプリごとに決められます。除外設定でアプリを追加して選びます。";
+    pub const APP_MODES_DETAIL: &str = "除外設定でアプリを追加して選びます。";
     pub const DEMO_TERMINAL: &str = "ターミナル";
     pub const CORRECTION_TITLE: &str = "自動補正";
-    pub const CORRECTION_DETAIL: &str = "打ち間違いを、文の流れから見つけて直します。直したところには点線が付き、Esc で打ったままに戻せます。";
     pub const CORRECTION_OFF: &str = "直さない";
     pub const THEME_TITLE: &str = "外観";
-    pub const THEME_DETAIL: &str =
-        "候補ウィンドウの見た目を選びます。あとから設定の画面で、色や書体を自由に変えられます。";
+    pub const THEME_DETAIL: &str = "色や書体は、あとから設定の画面で変えられます。";
     pub const LIVE_TITLE: &str = "ライブ変換";
-    pub const LIVE_DETAIL: &str =
-        "打ちながら漢字に変換して見せます。Space を押さずに、そのまま Enter で確定できます。";
     pub const LIVE_ON: &str = "ライブ変換を使う";
     pub const LIVE_OFF: &str = "使わない";
     pub const LIVE_DELAY: &str = "漢字にするまでの時間";
     pub const PRESENTATION_TITLE: &str = "候補の出し方";
-    pub const PRESENTATION_DETAIL: &str =
-        "Space を押したときの候補の並べ方と、最初に選ぶ文節を選びます。";
     pub const INITIAL_FOCUS: &str = "最初に選ぶ文節";
     pub const CHARACTERS_TITLE: &str = "入力する文字";
-    pub const CHARACTERS_DETAIL: &str = "句読点や括弧など、キーを押したときに入る文字を選びます。";
     pub const FEATURES_TITLE: &str = "便利な機能";
-    pub const FEATURES_DETAIL: &str = "変換の候補に、関連する語や計算の結果などを出します。";
     pub const EXTRAS_TITLE: &str = "試験的な機能";
-    pub const EXTRAS_DETAIL: &str = "既定ではオフの機能です。あとから設定の画面でも変えられます。";
+    pub const EXTRAS_DETAIL: &str = "既定ではオフの機能です。";
     pub const MACROS: &str = "変換マクロ";
     pub const MACROS_DETAIL: &str =
         "連想変換と同じ Shift + Space で、選んでいる語を「」で囲む・ルビを付けるなどした形を出します。";
@@ -1059,7 +1050,6 @@ pub mod wizard {
     pub const COMMANDS: &str = "コマンド";
     pub const COMMANDS_DETAIL: &str = "読みでアプリや Web ページを開きます。候補から選んだときだけ動きます。設定の「コマンド」で登録します。";
     pub const COMMANDS_EXAMPLE: &str = "Claude を開く";
-    pub const SPOTLIGHT_HINT: &str = "項目にポインタを置くと、左に使い方を出します。";
     pub const ASSOCIATION: &str = "連想変換";
     pub const ASSOCIATION_DETAIL: &str = "Shift + Space で、似た意味の語を出します。";
     pub const CALCULATION: &str = "計算";
@@ -1075,17 +1065,7 @@ pub mod wizard {
 pub mod windows_wizard {
     /// 英数とかなの切り替え(macOS の ModeSwitchStyle．分けるのが推奨)
     pub const MODE_SEPARATE: &str = "無変換キーと変換キーで分ける";
-    pub const MODE_SEPARATE_DETAIL: &str =
-        "無変換キーで英数、変換キーで日本語になります。半角/全角キーでも切り替えられます。";
     pub const MODE_SINGLE: &str = "半角/全角キーで切り替え";
-    pub const MODE_SINGLE_DETAIL: &str =
-        "半角/全角キーを押すたびに、日本語と英数が切り替わります。";
-
-    /// アプリごとの入力モードの説明(macOS の UIStrings.Onboarding.appModeDetail(for:))
-    pub const APP_MODE_OFF_DETAIL: &str =
-        "そのアプリに切り替えるたびに英数にします。あとから日本語入力にも切り替えられます。";
-    pub const APP_MODE_ON_DETAIL: &str = "そのアプリに切り替えるたびに日本語入力にします。";
-    pub const APP_MODE_REMEMBERS_DETAIL: &str = "そのアプリで最後に使った入力モードに戻します。";
 
     /// 補正の強さの説明(macOS の UIStrings.Onboarding.detail(for: CorrectionSensitivity))
     pub const CORRECTION_CAUTIOUS_DETAIL: &str =
@@ -1094,8 +1074,7 @@ pub mod windows_wizard {
     pub const CORRECTION_AGGRESSIVE_DETAIL: &str = "少しでも打ち間違いらしければ直します。";
 
     /// 候補の出し方の説明(macOS の UIStrings.Onboarding.detail(for: CandidatePresentation))
-    pub const PRESENTATION_AUTOMATIC_DETAIL: &str =
-        "文節ごとに候補が枝分かれします。文全体を見渡しながら、直したい文節だけを選び直せます。";
+    pub const PRESENTATION_AUTOMATIC_DETAIL: &str = "文節ごとに候補を枝分かれさせます。";
     pub const PRESENTATION_SEGMENT_LIST_DETAIL: &str = "選んでいる文節の候補を縦に並べます。";
     pub const PRESENTATION_LIST_DETAIL: &str = "文全体の候補を縦に並べます。";
 

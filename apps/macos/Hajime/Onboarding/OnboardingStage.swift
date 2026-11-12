@@ -139,7 +139,7 @@ final class DemoStageView: NSView {
 
     private var fieldRect: NSRect {
         // タイトルバーの下から，舞台の上 1/4 ほどに置く(下に候補の窓を広げる場所を空ける)
-        NSRect(x: Size.stagePadding, y: Size.stagePadding * 4, width: bounds.width - Size.stagePadding * 2, height: Size.fieldHeight)
+        NSRect(x: Size.stagePadding, y: Size.fieldTop, width: bounds.width - Size.stagePadding * 2, height: Size.fieldHeight)
     }
 
     private var textAttributes: [NSAttributedString.Key: Any] {
@@ -164,7 +164,7 @@ final class DemoStageView: NSView {
         let x = min(max(positions.markedStart - Size.cardPadding, Size.stagePadding), bounds.width - Size.stagePadding - size.width)
         panelHost.frame = NSRect(x: x.rounded(), y: top, width: size.width, height: size.height)
         let modeSize = mode.fittingSize
-        mode.frame = NSRect(x: min(positions.end + Size.demoGap / 2, bounds.width - Size.stagePadding - modeSize.width).rounded(),
+        mode.frame = NSRect(x: min(positions.end + DesignTokens.Size.Space.group, bounds.width - Size.stagePadding - modeSize.width).rounded(),
                             y: top, width: modeSize.width, height: modeSize.height)
     }
 
@@ -222,12 +222,14 @@ final class DemoStageView: NSView {
         let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Size.applicationTabFontSize, weight: .semibold),
                                                          .foregroundColor: NSColor.secondaryLabelColor]
         let text = name.size(withAttributes: attributes)
-        let tab = NSRect(x: field.minX, y: field.minY - Size.demoGap / 2 - text.height - Size.cardGap / 2,
-                         width: text.width + Size.cardGap * 2, height: text.height + Size.cardGap / 2)
+        // 札の形(1 行の欄の左右の余白，札の上下の余白)にし，入力欄の上に stack だけ離して置く
+        let height = text.height + DesignTokens.Size.Part.tagPaddingY * 2
+        let tab = NSRect(x: field.minX, y: field.minY - DesignTokens.Size.Space.stack - height,
+                         width: text.width + DesignTokens.Size.Part.fieldPaddingX * 2, height: height)
         let path = NSBezierPath(roundedRect: tab, xRadius: tab.height / 2, yRadius: tab.height / 2)
         NSColor.controlAccentColor.withAlphaComponent(DesignTokens.Opacity.Onboarding.cardSelected).setFill()
         path.fill()
-        name.draw(at: NSPoint(x: tab.minX + Size.cardGap, y: tab.minY + Size.cardGap / 4), withAttributes: attributes)
+        name.draw(at: NSPoint(x: tab.minX + DesignTokens.Size.Part.fieldPaddingX, y: tab.minY + DesignTokens.Size.Part.tagPaddingY), withAttributes: attributes)
     }
 }
 

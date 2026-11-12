@@ -30,6 +30,7 @@ use tokens::motion::settings_windows as motion;
 use tokens::opacity::onboarding as shade;
 use tokens::size::onboarding as board;
 use tokens::size::settings_windows as size;
+use tokens::size::{part, space};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
 use windows::Win32::UI::Controls::WM_MOUSELEAVE;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
@@ -82,8 +83,8 @@ const CHECK: f32 = board::CHECK_SIZE;
 const BADGE_HEIGHT: f32 = board::BADGE_HEIGHT;
 /// テーマのカードの見本の高さ(macOS の fieldHeight × 1.3)
 const SWATCH_HEIGHT: f32 = board::FIELD_HEIGHT * 1.3;
-/// 機能の行の上下の余白(macOS の cardPadding × 0.7)
-const SPOT_PADDING_Y: f32 = board::CARD_PADDING * 0.7;
+/// 機能の行の上下の余白(macOS と同じ)
+const SPOT_PADDING_Y: f32 = space::GROUP;
 /// スライダーのつまみの大きさ
 const THUMB: f32 = board::SLIDER_THUMB;
 /// 足元のボタンの最小の幅
@@ -171,8 +172,6 @@ enum PartKind {
         spot: Spot,
         switch: Rect,
     },
-    /// 項目にポインターを置くと実演を出す案内
-    Hint,
     /// タスクバーから設定を開ける案内(最後のページ)
     TaskbarNote,
 }
@@ -453,8 +452,7 @@ fn spot_glyph(path: &str) -> &'static str {
         _ => "\u{E946}",
     }
 }
-/// 案内の行のアイコン(ポインター・情報)
-const POINTER_GLYPH: &str = "\u{E7C9}";
+/// 案内の行のアイコン(情報)
 const INFO_GLYPH: &str = "\u{E946}";
 
 fn mode_label(mode: Mode) -> &'static str {
@@ -494,7 +492,7 @@ fn stage_rect(height: f32) -> Rect {
 fn field_rect() -> Rect {
     Rect::new(
         board::STAGE_PADDING,
-        board::STAGE_PADDING * 4.0,
+        board::FIELD_TOP,
         board::STAGE_WIDTH - board::STAGE_PADDING * 2.0,
         board::FIELD_HEIGHT,
     )
@@ -858,7 +856,8 @@ impl Wizard {
             .fold(0.0, f32::max);
         let width = control
             .width
-            .max(widest + size::FIELD_PADDING_X * 2.0 + size::FLYOUT_PADDING * 2.0 + 8.0);
+            // 項目の左の選んでいる印の分(group)も空ける
+            .max(widest + size::FIELD_PADDING_X * 2.0 + size::FLYOUT_PADDING * 2.0 + space::GROUP);
         let height =
             picker.choices.len() as f32 * size::FLYOUT_ITEM_HEIGHT + size::FLYOUT_PADDING * 2.0;
         let (_, window_height) = self.size();
@@ -943,11 +942,14 @@ impl Wizard {
         let gap = board::CARD_GAP;
         let mut y = board::PADDING;
         let counter = Rect::new(x, y, width, COUNTER_HEIGHT);
-        y += COUNTER_HEIGHT + gap / 2.0;
+        y += COUNTER_HEIGHT + space::STACK;
         let title_height = measure.wrapped_height(step.title(), TextStyle::Title, width);
         let title = Rect::new(x, y, width, title_height);
-        y += title_height + gap / 2.0;
-        let detail_height = measure.wrapped_height(step.detail(), TextStyle::Body, width);
+        y += title_height + space::STACK;
+        // 添える 1 行の無いページは，見出しのすぐ下から選ぶものを並べる
+        let detail_height = step.detail().map_or(0.0, |detail| {
+            measure.wrapped_height(detail, TextStyle::Body, width)
+        });
         let detail = Rect::new(x, y, width, detail_height);
         y += detail_height + gap;
         let footer = height - board::PADDING - size::CONTROL_HEIGHT;
@@ -969,9 +971,10 @@ impl Wizard {
         let gap = board::CARD_GAP;
         let padding = board::CARD_PADDING;
         let mut parts = Vec::new();
-        let mut y = gap / 2.0;
+        // カードの縁の線がスクロールの端で切れないように空ける(macOS と同じ)
+        let mut y = space::INSET;
         let detail_height = |detail: &str, inner: f32| {
-            gap / 3.0 + measure.wrapped_height(detail, TextStyle::Caption, inner)
+            space::STACK + measure.wrapped_height(detail, TextStyle::Caption, inner)
         };
         for (item_index, item) in step.items().into_iter().enumerate() {
             if item_index > 0 {
@@ -1002,12 +1005,11 @@ impl Wizard {
                     }
                 }
                 Item::Info(infos) => {
-                    let inner = width - padding * 2.0 - board::INFO_SYMBOL_WIDTH * 2.0 - gap;
                     for (index, info) in infos.iter().enumerate() {
                         if index > 0 {
                             y += gap;
                         }
-                        let height = padding * 2.0 + LINE + detail_height(info.detail, inner);
+                        let height = padding * 2.0 + LINE.max(board::INFO_SYMBOL_WIDTH);
                         parts.push(Part {
                             kind: PartKind::Info(index, *info),
                             rect: Rect::new(0.0, y, width, height),
@@ -1018,7 +1020,7 @@ impl Wizard {
                 Item::Themes => {
                     let columns = 3;
                     let tile_width = (width - gap * (columns - 1) as f32) / columns as f32;
-                    let tile_height = padding / 1.5 * 2.0 + SWATCH_HEIGHT + gap / 2.0 + LINE;
+                    let tile_height = padding * 2.0 + SWATCH_HEIGHT + space::STACK + LINE;
                     for index in 0..wizard::THEME_ORDER.len() {
                         parts.push(Part {
                             kind: PartKind::Theme(index),
@@ -1034,9 +1036,8 @@ impl Wizard {
                     y += rows as f32 * tile_height + (rows - 1) as f32 * gap;
                 }
                 Item::Seconds { title, field } => {
-                    y += gap / 2.0;
                     let label = measure.width(title, TextStyle::Body);
-                    let track_x = label + gap * 1.5;
+                    let track_x = label + space::GROUP;
                     let track = Rect::new(
                         track_x,
                         y,
@@ -1062,12 +1063,18 @@ impl Wizard {
                             measure.width(&menu_label(&picker, value, label), TextStyle::Body)
                         })
                         .fold(0.0, f32::max);
-                    let control_width =
-                        (widest + size::FIELD_PADDING_X * 3.0 + size::CHEVRON_SIZE + 4.0).ceil();
+                    // ドロップダウンの並び(左の余白・名前・名前と印のあいだ・山形の印・右の余白)に，
+                    // 測った幅と描いた幅の差の見込み(inset)を足す
+                    let control_width = (size::FIELD_PADDING_X
+                        + widest
+                        + size::FIELD_PADDING_X
+                        + size::CHEVRON_SIZE
+                        + size::FIELD_PADDING_X
+                        + space::INSET)
+                        .ceil();
                     let (height, inset) = if picker.framed {
                         (size::CONTROL_HEIGHT + padding, padding)
                     } else {
-                        y += gap / 2.0;
                         (size::CONTROL_HEIGHT, 0.0)
                     };
                     let control = Rect::new(
@@ -1108,18 +1115,9 @@ impl Wizard {
                         });
                         y += height;
                     }
-                    y += gap + gap / 2.0;
-                    let inner = width - size::CHEVRON_SIZE - gap / 2.0;
-                    let hint = measure
-                        .wrapped_height(text::SPOTLIGHT_HINT, TextStyle::Caption, inner)
-                        .max(size::NOTE_LINE_HEIGHT);
-                    parts.push(Part {
-                        kind: PartKind::Hint,
-                        rect: Rect::new(0.0, y, width, hint),
-                    });
-                    y += hint;
                     if step.is_last() {
-                        y += gap / 2.0;
+                        y += gap;
+                        let inner = width - size::CHEVRON_SIZE - space::INLINE;
                         let note = measure
                             .wrapped_height(notes::TASKBAR_NOTE, TextStyle::Caption, inner)
                             .max(size::NOTE_LINE_HEIGHT);
@@ -1132,7 +1130,7 @@ impl Wizard {
                 }
             }
         }
-        (parts, y + gap / 2.0)
+        (parts, y + space::INSET)
     }
 
     /// 足元のボタンの置き場所(見えるものだけ)
@@ -1236,7 +1234,7 @@ impl Wizard {
                         Target::Spot(index)
                     })
                 }
-                PartKind::Info(..) | PartKind::Hint | PartKind::TaskbarNote => None,
+                PartKind::Info(..) | PartKind::TaskbarNote => None,
             };
         }
         None
@@ -1331,7 +1329,7 @@ impl Wizard {
         if let Some(label) = mode {
             let shown = Shown::Mode(label);
             let (width, height) = preview.size(&theme, font_size, shown).ok()?;
-            let x = (end + board::DEMO_GAP / 2.0).min(board::STAGE_WIDTH - padding - width);
+            let x = (end + space::GROUP).min(board::STAGE_WIDTH - padding - width);
             layers.push((
                 shown,
                 Rect::new(x.round(), top, width.ceil(), height.ceil()),
@@ -1991,7 +1989,7 @@ impl Wizard {
                     PartKind::Info(index, info) => nodes.push(node(
                         NODE_INFO + index as i32,
                         uia::Role::Document,
-                        format!("{} {}", info.title, info.detail),
+                        info.title.to_string(),
                         &rect,
                     )),
                     PartKind::Theme(index) => {
@@ -2049,7 +2047,7 @@ impl Wizard {
                             &rect,
                         )
                     }),
-                    PartKind::Hint | PartKind::TaskbarNote => {}
+                    PartKind::TaskbarNote => {}
                 }
             }
         }
@@ -2210,7 +2208,8 @@ fn paint_window(canvas: &mut dyn Canvas, state: &PaintState) {
         Rect::new(
             state.layout.viewport.x,
             state.layout.viewport.y,
-            state.layout.viewport.width + board::PADDING / 2.0,
+            // 中身から group だけ右に離し，ページの余白の中に置く
+            state.layout.viewport.width + space::GROUP,
             state.layout.viewport.height,
         ),
         &wizard.scroll,
@@ -2306,11 +2305,12 @@ fn paint_stage_frame(
     if let Some(application) = frame.and_then(|frame| frame.application) {
         // 入力欄の上に，入力先のアプリの名前を窓の見出しのように出す
         let label = canvas.width(application, TextStyle::NavHeader);
-        let tab_height = size::NOTE_LINE_HEIGHT + board::CARD_GAP / 2.0;
+        // 札の形(1 行の欄の左右の余白，札の上下の余白)にし，入力欄の上に stack だけ離して置く(macOS と同じ)
+        let tab_height = size::NOTE_LINE_HEIGHT + part::TAG_PADDING_Y * 2.0;
         let tab = Rect::new(
             field.x,
-            field.y - board::DEMO_GAP / 2.0 - tab_height,
-            label + board::CARD_GAP * 2.0,
+            field.y - space::STACK - tab_height,
+            label + part::FIELD_PADDING_X * 2.0,
             tab_height,
         );
         canvas.fill_round(
@@ -2352,7 +2352,8 @@ fn paint_stage_frame(
     if let Some(frame) = frame {
         let committed = canvas.width(&frame.committed, TextStyle::Demo);
         canvas.text(
-            Rect::new(x, line_top, committed + 2.0, line),
+            // 最後の字が切れないように fine だけ広く測る
+            Rect::new(x, line_top, committed + space::FINE, line),
             &frame.committed,
             TextStyle::Demo,
             Color::from(palette.text),
@@ -2363,7 +2364,7 @@ fn paint_stage_frame(
         for segment in &frame.marked {
             let width = canvas.width(&segment.text, TextStyle::Demo);
             canvas.text(
-                Rect::new(x, line_top, width + 2.0, line),
+                Rect::new(x, line_top, width + space::FINE, line),
                 &segment.text,
                 TextStyle::Demo,
                 Color::from(palette.text),
@@ -2391,7 +2392,7 @@ fn paint_stage_frame(
                     }
                 }
             }
-            x += width + 2.0;
+            x += width + space::FINE;
         }
     }
     // 入力位置
@@ -2463,7 +2464,7 @@ fn paint_caption(
     let width = board::STAGE_WIDTH - board::STAGE_PADDING * 2.0;
     let text_width = width - padding * 2.0 - icon - gap;
     let detail = canvas.wrapped_height(spot.detail, TextStyle::Body, text_width);
-    let card_height = (LINE + gap / 3.0 + detail).max(icon) + padding * 2.0;
+    let card_height = (LINE + space::STACK + detail).max(icon) + padding * 2.0;
     let card = Rect::new(
         board::STAGE_PADDING,
         height - board::STAGE_PADDING - card_height + lift,
@@ -2510,9 +2511,9 @@ fn paint_caption(
     canvas.text(
         Rect::new(
             text_x,
-            card.y + padding + LINE + gap / 3.0,
+            card.y + padding + LINE + space::STACK,
             text_width,
-            detail + 2.0,
+            detail + space::FINE,
         ),
         spot.detail,
         TextStyle::Body,
@@ -2551,13 +2552,15 @@ fn paint_page(
         Color::from(palette.text),
         TextLayout::WRAP,
     );
-    canvas.text(
-        layout.detail,
-        step.detail(),
-        TextStyle::Body,
-        Color::from(palette.text_secondary),
-        TextLayout::WRAP,
-    );
+    if let Some(detail) = step.detail() {
+        canvas.text(
+            layout.detail,
+            detail,
+            TextStyle::Body,
+            Color::from(palette.text_secondary),
+            TextLayout::WRAP,
+        );
+    }
     canvas.push_clip(layout.viewport);
     if !wizard.ready() {
         let y = layout.viewport.y + board::CARD_GAP;
@@ -2641,7 +2644,6 @@ fn paint_page(
                 index,
                 spot,
             ),
-            PartKind::Hint => paint_note(canvas, theme, rect, POINTER_GLYPH, text::SPOTLIGHT_HINT),
             PartKind::TaskbarNote => {
                 paint_note(canvas, theme, rect, INFO_GLYPH, notes::TASKBAR_NOTE)
             }
@@ -2736,10 +2738,10 @@ fn card_text(
     );
     if recommended {
         let title_width = canvas.width(title, TextStyle::Section);
-        badge(canvas, theme, x + title_width + board::CARD_GAP / 2.0, line);
+        badge(canvas, theme, x + title_width + space::INLINE, line);
     }
     if let Some(detail) = detail {
-        let top = line.max_y() + board::CARD_GAP / 3.0;
+        let top = line.max_y() + space::STACK;
         canvas.text(
             Rect::new(x, top, width, rect.max_y() - top),
             detail,
@@ -2817,7 +2819,7 @@ fn paint_info(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, info: Info) 
     card_ground(canvas, theme, rect, false, 0.0, false);
     let mark = Rect::new(
         rect.x + board::CARD_PADDING,
-        rect.y + board::CARD_PADDING + (LINE - board::INFO_SYMBOL_WIDTH) / 2.0,
+        rect.y + (rect.height - board::INFO_SYMBOL_WIDTH) / 2.0,
         board::INFO_SYMBOL_WIDTH * 2.0,
         board::INFO_SYMBOL_WIDTH,
     );
@@ -2834,14 +2836,19 @@ fn paint_info(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, info: Info) 
         Color::from(palette.accent),
         TextLayout::CENTER,
     );
-    card_text(
-        canvas,
-        theme,
-        mark.max_x() + board::CARD_GAP,
-        rect,
+    // 名前は札と同じく縦の真ん中に置く(macOS の InfoCard)
+    let x = mark.max_x() + board::CARD_GAP;
+    canvas.text(
+        Rect::new(
+            x,
+            rect.y,
+            rect.max_x() - board::CARD_PADDING - x,
+            rect.height,
+        ),
         info.title,
-        Some(info.detail),
-        false,
+        TextStyle::Section,
+        Color::from(palette.text),
+        TextLayout::LINE,
     );
 }
 
@@ -2868,7 +2875,7 @@ fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look
         backdrop: false,
     };
     let colors = candidate_ui::theme::ResolvedTheme::resolve(name, None, &systems);
-    let inset = board::CARD_PADDING / 1.5;
+    let inset = board::CARD_PADDING;
     let swatch = Rect::new(
         rect.x + inset,
         rect.y + inset,
@@ -2880,17 +2887,17 @@ fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look
     let dot = board::DOT_SIZE;
     let bars = [
         (
-            board::CARD_PADDING * 4.0,
+            board::THEME_SAMPLE_WIDTH,
             dot * 1.6,
             ui_color(colors.selection),
         ),
         (
-            board::CARD_PADDING * 3.0,
+            board::THEME_SAMPLE_WIDTH * 0.75,
             dot / 1.5,
             ui_color(colors.text).with_alpha(shade::SWATCH_TEXT),
         ),
         (
-            board::CARD_PADDING * 2.0,
+            board::THEME_SAMPLE_WIDTH * 0.5,
             dot / 2.0,
             ui_color(colors.correction),
         ),
@@ -2900,9 +2907,9 @@ fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look
     for (width, height, color) in bars {
         canvas.fill_round(
             Rect::new(
-                swatch.x + inset,
+                swatch.x + space::GROUP,
                 y,
-                width.min(swatch.width - inset * 2.0),
+                width.min(swatch.width - space::GROUP * 2.0),
                 height,
             ),
             height / 2.0,
@@ -2916,12 +2923,7 @@ fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look
         1.0,
         ui_color(colors.frame).with_alpha(shade::SWATCH_FRAME),
     );
-    let line = Rect::new(
-        swatch.x,
-        swatch.max_y() + board::CARD_GAP / 2.0,
-        swatch.width,
-        LINE,
-    );
+    let line = Rect::new(swatch.x, swatch.max_y() + space::STACK, swatch.width, LINE);
     let label = wizard::theme_label(name);
     canvas.text(
         line,
@@ -2932,7 +2934,7 @@ fn paint_theme(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, look: &Look
     );
     if index == 0 {
         let width = canvas.width(label, TextStyle::Body);
-        badge(canvas, theme, line.x + width + board::CARD_GAP / 2.0, line);
+        badge(canvas, theme, line.x + width + space::INLINE, line);
     }
     if look.current && wizard.focus_visible && wizard.focus == Focus::Themes && selected {
         paint::focus_ring(canvas, theme, rect, board::CARD_RADIUS);
@@ -3192,7 +3194,7 @@ fn paint_note(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, glyph: &str, n
         color,
         TextLayout::CENTER,
     );
-    let x = rect.x + size::CHEVRON_SIZE + board::CARD_GAP / 2.0;
+    let x = rect.x + size::CHEVRON_SIZE + space::INLINE;
     canvas.text(
         Rect::new(x, rect.y + 1.0, rect.max_x() - x, rect.height),
         note,
@@ -3361,7 +3363,12 @@ fn paint_menu(canvas: &mut dyn Canvas, state: &PaintState) {
             None
         };
         if let Some(fill) = fill {
-            let inner = Rect::new(row.x, row.y + 2.0, row.width, row.height - 4.0);
+            let inner = Rect::new(
+                row.x,
+                row.y + space::FINE,
+                row.width,
+                row.height - space::FINE * 2.0,
+            );
             canvas.fill_round(inner, size::CONTROL_RADIUS, Color::from(fill));
         }
         if selected {
