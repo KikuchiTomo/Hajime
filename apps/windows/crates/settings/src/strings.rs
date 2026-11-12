@@ -196,8 +196,10 @@ pub mod extras {
     pub const ENGLISH_TERM_PLACEHOLDER: &str = "書き方どおりの語（例: OpenAI）";
     pub const ENGLISH_TERMS_EMPTY: &str = "足した語はありません";
     pub const ENGLISH_TERMS_NOTE: &str = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。";
-    pub const DYNAMIC_DICTIONARY: &str = "単語の {datetime:…} などを入力時の値にする";
-    pub const DYNAMIC_DICTIONARY_NOTE: &str = "例: 読み「にちじ」、単語「{datetime:YYYY/MM/DD hh:mm:ss}」。ほかに {date}、{time}、{datetime+1d:MM/DD}、{uuid}、{random:1-6} を使えます。読みはローマ字（gh など）でも登録できます。";
+    pub const DYNAMIC_DICTIONARY: &str = "単語に書いた日付や時刻などを入力時の値にする";
+    pub const DYNAMIC_DICTIONARY_NOTE: &str = "登録する単語に次の書き方を入れておくと、変換したときにその時点の値に置き換えて入れます。単語のほかの文字はそのまま入ります。読みはローマ字（gh など）でも登録できます。";
+    pub const TEMPLATE_FILTERS: &str = "| のあとに付けられる名前: upper（大文字）、lower（小文字）、capitalize（先頭を大文字）、katakana（カタカナ）、hiragana（ひらがな）、halfwidth（半角カタカナ）、fullwidth（全角英数）。";
+    pub const DATE_FORMAT_SYMBOLS: &str = "日時の書式の記号: YYYY 年、MM 月、DD 日、hh 時（24 時間制）、KK 時（12 時間制）、A 午前・午後、mm 分、ss 秒、ddd 曜日（月）、dddd 曜日（月曜日）、GG 元号（令和）、E 元号の年。M・D・h・m・s のように 1 文字にすると、1 桁の数に 0 を付けません。' で囲んだ文字（'年' など）は記号として読まず、そのまま入れます。";
     pub const COMMANDS_PAGE: &str = "コマンド";
     pub const COMMANDS_SECTION: &str = "コマンド";
     pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
@@ -738,6 +740,19 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
+    /// 単語に書ける書き方(TextTemplate)と，入るもの・例．1 つずつ注記の行にする(macOS は表にして今の値を出す)
+    pub const TEMPLATE_ROWS: &[&str] = &[
+        "{date}　今日の日付（例: 2026/04/01）",
+        "{time}　今の時刻（例: 09:30）",
+        "{datetime:YYYY/MM/DD hh:mm:ss}　書式を決めた日時（例: 2026/04/01 09:30:15）",
+        "{datetime+1d:MM/DD}　日をずらした日付。-7d なら 7 日前（例: 04/02）",
+        "{uuid}　UUID。入れるたびに変わる",
+        "{random:1-6}　範囲の中の整数。入れるたびに変わる",
+        "{date|fullwidth}　| のあとの名前で変えた値（例: ２０２６／０４／０１）",
+        "{{ }}　「{」と「}」の文字そのもの",
+    ];
+    /// 単語に書ける書き方の登録の例(macOS は今の値を出す)
+    pub const TEMPLATE_EXAMPLE: &str = "例: 読み「dt」に単語「{datetime:YYYY-MM-DD hh:mm}」を登録すると、「dt」を変換したときに「2026-04-01 09:30」のような今の日時を入れます。";
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
     /// 絵文字と記号のパレットを開く既定のキー(macOS はキー設定の表から引いて出す)
