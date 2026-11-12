@@ -857,6 +857,7 @@ enum UIStrings {
         static let correctsEnglish = "英単語"
         static let correctsJapanese = "日本語のタイプミス"
         static let correctsRepeatedKeys = "同じキーの重なり"
+        static let correctionKindsNote = "使用できない項目は、変換の「タイプミスの修正」で有効にできます。"
         static let exceptions = "修正しない語句"
         static let exceptionPlaceholder = "英字か読み"
         static let rules = "置き換え"
