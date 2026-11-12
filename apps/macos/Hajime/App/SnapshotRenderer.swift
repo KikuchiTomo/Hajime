@@ -253,6 +253,22 @@ enum SnapshotRenderer {
             render(frame, name: "settings-dictionary-words", to: output, appearance: NSAppearance(named: .aqua))
         }
         dictionaryWindow.close()
+        // 下のほうに項目のあるページは，ページを下まで送った画像も写す(補正・英語と日本語・コマンド・除外・同期・情報)
+        for page in [SettingsView.Page.correction, .language, .commands, .apps, .sync, .about] {
+            let navigation = SettingsNavigation()
+            let window = SettingsWindowController.makeWindow(model: fixture.model, sync: fixture.sync, navigation: navigation)
+            navigation.page = page
+            window.orderFrontRegardless()
+            for _ in 0..<2 {
+                SettingsFixture.settle(window)
+                scrollPageToBottom(window)
+            }
+            SettingsFixture.settle(window)
+            if let frame = window.contentView?.superview {
+                render(frame, name: "settings-\(page)-bottom", to: output, appearance: NSAppearance(named: .aqua))
+            }
+            window.close()
+        }
         // 単語と変換マクロの書き方のチップ(R-21・R-22)．縦に長い窓でページを開き，欄・欄の下の結果・チップをまとめて写す．
         // 前に開いた窓の欄が単語の下書きを受け取らないよう，別の設定で開く
         let templateFixture = SettingsFixture.make(name: "templates")

@@ -1728,7 +1728,8 @@ const ROMAJI_FIELDS: &[Field] = &[
     Field::named("kana", settings::ROMAJI_KANA, false),
 ];
 const WORD_FIELDS: &[Field] = &[Field::text(features::WORD_PLACEHOLDER)];
-const ENGLISH_TERM_FIELDS: &[Field] = &[Field::text(extras::ENGLISH_TERM_PLACEHOLDER)];
+const ENGLISH_TERM_FIELDS: &[Field] =
+    &[Field::text(extras::ENGLISH_TERM_PLACEHOLDER).prompt(extras::ENGLISH_TERM_PROMPT)];
 const LANGUAGE_RULE_FIELDS: &[Field] = &[
     Field::named("word", features::LANGUAGE_RULE_WORD, true),
     // macOS の WordLanguagePage と同じく，新しい決まりは「前: 日本語 → 日本語」から始める
@@ -1767,28 +1768,28 @@ fn correction() -> Vec<Section> {
         Section::new(
             features::CORRECTION_KINDS,
             vec![
+                // 種類を選べるかは「タイプミスの修正」(変換のページと同じ設定)で決まるので，ここでも切り替えられるようにする
+                Row::choice(
+                    choice::TYPO_CORRECTION,
+                    "typoCorrection",
+                    options::TYPO_CORRECTION,
+                ),
                 Row::toggle(features::CORRECTS_ENGLISH, "correction.english")
                     .enabled_when(IsNot("typoCorrection", "off")),
                 Row::toggle(features::CORRECTS_JAPANESE, "correction.japanese")
                     .enabled_when(Is("typoCorrection", "standard")),
                 Row::toggle(features::CORRECTS_REPEATED_KEYS, "correction.repeatedKeys")
                     .enabled_when(CORRECTS_JAPANESE),
-                Row::note(features::CORRECTION_KINDS_NOTE)
-                    .visible_when(IsNot("typoCorrection", "standard")),
                 Row::toggle(features::MISREADINGS, "misreadings"),
-                Row::toggle(extras::LOOSE_READINGS, "looseReadings"),
-                Row::note(extras::LOOSE_READINGS_NOTE),
-                Row::toggle(extras::PHONETIC_SPELLING, "phoneticSpelling"),
-                Row::note(extras::PHONETIC_SPELLING_NOTE),
+                Row::toggle(extras::LOOSE_READINGS, "looseReadings")
+                    .with_example(extras::LOOSE_READINGS_EXAMPLE),
+                Row::toggle(extras::PHONETIC_SPELLING, "phoneticSpelling")
+                    .with_example(extras::PHONETIC_SPELLING_EXAMPLE),
             ],
         ),
-        Section {
-            title: None,
-            rows: vec![Row::toggle(extras::HAND_SHIFT, "handShiftCorrection")
-                .enabled_when(CORRECTS_JAPANESE)],
-            footer: Some(extras::HAND_SHIFT_NOTE),
-            footer_variants: &[],
-        },
+        Section::untitled(vec![Row::toggle(extras::HAND_SHIFT, "handShiftCorrection")
+            .with_example(extras::HAND_SHIFT_EXAMPLE)
+            .enabled_when(CORRECTS_JAPANESE)]),
         Section::new(
             features::RULES,
             files_inline(
@@ -1847,10 +1848,11 @@ fn language() -> Vec<Section> {
         Section {
             title: Some(features::LANGUAGE_JUDGING),
             rows: vec![
-                Row::toggle(features::USES_CONTEXT, "wordLanguage.usesContext"),
+                Row::toggle(features::USES_CONTEXT, "wordLanguage.usesContext")
+                    .with_example(features::USES_CONTEXT_EXAMPLE),
                 Row::toggle(features::AVOIDS_OFFENSIVE, "wordLanguage.avoidsOffensive"),
             ],
-            footer: Some(features::USES_CONTEXT_NOTE),
+            footer: None,
             footer_variants: &[],
         },
         Section::new(
@@ -1892,16 +1894,16 @@ fn language() -> Vec<Section> {
                 },
                 LimitKind::WordLanguageEntries,
             )],
-            footer: Some(crate::strings::windows::LANGUAGE_NOTE),
+            footer: None,
             footer_variants: &[],
         },
         Section {
             title: Some(extras::ENGLISH_TERMS_SECTION),
-            rows: vec![Row::toggle(
-                extras::ENGLISH_TERM_CANDIDATES,
-                "englishTermCandidates",
-            )],
-            footer: Some(extras::ENGLISH_TERM_CANDIDATES_NOTE),
+            rows: vec![
+                Row::toggle(extras::ENGLISH_TERM_CANDIDATES, "englishTermCandidates")
+                    .with_example(extras::ENGLISH_TERM_CANDIDATES_EXAMPLE),
+            ],
+            footer: None,
             footer_variants: &[],
         },
         Section {
@@ -1923,7 +1925,7 @@ fn language() -> Vec<Section> {
                 .enabled_when(Condition::On("englishTermCandidates")),
                 RuleList::EnglishTerms,
             ),
-            footer: Some(extras::ENGLISH_TERMS_NOTE),
+            footer: None,
             footer_variants: &[],
         },
     ]
@@ -1995,7 +1997,7 @@ fn apps() -> Vec<Section> {
                 },
                 LimitKind::ProfileRules,
             )],
-            footer: Some(crate::strings::windows::EXCLUSIONS_NOTE),
+            footer: Some(crate::strings::windows::EXCLUSIONS_ORDER),
             footer_variants: &[],
         },
         // CSV の読み込みと書き出しは一覧の下の別のカードに置く(macOS の ExclusionsPage)
@@ -2063,7 +2065,7 @@ fn commands() -> Vec<Section> {
                     LimitKind::Commands,
                 ),
             ],
-            footer: Some(extras::COMMANDS_NOTE),
+            footer: Some(crate::strings::windows::COMMANDS_STORED_LOCALLY),
             footer_variants: &[],
         },
         Section {
@@ -2545,7 +2547,7 @@ fn sync_page() -> Vec<Section> {
                     .danger()
                     .visible_when(Is(crate::sync::PROBLEM, crate::sync::PROBLEM_UNREADABLE)),
             ],
-            footer: Some(crate::strings::windows::SYNC_NOTE),
+            footer: None,
             footer_variants: &[],
         },
         Section::new(sync::SCOPES, scopes),
@@ -2583,7 +2585,7 @@ fn backup() -> Vec<Section> {
         Section {
             title: None,
             rows: vec![Row::new("", "", Control::Buttons(BACKUP_BUTTONS))],
-            footer: Some(more::BACKUP_NOTE),
+            footer: None,
             footer_variants: &[],
         },
         Section::untitled(vec![Row::action(
@@ -2626,7 +2628,7 @@ fn about() -> Vec<Section> {
         Section {
             title: Some(more::ACKNOWLEDGEMENTS),
             rows,
-            footer: Some(more::ACKNOWLEDGEMENTS_NOTE),
+            footer: None,
             footer_variants: &[],
         },
     ]

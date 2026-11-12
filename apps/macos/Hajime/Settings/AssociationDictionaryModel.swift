@@ -15,19 +15,20 @@ extension SettingsModel {
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
-        guard panel.runModal() == .OK, let source = panel.url else { return }
-        isImportingDictionary = true
-        Task {
-            defer { isImportingDictionary = false }
-            do throws(SettingsFileFailure) {
-                let imported = try await files.importAssociationDictionary(from: source.path, replacing: existing?.id)
-                message = UIStrings.Association.imported(imported.groupCount)
-            } catch {
-                logger.error("連想の辞書を取り込めませんでした: \(String(describing: error), privacy: .public)")
-                switch error {
-                case .tooMany: message = UIStrings.Association.tooMany
-                case .writeFailed: message = UIStrings.Settings.saveFailed
-                default: message = UIStrings.Association.importFailed
+        FilePanel.chooseOne(panel) { [self] source in
+            isImportingDictionary = true
+            Task {
+                defer { isImportingDictionary = false }
+                do throws(SettingsFileFailure) {
+                    let imported = try await files.importAssociationDictionary(from: source.path, replacing: existing?.id)
+                    message = UIStrings.Association.imported(imported.groupCount)
+                } catch {
+                    logger.error("連想の辞書を取り込めませんでした: \(String(describing: error), privacy: .public)")
+                    switch error {
+                    case .tooMany: message = UIStrings.Association.tooMany
+                    case .writeFailed: message = UIStrings.Settings.saveFailed
+                    default: message = UIStrings.Association.importFailed
+                    }
                 }
             }
         }

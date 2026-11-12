@@ -16,6 +16,9 @@ use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows::Win32::Graphics::Gdi::HDC;
 use windows_core::{Interface, Result};
 
+/// 下地を描き先の外へ広げて塗る量(1 ドット)．余白ではなく，ピクセルへの切り上げで端が塗り残らないようにする
+const BLEED: f32 = 1.0;
+
 const BASE_DPI: f32 = 96.0;
 
 /// 見本に描く候補の窓
@@ -164,10 +167,10 @@ impl Preview {
             Placement::Center { ground } => {
                 // 下地は設定の画面のカードの色で塗る(見本のまわりに別の色の四角を出さない)．
                 // 描き先(DC に結んだ描き先)は前の中身を読まないので，塗らないと黒く残る
-                // 描き先の幅と高さはピクセルに切り上げるので，端の 1 列も塗れるよう少し広く塗る
+                // 描き先の幅と高さはピクセルに切り上げるので，端の 1 列も塗れるよう四方に 1 ドット広く塗る
                 let (width, height) = (scene.width, scene.height);
                 if let Some(Draw::Rect { frame, color }) = scene.draws.first_mut() {
-                    *frame = Frame::new(-1.0, -1.0, width + 2.0, height + 2.0);
+                    *frame = Frame::new(-BLEED, -BLEED, width + BLEED * 2.0, height + BLEED * 2.0);
                     *color = Color::rgb(ground);
                 }
             }

@@ -60,8 +60,13 @@ private struct DictionaryRow: View {
                     }
                 }
                 Button(UIStrings.Dictionaries.addApp) {
-                    guard let id = model.chooseApplicationID(), !apps.contains(id) else { return }
-                    model.updateDictionary(dictionary.id) { $0.condition = .apps(apps + [id]) }
+                    // 選ぶ窓を閉じるまでに条件が変わることがあるので，足すときの条件に足す
+                    model.chooseApplicationID { id in
+                        model.updateDictionary(dictionary.id) { dictionary in
+                            guard case .apps(let current) = dictionary.condition, !current.contains(id) else { return }
+                            dictionary.condition = .apps(current + [id])
+                        }
+                    }
                 }
             }
             HStack {

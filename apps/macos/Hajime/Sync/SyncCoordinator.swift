@@ -40,20 +40,29 @@ final class SyncCoordinator: ObservableObject {
     }
 
     /// 同期のフォルダを選ぶ．選んだら同期を始める
+    /// iCloud Drive のフォルダ．サンドボックスの中ではホームがコンテナになるので，利用者のホームから求める
+    private static let iCloudDrive: URL = {
+        let home = getpwuid(getuid()).map { String(cString: $0.pointee.pw_dir) } ?? NSHomeDirectory()
+        return URL(fileURLWithPath: home).appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
+    }()
+
     func chooseFolder() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.canChooseFiles = false
         panel.canCreateDirectories = true
         panel.allowsMultipleSelection = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let bookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
-            try synchronizer.setEnabled(true, folderBookmark: bookmark, folderName: url.lastPathComponent)
-            refresh()
-            syncNow()
-        } catch {
-            fail(error)
+        // 同期に使うフォルダの例として，iCloud Drive があればそこから開く
+        if FileManager.default.fileExists(atPath: Self.iCloudDrive.path) { panel.directoryURL = Self.iCloudDrive }
+        FilePanel.chooseOne(panel) { [self] url in
+            do {
+                let bookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                try synchronizer.setEnabled(true, folderBookmark: bookmark, folderName: url.lastPathComponent)
+                refresh()
+                syncNow()
+            } catch {
+                fail(error)
+            }
         }
     }
 

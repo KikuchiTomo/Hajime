@@ -41,7 +41,7 @@ struct CommandsPage: View {
             } header: {
                 Text(UIStrings.Extras.commandsSection)
             } footer: {
-                Text(UIStrings.Extras.commandsNote).font(.caption).foregroundStyle(.secondary)
+                Text(UIStrings.Extras.commandsStoredLocally).font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.conversionMacros, keyPath: \.conversionMacros)
@@ -270,9 +270,10 @@ private struct CommandEditor: View {
             panel.allowedContentTypes = [.application]
             panel.directoryURL = URL(fileURLWithPath: "/Applications")
         }
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        draft.target = url.path
-        if draft.kind == .openFile { chosenFile = url }
-        if draft.title.isEmpty { draft.title = url.deletingPathExtension().lastPathComponent }
+        FilePanel.chooseOne(panel) { url in
+            draft.target = url.path
+            if draft.kind == .openFile { chosenFile = url }
+            if draft.title.isEmpty { draft.title = url.deletingPathExtension().lastPathComponent }
+        }
     }
 }

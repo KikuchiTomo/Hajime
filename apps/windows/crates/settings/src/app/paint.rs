@@ -6,6 +6,7 @@
 use super::theme::{Color, Theme};
 use crate::layout::Rect;
 use tokens::opacity::settings_windows as opacity;
+use tokens::size::part;
 use tokens::size::settings_windows as size;
 
 /// 文字の種類(書体と大きさと太さ)
@@ -202,13 +203,14 @@ pub fn focus_ring(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, radius: f3
         rect.height + (stroke + 1.0) * 2.0,
     );
     canvas.stroke_round(outer, radius + stroke + 1.0, stroke, theme.focus_outer());
+    let line = part::STROKE;
     let inner = Rect::new(
-        rect.x - 1.0,
-        rect.y - 1.0,
-        rect.width + 2.0,
-        rect.height + 2.0,
+        rect.x - line,
+        rect.y - line,
+        rect.width + line * 2.0,
+        rect.height + line * 2.0,
     );
-    canvas.stroke_round(inner, radius + 1.0, 1.0, theme.focus_inner());
+    canvas.stroke_round(inner, radius + line, line, theme.focus_inner());
 }
 
 /// ボタン
@@ -363,10 +365,12 @@ pub fn dropdown(
     };
     let padding = size::FIELD_PADDING_X;
     let chevron = size::CHEVRON_SIZE;
+    // 右の端に開く印を置き，印と名前のあいだにも同じ余白をとる
+    let chevron_left = rect.max_x() - padding - chevron;
     let label_rect = Rect::new(
         rect.x + padding,
         rect.y,
-        (rect.width - padding * 3.0 - chevron).max(0.0),
+        (chevron_left - padding - (rect.x + padding)).max(0.0),
         rect.height,
     );
     canvas.text(
@@ -376,12 +380,7 @@ pub fn dropdown(
         Color::from(text),
         TextLayout::LINE,
     );
-    let chevron_rect = Rect::new(
-        rect.max_x() - padding - chevron,
-        rect.y,
-        chevron,
-        rect.height,
-    );
+    let chevron_rect = Rect::new(chevron_left, rect.y, chevron, rect.height);
     let secondary = if state.enabled {
         palette.text_secondary
     } else {
@@ -484,7 +483,7 @@ pub fn toggle(
     let label_rect = Rect::new(
         rect.x,
         rect.y,
-        (rect.width - width - size::CONTROL_GAP * 1.5).max(0.0),
+        (rect.width - width - size::CONTROL_GAP).max(0.0),
         rect.height,
     );
     canvas.text(

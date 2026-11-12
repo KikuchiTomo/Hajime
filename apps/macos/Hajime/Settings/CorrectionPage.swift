@@ -9,25 +9,24 @@ struct CorrectionPage: View {
         Form {
             // 修正の対象は，変換のページの「タイプミスの修正」で選んだ範囲の中でだけ効く(オフなら何も直さず，英単語のみなら日本語は直さない)
             Section(UIStrings.Features.correctionKinds) {
+                // 種類を選べるかは「タイプミスの修正」(変換のページと同じ設定)で決まるので，ここでも切り替えられるようにする
+                ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))
                 ResettableToggle(model: model, title: UIStrings.Features.correctsEnglish, keyPath: \.correction.english)
                     .disabled(model.settings.typoCorrection == .off)
                 ResettableToggle(model: model, title: UIStrings.Features.correctsJapanese, keyPath: \.correction.japanese)
                     .disabled(model.settings.typoCorrection != .standard)
                 ResettableToggle(model: model, title: UIStrings.Features.correctsRepeatedKeys, keyPath: \.correction.repeatedKeys)
                     .disabled(!correctsJapanese)
-                if model.settings.typoCorrection != .standard {
-                    Text(UIStrings.Features.correctionKindsNote).font(.caption).foregroundStyle(.secondary)
-                }
                 ResettableToggle(model: model, title: UIStrings.Features.misreadings, keyPath: \.misreadings)
-                ResettableToggle(model: model, title: UIStrings.Extras.looseReadings, keyPath: \.looseReadings, help: UIStrings.Extras.looseReadingsNote)
-                ResettableToggle(model: model, title: UIStrings.Extras.phoneticSpelling, keyPath: \.phoneticSpelling,
-                                 help: UIStrings.Extras.phoneticSpellingNote)
+                ExampleToggle(model: model, title: UIStrings.Extras.looseReadings, keyPath: \.looseReadings,
+                              example: UIStrings.Extras.looseReadingsExample, titleWidth: exampleTitleWidth)
+                ExampleToggle(model: model, title: UIStrings.Extras.phoneticSpelling, keyPath: \.phoneticSpelling,
+                              example: UIStrings.Extras.phoneticSpellingExample, titleWidth: exampleTitleWidth)
             }
             Section {
-                ResettableToggle(model: model, title: UIStrings.Extras.handShift, keyPath: \.handShiftCorrection)
+                ExampleToggle(model: model, title: UIStrings.Extras.handShift, keyPath: \.handShiftCorrection,
+                              example: UIStrings.Extras.handShiftExample, titleWidth: exampleTitleWidth)
                     .disabled(!correctsJapanese)
-            } footer: {
-                Text(UIStrings.Extras.handShiftNote).font(.caption).foregroundStyle(.secondary)
             }
             Section(UIStrings.Features.rules) {
                 RuleListEditor(model: model, spec: .correctionRules, labels: .init(
@@ -41,6 +40,11 @@ struct CorrectionPage: View {
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// 見本のタグを添える行の名前のうちいちばん長いものの幅(タグの左の端をページの中でそろえる)
+    private var exampleTitleWidth: CGFloat {
+        ExampleToggle.titleWidth([UIStrings.Extras.looseReadings, UIStrings.Extras.phoneticSpelling, UIStrings.Extras.handShift])
     }
 
     /// 日本語のタイプミスを直すか(同じキーの重なりと手のずれは，その中の種類)

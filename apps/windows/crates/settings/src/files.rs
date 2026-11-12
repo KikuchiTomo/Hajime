@@ -106,6 +106,8 @@ impl FileTask {
     pub fn done(self) -> Option<&'static str> {
         match self {
             FileTask::ImportSettings => Some(more::SETTINGS_IMPORTED),
+            // 書き出せたことが分かるよう知らせる(macOS の exportSettings と同じ)
+            FileTask::ExportSettings => Some(more::SETTINGS_EXPORTED),
             _ => None,
         }
     }
@@ -152,6 +154,18 @@ mod tests {
             more::EXPORT_SETTINGS_FILE_NAME
         );
         assert!(FileTask::ImportSettings.default_name(&catalog).is_empty());
+    }
+
+    #[test]
+    fn 設定を書き出せたら知らせる() {
+        assert_eq!(
+            FileTask::ExportSettings.done(),
+            Some(more::SETTINGS_EXPORTED)
+        );
+        assert_eq!(
+            FileTask::ImportSettings.done(),
+            Some(more::SETTINGS_IMPORTED)
+        );
     }
 
     #[test]

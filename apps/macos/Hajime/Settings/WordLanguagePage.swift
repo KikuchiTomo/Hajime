@@ -11,18 +11,19 @@ struct WordLanguagePage: View {
     @State private var ruleWord = ""
     @State private var ruleContext = WordLanguageContext.afterJapanese
     @State private var ruleLanguage = WordLanguage.japanese
+    /// 一覧に足す先を選んでいる試した語(結果のタグを押したとき)
+    @State private var adding: String?
 
     private var settings: WordLanguageSettings { model.settings.wordLanguage }
 
     var body: some View {
         Form {
             Section {
-                ResettableToggle(model: model, title: UIStrings.Features.usesContext, keyPath: \.wordLanguage.usesContext)
+                ExampleToggle(model: model, title: UIStrings.Features.usesContext, keyPath: \.wordLanguage.usesContext,
+                              example: UIStrings.Features.usesContextExample)
                 ResettableToggle(model: model, title: UIStrings.Features.avoidsOffensive, keyPath: \.wordLanguage.avoidsOffensive)
             } header: {
                 Text(UIStrings.Features.languageJudging)
-            } footer: {
-                Text(UIStrings.Features.usesContextNote).font(.caption).foregroundStyle(.secondary)
             }
             if let preview = model.previewLanguage {
                 Section(UIStrings.Features.tryLanguage) {
@@ -32,7 +33,7 @@ struct WordLanguagePage: View {
                         .textFieldStyle(.roundedBorder)
                     let words = sample.isEmpty ? [] : preview(sample, preceding.isEmpty ? nil : preceding)
                     if !words.isEmpty {
-                        WrappingStack(spacing: DesignTokens.Size.Settings.previewChipGap) {
+                        WrappingStack(spacing: DesignTokens.Size.Settings.previewButtonGap) {
                             ForEach(Array(words.enumerated()), id: \.offset) { _, word in
                                 resultChip(word)
                             }
@@ -77,46 +78,61 @@ struct WordLanguagePage: View {
                 }
             } header: {
                 Text(UIStrings.Features.languageRules)
-            } footer: {
-                Text(UIStrings.Features.languageNote).font(.caption).foregroundStyle(.secondary)
             }
             Section {
-                ResettableToggle(model: model, title: UIStrings.Extras.englishTermCandidates, keyPath: \.englishTermCandidates)
+                ExampleToggle(model: model, title: UIStrings.Extras.englishTermCandidates, keyPath: \.englishTermCandidates,
+                              example: UIStrings.Extras.englishTermCandidatesExample)
             } header: {
                 Text(UIStrings.Extras.englishTermsSection)
-            } footer: {
-                Text(UIStrings.Extras.englishTermCandidatesNote).font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 RuleListEditor(model: model, spec: .englishTerms, labels: .init(
-                    key: UIStrings.Extras.englishTermPlaceholder, value: nil, empty: UIStrings.Extras.englishTermsEmpty))
+                    key: UIStrings.Extras.englishTermPlaceholder, value: nil, keyPrompt: UIStrings.Extras.englishTermPrompt,
+                    empty: UIStrings.Extras.englishTermsEmpty))
                     .disabled(!model.settings.englishTermCandidates)
             } header: {
                 Text(UIStrings.Extras.englishTerms)
-            } footer: {
-                Text(UIStrings.Extras.englishTermsNote).font(.caption).foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
     }
 
-    /// 試した結果の 1 語．入る文字と，英語か日本語かを並べる
+    /// 試した結果の 1 語．入る文字と，英語か日本語かを並べる．押すと，その語を常に英語・常に日本語にする一覧に足すボタンを出す
     private func resultChip(_ word: WordLanguagePreview.Word) -> some View {
-        VStack(spacing: DesignTokens.Size.Space.fine) {
-            Text(word.shown)
-            Text(UIStrings.Features.label(for: word.language))
-                .font(.caption2)
-                .foregroundStyle(word.language == .japanese ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+        Button { adding = word.typed } label: {
+            VStack(spacing: DesignTokens.Size.Space.fine) {
+                HStack(spacing: DesignTokens.Size.Space.inline) {
+                    Text(word.shown)
+                    Image(systemName: "chevron.down").imageScale(.small).foregroundStyle(.secondary)
+                }
+                Text(UIStrings.Features.label(for: word.language))
+                    .font(.caption2)
+                    .foregroundStyle(word.language == .japanese ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+            }
+            .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
+            .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
         }
-        .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
-        .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
+        .buttonStyle(.plain)
+        .popover(isPresented: Binding(get: { adding == word.typed }, set: { if !$0 { adding = nil } }), arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: DesignTokens.Size.Space.stack) {
+                Button(UIStrings.Features.englishWords) { addFromPopover(word.typed, to: .english) }
+                Button(UIStrings.Features.japaneseWords) { addFromPopover(word.typed, to: .japanese) }
+            }
+            .buttonStyle(.borderless)
+            .padding(DesignTokens.Size.Space.section)
+        }
         .contextMenu {
-            // 試した語をそのまま一覧に足せるようにする
             Button(UIStrings.Features.englishWords) { add(word.typed, to: .english) }
             Button(UIStrings.Features.japaneseWords) { add(word.typed, to: .japanese) }
         }
-        .accessibilityElement(children: .combine)
+    }
+
+    /// 結果のタグから一覧に足し，足す先のボタンを閉じる
+    private func addFromPopover(_ text: String, to language: WordLanguage) {
+        add(text, to: language)
+        adding = nil
     }
 
     private func wordList(title: String, language: WordLanguage, empty: String) -> some View {

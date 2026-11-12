@@ -28,7 +28,7 @@ struct AssociationSection: View {
         } header: {
             Text(UIStrings.Association.dictionaries)
         } footer: {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: DesignTokens.Size.Space.group) {
                 HStack {
                     Button(UIStrings.Association.importFile) { model.importAssociationFile() }
                         .disabled(model.isImportingDictionary || model.associations == nil)

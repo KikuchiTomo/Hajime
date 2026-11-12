@@ -33,9 +33,9 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
-    FileOpenDialog, FileSaveDialog, IFileDialog, IFileOpenDialog, ShellExecuteW,
-    FILEOPENDIALOGOPTIONS, FOS_ALLOWMULTISELECT, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS,
-    SIGDN_FILESYSPATH,
+    FileOpenDialog, FileSaveDialog, IFileDialog, IFileOpenDialog, IShellItem,
+    SHCreateItemFromParsingName, ShellExecuteW, FILEOPENDIALOGOPTIONS, FOS_ALLOWMULTISELECT,
+    FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS, SIGDN_FILESYSPATH,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, FindWindowW, GetClientRect,
@@ -645,11 +645,22 @@ pub fn choose_files(owner: HWND, filter_name: &str, pattern: &str) -> Vec<String
     }
 }
 
-/// フォルダを選ぶ窓を出し，選んだフォルダの場所を返す．キャンセルしたら None
-pub fn choose_folder(owner: HWND) -> Option<String> {
+/// フォルダを選ぶ窓を出し，選んだフォルダの場所を返す．キャンセルしたら None．
+/// start があれば，そのフォルダから開く(同期のフォルダは OneDrive から．macOS は iCloud Drive から)
+pub fn choose_folder(owner: HWND, start: Option<&str>) -> Option<String> {
     // SAFETY: 引数は定数だけ
     let dialog: IFileDialog =
         unsafe { CoCreateInstance(&FileOpenDialog, None, CLSCTX_INPROC_SERVER) }.ok()?;
+    if let Some(start) = start {
+        let start = HSTRING::from(start);
+        // SAFETY: start の文字列は呼び出しの間生きている
+        let item: windows::core::Result<IShellItem> =
+            unsafe { SHCreateItemFromParsingName(&start, None) };
+        if let Ok(item) = item {
+            // SAFETY: dialog と item は生きている COM のオブジェクト．開く場所を決められなくても窓は出す
+            let _ = unsafe { dialog.SetFolder(&item) };
+        }
+    }
     show_dialog(&dialog, owner, FOS_FORCEFILESYSTEM | FOS_PICKFOLDERS)
 }
 

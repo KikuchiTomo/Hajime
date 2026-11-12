@@ -167,6 +167,13 @@ pub fn layout(
     y += size::TITLE_HEIGHT;
     let mut result = Vec::new();
     let mut shown = 0;
+    // 候補の見本は，ページの中でいちばん長い名前のあとから書き出し，行ごとの左の端をそろえる(まとまりをまたいでも)
+    let example_title = sections
+        .iter()
+        .flat_map(|section| &section.rows)
+        .filter(|row| row.example.is_some())
+        .map(|row| metrics.width(row.title, TextKind::Body))
+        .fold(0.0, f32::max);
     for section in sections {
         // 行がひとつも出ないまとまりは，見出しも間も置かない(カスタムテーマを選んでいないときの色・形など)
         if !section.rows.iter().any(&visible) {
@@ -189,12 +196,6 @@ pub fn layout(
         });
         let mut cards: Vec<CardLayout> = Vec::new();
         let rows = &section.rows;
-        // 候補の見本は，まとまりの中でいちばん長い名前のあとから書き出し，行ごとの左の端をそろえる
-        let example_title = rows
-            .iter()
-            .filter(|row| row.example.is_some())
-            .map(|row| metrics.width(row.title, TextKind::Body))
-            .fold(0.0, f32::max);
         let mut index = 0;
         while index < rows.len() {
             let row = &rows[index];
@@ -257,7 +258,7 @@ struct Frame {
     y: f32,
     width: f32,
     reserve: bool,
-    /// まとまりの中で候補の見本を添える行の，いちばん長い名前の幅(タグの左の端をそろえる)
+    /// ページの中で候補の見本を添える行の，いちばん長い名前の幅(タグの左の端をそろえる)
     example_title: f32,
 }
 
@@ -339,7 +340,7 @@ fn place(
                 2,
                 PREVIEW_BUTTONS,
                 frame,
-                chip * size::PREVIEW_LINES + tokens::size::settings::PREVIEW_CHIP_GAP,
+                chip * size::PREVIEW_LINES + tokens::size::settings::PREVIEW_BUTTON_GAP,
                 metrics,
             )
         }
@@ -1394,6 +1395,26 @@ mod tests {
             .unwrap();
         assert_eq!(preview.control.x, names.label.x);
         assert_eq!(preview.control.y - preview.card.y, size::CARD_PADDING_Y);
+    }
+
+    #[test]
+    fn 補正のページの見本のタグはまとまりをまたいで左の端をそろえる() {
+        let page = sections(Page::Correction).unwrap();
+        let layout = layout(&page, 900.0, |_| true, &Estimate);
+        let xs: Vec<f32> = page
+            .iter()
+            .zip(&layout.sections)
+            .flat_map(|(section, placed)| {
+                placed
+                    .cards
+                    .iter()
+                    .filter(|card| section.rows[card.row].example.is_some())
+                    .map(|card| card.icon.x)
+                    .collect::<Vec<_>>()
+            })
+            .collect();
+        assert_eq!(xs.len(), 3);
+        assert!(xs.iter().all(|x| *x == xs[0]));
     }
 
     #[test]

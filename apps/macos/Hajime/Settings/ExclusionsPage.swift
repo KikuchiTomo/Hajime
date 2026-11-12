@@ -69,7 +69,7 @@ struct ExclusionsPage: View {
                         .disabled(selection.isEmpty)
                 }
             } footer: {
-                Text(UIStrings.More.exclusionsNote).font(.caption).foregroundStyle(.secondary)
+                Text(UIStrings.More.exclusionsOrder).font(.caption).foregroundStyle(.secondary)
             }
             Section {
                 HStack {

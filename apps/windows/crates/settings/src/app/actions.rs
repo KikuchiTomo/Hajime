@@ -176,7 +176,11 @@ pub fn run_after(window: Window, after: Option<After>) {
             run_after(window, after);
         }
         Some(After::ChooseSyncFolder) => {
-            let Some(path) = ffi::choose_folder(window) else {
+            // 同期に使うフォルダの例として，OneDrive があればそこから開く
+            let one_drive = std::env::var("OneDrive")
+                .ok()
+                .filter(|path| std::path::Path::new(path).is_dir());
+            let Some(path) = ffi::choose_folder(window, one_drive.as_deref()) else {
                 return;
             };
             let after =

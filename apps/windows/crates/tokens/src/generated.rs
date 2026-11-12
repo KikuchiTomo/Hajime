@@ -359,7 +359,8 @@ pub mod size {
         pub const PREVIEW_CHIP_PADDING_X: f32 = 8.0;
         pub const PREVIEW_CHIP_PADDING_Y: f32 = 4.0;
         pub const PREVIEW_CHIP_RADIUS: f32 = 6.0;
-        pub const PREVIEW_CHIP_GAP: f32 = 6.0;
+        pub const PREVIEW_CHIP_GAP: f32 = 4.0;
+        pub const PREVIEW_BUTTON_GAP: f32 = 8.0;
         pub const RULE_CHECK_COLUMN_WIDTH: f32 = 40.0;
         pub const RULE_KEY_COLUMN_WIDTH: f32 = 160.0;
         pub const RULE_VALUE_COLUMN_WIDTH: f32 = 150.0;
@@ -383,7 +384,7 @@ pub mod size {
         pub const THEME_SWATCH_WIDTH: f32 = 40.0;
         pub const ABOUT_ICON: f32 = 64.0;
         pub const THEME_SWATCH_HEIGHT: f32 = 20.0;
-        pub const THEME_SWATCH_GAP: f32 = 3.0;
+        pub const THEME_SWATCH_GAP: f32 = 4.0;
         pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;
         pub const THEME_SWATCH_SELECTION_WIDTH: f32 = 12.0;
         pub const THEME_SWATCH_SELECTION_HEIGHT: f32 = 10.0;
@@ -590,6 +591,7 @@ pub mod size {
         pub const NAV_HEADER_FONT_SIZE: f32 = 12.0;
         pub const CONTROL_RADIUS: f32 = 4.0;
         pub const FIELD_PADDING_X: f32 = 11.0;
+        pub const FIELD_PADDING_Y: f32 = 5.0;
         pub const FOCUS_STROKE: f32 = 2.0;
         pub const CHEVRON_SIZE: f32 = 12.0;
         pub const FLYOUT_PADDING: f32 = 4.0;
@@ -599,7 +601,7 @@ pub mod size {
         pub const TABLE_HEADER_HEIGHT: f32 = 32.0;
         pub const SCROLLBAR_THIN: f32 = 2.0;
         pub const SCROLLBAR_WIDE: f32 = 6.0;
-        pub const SCROLLBAR_MARGIN: f32 = 3.0;
+        pub const SCROLLBAR_MARGIN: f32 = 2.0;
         pub const SCROLLBAR_HIT: f32 = 14.0;
         pub const SCROLLBAR_MIN_THUMB: f32 = 24.0;
         pub const PROGRESS_RING_SIZE: f32 = 32.0;
@@ -609,12 +611,10 @@ pub mod size {
         pub const WIZARD_WIDTH: f32 = 920.0;
         pub const WIZARD_HEIGHT: f32 = 640.0;
         pub const WIZARD_TEXT_WIDTH: f32 = 380.0;
-        pub const WIZARD_PADDING: f32 = 32.0;
         pub const WIZARD_FOOTER_HEIGHT: f32 = 72.0;
         pub const WIZARD_STEP_BAR: f32 = 4.0;
         pub const WIZARD_OPTION_HEIGHT: f32 = 44.0;
         pub const WIZARD_OPTION_NOTE_HEIGHT: f32 = 64.0;
-        pub const WIZARD_OPTION_GAP: f32 = 6.0;
         pub const WIZARD_RADIO_SIZE: f32 = 20.0;
         pub const WIZARD_DEMO_FONT_SIZE: f32 = 20.0;
         pub const WIZARD_DEMO_LINE_HEIGHT: f32 = 34.0;
@@ -636,7 +636,7 @@ pub mod size {
         pub const RADIO_DOT: f32 = 10.0;
         pub const THEME_SWATCH_WIDTH: f32 = 40.0;
         pub const THEME_SWATCH_HEIGHT: f32 = 20.0;
-        pub const THEME_SWATCH_GAP: f32 = 3.0;
+        pub const THEME_SWATCH_GAP: f32 = 4.0;
         pub const THEME_SWATCH_SELECTION_WIDTH: f32 = 12.0;
         pub const THEME_SWATCH_SELECTION_HEIGHT: f32 = 10.0;
         pub const THEME_SWATCH_RADIUS: f32 = 6.0;

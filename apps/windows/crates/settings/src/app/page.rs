@@ -34,6 +34,7 @@ use std::collections::HashMap;
 use tokens::motion::settings_windows as motion;
 use tokens::opacity::settings_windows as opacity;
 use tokens::size::settings_windows as size;
+use tokens::size::{part, space};
 
 /// 部品の番号の始まり(0 は使わない．窓の部品の番号と分ける)
 const FIRST_ID: u16 = 100;
@@ -633,12 +634,13 @@ impl AcknowledgementLayout {
         let mut expand = None;
         let mut license = None;
         if let Some(text) = &item.license {
-            top += size::CONTROL_GAP / 2.0;
+            top += space::STACK;
             let label = measure.width(more::LICENSE_TEXT, TextStyle::Body);
+            // 開く印を本文の左の端にそろえ，押せる背景は inset だけ外に広げる
             let button = Rect::new(
-                x - size::FIELD_PADDING_X / 2.0,
+                x - space::INSET,
                 top,
-                label + size::CHEVRON_SIZE + size::FIELD_PADDING_X * 2.0,
+                space::INSET * 2.0 + size::CHEVRON_SIZE + space::INLINE + label,
                 size::CONTROL_HEIGHT,
             );
             expand = Some(button);
@@ -2191,7 +2193,7 @@ impl PageView {
                     if let Some(card) = &row.card {
                         let inner = card.control.width - size::FIELD_PADDING_X * 2.0;
                         let height = measure.wrapped_height(&row.text, TextStyle::Caption, inner)
-                            + size::FIELD_PADDING_X;
+                            + size::FIELD_PADDING_Y * 2.0;
                         row.text_scroll.set_extent(height, card.control.height);
                     }
                 }
@@ -3945,7 +3947,7 @@ impl PageView {
                     (Part::Increment, theme.glyphs.plus),
                 ] {
                     if let Some(rect) = row.part_rect(part) {
-                        let inset = size::CONTROL_GAP / 2.0;
+                        let inset = space::INSET;
                         let rect = Rect::new(
                             rect.x,
                             rect.y + inset,
@@ -4153,9 +4155,10 @@ impl PageView {
             Control::ThemePreview => canvas.preview(card.control),
             // 変換マクロの試す欄には下のボタンが無い(part_rect が無いので描かない)
             Control::PreviewChips(_) => {
-                preview_chips(canvas, theme, card.control, &row.preview_result);
+                let gap = tokens::size::settings::PREVIEW_CHIP_GAP;
+                preview_chips(canvas, theme, card.control, &row.preview_result, gap);
             }
-            Control::Preview(_) => {
+            Control::Preview(kind) => {
                 for field in 0..2 {
                     self.paint_field(canvas, frame, index, row, Part::PreviewField(field));
                 }
@@ -4172,7 +4175,13 @@ impl PageView {
                         );
                     }
                 }
-                preview_chips(canvas, theme, card.control, &row.preview_result);
+                // 英語と日本語の結果は押せるチップなので group で離す(押せる部品どうし)
+                let gap = if *kind == TryKind::Language {
+                    tokens::size::settings::PREVIEW_BUTTON_GAP
+                } else {
+                    tokens::size::settings::PREVIEW_CHIP_GAP
+                };
+                preview_chips(canvas, theme, card.control, &row.preview_result, gap);
             }
             Control::Note | Control::Placeholder => {}
             Control::Dictionaries(_) => self.paint_dictionaries(canvas, frame, index, row),
@@ -4325,13 +4334,9 @@ impl PageView {
         } else {
             palette.text_disabled
         };
+        let left = swatch.max_x() + gap;
         canvas.text(
-            Rect::new(
-                swatch.max_x() + gap,
-                rect.y,
-                rect.width - swatch_size - gap * 3.0,
-                rect.height,
-            ),
+            Rect::new(left, rect.y, rect.max_x() - gap - left, rect.height),
             &row.color,
             TextStyle::Body,
             Color::from(text),
@@ -4362,7 +4367,7 @@ impl PageView {
         // 高さは測ったときと同じにして，組んだ文字を使い回す
         let inner = Rect::new(
             rect.x + padding,
-            rect.y + padding / 2.0 - offset,
+            rect.y + size::FIELD_PADDING_Y - offset,
             rect.width - padding * 2.0,
             f32::MAX,
         );
@@ -4445,7 +4450,7 @@ impl PageView {
                     canvas.text(*link, url, TextStyle::Caption, color, TextLayout::LINE);
                     // 押せることを下線で示す(ポインターを載せると濃くする)
                     canvas.fill_rect(
-                        Rect::new(link.x, link.max_y() - 2.0, link.width, 1.0),
+                        Rect::new(link.x, link.max_y() - space::FINE, link.width, part::STROKE),
                         color.with_alpha(opacity::LINK + (1.0 - opacity::LINK) * state.hover),
                     );
                     // URL のあとの文(「(v0.2.0)」など)はリンクにせず，URL と同じ行に収まる分を続けて書き，残りを下に折り返す
@@ -4518,7 +4523,7 @@ impl PageView {
             } else {
                 theme.glyphs.chevron_right
             };
-            let padding = size::FIELD_PADDING_X / 2.0;
+            let padding = space::INSET;
             canvas.text(
                 Rect::new(
                     button.x + padding,
@@ -4533,9 +4538,9 @@ impl PageView {
             );
             canvas.text(
                 Rect::new(
-                    button.x + padding * 2.0 + size::CHEVRON_SIZE,
+                    button.x + padding + size::CHEVRON_SIZE + space::INLINE,
                     button.y,
-                    button.width - padding * 3.0 - size::CHEVRON_SIZE,
+                    button.width - padding * 2.0 - size::CHEVRON_SIZE - space::INLINE,
                     button.height,
                 ),
                 more::LICENSE_TEXT,
@@ -4579,7 +4584,7 @@ impl PageView {
         {
             let line = Rect::new(
                 table.x,
-                table.y - size::NOTE_LINE_HEIGHT - size::CONTROL_GAP / 2.0,
+                table.y - size::NOTE_LINE_HEIGHT - space::STACK,
                 table.width,
                 size::NOTE_LINE_HEIGHT,
             );
@@ -4904,7 +4909,7 @@ impl PageView {
                 };
                 canvas.text(
                     Rect::new(
-                        cell.x + title + size::CONTROL_GAP / 2.0,
+                        cell.x + title + space::INLINE,
                         cell.y,
                         size::CHEVRON_SIZE,
                         cell.height,
@@ -4956,12 +4961,13 @@ impl PageView {
                 continue;
             };
             let top = body.y + position as f32 * row_height - offset;
+            // 左右は表の枠から離し，上下は隣の行の背景と 1 ドットずつ離す
             let inset = size::TABLE_ROW_INSET;
             let line = Rect::new(
                 rect.x + inset,
-                top + inset / 2.0,
+                top + part::STROKE,
                 rect.width - inset * 2.0,
-                row_height - inset,
+                row_height - part::STROKE * 2.0,
             );
             let selected = row.table.is_selected(position);
             if selected {
@@ -4988,7 +4994,12 @@ impl PageView {
             // 1 行おきに薄く敷く(macOS の表の縞)．選んだ行とポインターを載せた行は上の背景のまま
             if position % 2 == 1 && !selected && self.table_hover != Some((index, position)) {
                 canvas.fill_rect(
-                    Rect::new(rect.x + 1.0, top, rect.width - 2.0, row_height),
+                    Rect::new(
+                        rect.x + part::STROKE,
+                        top,
+                        rect.width - part::STROKE * 2.0,
+                        row_height,
+                    ),
                     Color::from(palette.text).with_alpha(opacity::TABLE_STRIPE),
                 );
             }
@@ -5194,9 +5205,10 @@ fn preview_chips(
     theme: &Theme,
     rect: Rect,
     shown: &crate::engine::PreviewShown,
+    gap: f32,
 ) {
     use tokens::size::settings::{
-        PREVIEW_CHIP_GAP, PREVIEW_CHIP_PADDING_X, PREVIEW_CHIP_PADDING_Y, PREVIEW_CHIP_RADIUS,
+        PREVIEW_CHIP_PADDING_X, PREVIEW_CHIP_PADDING_Y, PREVIEW_CHIP_RADIUS,
     };
     let palette = &theme.palette;
     if !shown.line.is_empty() {
@@ -5227,7 +5239,7 @@ fn preview_chips(
         let width = (text_width + PREVIEW_CHIP_PADDING_X * 2.0).min(rect.width);
         if x > rect.x && x + width > rect.x + rect.width {
             x = rect.x;
-            y += height + PREVIEW_CHIP_GAP;
+            y += height + gap;
         }
         if y + height > rect.y + rect.height {
             break;
@@ -5270,7 +5282,7 @@ fn preview_chips(
                 TextLayout::CENTER,
             );
         }
-        x += width + PREVIEW_CHIP_GAP;
+        x += width + gap;
     }
     canvas.pop_clip();
 }
@@ -5468,11 +5480,13 @@ fn paint_table_choice(
     };
     let padding = size::FIELD_PADDING_X;
     let chevron = size::CHEVRON_SIZE;
+    // 右の端に開く印を置き，印と名前のあいだにも同じ余白をとる
+    let chevron_left = rect.max_x() - padding - chevron;
     canvas.text(
         Rect::new(
             rect.x + padding,
             rect.y,
-            (rect.width - padding * 3.0 - chevron).max(0.0),
+            (chevron_left - padding - (rect.x + padding)).max(0.0),
             rect.height,
         ),
         label,
@@ -5481,12 +5495,7 @@ fn paint_table_choice(
         TextLayout::LINE,
     );
     canvas.text(
-        Rect::new(
-            rect.max_x() - padding - chevron,
-            rect.y,
-            chevron,
-            rect.height,
-        ),
+        Rect::new(chevron_left, rect.y, chevron, rect.height),
         theme.glyphs.chevron_down,
         TextStyle::IconSmall,
         Color::from(secondary),
