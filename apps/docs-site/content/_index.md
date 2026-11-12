@@ -131,7 +131,7 @@ layout: hextra-home
     subtitle="アプリを切り替えたときに日本語入力にするか英数にするかを，アプリごとに決められます．"
     link="docs/settings/#除外設定"
     image="images/features/app-modes.webp"
-    alt="初期設定のアプリごとの入力モードの画面．IME をオフ，IME をオン，IME のオンオフを記憶を説明している"
+    alt="初期設定のアプリごとの入力モードの画面．IME をオフを選び，ターミナルに切り替えると英数(A)になる実演を出している"
   >}}
   {{< hajime/feature
     title="外部通信不要"

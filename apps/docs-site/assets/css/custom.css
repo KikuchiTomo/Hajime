@@ -23,6 +23,8 @@
 }
 
 .hajime-gradient-text {
+  /* 狭い画面で「高機能日本語IME」を途中で折り返さず，まとめて次の行に送る */
+  display: inline-block;
   background-image: linear-gradient(90deg, var(--hajime-sun-from), var(--hajime-sun-to) 45%, var(--hajime-step-via) 80%, var(--hajime-step-to));
   -webkit-background-clip: text;
   background-clip: text;
@@ -81,6 +83,8 @@
 }
 
 .hajime-hero__note a {
+  /* リンクの文を途中で折り返さない */
+  display: inline-block;
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -167,8 +171,14 @@
     order: 2;
   }
 
-  .hajime-feature--text {
-    grid-template-columns: minmax(0, 1fr);
+  /* 写真の無い機能も説明の列の幅にそろえ，左に置く(ほかの機能と行の長さを同じにする) */
+  .hajime-feature--text,
+  .hajime-feature--text:nth-of-type(even) {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  }
+
+  .hajime-feature--text:nth-of-type(even) .hajime-feature__body {
+    order: 0;
   }
 }
 
@@ -271,5 +281,42 @@
   to {
     opacity: 1;
     transform: none;
+  }
+}
+
+/*
+ * 文書の表．見出しを中身と同じく左にそろえ，ページの中の表で列の幅をそろえる(項目の列と既定の列)．
+ * 狭い画面では列を 1 字の幅まで細くせず，表を横に送る(Hextra の表は横に送れる)
+ */
+.content table:not(.hextra-code-block table) th {
+  text-align: left;
+}
+
+@media (min-width: 768px) {
+  .content table:not(.hextra-code-block table):not(:has(th:nth-child(4))) {
+    display: table;
+    table-layout: fixed;
+  }
+
+  .content table:not(.hextra-code-block table):not(:has(th:nth-child(4))) th:first-child {
+    width: 28%;
+  }
+
+  .content table:not(.hextra-code-block table):not(:has(th:nth-child(4))) th:nth-child(2):not(:last-child) {
+    width: 18%;
+  }
+}
+
+@media (max-width: 767px) {
+  .content table:not(.hextra-code-block table) :is(th, td):first-child {
+    min-width: 7rem;
+  }
+
+  .content table:not(.hextra-code-block table) :is(th, td):nth-child(2):not(:last-child) {
+    min-width: 5rem;
+  }
+
+  .content table:not(.hextra-code-block table) :is(th, td):last-child {
+    min-width: 12rem;
   }
 }
