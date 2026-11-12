@@ -6,7 +6,7 @@
 //! - 候補の窓の右に出す．画面の右の端に入らなければ左に出す
 //! - 縦は，先が選んでいる行を指す位置(先は見出しの行の高さ)にし，画面の上下の端からはみ出さないように寄せる．
 //!   寄せた分だけ先の位置をずらし，行を指し続ける
-//! - 地・縁・角の丸みは候補の窓と同じ決まりにし，縁の線は先まで途切れずにつなぐ
+//! - 背景・枠線・角の丸みは候補の窓と同じ決まりにし，枠線は先まで途切れずにつなぐ
 //! - 中身は語の意味の配置(card_layout)をそのまま使う．アクセントの色は使わない
 //!
 //! 座標は下が y の正
@@ -28,15 +28,15 @@ pub enum Side {
 /// 吹き出しの寸法
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Metrics {
-    /// 本体の幅(縁を含み，先を除く)
+    /// 本体の幅(枠線を含み，先を除く)
     pub width: f32,
     pub padding: f32,
     pub radius: f32,
     pub pointer_length: f32,
     pub pointer_width: f32,
-    /// 候補の窓の縁と先の頂点のあいだ
+    /// 候補の窓の枠線と先の頂点のあいだ
     pub gap: f32,
-    /// 画面の端に寄せたときの，吹き出しの縁と画面の端のあいだ
+    /// 画面の端に寄せたときの，吹き出しの枠線と画面の端のあいだ
     pub screen_margin: f32,
 }
 
@@ -144,7 +144,7 @@ pub fn place(
     }
 }
 
-/// 本体と先を 1 本の線でなぞる閉じた図形．縁の線の太さ stroke の半分だけ内側を通し，線をピクセルにそろえる
+/// 本体と先を 1 本の線でなぞる閉じた図形．枠線の太さ stroke の半分だけ内側を通し，線をピクセルにそろえる
 pub fn outline(placement: &Placement, metrics: &Metrics, stroke: f32) -> Figure {
     let half_stroke = stroke / 2.0;
     let body = placement.body.inset(half_stroke, half_stroke);
@@ -201,7 +201,7 @@ pub struct Bubble {
     pub preferred_pointer: f32,
 }
 
-/// 語の意味の吹き出しの中身．others は同音語の札に出す語
+/// 語の意味の吹き出しの中身．others は同音語のタグに出す語
 pub fn bubble(
     note: &HomophoneNote,
     others: Vec<String>,
@@ -230,7 +230,7 @@ pub fn bubble(
     }
 }
 
-/// 一覧で吹き出しに出す語の意味と同音語の札の語，先で指す行(候補の窓の場面の座標)．
+/// 一覧で吹き出しに出す語の意味と同音語のタグの語，先で指す行(候補の窓の場面の座標)．
 /// 候補の右(吹き出し)に出す設定で，候補を選んでいて意味があるときだけ
 pub fn for_list<'a>(
     list: &'a ipc::CandidateList,
@@ -247,7 +247,7 @@ pub fn for_list<'a>(
     Some((note, note.others.clone(), row))
 }
 
-/// 分岐図で吹き出しに出す語の意味と同音語の札の語(枝に出ていない語だけ)，先で指す枝の行．
+/// 分岐図で吹き出しに出す語の意味と同音語のタグの語(枝に出ていない語だけ)，先で指す枝の行．
 /// 候補の右(吹き出し)に出す設定で，注目している文節で候補を選んでいて意味があり，区切っていないときだけ
 pub fn for_branch<'a>(
     map: &'a ipc::BranchMap,
@@ -275,7 +275,7 @@ fn target_row(scene: &Scene, target: &ipc::PointerTarget) -> Option<Frame> {
         .map(|hit| hit.frame)
 }
 
-/// 置き方の決まった吹き出しの窓を描く．地と縁は候補の窓と同じ色で，先まで 1 本の線で縁取る．
+/// 置き方の決まった吹き出しの窓を描く．背景と枠線は候補の窓と同じ色で，先まで 1 本の線で枠線を描く．
 /// 角丸のテーマは，候補の窓(scene::surround)と同じぼかした影を本体の下に付け，そのぶん窓のまわりを空ける．
 /// 返す場面の body が吹き出し(本体と先)の枠なので，窓は placement.window の左上から body の分だけずらして置く
 pub fn bubble_scene(
@@ -401,7 +401,7 @@ mod tests {
     /// 窓・選んでいる行・覆わない物
     type Setup = (Frame, Frame, Vec<Frame>);
 
-    /// 一覧の窓(幅 300)．行の地は窓の左右の余白 12 の内側
+    /// 一覧の窓(幅 300)．行の背景は窓の左右の余白 12 の内側
     fn list(x: f32, y: f32, selected: usize) -> Setup {
         let window = Frame::new(x, y, 300.0, 200.0);
         let rows: Vec<Frame> = (0..4)
@@ -524,7 +524,7 @@ mod tests {
     }
 
     #[test]
-    fn 縁の線は先まで途切れずにつながる() {
+    fn 枠線は先まで途切れずにつながる() {
         for x in [100.0, 880.0] {
             let placement = placed(&list(x, 100.0, 1), (288.0, 160.0), SCREEN);
             let figure = outline(&placement, &METRICS, 1.0);

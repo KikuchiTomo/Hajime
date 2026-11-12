@@ -41,7 +41,7 @@ enum Content {
     Candidates(ipc::CandidateList),
     BranchMap(ipc::BranchMap),
     Note(ipc::Note),
-    /// モードの札の文字
+    /// モード表示の文字
     Mode(String),
 }
 
@@ -51,7 +51,7 @@ enum Fade {
     None,
     /// 出し始めに，第 1 候補と選んでいる候補のほかを濃くしていく
     Rest(Instant),
-    /// モードの札を消していく
+    /// モード表示を消していく
     ModeOut(Instant),
 }
 
@@ -93,7 +93,7 @@ struct App {
     crossfade: Option<(Scene, Instant)>,
     /// 選んでいるものが同じまま中身が変わった(次の refresh で重ねて変える)
     arrived: bool,
-    /// 語の意味の吹き出しの窓(候補の窓の横に出す．地は自分で塗り，押しても受けない)
+    /// 語の意味の吹き出しの窓(候補の窓の横に出す．背景は自分で塗り，押しても受けない)
     bubble: Window,
     bubble_scene: Option<Scene>,
     /// 吹き出しの本体を置いた位置(論理ピクセル)と，選んでいる候補が変わって付いて動いている途中の動き
@@ -343,7 +343,7 @@ impl App {
             }
             UiCommand::HideHandwriting => crate::handwriting::ffi::hide(),
             UiCommand::ShowPalette { panel, anchor } => {
-                // パレット(R-26)は別の窓に出す(候補・案内・モードの札に置き換わらないように)．すりガラスにはしない
+                // パレット(R-26)は別の窓に出す(候補・案内・モード表示に置き換わらないように)．すりガラスにはしない
                 let theme = ResolvedTheme::resolve(
                     &self.presentation.theme,
                     self.presentation.custom_theme.as_ref(),
@@ -360,8 +360,8 @@ impl App {
                 self.prediction_anchor = Some(composition.unwrap_or_else(|| anchor.clone()));
                 self.anchor = Some(anchor);
             }
-            // 候補と知らせを消す．モードの札は残し，出しておく時間が過ぎたら消す(macOS と同じく札は別に扱う．
-            // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate で札が消えないように)
+            // 候補と知らせを消す．モード表示は残し，出しておく時間が過ぎたら消す(macOS と同じくタグは別に扱う．
+            // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate でタグが消えないように)
             UiCommand::Hide => {
                 if !matches!(self.content, Content::Mode(_)) {
                     self.content = Content::Hidden;
@@ -395,7 +395,7 @@ impl App {
         self.window().start_timer(Timer::Fade, FRAME_MILLISECONDS);
     }
 
-    /// モードの札を出しておく時間が過ぎた．フェードして消す
+    /// モード表示を出しておく時間が過ぎた．フェードして消す
     fn mode_elapsed(&mut self) {
         self.window().stop_timer(Timer::Mode);
         if !matches!(self.content, Content::Mode(_)) {
@@ -576,7 +576,7 @@ impl App {
     }
 
     /// 語の意味の吹き出しを，候補の窓の横に出す・動かす・隠す．window は候補の窓の場面(影を足す前)．
-    /// 吹き出しは自分で地を塗る窓なので，すりガラスの地を使わない見た目(backdrop なし)で描く
+    /// 吹き出しは自分で背景を塗る窓なので，すりガラスの背景を使わない見た目(backdrop なし)で描く
     fn refresh_bubble(&mut self, window: Option<&Scene>, font_size: f32, now: Instant) {
         let shown = match (&self.content, window) {
             (Content::Candidates(list), Some(window)) => scene::bubble::for_list(list, window),

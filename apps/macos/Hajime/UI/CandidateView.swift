@@ -38,13 +38,13 @@ final class CandidateView: NSView {
             let footer = max(Glass.keycapHeight, Glass.noteIconSize, (labelFont.ascender - labelFont.descender).rounded(.up))
             return .rounded(rowPitch: (Glass.rowHeight * scale).rounded(), headerHeight: Glass.headerHeight, footerHeight: footer)
         }
-        // 文字種の行と足元の行は，角丸のテーマと同じく文字・キーの札・案内のアイコンのいちばん高いもの
+        // 文字種の行と足元の行は，角丸のテーマと同じく文字・キーキャップ・案内のアイコンのいちばん高いもの
         let section = max(Glass.keycapHeight, Glass.noteIconSize, (labelFont.ascender - labelFont.descender).rounded(.up))
         return .bevel(rowPitch: (Size.rowHeight * scale).rounded(), headerHeight: max(section, Glass.headerHeight), footerHeight: section,
                       hasShadow: theme.hasDropShadow)
     }
 
-    /// 行の地の内側の左右の余白．番号の丸(番号)の左と注釈の札の右，足元の案内と位置の左右の端をここにそろえる
+    /// 行の地の内側の左右の余白．番号の丸(番号)の左と注釈のタグの右，足元の案内と位置の左右の端をここにそろえる
     private var rowPaddingX: CGFloat { theme.isRounded ? Glass.rowPaddingX : Size.paddingX }
     /// 番号の幅(番号から候補の文字まで)
     private var lead: CGFloat { theme.isRounded ? Glass.badgeSize + Size.paddingX : Size.indexWidth }
@@ -163,7 +163,7 @@ final class CandidateView: NSView {
     private var columnGutter: CGFloat { Size.columnGap * 2 + Size.frameWidth }
 
     /// 候補ごとの枠．表では上から下へ詰め，列を左から右へ並べる．列のあいだは 1 ドットの縦の線で区切り，
-    /// 線の左と右を同じだけ空ける(Size.columnGap．選んでいる行の地は線に触れない)．
+    /// 線の左と右を同じだけ空ける(Size.columnGap．選んでいる行の背景は線に触れない)．
     /// 表でなければ，配置の候補の行をそのまま使う
     private func cells(for panel: CandidatePanel, layout: CandidateListLayout) -> Cells {
         let rows = layout.rows.map(NSRect.init), hits = layout.hitRows.map(NSRect.init)
@@ -175,7 +175,7 @@ final class CandidateView: NSView {
         let cell = min(cellWidth(for: panel), ((first.width - gutter * CGFloat(columns - 1)) / CGFloat(columns)).rounded(.down))
         let x = { (column: Int) in first.minX + CGFloat(column) * (cell + gutter) }
         let place = { (row: NSRect, index: Int) in NSRect(x: x(index / length), y: row.minY, width: cell, height: row.height) }
-        // 縦の線は列と列のあいだの真ん中．縦は行の地の上の端から下の端まで(glass は行と行のあいだの空きの分だけ短くなる)
+        // 縦の線は列と列のあいだの真ん中．縦は行の背景の上の端から下の端まで(glass は行と行のあいだの空きの分だけ短くなる)
         let separators = (1..<max(columns, 1)).map {
             NSRect(x: x($0) - Size.columnGap - Size.frameWidth, y: first.minY, width: Size.frameWidth, height: last.maxY - first.minY)
         }
@@ -193,17 +193,17 @@ final class CandidateView: NSView {
         }
     }
 
-    /// 候補の行の札の右端(行の地の内側の余白の内側．足元の位置の右の端と同じ x)
+    /// 候補の行のタグの右端(行の地の内側の余白の内側．足元の位置の右の端と同じ x)
     private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - rowPaddingX }
 
-    /// ユーザー辞書の語のコメントの札を押せる範囲．コメントの札の無い行は nil
+    /// ユーザー辞書の語のコメントのタグを押せる範囲．コメントのタグの無い行は nil
     private func commentRect(_ entry: CandidatePanel.Entry, in row: NSRect) -> NSRect? {
         entry.comment.map { NoteDrawing.tagHitRect($0, maxX: tagMaxX(in: row), row: row, theme: theme) }
     }
 
     /// point(この view の座標)にある押せる対象．無ければ nil．
-    /// コメントの札は行の中にあるので，行より先に調べる(札を押すと候補の代わりにコメントを入れる)
-    /// 選んでいる候補の行の地(この view の座標)．大きさ size の窓で置いたとき．候補を選んでいなければ nil．
+    /// コメントのタグは行の中にあるので，行より先に調べる(タグを押すと候補の代わりにコメントを入れる)
+    /// 選んでいる候補の行の背景(この view の座標)．大きさ size の窓で置いたとき．候補を選んでいなければ nil．
     /// 語の意味の吹き出しの先はこの行の縦の真ん中を指す
     func selectedRowRect(size: NSSize) -> NSRect? {
         guard let panel, panel.focus == .candidate, let selected = panel.selectedEntry else { return nil }
@@ -227,7 +227,7 @@ final class CandidateView: NSView {
         let layout = placement(for: panel, size: bounds.size).layout
         let hitRows = cells(for: panel, layout: layout).hitRows
         if let row = hitRows.firstIndex(where: { $0.contains(point) }) {
-            // 札を押せる範囲は，候補の行と同じく行と行のあいだまで(札の右の端は行の地の内側)
+            // タグを押せる範囲は，候補の行と同じく行と行のあいだまで(タグの右の端は行の地の内側)
             if let comment = commentRect(panel.entries[row], in: hitRows[row]), comment.contains(point) { return .comment(row) }
             return .entry(row)
         }
@@ -374,7 +374,7 @@ final class CandidateView: NSView {
         var hints: [KeyHint]
         var note: Note?
         var position: String
-        /// 選んでいる候補に連想があるときの知らせ(R-18)のうち，キーの割り当てが無いときの語．キーがあればキーキャップの札として hints に入れる
+        /// 選んでいる候補に連想があるときの知らせ(R-18)のうち，キーの割り当てが無いときの語．キーがあればキーキャップとして hints に入れる
         var associationHint: String?
     }
 
@@ -408,7 +408,7 @@ final class CandidateView: NSView {
     }
 
     /// glass は案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)．
-    /// 左右の端は候補の行の番号の左と注釈の札の右にそろえる
+    /// 左右の端は候補の行の番号の左と注釈のタグの右にそろえる
     private func drawFooter(_ panel: CandidatePanel, in rect: NSRect) {
         let footer = footerContent(for: panel)
         let muted: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: theme.textMuted]
@@ -448,7 +448,7 @@ final class CandidateView: NSView {
 }
 
 extension CandidatePanel.Entry {
-    /// 札に出したユーザー辞書の語のコメント(長ければ先頭だけ)．札がコメントでなければ nil
+    /// タグに出したユーザー辞書の語のコメント(長ければ先頭だけ)．タグがコメントでなければ nil
     var comment: String? { hasComment ? annotation : nil }
 }
 

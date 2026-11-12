@@ -1,7 +1,7 @@
 import HajimeApplication
 import Testing
 
-/// 語の意味の吹き出しの置き方: 選んでいる行のすぐ横，覆わない物を避けた上下の寄せ，左右の切り替え，先の位置，縁の線のつながり
+/// 語の意味の吹き出しの置き方: 選んでいる行のすぐ横，覆わない物を避けた上下の寄せ，左右の切り替え，先の位置，枠線のつながり
 @Suite("語の意味の吹き出しの置き方")
 struct MeaningBubbleLayoutTests {
     typealias Layout = MeaningBubbleLayout
@@ -11,7 +11,7 @@ struct MeaningBubbleLayoutTests {
     static let screen = Box(x: 0, y: 0, width: 1200, height: 800)
     static let size = (width: 288.0, height: 160.0)
 
-    /// 一覧の窓(幅 300)．行の地は窓の左右の余白 12 の内側で，行の右の端は窓の右の端の 12 手前
+    /// 一覧の窓(幅 300)．行の背景は窓の左右の余白 12 の内側で，行の右の端は窓の右の端の 12 手前
     static func list(x: Double, y: Double, selected: Int) -> (window: Box, row: Box, obstacles: [Box]) {
         let window = Box(x: x, y: y, width: 300, height: 200)
         let rows = (0..<4).map { Box(x: x + 12, y: y + 12 + 28 * Double($0), width: 276, height: 24) }
@@ -99,7 +99,7 @@ struct MeaningBubbleLayoutTests {
         #expect(layout.pointerY <= 160 - Self.metrics.radius - Self.metrics.pointerWidth / 2)
     }
 
-    @Test("縁の線は本体と先を 1 本でなぞり，始まりに戻る", arguments: [100.0, 880.0])
+    @Test("枠線は本体と先を 1 本でなぞり，始まりに戻る", arguments: [100.0, 880.0])
     func outline(x: Double) throws {
         let layout = Self.place(Self.list(x: x, y: 100, selected: 1))
         let outline = layout.outline(metrics: Self.metrics, stroke: 1)

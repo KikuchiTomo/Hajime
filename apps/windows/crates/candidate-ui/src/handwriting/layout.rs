@@ -62,7 +62,7 @@ pub struct Layout {
     pub canvas: Frame,
     /// 候補を並べる場所(この中だけに描く)．はみ出した分は横に送る
     pub strip: Frame,
-    /// 候補の札．送った分を引いた位置(strip の外にはみ出すことがある)
+    /// 候補のタグ．送った分を引いた位置(strip の外にはみ出すことがある)
     pub chips: Vec<Frame>,
     pub undo: Frame,
     pub clear: Frame,
@@ -319,7 +319,7 @@ mod tests {
     }
 
     #[test]
-    fn 札は字が短くても正方形より細くしない() {
+    fn タグは字が短くても正方形より細くしない() {
         let layout = smallest(&["", "鬱"]);
         assert!(layout
             .chips

@@ -5,7 +5,7 @@
 /// - 縦は，先が行を指す位置(先は見出しの行の高さ)にし，覆ってしまう物があれば上か下へ寄せる．画面の上下の端からは screenMargin の内側．
 ///   寄せた分だけ先の位置をずらし，行を指し続ける．先は角の丸みにはかけない
 /// - 行の右に置けなければ(画面の右に入らない・寄せても覆う・先が行に届かない)，候補の窓の右の外，それも無理なら窓の左の外に置く
-/// - 縁の線は本体と先を 1 本でなぞる(outline)
+/// - 枠線は本体と先を 1 本でなぞる(outline)
 ///
 /// 座標は上が y の小さい側(画面の上の端が 0 に近い)．macOS は画面の座標(下が y の小さい側)から直して使う．
 /// Windows の候補ウィンドウ(scene::bubble)は同じ決め方を Rust で持つ
@@ -20,15 +20,15 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
     }
 
     public struct Metrics: Sendable, Equatable {
-        /// 本体の幅(縁を含み，先を除く)
+        /// 本体の幅(枠線を含み，先を除く)
         public var width: Double
         public var padding: Double
         public var radius: Double
         public var pointerLength: Double
         public var pointerWidth: Double
-        /// 候補の窓の縁と先の頂点のあいだ
+        /// 候補の窓の枠線と先の頂点のあいだ
         public var gap: Double
-        /// 画面の端に寄せたときの，吹き出しの縁と画面の端のあいだ
+        /// 画面の端に寄せたときの，吹き出しの枠線と画面の端のあいだ
         public var screenMargin: Double
 
         public init(width: Double, padding: Double, radius: Double, pointerLength: Double, pointerWidth: Double, gap: Double, screenMargin: Double) {
@@ -58,7 +58,7 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
     public var pointerY: Double
 
     /// - Parameters:
-    ///   - row: 選んでいる候補の行の地(画面の座標)．先はこの行の縦の真ん中を指す
+    ///   - row: 選んでいる候補の行の背景(画面の座標)．先はこの行の縦の真ん中を指す
     ///   - window: 候補の窓の本体の枠(画面の座標)
     ///   - size: 本体の大きさ
     ///   - preferredPointer: 本体の上の端から先までの長さ(見出しの行の真ん中)
@@ -106,7 +106,7 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         pointerY = pointer.rounded()
     }
 
-    /// 縁の線がなぞる点．本体の角は丸め(corner)，先は 3 つの点でとがらせる．
+    /// 枠線がなぞる点．本体の角は丸め(corner)，先は 3 つの点でとがらせる．
     /// 線の太さ stroke の半分だけ内側を通し，線をピクセルにそろえる．左上の角の終わりから時計回り
     public enum Segment: Sendable, Equatable {
         case line(x: Double, y: Double)

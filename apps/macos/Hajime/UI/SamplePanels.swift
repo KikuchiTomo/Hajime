@@ -51,7 +51,7 @@ enum SamplePanels {
                               position: selected + 1, total: entries.count, note: note)
     }
 
-    /// ユーザー辞書の語のコメント(R-21)を札に出した一覧．札を押すと候補の代わりにコメントを入れる．長いコメントは札では先頭だけを出す
+    /// ユーザー辞書の語のコメント(R-21)をタグに出した一覧．タグを押すと候補の代わりにコメントを入れる．長いコメントはタグでは先頭だけを出す
     static let comment = CandidatePanel(
         variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) },
         selectedVariant: nil,
@@ -64,7 +64,7 @@ enum SamplePanels {
         selectedEntry: 1, focus: .candidate, position: 2, total: 4, note: nil
     )
 
-    /// ユーザー辞書の語のコメントを下の枝に添えた分岐図．コメントの無い第 1 候補を選んでいる(選んでいない枝の札の見え方)
+    /// ユーザー辞書の語のコメントを下の枝に添えた分岐図．コメントの無い第 1 候補を選んでいる(選んでいない枝のタグの見え方)
     static let commentLattice: LatticePanel = {
         var column = LatticePanel.Column(text: "会社", alternatives: ["会社", "ピヨ株式会社", "かいしゃ"], selectedAlternative: 0,
                                          isFocused: true, isUncertain: false)
@@ -289,7 +289,7 @@ enum SamplePalettes {
             selection: .init(row: 0, column: 3), preview: preview(japanFlag), showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
     }()
 
-    /// 「tsugi」と打って探し，Unicode の名前とショートコードの長い ⏭️ を選んだところ．名前は 2 行で「…」にし，長い札は字を縮めて折り返す
+    /// 「tsugi」と打って探し，Unicode の名前とショートコードの長い ⏭️ を選んだところ．名前は 2 行で「…」にし，長いタグは字を縮めて折り返す
     static let longName: PalettePanel = {
         PalettePanel(
             modes: modes(.emoji), query: "つぎ", placeholder: PaletteStrings.emojiPlaceholder, tabs: [],

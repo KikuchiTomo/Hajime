@@ -5,7 +5,7 @@ import HajimeDomain
 /// 語の意味の吹き出し(R-08)を出し入れする．候補の窓の子の窓にし，候補の窓の外に出す．
 ///
 /// - 候補の窓の右に出し，画面の右の端に入らなければ左に出す．先(三角)は選んでいる候補の行の縦の真ん中を指す(core の MeaningBubbleLayout)
-/// - 地・縁・角の丸み・影は候補の窓と同じ(角丸のテーマはすりガラスの地を吹き出しの形に切り抜き，窓の影を付ける)
+/// - 背景・枠線・角の丸み・影は候補の窓と同じ(角丸のテーマはすりガラスの背景を吹き出しの形に切り抜き，窓の影を付ける)
 /// - 選んでいる候補が変わったら付いて動く．「視差効果を減らす」が有効ならすぐ移す
 /// - フォーカスを取らず，マウスは通す(押しても受けない)
 @MainActor
@@ -21,7 +21,7 @@ final class MeaningBubbleController {
 
     /// note を，選んでいる候補の行 row のすぐ横(行の右の端から inline)に出し，先で行の縦の真ん中を指す．
     /// 候補の窓 anchor の空いている所に重ねてよいが，obstacles(ほかの候補・幹の文節・足元の案内・入力中の文字)は覆わない．
-    /// 座標はどれも画面の座標．others は同音語の札に出す語，screen は画面の使える範囲
+    /// 座標はどれも画面の座標．others は同音語のタグに出す語，screen は画面の使える範囲
     func show(_ note: HomophoneNote, others: [String], theme: ResolvedTheme, row: NSRect, anchor: NSRect, obstacles: [NSRect], screen: NSRect,
               parent: NSWindow) {
         let metrics = MeaningBubbleLayout.Metrics.tokens(rounded: theme.isRounded)
@@ -94,13 +94,13 @@ final class MeaningBubbleController {
     }
 }
 
-/// 吹き出しの形(本体と先を 1 本の縁の線でなぞる)と，中の語の意味を描く
+/// 吹き出しの形(本体と先を 1 本の枠線でなぞる)と，中の語の意味を描く
 final class MeaningBubbleView: NSView {
     private var content: MeaningCardDrawing.Layout?
     private var placement: MeaningBubbleLayout?
     private var metrics = MeaningBubbleLayout.Metrics.tokens(rounded: true)
     private var theme = ResolvedTheme.resolveStatic
-    /// glass の面を自分で塗るか．ぼかしの地の無いところ(画像への書き出し)で使う
+    /// glass の面を自分で塗るか．ぼかしの背景の無いところ(画像への書き出し)で使う
     var fillsSurface = false { didSet { needsDisplay = true } }
 
     override var isFlipped: Bool { true }
@@ -113,7 +113,7 @@ final class MeaningBubbleView: NSView {
         needsDisplay = true
     }
 
-    /// 吹き出しの形の縁の線．線の太さの半分だけ内側を通す
+    /// 吹き出しの形の枠線．線の太さの半分だけ内側を通す
     private func outline() -> NSBezierPath? {
         guard let placement else { return nil }
         let outline = placement.outline(metrics: metrics, stroke: DesignTokens.Size.Part.stroke)
@@ -135,7 +135,7 @@ final class MeaningBubbleView: NSView {
         return path
     }
 
-    /// すりガラスの地を吹き出しの形に切り抜く形(大きさ size の窓)
+    /// すりガラスの背景を吹き出しの形に切り抜く形(大きさ size の窓)
     func mask(size: NSSize) -> NSImage {
         NSImage(size: size, flipped: true) { [weak self] _ in
             NSColor.black.setFill()

@@ -2,7 +2,7 @@ import AppKit
 import HajimeDomain
 
 /// コマンドの候補(R-22)の頭に置く種類のアイコンを描く．一覧(CandidateView)と分岐図(BranchView)で同じ形にする．
-/// 文字を入れる候補と見分けられるよう，形(種類のアイコン)・色(アクセントの色)・言葉(行の右の「コマンド」の札)の 3 つで示す
+/// 文字を入れる候補と見分けられるよう，形(種類のアイコン)・色(アクセントの色)・言葉(行の右の「コマンド」のタグ)の 3 つで示す
 @MainActor
 enum CommandDrawing {
     private typealias Glass = DesignTokens.Size.Glass

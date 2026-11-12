@@ -576,8 +576,8 @@ enum SnapshotRenderer {
     }
 
     /// 押した位置から対象を求める処理(候補をマウスで選ぶ)を確かめる．窓を細かく区切って押してみて，
-    /// 見えている幹・枝・行・字種・コメントの札がどれも押せることと，上から下への並びが候補の順と合うことを確かめ，合わなければ知らせる．
-    /// コメントの札は，札の中を押すとコメントに，札の外の行を押すと候補になることも確かめる
+    /// 見えている幹・枝・行・字種・コメントのタグがどれも押せることと，上から下への並びが候補の順と合うことを確かめ，合わなければ知らせる．
+    /// コメントのタグは，タグの中を押すとコメントに，タグの外の行を押すと候補になることも確かめる
     private static func checkPointerTargets() {
         for (name, theme) in [("glass", ThemeChoice(.automatic)), ("platinum", ThemeChoice(.platinum))] {
             let resolved = ResolvedTheme.resolve(theme, appearance: NSAppearance(named: .aqua))
@@ -610,7 +610,7 @@ enum SnapshotRenderer {
         }
     }
 
-    /// 分岐図で押せるはずの対象．幹の文節と，注目している文節の上下の枝と，コメントの札
+    /// 分岐図で押せるはずの対象．幹の文節と，注目している文節の上下の枝と，コメントのタグ
     private static func expectedTargets(_ panel: LatticePanel) -> Set<PointerTarget> {
         let focused = panel.columns.first(where: \.isFocused)
         let comments = focused.map { column in column.alternatives.indices.filter { column.comment(at: $0) != nil } } ?? []
@@ -618,7 +618,7 @@ enum SnapshotRenderer {
                    + (focused?.variants.indices.map(PointerTarget.variant) ?? []) + comments.map(PointerTarget.comment))
     }
 
-    /// 一覧で押せるはずの対象．候補の行と，使える字種と，コメントの札
+    /// 一覧で押せるはずの対象．候補の行と，使える字種と，コメントのタグ
     private static func expectedTargets(_ panel: CandidatePanel) -> Set<PointerTarget> {
         Set(panel.entries.indices.map(PointerTarget.entry)
             + panel.variants.indices.filter { panel.variants[$0].isAvailable }.map(PointerTarget.listVariant)
@@ -829,7 +829,7 @@ enum SnapshotRenderer {
     }
 
     /// 同音異義語の使い分けを分岐図で出したところ．既定では候補の窓の横の吹き出しにし，先で選んでいる枝の行を指す．
-    /// 同音語の札には枝に出ていない語だけを出す．selected を意味の無い候補にすると，吹き出しを出さない
+    /// 同音語のタグには枝に出ていない語だけを出す．selected を意味の無い候補にすると，吹き出しを出さない
     private static func homophoneBranchView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side, selected: Int = 1) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
@@ -878,7 +878,7 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// ユーザー辞書の語のコメント(R-21)を札に出した一覧．選んでいる行の札は選択の地の上に描く
+    /// ユーザー辞書の語のコメント(R-21)をタグに出した一覧．選んでいる行のタグは選択の地の上に描く
     private static func commentListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)

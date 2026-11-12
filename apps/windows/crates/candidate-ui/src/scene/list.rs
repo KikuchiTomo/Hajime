@@ -19,7 +19,7 @@ use tokens::size::{branch, candidate, glass};
 struct Metrics {
     layout: list_layout::Metrics,
     style: Style,
-    /// 行の地の内側の左右の余白．番号の丸(番号)の左と注釈の札の右，足元の案内と位置の左右の端をここにそろえる
+    /// 行の地の内側の左右の余白．番号の丸(番号)の左と注釈のタグの右，足元の案内と位置の左右の端をここにそろえる
     row_padding_x: f32,
     /// 番号の幅(番号から候補の文字まで)
     lead: f32,
@@ -31,7 +31,7 @@ impl Metrics {
         let scale = look.font_size / candidate::FONT_SIZE;
         let label = measure.height(Font::Label).ceil();
         if rounded {
-            // 足元の行は，キーの札・案内のアイコン・文字の行の箱のいちばん高いもの
+            // 足元の行は，キーキャップ・案内のアイコン・文字の行の箱のいちばん高いもの
             let footer = glass::KEYCAP_HEIGHT.max(glass::NOTE_ICON_SIZE).max(label);
             Self {
                 layout: list_layout::Metrics::rounded(
@@ -44,7 +44,7 @@ impl Metrics {
                 lead: glass::BADGE_SIZE + candidate::PADDING_X,
             }
         } else {
-            // 文字種の行と足元の行は，角丸のテーマと同じく文字・キーの札・案内のアイコンのいちばん高いもの
+            // 文字種の行と足元の行は，角丸のテーマと同じく文字・キーキャップ・案内のアイコンのいちばん高いもの
             let section = label.max(glass::KEYCAP_HEIGHT).max(glass::NOTE_ICON_SIZE);
             Self {
                 layout: list_layout::Metrics::bevel(
@@ -66,7 +66,7 @@ struct Footer {
     note: Option<ipc::Note>,
     position: String,
     /// 選んでいる候補に連想があることの知らせ(R-18)のうち，キーの割り当てが無いときの語．
-    /// キーがあればキーキャップの札として hints に入れる(キーを文字で書かない)
+    /// キーがあればキーキャップとして hints に入れる(キーを文字で書かない)
     association_hint: Option<String>,
 }
 
@@ -343,8 +343,8 @@ fn cells(list: &CandidateList, layout: &ListLayout, cell_width: f32) -> Cells {
         hit_rows: (0..list.entries.len())
             .map(|index| place(layout.hit_rows[index % length], index))
             .collect(),
-        // 縦の線は列と列のあいだの真ん中．左と右の空きは同じ(COLUMN_GAP)で，選んでいる行の地は線に触れない．
-        // 縦は行の地の上の端から下の端まで(角丸のテーマは行と行のあいだの空きの分だけ短くなる)
+        // 縦の線は列と列のあいだの真ん中．左と右の空きは同じ(COLUMN_GAP)で，選んでいる行の背景は線に触れない．
+        // 縦は行の背景の上の端から下の端まで(角丸のテーマは行と行のあいだの空きの分だけ短くなる)
         separators: (1..columns)
             .map(|column| {
                 Frame::new(
@@ -391,8 +391,8 @@ fn draw_list(
     }
     for (index, entry) in list.entries.iter().enumerate() {
         let row = cells.rows[index];
-        // コメントの札は行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
-        // 札を押すと候補の代わりにコメントを入れる
+        // コメントのタグは行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
+        // タグを押すと候補の代わりにコメントを入れる
         if let Some(comment) = super::entry_comment(entry) {
             // 押せる範囲は，候補の行と同じく行と行のあいだまで
             let frame =
@@ -552,7 +552,7 @@ fn draw_list(
     }
 }
 
-/// 候補の行の札の右端(行の地の内側の余白の内側．足元の位置の右の端と同じ x)
+/// 候補の行のタグの右端(行の地の内側の余白の内側．足元の位置の右の端と同じ x)
 fn tag_max_x(row: Frame, metrics: &Metrics) -> f32 {
     row.max_x() - metrics.row_padding_x
 }
@@ -599,7 +599,7 @@ fn variants(painter: &mut Painter, list: &CandidateList, section: Frame, inset: 
 }
 
 /// 角丸のテーマは案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)．
-/// 左右の端は候補の行の番号の左と注釈の札の右(行の地の内側の余白 inset)にそろえる
+/// 左右の端は候補の行の番号の左と注釈のタグの右(行の地の内側の余白 inset)にそろえる
 fn footer_section(painter: &mut Painter, footer: &Footer, section: Frame, inset: f32) {
     let theme = painter.theme;
     let left = section.x + inset;
@@ -829,7 +829,7 @@ mod tests {
     }
 
     #[test]
-    fn コメントの札を押すとコメント_札の外の行と_コメントでない札は候補() {
+    fn コメントのタグを押すとコメント_タグの外の行と_コメントでないタグは候補() {
         for name in ["platinum", "automatic"] {
             let theme = theme(name);
             let mut commented = list(Some(0));
@@ -844,17 +844,17 @@ mod tests {
                     .map(|hit| hit.frame)
             };
             let comment = ipc::PointerTarget::Comment { index: 0 };
-            let tag = text_frame(&scene, "千代田区千代田1-1").expect("札を描く");
+            let tag = text_frame(&scene, "千代田区千代田1-1").expect("タグを描く");
             assert_eq!(
                 scene.target_at(tag.mid_x(), tag.mid_y()),
                 Some(comment.clone())
             );
-            // 札の上下の空きも，行の高さいっぱいまで札として押せる
+            // タグの上下の空きも，行の高さいっぱいまでタグとして押せる
             let row = hit(ipc::PointerTarget::Entry { index: 0 }).expect("候補の行");
-            let area = hit(comment.clone()).expect("札を押せる範囲");
+            let area = hit(comment.clone()).expect("タグを押せる範囲");
             assert_eq!((area.y, area.height), (row.y, row.height), "{name}");
             assert_eq!(scene.target_at(tag.mid_x(), row.y + 1.0), Some(comment));
-            // 札の左(候補の文字の側)は候補
+            // タグの左(候補の文字の側)は候補
             assert_eq!(
                 scene.target_at(area.x - 1.0, row.mid_y()),
                 Some(ipc::PointerTarget::Entry { index: 0 })
@@ -864,14 +864,14 @@ mod tests {
                 scene.target_at(text.x + 1.0, text.mid_y()),
                 Some(ipc::PointerTarget::Entry { index: 0 })
             );
-            // コメントでない札(入力のまま)は押しても候補
-            let plain = text_frame(&scene, "入力のまま").expect("札を描く");
+            // コメントでないタグ(入力のまま)は押しても候補
+            let plain = text_frame(&scene, "入力のまま").expect("タグを描く");
             assert_eq!(
                 scene.target_at(plain.mid_x(), plain.mid_y()),
                 Some(ipc::PointerTarget::Entry { index: 1 })
             );
         }
-        // コメントの無い一覧には札の押せる範囲を足さない
+        // コメントの無い一覧にはタグの押せる範囲を足さない
         let theme = theme("automatic");
         let scene = candidate_list(&list(Some(0)), &Look::new(&theme, 15.0), &Fixed);
         assert!(!scene
@@ -1166,7 +1166,7 @@ mod tests {
     }
 
     #[test]
-    fn コマンドの候補は種類のアイコンを文字の前に置き_札をアクセントの色にする() {
+    fn コマンドの候補は種類のアイコンを文字の前に置き_タグをアクセントの色にする() {
         for name in ["platinum", "automatic"] {
             let theme = theme(name);
             let mut commands = list(Some(0));
@@ -1200,7 +1200,7 @@ mod tests {
     }
 
     #[test]
-    fn 選んでいるコマンドの候補は_アイコンと札を選択の文字の色にする() {
+    fn 選んでいるコマンドの候補は_アイコンとタグを選択の文字の色にする() {
         let theme = theme("automatic");
         let mut commands = list(Some(2));
         commands.entries.push(CandidateEntry {

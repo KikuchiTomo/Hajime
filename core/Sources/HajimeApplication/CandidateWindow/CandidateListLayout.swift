@@ -2,7 +2,7 @@
 /// 候補の右(吹き出し)に出す設定の語の意味は窓の外の吹き出し(MeaningBubbleLayout)に出すので，ここには入らない
 ///
 /// 角丸のテーマ(rounded)
-/// - 縁の線の内側に，上下左右とも metrics.padding の余白を空ける．候補の行の地・区切りの線・語の意味の左右の端は余白の内側の端にそろう
+/// - 枠線の内側に，上下左右とも metrics.padding の余白を空ける．候補の行の背景・区切りの線・語の意味の左右の端は余白の内側の端にそろう
 /// - 区切りの線の上と下は metrics.separatorGap．候補の下の語の意味と候補のあいだも同じ
 ///
 /// platinum と desk(bevel)
@@ -67,7 +67,7 @@ public struct CandidateListLayout: Sendable, Equatable {
                     headerHeight: headerHeight, footerHeight: footerHeight, shadow: 0)
         }
 
-        /// platinum と desk．余白と区切りの線の上下は角丸のテーマと同じ(余白の決まり)．候補の行の地は角を丸めず，上下を縮めない
+        /// platinum と desk．余白と区切りの線の上下は角丸のテーマと同じ(余白の決まり)．候補の行の背景は角を丸めず，上下を縮めない
         public static func bevel(rowPitch: Double, headerHeight: Double, footerHeight: Double, hasShadow: Bool) -> Metrics {
             Metrics(edge: LayoutTokens.Candidate.frameWidth + LayoutTokens.Candidate.bevelWidth, padding: LayoutTokens.Glass.windowPadding,
                     separatorGap: LayoutTokens.Glass.separatorGap, separatorWidth: LayoutTokens.Candidate.frameWidth, rowPitch: rowPitch, rowInset: 0,

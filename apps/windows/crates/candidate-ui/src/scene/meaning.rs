@@ -3,11 +3,11 @@
 //! 語の意味(R-08．macOS の MeaningCardDrawing)．一覧(list)と分岐図(branch)で同じものを使う．
 //!
 //! 箱は描かず，候補の列(分岐図では候補の枝)の続きとして置く．
-//! 上から順に，見出し(辞書のアイコン・語・品詞の札)，意味，使い方の例，同音語を並べる．
+//! 上から順に，見出し(辞書のアイコン・語・品詞のタグ)，意味，使い方の例，同音語を並べる．
 //! - 意味が 2 つ以上なら，頭に角丸の四角の番号を付ける(候補の番号の丸と形を変え，番号キーで選ぶものと見分ける)
 //! - 意味と例は語の意味の幅で折り返す(行の頭に句読点や小さいかなを置かない)．行数の上限を超える分は「…」で省く
 //! - 使い方の例は左に縦の線を引いて控えめな色で出し，例の中の見出しの語だけを強める
-//! - 同音語は区切りの線の下に，耳のアイコンと札だけで並べる．入らない札は「+n」にまとめる
+//! - 同音語は区切りの線の下に，耳のアイコンとタグだけで並べる．入らないタグは「+n」にまとめる
 //!
 //! 候補の右に出すときは，一覧でも分岐図でも，選んでいる候補から見出しへ線を引く(アクセントの色はこの線だけに使う)
 
@@ -122,7 +122,7 @@ impl Card {
     }
 }
 
-/// 分岐図で出す語の意味の，同音語の札に出す語．下の枝に出ていない語だけにする(枝に出ている語は見れば分かる)
+/// 分岐図で出す語の意味の，同音語のタグに出す語．下の枝に出ていない語だけにする(枝に出ている語は見れば分かる)
 pub(super) fn branch_others(note: &HomophoneNote, column: &BranchColumn) -> Vec<String> {
     note.others
         .iter()
@@ -167,9 +167,9 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
     let theme = painter.theme;
     let layout = &card.layout;
     let at = |frame: Frame| frame.offset(rect.x, rect.y);
-    // アクセントの色(青)は使わない．アイコン・番号・品詞は控えめな色で，番号は枠線だけの丸，品詞は枠線だけの札にする
-    // (地を塗らないので，控えめな色の字でも地との差が保てる)．同音語の札は，パレットの説明の札と同じく
-    // 文字の色を薄く敷いた地に文字の色の字．札の形は 1 種類(角の丸み part.tag-radius)
+    // アクセントの色(青)は使わない．アイコン・番号・品詞は控えめな色で，番号は枠線だけの丸，品詞は枠線だけのタグにする
+    // (背景を塗らないので，控えめな色の字でも背景との差が保てる)．同音語のタグは，パレットの説明のタグと同じく
+    // 文字の色を薄く敷いた背景に文字の色の字．タグの形は 1 種類(角の丸み part.tag-radius)
     let (mark, bar_color) = (theme.text_muted, theme.line);
     let tag_radius = if theme.is_rounded() {
         tokens::size::part::TAG_RADIUS
@@ -188,7 +188,7 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
         at(headword.place.line),
     );
     if let Some(chip) = &layout.part_of_speech {
-        // 品詞の札
+        // 品詞のタグ
         let frame = at(chip.frame);
         painter.draws.push(Draw::RoundRect {
             frame: frame.inset(0.5, 0.5),
@@ -525,7 +525,7 @@ mod tests {
         header_mid_y: 12.0,
     };
 
-    /// 一覧の幅の語の意味．column を渡すと，同音語の札に枝に出ていない語だけを出す(分岐図)
+    /// 一覧の幅の語の意味．column を渡すと，同音語のタグに枝に出ていない語だけを出す(分岐図)
     fn card_with(painter: &Painter, note: &HomophoneNote, column: Option<&BranchColumn>) -> Card {
         let others =
             column.map_or_else(|| note.others.clone(), |column| branch_others(note, column));
@@ -711,7 +711,7 @@ mod tests {
     }
 
     #[test]
-    fn 同音語の行は区切りの線の下に並べ_入らない札は数にまとめる() {
+    fn 同音語の行は区切りの線の下に並べ_入らないタグは数にまとめる() {
         let theme = theme("washi");
         let look = Look::new(&theme, 15.0);
         let few = card(
@@ -743,7 +743,7 @@ mod tests {
         for text in ["撮る", "動詞", "撮影する", "取る", "採る"] {
             assert!(shown.contains(&text.to_string()), "{text}");
         }
-        // 同音語は耳のアイコンと札だけで並べ，見出しの言葉は置かない
+        // 同音語は耳のアイコンとタグだけで並べ，見出しの言葉は置かない
         assert!(!shown.contains(&"同音語".to_string()));
         assert!(drawn.draws.iter().any(|draw| matches!(
             draw,

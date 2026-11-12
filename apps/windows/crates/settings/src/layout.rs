@@ -73,7 +73,7 @@ pub struct CardLayout {
     pub reset: Rect,
     /// 部品の中のボタン・入力欄(一覧は 左の欄・右の欄・上のボタン・検索欄・絞り込み・下のボタンの順)
     pub parts: Vec<Rect>,
-    /// 絵(情報のページのアイコン・テーマの見本の札・名前の横の候補の見本の札)．無ければ幅 0
+    /// 絵(情報のページのアイコン・テーマの見本・名前の横の候補の見本)．無ければ幅 0
     pub icon: Rect,
 }
 
@@ -168,7 +168,7 @@ pub fn layout(
         });
         let mut cards: Vec<CardLayout> = Vec::new();
         let rows = &section.rows;
-        // 候補の見本の札は，まとまりの中でいちばん長い名前のあとから書き出し，行ごとの左の端をそろえる
+        // 候補の見本は，まとまりの中でいちばん長い名前のあとから書き出し，行ごとの左の端をそろえる
         let example_title = rows
             .iter()
             .filter(|row| row.example.is_some())
@@ -196,6 +196,10 @@ pub fn layout(
                 };
                 let card = place(index, row, &notes, frame, metrics);
                 y = card.card.max_y();
+                // 辞書の一覧は取り込むボタンをカードの下に置く(macOS の Section の footer)
+                if let Control::Dictionaries(_) = row.control {
+                    y = card.parts.iter().map(Rect::max_y).fold(y, f32::max);
+                }
                 cards.push(card);
             }
             index = next;
@@ -232,7 +236,7 @@ struct Frame {
     y: f32,
     width: f32,
     reserve: bool,
-    /// まとまりの中で候補の見本の札を添える行の，いちばん長い名前の幅(札の左の端をそろえる)
+    /// まとまりの中で候補の見本を添える行の，いちばん長い名前の幅(タグの左の端をそろえる)
     example_title: f32,
 }
 
@@ -299,7 +303,7 @@ fn place(
     }
     match control {
         // 英語と日本語の試す欄は下に単語へ足すボタンを置く．変換マクロの結果は並べると長くなるので行を多く取る
-        // 英語と日本語の試す欄は，macOS と同じく打つ欄を縦に 2 つ並べ，下に結果の札(2 行の札)を置く
+        // 英語と日本語の試す欄は，macOS と同じく打つ欄を縦に 2 つ並べ，下に結果のタグ(2 行のタグ)を置く
         Control::Preview(TryKind::Language) => {
             let chip = size::BODY_LINE_HEIGHT
                 + size::NOTE_LINE_HEIGHT
@@ -339,6 +343,7 @@ fn place(
             card.control = Rect::new(frame.inner_left(), frame.y, frame.inner_width(), height);
             card
         }
+        Control::Dictionaries(list) => place_dictionaries(position, row, *list, frame, metrics),
         Control::Segmented(choices) => place_segments(position, choices, frame, metrics),
         Control::Action(_) => place_action(position, row.title, notes, frame, metrics),
         Control::Buttons(buttons) => {
@@ -356,6 +361,28 @@ fn place(
         }
         _ => place_labeled(position, row, notes, frame, metrics),
     }
+}
+
+/// 辞書の一覧(macOS の ImportedDictionariesView・AssociationSection)．カードは辞書の行の高さ(画面の側で測る)にし，
+/// 取り込むボタンをカードの下に注記と同じ間を空けて置く(parts の 0 番目)．部品の欄はカードの中の全体
+fn place_dictionaries(
+    position: usize,
+    row: &Row,
+    list: crate::pages::DictionaryList,
+    frame: Frame,
+    metrics: &dyn Metrics,
+) -> CardLayout {
+    let height = metrics.height(row, frame.width).unwrap_or(size::ROW_HEIGHT);
+    let mut card = empty(frame.card(height), position);
+    card.control = Rect::new(frame.inner_left(), frame.y, frame.inner_width(), height);
+    let button = button_width(list.import_label(), metrics).min(frame.width);
+    card.parts = vec![Rect::new(
+        frame.x,
+        frame.y + height + size::FOOTER_GAP,
+        button,
+        size::CONTROL_HEIGHT,
+    )];
+    card
 }
 
 /// 見本の行(macOS の AppearancePage の ThemePreview)．見本は描いた大きさのまま置き，まわりに見本の余白をとる．
@@ -422,7 +449,7 @@ fn place_labeled(
     } else {
         metrics.lines(row.title, TextKind::Body, label_width)
     };
-    // 名前の横の候補の見本の札．まとまりの中でいちばん長い名前のあとにそろえて置き，
+    // 名前の横の候補の見本．まとまりの中でいちばん長い名前のあとにそろえて置き，
     // 名前の 1 行目の横に収まらなければ，名前の下の行に置く
     let example = row
         .example
@@ -470,7 +497,7 @@ fn place_labeled(
     // 狭い窓で部品の幅が足りなければ縮める
     let trailing = trailing.min((frame.inner_width() - reset_space).max(0.0));
     let label = Rect::new(left, text_top, label_width.max(0.0), label_height);
-    // 札は名前の 1 行目と同じ大きさの文字を，行の真ん中にそろえて書く(ベースラインがそろう)
+    // タグは名前の 1 行目と同じ大きさの文字を，行の真ん中にそろえて書く(ベースラインがそろう)
     let icon = match example {
         Some((width, _)) if example_beside => Rect::new(
             example_x,
@@ -539,12 +566,12 @@ fn place_labeled(
     }
 }
 
-/// 候補の見本の札の高さ(名前と同じ大きさの文字の 1 行と上下の余白)
+/// 候補の見本の高さ(名前と同じ大きさの文字の 1 行と上下の余白)
 pub fn example_height() -> f32 {
     size::BODY_LINE_HEIGHT + size_settings::PREVIEW_CHIP_PADDING_Y * 2.0
 }
 
-/// 候補の見本の札の中身(読み・矢印・候補)の並び．札の左の端からの位置と幅を返す(描く側と同じ並べ方)
+/// 候補の見本の中身(読み・矢印・候補)の並び．タグの左の端からの位置と幅を返す(描く側と同じ並べ方)
 pub fn example_parts(example: (&str, &str), width: impl Fn(&str) -> f32) -> [(f32, f32); 3] {
     let (reading, candidate) = example;
     let mut x = size_settings::PREVIEW_CHIP_PADDING_X;
@@ -728,7 +755,7 @@ fn place_about(position: usize, title: &str, frame: Frame, metrics: &dyn Metrics
     card
 }
 
-/// 既成のテーマの 1 つ．選ぶ印・見本の札・名前を左から並べ，カードのどこを押しても選ぶ
+/// 既成のテーマの 1 つ．選ぶ印・見本・名前を左から並べ，カードのどこを押しても選ぶ
 fn place_option(position: usize, frame: Frame) -> CardLayout {
     let left = frame.inner_left();
     let height = size::ROW_HEIGHT;
@@ -803,6 +830,7 @@ pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     bottom_fields: 0,
     sheet: false,
     move_icons: false,
+    message_line: false,
 };
 
 const NO_BUTTONS: ListButtons = ListButtons {
@@ -819,6 +847,7 @@ const NO_BUTTONS: ListButtons = ListButtons {
     bottom_fields: 0,
     sheet: false,
     move_icons: false,
+    message_line: false,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -857,7 +886,8 @@ fn place_list(
     let x = frame.inner_left();
     let card_top = frame.y + size::CARD_PADDING_Y;
     let inner = frame.inner_width();
-    // 上の帯(キー設定): 検索欄が残りの幅に広がり，右に絞り込みを置く
+    // 上の帯(キー設定): 検索欄が残りの幅に広がり，右に「キーで検索」のボタンと絞り込みを置く(macOS の KeymapPage)
+    let mut key_search = None;
     let (toolbar_search, toolbar_filter, top) = if buttons.toolbar {
         let filter = buttons.filter.then(|| {
             Rect::new(
@@ -867,7 +897,16 @@ fn place_list(
                 size::CONTROL_HEIGHT,
             )
         });
-        let search_right = filter.map_or(x + inner, |rect| rect.x - size::CONTROL_GAP);
+        let filter_left = filter.map_or(x + inner, |rect| rect.x - size::CONTROL_GAP);
+        let key_width = button_width(crate::strings::keys::SEARCH_BY_KEY, metrics);
+        let key = Rect::new(
+            filter_left - key_width,
+            card_top,
+            key_width,
+            size::CONTROL_HEIGHT,
+        );
+        key_search = Some(key);
+        let search_right = key.x - size::CONTROL_GAP;
         let search = buttons.search.then(|| {
             Rect::new(
                 x,
@@ -932,6 +971,10 @@ fn place_list(
         let note = Rect::new(x, list_top, inner, size::CONTROL_HEIGHT);
         parts.insert(fields, note);
         list_top += size::CONTROL_HEIGHT + size::CONTROL_GAP;
+    }
+    // 打った行の確かめの文の行(空のときも場所を取り，文が出ても表が動かないようにする)
+    if buttons.message_line {
+        list_top += size::NOTE_LINE_HEIGHT;
     }
     // 表の下の帯: 左の組(下のボタン)と右の組(右に寄せる下のボタン・絞り込み・検索欄・ファイルのボタン)
     let split = buttons.bottom.len().saturating_sub(buttons.trailing_bottom);
@@ -1032,6 +1075,8 @@ fn place_list(
     parts.extend(leading_rects);
     parts.extend(right_buttons);
     parts.extend(trailing_iter);
+    // 「キーで検索」のボタンは最後に入れる(part_rect は最後の部品を引く)
+    parts.extend(key_search);
     let lines = leading_lines
         .len()
         .max(trailing_line.map_or(0, |line| line + 1));
@@ -1170,7 +1215,7 @@ mod tests {
         }
     }
 
-    /// 変換のページの「絵文字」の 2 つの切り替え(名前の横に候補の見本の札を添える行)
+    /// 変換のページの「絵文字」の 2 つの切り替え(名前の横に候補の見本を添える行)
     fn example_cards(width: f32) -> Vec<CardLayout> {
         let page = sections(Page::Conversion).unwrap();
         let layout = layout(&page, width, |_| true, &Estimate);
@@ -1188,10 +1233,10 @@ mod tests {
     }
 
     #[test]
-    fn 候補の見本の札は名前の横に置き_名前と同じ行の真ん中にそろえる() {
+    fn 候補の見本は名前の横に置き_名前と同じ行の真ん中にそろえる() {
         let cards = example_cards(900.0);
         assert_eq!(cards.len(), 2);
-        // 2 つの札の左の端は，長いほうの名前のあとにそろえる
+        // 2 つのタグの左の端は，長いほうの名前のあとにそろえる
         assert_eq!(cards[0].icon.x, cards[1].icon.x);
         let longest = [
             settings_strings::EMOJI_CONVERSION,
@@ -1238,7 +1283,7 @@ mod tests {
     }
 
     #[test]
-    fn 名前の横に収まらない窓では候補の見本の札を名前の下に置く() {
+    fn 名前の横に収まらない窓では候補の見本を名前の下に置く() {
         let cards = example_cards(260.0);
         assert_eq!(cards.len(), 2);
         for card in cards {
@@ -1370,22 +1415,32 @@ mod tests {
     }
 
     #[test]
-    fn 辞書の一覧は表の下にボタンを折り返して並べる() {
-        let page = sections(Page::Dictionary).unwrap();
-        for width in [800.0, 400.0] {
-            let layout = layout(&page, width, |_| true, &Estimate);
-            let card = &layout.sections[3].cards[0];
-            // 入力欄 4 つ・更新・表の下の 6 つ
-            assert_eq!(card.parts.len(), 11);
-            for part in &card.parts {
-                assert!(part.max_x() <= card.card.max_x() - size::CARD_PADDING_X + 0.01);
-                assert!(part.max_y() <= card.card.max_y());
-            }
-            for part in &card.parts[5..] {
-                assert!(part.y >= card.control.max_y());
+    fn 辞書の一覧は取り込むボタンをカードの下に置き_注記はその下() {
+        for (page, index) in [(Page::Dictionary, 3), (Page::Conversion, 0)] {
+            let sections = sections(page).unwrap();
+            let index = sections
+                .iter()
+                .position(|section| {
+                    section
+                        .rows
+                        .iter()
+                        .any(|row| matches!(row.control, Control::Dictionaries(_)))
+                })
+                .unwrap_or(index);
+            for width in [800.0, 400.0] {
+                let layout = layout(&sections, width, |_| true, &Estimate);
+                let section = &layout.sections[index];
+                let card = &section.cards[0];
+                // 取り込むボタンだけ．カードの左の端にそろえ，カードの下に間を空けて置く
+                assert_eq!(card.parts.len(), 1);
+                let button = card.parts[0];
+                assert_eq!(button.x, card.card.x);
+                assert_eq!(button.y, card.card.max_y() + size::FOOTER_GAP);
+                assert!(button.width >= size::BUTTON_WIDTH);
+                let footer = section.footer.unwrap();
+                assert!(footer.y >= button.max_y());
             }
         }
-        assert!(button_width("有効・無効の切り替え", &Estimate) > size::BUTTON_WIDTH);
         assert_eq!(button_width("更新", &Estimate), size::BUTTON_WIDTH);
     }
 
@@ -1461,11 +1516,18 @@ mod tests {
             Page::Palette,
         ] {
             let layout = all(page, 800.0);
-            for card in layout.sections.iter().flat_map(|section| &section.cards) {
-                assert!(card.control.max_y() <= card.card.max_y(), "{card:?}");
-                assert!(card.control.y >= card.card.y);
-                for part in &card.parts {
-                    assert!(part.max_y() <= card.card.max_y(), "{card:?}");
+            let rows = sections(page).unwrap();
+            for (section, rows) in layout.sections.iter().zip(&rows) {
+                for card in &section.cards {
+                    assert!(card.control.max_y() <= card.card.max_y(), "{card:?}");
+                    assert!(card.control.y >= card.card.y);
+                    // 辞書の一覧の取り込むボタンはカードの下に置く
+                    if matches!(rows.rows[card.row].control, Control::Dictionaries(_)) {
+                        continue;
+                    }
+                    for part in &card.parts {
+                        assert!(part.max_y() <= card.card.max_y(), "{card:?}");
+                    }
                 }
             }
         }

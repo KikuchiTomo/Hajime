@@ -87,7 +87,7 @@ final class BranchView: NSView {
 
     private var metrics: Metrics {
         let scale = fontSize / Size.fontSize
-        // 足元の行(と注釈・知らせの行)は，キーの札・案内のアイコン・文字の行の箱のいちばん高いもの
+        // 足元の行(と注釈・知らせの行)は，キーキャップ・案内のアイコン・文字の行の箱のいちばん高いもの
         let footer = max(Glass.keycapHeight, Glass.noteIconSize, (labelFont.ascender - labelFont.descender).rounded(.up))
         if theme.isRounded {
             return Metrics(inset: Size.frameWidth + Glass.windowPadding, rowHeight: (Glass.rowHeight * scale).rounded(), trunkGap: Glass.trunkGap,
@@ -121,7 +121,7 @@ final class BranchView: NSView {
         .init(left: Size.paddingX, headerMidY: MeaningCardDrawing.headerHeight(theme: theme) / 2)
     }
 
-    /// 同音語の札に出す語．下の枝に出ていない語だけにする(枝に出ている語は見れば分かる)
+    /// 同音語のタグに出す語．下の枝に出ていない語だけにする(枝に出ている語は見れば分かる)
     static func others(of note: HomophoneNote, in column: LatticePanel.Column) -> [String] {
         let shown = Set(column.alternatives)
         return note.others.filter { !shown.contains($0) }
@@ -166,7 +166,7 @@ final class BranchView: NSView {
         text.size(withAttributes: [.font: font]).width.rounded(.up)
     }
 
-    /// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」の札の幅(前の空きを含む)
+    /// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」のタグの幅(前の空きを含む)
     private var correctedLabelWidth: CGFloat {
         NoteDrawing.tagWidth(UIStrings.Branch.corrected, theme: theme) + Size.paddingX / 2
     }
@@ -298,7 +298,7 @@ final class BranchView: NSView {
         }
         let column = panel.columns[focused]
         if let index = column.alternatives.indices.first(where: { row($0, downward: true).contains(point) }) {
-            // コメントの札は枝の行の中にあるので，行より先に調べる(札を押すと候補の代わりにコメントを入れる)
+            // コメントのタグは枝の行の中にあるので，行より先に調べる(タグを押すと候補の代わりにコメントを入れる)
             if let comment = column.comment(at: index) {
                 let node = NSRect(x: left, y: layout.trunkY, width: layout.trunkWidths[focused], height: metrics.rowHeight)
                 let rect = branchRowRect(index, from: node, width: layout.branchWidth, downward: true, metrics: metrics)
@@ -503,7 +503,7 @@ final class BranchView: NSView {
         var opacity: CGFloat
         /// 打ったまま・修正・コマンドの添え書きか，ユーザー辞書の語のコメント
         var note: String? = nil
-        /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色の札にする)
+        /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色のタグにする)
         var command: LauncherCommand.Kind? = nil
         /// 文字のすぐあとに控えめに添える説明(絵文字の名前)
         var detail: String? = nil
@@ -526,14 +526,14 @@ final class BranchView: NSView {
         }
     }
 
-    /// 枝の index 番目の行(番号・文字・札を描く枠)．描くときと押した位置を調べるときで同じものを使う
+    /// 枝の index 番目の行(番号・文字・タグを描く枠)．描くときと押した位置を調べるときで同じものを使う
     private func branchRowRect(_ index: Int, from node: NSRect, width: CGFloat, downward: Bool, metrics: Metrics) -> NSRect {
         let stemX = (node.minX + metrics.stemX).rounded()
         let y = downward ? node.maxY + CGFloat(index) * metrics.rowHeight : node.minY - CGFloat(index + 1) * metrics.rowHeight
         return NSRect(x: stemX + metrics.branchIndent, y: y, width: width - metrics.stemX - metrics.branchIndent, height: metrics.rowHeight)
     }
 
-    /// 枝の行の札の右端
+    /// 枝の行のタグの右端
     private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - Size.paddingX / 2 }
 
     private func drawBranches(_ rows: [Row], from node: NSRect, width: CGFloat, downward: Bool) {
@@ -553,7 +553,7 @@ final class BranchView: NSView {
     /// 枝の行の番号(丸)の左の端．枝の水平の線は，ここから inline の空きを残して終える
     private func leadMinX(in row: NSRect) -> CGFloat { row.minX + Size.paddingX / 2 }
 
-    /// 幹の根元: 下の枝は文節の札の下の端，上の枝は上の端
+    /// 幹の根元: 下の枝は文節のタグの下の端，上の枝は上の端
     private func rootY(of node: NSRect, downward: Bool) -> CGFloat {
         downward ? node.maxY - metrics.rootInset : node.minY + metrics.rootInset
     }
@@ -629,7 +629,7 @@ final class BranchView: NSView {
         return (showsHints ? GlassDrawing.hintsWidth(hints, theme: theme) : 0) + source + associationWidth(panel)
     }
 
-    /// 連想の知らせ(R-18)．キーが割り当てられていればキーキャップの札，無ければ語だけ
+    /// 連想の知らせ(R-18)．キーが割り当てられていればキーキャップ，無ければ語だけ
     private func associationKeyHint(_ panel: LatticePanel) -> KeyHint? {
         panel.associationHint.flatMap { hint in hint.key.map { KeyHint(key: $0, label: hint.label) } }
     }
@@ -687,7 +687,7 @@ final class BranchView: NSView {
 }
 
 extension LatticePanel.Column {
-    /// 下の枝の index 番目の候補に添えたユーザー辞書の語のコメント(札に出す文字．長ければ先頭だけ)．コメントでなければ nil
+    /// 下の枝の index 番目の候補に添えたユーザー辞書の語のコメント(タグに出す文字．長ければ先頭だけ)．コメントでなければ nil
     func comment(at index: Int) -> String? {
         guard alternativeComments.indices.contains(index), alternativeComments[index], alternativeNotes.indices.contains(index) else { return nil }
         return alternativeNotes[index]
