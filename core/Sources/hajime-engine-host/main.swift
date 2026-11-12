@@ -166,7 +166,7 @@ func run() -> Int32 {
     let terms = resources.dictionary?.termDictionaryURL.map { TermDictionaryStore(url: $0) }
     let associations = AssociationDictionaryStore(
         directory: HostPaths.local.appendingPathComponent("associations", isDirectory: true),
-        bundledSource: HostPaths.installation.appendingPathComponent(DefaultSettings.bundledAssociationFileName))
+        bundledSource: HostPaths.installation.appendingPathComponent(DefaultSettings.bundledAssociationFileName), settings: settings)
     associations.preloadBundled()
     let postalTable = HostPaths.installation.appendingPathComponent("postal-codes.tsv")
     let postalCodes = FileManager.default.fileExists(atPath: postalTable.path) ? PostalCodeFile(url: postalTable) : nil

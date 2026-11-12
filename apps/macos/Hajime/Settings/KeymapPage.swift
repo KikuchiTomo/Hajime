@@ -303,8 +303,8 @@ struct KeymapPage: View {
                 Text(Keys.label(for: $0)).tag($0)
             }
         }
+        // 名前は Picker の名前(見せない)を VoiceOver が読む．accessibilityLabel を重ねると「状態、状態」と 2 回読む
         .labelsHidden()
-        .accessibilityLabel(Keys.state)
     }
 
     /// コマンドを選ぶ．状態で効くコマンドだけを，まとまりごとに並べる
@@ -321,7 +321,6 @@ struct KeymapPage: View {
         }
         .labelsHidden()
         .help(Keys.help(for: selection.wrappedValue) ?? Keys.label(for: selection.wrappedValue))
-        .accessibilityLabel(Keys.command)
     }
 
     // MARK: 下の操作

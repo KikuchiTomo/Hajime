@@ -121,6 +121,17 @@ struct BundledAssociationDictionaryTests {
         #expect(groups.allSatisfy { !$0.words.contains("美しい") })
     }
 
+    @Test("同梱のファイルを読み終えたら，設定の同梱の辞書の意味の数を読んだ数にする(設定の画面が 0 件と出さない)")
+    func bundledGroupCount() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let settings = FileSettingsStore(fileURL: root.appendingPathComponent("settings.json"))
+        #expect(settings.current.associationDictionaries.first?.groupCount == 0)
+        let store = AssociationDictionaryStore(directory: root.appendingPathComponent("associations"), bundledSource: bundledFile, settings: settings)
+        await store.waitForBundled()
+        let count = try #require(settings.current.associationDictionaries.first { $0.isBundled }?.groupCount)
+        #expect(count > 1000)
+    }
+
     @Test("同梱のファイルが無くても落ちず，何も返さない(連想変換だけが効かない)")
     func missingFile() async {
         let store = AssociationDictionaryStore(directory: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString),

@@ -58,3 +58,45 @@ struct ResettableToggle: View {
         }
     }
 }
+
+/// 取り込んだ辞書・連想の辞書の 1 行の見出し．開いて詳細を出すボタン・オン・オフのスイッチ・名前と件数・並べ替えのボタンを並べる．
+/// DisclosureGroup の見出しに部品を入れると，開閉の部品に部品がまとめられ，VoiceOver ではスイッチを切り替えることも開くこともできないので，
+/// 開閉もボタンにして 1 つずつ使えるようにする
+struct DictionaryRowHeader: View {
+    @Binding var isExpanded: Bool
+    let isEnabled: Binding<Bool>
+    let name: String
+    let summary: String
+    let isFirst: Bool
+    let isLast: Bool
+    let move: (Int) -> Void
+
+    var body: some View {
+        // スイッチは名前の 1 行目にそろうので，開閉と並べ替えのボタンも 1 行目の文字の並びにそろえる
+        HStack(alignment: .firstTextBaseline) {
+            Button { isExpanded.toggle() } label: {
+                Image(systemName: "chevron.right")
+                    .rotationEffect(.degrees(isExpanded ? 90 : 0))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.borderless)
+            .help(isExpanded ? UIStrings.Dictionaries.hideDetails : UIStrings.Dictionaries.showDetails)
+            .accessibilityLabel(isExpanded ? UIStrings.Dictionaries.hideDetails : UIStrings.Dictionaries.showDetails)
+            // 名前と件数をスイッチのラベルにする(ラベルを隠すと VoiceOver でスイッチを切り替えられない)
+            Toggle(isOn: isEnabled) {
+                VStack(alignment: .leading) {
+                    Text(name)
+                    Text(summary).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            .toggleStyle(.switch)
+            Spacer()
+            Button { move(-1) } label: { Image(systemName: "chevron.up") }
+                .buttonStyle(.borderless).disabled(isFirst).help(UIStrings.Dictionaries.moveUp)
+                .accessibilityLabel(UIStrings.Dictionaries.moveUp)
+            Button { move(1) } label: { Image(systemName: "chevron.down") }
+                .buttonStyle(.borderless).disabled(isLast).help(UIStrings.Dictionaries.moveDown)
+                .accessibilityLabel(UIStrings.Dictionaries.moveDown)
+        }
+    }
+}
