@@ -557,10 +557,46 @@ pub mod rule_list {
     pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
 }
 
+/// UIStrings.Terms
+pub mod terms {
+    pub const ENABLED: &str = "専門用語の辞書を使う";
+    pub const FIELDS: &str = "使う分野";
+    pub const NOTE: &str = "医学・法律・情報技術などの専門用語のうち、通常の辞書に無い語を候補に足します。通常の辞書にある語は、ここで切っても出ます。語は JMdict と Wikidata から集めています。";
+
+    /// 分野の id と名前(core の TermField と同じ並びと名前．tools/check/check_strings.py が確かめる)
+    pub const FIELD_NAMES: &[(&str, &str)] = &[
+        ("computing", "情報技術"),
+        ("medicine", "医学"),
+        ("biology", "生物学"),
+        ("chemistry", "化学"),
+        ("physics", "物理学"),
+        ("mathematics", "数学"),
+        ("earth", "地学・天文学"),
+        ("engineering", "工学"),
+        ("architecture", "建築"),
+        ("law", "法律・政治"),
+        ("economics", "経済・金融"),
+        ("business", "ビジネス"),
+        ("linguistics", "言語学"),
+        ("philosophy", "哲学・思想"),
+        ("religion", "宗教・神話"),
+        ("music", "音楽"),
+        ("design", "美術・デザイン"),
+        ("food", "料理・食品"),
+        ("sports", "スポーツ"),
+        ("games", "囲碁・将棋・ゲーム"),
+        ("military", "軍事"),
+        ("agriculture", "農林水産"),
+        ("performingArts", "芸能・映像"),
+        ("history", "歴史・考古学"),
+    ];
+}
+
 /// UIStrings.Dictionaries
 pub mod dictionaries {
     pub const USER_WORDS: &str = "登録した単語";
     pub const IMPORTED: &str = "取り込んだ辞書";
+    pub const TERMS: &str = "専門用語";
     pub const EMPTY: &str = "取り込んだ辞書はありません";
     pub const IMPORT_FILE: &str = "辞書をインポート…";
     pub const REIMPORT: &str = "再読み込み…";
@@ -781,6 +817,8 @@ pub mod sync {
         ("userDictionary", "ユーザー辞書"),
         ("importedDictionaries", "取り込んだ辞書"),
         ("associationDictionaries", "連想の辞書"),
+        ("termDictionary", "専門用語の辞書を使う"),
+        ("termFields", "専門用語の辞書の分野"),
         (
             "macroSkipsSameReading",
             "かなの語には読みを添える形を出さない",

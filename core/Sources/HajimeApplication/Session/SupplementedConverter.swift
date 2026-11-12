@@ -28,6 +28,9 @@ import HajimeDomain
 ///
 /// - 取り込んだ辞書の語(R-16): 読みの中の部分ごとに，効いている辞書から語を引いてエンジンに渡す(setAuxiliaryWords)．
 ///   どの辞書を効かせるかは DictionaryActivation が決める(アプリの条件，文脈の条件)
+/// - 専門用語の辞書の語(R-29): 取り込んだ辞書と同じく，読みの中の部分ごとに，設定で使う分野の語を引いてエンジンに渡す．
+///   点数は取り込んだ辞書の語より低く(DefaultSettings.termWordCost)，通常の辞書に同じ読みの語がある語はさらに低くする(termHomophoneWordCost)．
+///   同じ語が取り込んだ辞書にもあれば取り込んだ辞書の方を使う
 ///
 /// 記号・日付・数字の書き方は上から DefaultSettings.symbolCandidateOffset 番目に差し込む．
 /// 第 1 候補(ライブ変換で見える文字)は変えず，よく使う語より前に並ばないようにする
@@ -48,18 +51,23 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private var dictionaryIndex: (source: [UserDictionaryEntry], words: [String: [(word: String, comment: String)]]) = ([], [:])
     /// 取り込んだ辞書を引くもの．無ければ取り込んだ辞書は使わない
     private let lookup: (any DictionaryLookup)?
+    /// 専門用語の辞書を引くもの．無ければ専門用語の辞書は使わない
+    private let terms: (any TermDictionaryLookup)?
     private var applicationID: String?
     /// 最近確定した，取り込んだ辞書の語の辞書の id(新しいものが後ろ)．文脈の条件に使う
     private var recentDictionaryCommits: [String] = []
     /// 今エンジンに渡している語と，その語の辞書の名前
     private var auxiliary: [AuxiliaryWord] = []
     private var auxiliarySources: [DictionaryWord: Source] = [:]
-    /// 読みごとに引いた語と，その語の辞書．効いている辞書が変わったときと，入力を終えたときに捨てる
-    private var auxiliaryCache: (active: [DictionaryActivation.Active], lookups: [String: Lookup]) = ([], [:])
+    /// 読みごとに引いた語と，その語の辞書．効いている辞書か専門用語の分野が変わったときと，入力を終えたときに捨てる
+    private var auxiliaryCache: (active: [DictionaryActivation.Active], fields: Set<TermField>, lookups: [String: Lookup]) = ([], [], [:])
 
     private struct Source {
-        var id: String
+        /// 取り込んだ辞書の id．専門用語の辞書なら nil(文脈の条件に数えない)
+        var id: String?
         var name: String
+        /// 読み全体と一致するときに，候補の前の方に差し込む位置．専門用語の辞書の同音の語は nil(差し込まない)
+        var wholeReadingOffset: Int?
     }
 
     private struct Lookup {
@@ -68,9 +76,10 @@ public final class SupplementedConverter: KanaKanjiConverting {
     }
 
     public init(_ base: any KanaKanjiConverting, settings: any SettingsReading, calendar: any CalendarReading,
-                postalCodes: (any PostalCodeLooking)? = nil, dictionaries: (any DictionaryLookup)? = nil, emoji: (any EmojiLooking)? = nil,
-                lexicon: (any EnglishLexicon)? = nil, englishTerms: EnglishTerms? = nil) {
+                postalCodes: (any PostalCodeLooking)? = nil, dictionaries: (any DictionaryLookup)? = nil, terms: (any TermDictionaryLookup)? = nil,
+                emoji: (any EmojiLooking)? = nil, lexicon: (any EnglishLexicon)? = nil, englishTerms: EnglishTerms? = nil) {
         self.base = base
+        self.terms = terms
         self.lexicon = lexicon
         self.englishTerms = englishTerms
         self.settings = settings
@@ -114,14 +123,15 @@ public final class SupplementedConverter: KanaKanjiConverting {
 
     // MARK: - 取り込んだ辞書(R-16)
 
-    /// 読みの中の部分ごとに効いている辞書から語を引き，変わっていればエンジンに渡す
+    /// 読みの中の部分ごとに効いている辞書と専門用語の辞書から語を引き，変わっていればエンジンに渡す
     private func prepareAuxiliaryWords(for reading: String) {
-        guard let lookup else { return }
-        let dictionaries = settings.current.importedDictionaries
+        guard lookup != nil || terms != nil else { return }
+        let current = settings.current
         let hits = Dictionary(recentDictionaryCommits.map { ($0, 1) }, uniquingKeysWith: +)
-        let active = DictionaryActivation.active(dictionaries, applicationID: applicationID, recentHits: hits)
-        if active != auxiliaryCache.active { auxiliaryCache = (active, [:]) }
-        let found = auxiliaryCache.lookups[reading] ?? Self.lookUp(reading, in: active, lookup: lookup)
+        let active = lookup == nil ? [] : DictionaryActivation.active(current.importedDictionaries, applicationID: applicationID, recentHits: hits)
+        let fields = terms != nil && current.termDictionary ? current.termFields.enabledFields : []
+        if active != auxiliaryCache.active || fields != auxiliaryCache.fields { auxiliaryCache = (active, fields, [:]) }
+        let found = auxiliaryCache.lookups[reading] ?? Self.lookUp(reading, in: active, lookup: lookup, fields: fields, terms: terms)
         auxiliaryCache.lookups[reading] = found
         auxiliarySources = found.sources
         guard found.words != auxiliary else { return }
@@ -129,21 +139,32 @@ public final class SupplementedConverter: KanaKanjiConverting {
         base.setAuxiliaryWords(found.words)
     }
 
-    /// reading の中の部分(長さ DefaultSettings.maximumImportedReadingLength まで)を，効いている辞書で引く．
-    /// 同じ語が複数の辞書にあれば，優先度の高い方を使う
-    private static func lookUp(_ reading: String, in active: [DictionaryActivation.Active], lookup: any DictionaryLookup) -> Lookup {
-        guard !active.isEmpty else { return Lookup(words: [], sources: [:]) }
+    /// reading の中の部分(長さ DefaultSettings.maximumImportedReadingLength まで)を，効いている辞書と専門用語の辞書の使う分野で引く．
+    /// 同じ語が複数の辞書にあれば，優先度の高い方を使う(専門用語の辞書は取り込んだ辞書より低い)
+    private static func lookUp(_ reading: String, in active: [DictionaryActivation.Active], lookup: (any DictionaryLookup)?,
+                               fields: Set<TermField>, terms: (any TermDictionaryLookup)?) -> Lookup {
+        let terms = fields.isEmpty ? nil : terms
+        guard (!active.isEmpty && lookup != nil) || terms != nil else { return Lookup(words: [], sources: [:]) }
         let characters = Array(reading)
         var best: [DictionaryWord: Float] = [:]
         var sources: [DictionaryWord: Source] = [:]
         for start in characters.indices {
             for length in 1...min(DefaultSettings.maximumImportedReadingLength, characters.count - start) {
                 let part = String(characters[start..<(start + length)])
-                for entry in active {
-                    for word in lookup.words(reading: part, in: entry.dictionary) where best[word].map({ entry.costOffset > $0 }) ?? true {
-                        best[word] = entry.costOffset
-                        sources[word] = Source(id: entry.dictionary.id, name: entry.dictionary.displayName)
+                if let lookup {
+                    for entry in active {
+                        for word in lookup.words(reading: part, in: entry.dictionary) where best[word].map({ entry.costOffset > $0 }) ?? true {
+                            best[word] = entry.costOffset
+                            sources[word] = Source(id: entry.dictionary.id, name: entry.dictionary.displayName,
+                                                   wholeReadingOffset: DefaultSettings.importedWordCandidateOffset)
+                        }
                     }
+                }
+                for term in terms?.words(reading: part) ?? [] where fields.contains(term.field) && best[term.word] == nil {
+                    let cost = term.hasHomophones ? DefaultSettings.termHomophoneWordCost : DefaultSettings.termWordCost
+                    best[term.word] = cost - DefaultSettings.importedWordCost
+                    sources[term.word] = Source(id: nil, name: term.field.name,
+                                                wholeReadingOffset: term.hasHomophones ? nil : DefaultSettings.termWordCandidateOffset)
                 }
             }
         }
@@ -198,8 +219,12 @@ public final class SupplementedConverter: KanaKanjiConverting {
         attachComments(userWords, to: &result, reading: reading)
         // 読み全体と一致する取り込んだ辞書の語は，エンジンの候補の順に関わらず前の方に出るようにここで足す．
         // 既定の 1 番目は変えず，その次に優先度の順で並べる
-        let importedWords = auxiliary.filter { $0.word.reading == reading }.sorted { $0.costOffset > $1.costOffset }.map(\.word.word)
-        insert(importedWords, into: &result, at: DefaultSettings.importedWordCandidateOffset, reading: reading, origin: .userDictionary)
+        // 専門用語の辞書の語は取り込んだ辞書の語より下に足し，同音の語は足さない
+        let whole = auxiliary.filter { $0.word.reading == reading }.sorted { $0.costOffset > $1.costOffset }
+        for offset in Set(whole.compactMap { auxiliarySources[$0.word]?.wholeReadingOffset }).sorted() {
+            let words = whole.filter { auxiliarySources[$0.word]?.wholeReadingOffset == offset }.map(\.word.word)
+            insert(words, into: &result, at: offset, reading: reading, origin: .userDictionary)
+        }
         var extra: [String] = []
         if current.symbolConversion { extra += SymbolDictionary.symbols(for: reading, rules: current.symbolRules) }
         if current.latexConversion { extra += LatexCommands.commands(for: reading) }

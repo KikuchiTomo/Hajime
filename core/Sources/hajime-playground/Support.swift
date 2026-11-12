@@ -2,6 +2,7 @@ import Foundation
 import HajimeApplication
 import HajimeDomain
 import HajimeEngine
+import HajimePersistence
 
 /// macOS に入っている単語の一覧を英単語の辞書として使う．補正の候補は編集距離で探す．
 ///
@@ -50,13 +51,16 @@ struct PlaygroundEngine {
     let engine: AzooKeyConverterEngine
     /// アプリと同じく，打ち間違いの訂正を別の変換器で求めるもの(Zenzai があるときだけ)
     let typoService: ZenzaiTypoService?
+    /// --dictionary の辞書の中の専門用語の辞書(R-29)．辞書を渡さないか，--no-terms を付けたときは nil
+    let terms: TermDictionaryStore?
     private let memory: URL
 
     /// - Parameters:
     ///   - fastZenzaiPath: 速さを優先するモデル(xsmall)の場所．併用(zenzaiChoice)を試すときに渡す
     ///   - zenzaiChoice: 設定の「Zenzai のモデル」．渡したときだけ既定の設定にこれを入れてエンジンに渡す(渡さなければ今までどおり設定を渡さない)
+    @MainActor
     init(zenzaiPath: String?, zenzaiVariant: ZenzaiModel.Variant = .small, fastZenzaiPath: String? = nil, zenzaiChoice: ZenzaiModelChoice? = nil,
-         dictionaryPath: String?) throws {
+         dictionaryPath: String?, usesTerms: Bool = true) throws {
         memory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-playground-\(UUID().uuidString)")
         let zenzai = try zenzaiPath.map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0), variant: zenzaiVariant) }
         let fastZenzai = try fastZenzaiPath.map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0), variant: .xsmall) }
@@ -66,6 +70,10 @@ struct PlaygroundEngine {
             var settings = DefaultSettings.settings
             settings.zenzaiModel = zenzaiChoice
             engine.apply(settings)
+        }
+        terms = dictionaryPath.flatMap { path in
+            let url = URL(fileURLWithPath: path, isDirectory: true).appendingPathComponent(DefaultSettings.termDictionaryFileName)
+            return usesTerms && FileManager.default.fileExists(atPath: url.path) ? TermDictionaryStore(url: url) : nil
         }
         let directory = memory
         typoService = zenzai.map { ZenzaiTypoService(zenzai: $0, memoryDirectory: directory, versionString: "hajime-playground") }

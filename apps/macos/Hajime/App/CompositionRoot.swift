@@ -30,6 +30,8 @@ final class CompositionRoot {
     let sync: SyncCoordinator
     /// 取り込んだ辞書の索引(Application Support の dictionaries/)．入力欄ごとの変換と設定の画面で共有する
     let dictionaries: ImportedDictionaryStore
+    /// 同梱の辞書の中の専門用語の辞書(R-29)．同梱の辞書が無いか古ければ nil．入力欄ごとの変換で共有する
+    let terms: TermDictionaryStore?
     /// 連想の辞書の索引(Application Support の associations/．R-18)．入力欄ごとの変換と設定の画面で共有する
     let associations: AssociationDictionaryStore
 
@@ -45,8 +47,9 @@ final class CompositionRoot {
     let inputSourceRegistration = InputSourceRegistration()
 
     private init(settings: FileSettingsStore, engine: AzooKeyConverterEngine, usage: FileUsageStore, typoService: ZenzaiTypoService?, sync: SyncCoordinator,
-                 dictionaries: ImportedDictionaryStore, associations: AssociationDictionaryStore) {
+                 dictionaries: ImportedDictionaryStore, terms: TermDictionaryStore?, associations: AssociationDictionaryStore) {
         self.typoService = typoService
+        self.terms = terms
         self.settings = settings
         self.engine = engine
         self.usage = usage
@@ -93,8 +96,9 @@ final class CompositionRoot {
             directory: support.appendingPathComponent("associations", isDirectory: true),
             bundledSource: Bundle.main.resourceURL?.appendingPathComponent(DefaultSettings.bundledAssociationFileName))
         associations.preloadBundled()
+        let terms = resources.dictionary?.termDictionaryURL.map { TermDictionaryStore(url: $0) }
         let root = CompositionRoot(settings: settings, engine: engine, usage: usage, typoService: typoService, sync: sync, dictionaries: dictionaries,
-                                   associations: associations)
+                                   terms: terms, associations: associations)
         // 語の意味の辞書も，注釈を出す設定なら起動したら裏で読み始める(初めての変換で意味が出ないことを減らす)
         if settings.current.homophoneNotes { root.usageDictionary?.preload() }
         // パレットの表も，使う設定なら起動したら裏で読み始める(初めて開いたときに待たせない)
@@ -135,7 +139,7 @@ final class CompositionRoot {
         // エンジンのセッションは，候補を文脈で並べ替える採点(検証木)も受け持つ
         let engineSession = engine.makeSession()
         return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
-                                                             emoji: engine, lexicon: lexicon, englishTerms: englishTerms),
+                                                             terms: terms, emoji: engine, lexicon: lexicon, englishTerms: englishTerms),
                             lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
                             rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices,
                             calendar: calendar, scorer: engineSession)

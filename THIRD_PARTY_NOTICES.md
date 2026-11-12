@@ -1701,9 +1701,16 @@ Apache License 2.0 の全文は LICENSES/Apache-2.0.txt にあります．
 https://github.com/KikuchiTomo/hajime-dictionary
 hajime-dictionary v0.4.0 には，mecab-ipadic-NEologd の元のデータ(seed．コミット abc61e33d8be3d0ead202e6b1df064c72d5ccf11)の固有名詞・一般名詞・形容詞・副詞・表記の揺れと，SudachiDict の元のデータ(20261015 の small_lex・core_lex・notcore_lex)の名詞から選んだ語を追加しています．どちらも Apache License 2.0 で，それぞれ下の mecab-ipadic-NEologd と SudachiDict の節の条件に従います．
 
+## hajime-dictionary(専門用語の辞書)
+
+https://github.com/KikuchiTomo/hajime-dictionary
+hajime-dictionary v0.5.0 から，専門用語の辞書(Dictionary/terms.tsv)を含めています．次の 2 つから，分野の付いた語のうち通常の辞書に無い語の読みと表記を選んでいます．
+JMdict(Electronic Dictionary Research and Development Group．https://www.edrdg.org/jmdict/j_jmdict.html)の分野の印の付いた語義の語．jmdict-simplified(https://github.com/scriptin/jmdict-simplified)の 3.6.2+20261109214828 の JSON を使っています．CC BY-SA 4.0(https://www.edrdg.org/edrdg/licence.html)
+Wikidata(https://www.wikidata.org/)の分野ごとのクラスの項目の日本語名と名前の読み．CC0 1.0
+
 ## hajime-dictionary の配布の条件(CC BY-SA 4.0)
 
-hajime-dictionary v0.4.0 は CC BY-SA 4.0 の語(ウィキペディアの見出しと EDICT2)を含むので，辞書の全体を CC BY-SA 4.0(https://creativecommons.org/licenses/by-sa/4.0/legalcode)の条件で配布しています．辞書は Hajime IME のプログラムとは別のファイルとして同梱しています．辞書を作り変えて配布するときも，同じ条件で配布してください．全文は辞書の LICENSES/CC-BY-SA-4.0.txt にあります．
+hajime-dictionary v0.4.0 は CC BY-SA 4.0 の語(ウィキペディアの見出しと EDICT2．v0.5.0 からは JMdict も)を含むので，辞書の全体を CC BY-SA 4.0(https://creativecommons.org/licenses/by-sa/4.0/legalcode)の条件で配布しています．辞書は Hajime IME のプログラムとは別のファイルとして同梱しています．辞書を作り変えて配布するときも，同じ条件で配布してください．全文は辞書の LICENSES/CC-BY-SA-4.0.txt にあります．
 
 ## SudachiDict(hajime-dictionary の Mozc UT 辞書の語)
 

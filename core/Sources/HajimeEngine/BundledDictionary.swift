@@ -33,6 +33,8 @@ public struct BundledDictionary: Sendable, Equatable {
     static let requiredFile = "louds/charID.chid"
 
     public let url: URL
+    /// 専門用語の辞書(R-29)のファイル．一覧にあって確かめたときだけ持つ(v0.5.0 より前の辞書には無い)
+    public let termDictionaryURL: URL?
 
     /// ディレクトリを確かめてから作る．一覧かファイルのどれかが合わなければ使わない
     public static func verified(at directory: URL) throws(VerificationError) -> BundledDictionary {
@@ -53,7 +55,9 @@ public struct BundledDictionary: Sendable, Equatable {
         // どれか 1 つでも合わなければ使わない．理由は一覧の順で最初に見つかったものにする(並べ方で変わらないように)
         let failures = ConcurrentWork.map(entries.map(Entry.init)) { entry in check(entry, in: directory) }
         if let failure = failures.lazy.compactMap({ $0 }).first { throw failure }
-        return BundledDictionary(url: directory)
+        let terms = entries.contains { $0.path == DefaultSettings.termDictionaryFileName }
+            ? directory.appendingPathComponent(DefaultSettings.termDictionaryFileName, isDirectory: false) : nil
+        return BundledDictionary(url: directory, termDictionaryURL: terms)
     }
 
     /// 一覧の 1 行(並べた仕事に渡すため Sendable にする)

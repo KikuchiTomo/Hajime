@@ -219,12 +219,21 @@ impl Page {
                 .chain(keys::STATES.iter().map(|(_, label)| *label))
                 .chain(keys::PRESETS.iter().map(|(_, label)| *label))
                 .collect(),
-            Page::Dictionary => vec![
+            Page::Dictionary => [
                 settings::READING,
                 settings::WORD,
                 dictionaries::IMPORTED,
                 extras::DYNAMIC_DICTIONARY,
-            ],
+                dictionaries::TERMS,
+                crate::strings::terms::ENABLED,
+            ]
+            .into_iter()
+            .chain(
+                crate::strings::terms::FIELD_NAMES
+                    .iter()
+                    .map(|(_, name)| *name),
+            )
+            .collect(),
             Page::Commands => vec![
                 extras::LAUNCHER_COMMANDS,
                 extras::MACROS_SECTION,
@@ -1600,7 +1609,13 @@ fn commands() -> Vec<Section> {
 fn dictionary() -> Vec<Section> {
     use Condition::*;
     let imported = || Is(DICTIONARY_TAB, DICTIONARY_TAB_IMPORTED);
-    let words = || IsNot(DICTIONARY_TAB, DICTIONARY_TAB_IMPORTED);
+    let terms = || Is(DICTIONARY_TAB, DICTIONARY_TAB_TERMS);
+    let words = || {
+        All(&[
+            IsNot(DICTIONARY_TAB, DICTIONARY_TAB_IMPORTED),
+            IsNot(DICTIONARY_TAB, DICTIONARY_TAB_TERMS),
+        ])
+    };
     vec![
         Section::untitled(vec![Row::new(
             "",
@@ -1655,17 +1670,68 @@ fn dictionary() -> Vec<Section> {
             footer: Some(dictionaries::NOTE),
             footer_variants: &[],
         },
+        // 専門用語の辞書(R-29)．使うかと，分野ごとのオン・オフ(macOS の TermDictionaryView)
+        Section {
+            title: None,
+            rows: std::iter::once(Row::toggle(
+                crate::strings::terms::ENABLED,
+                "termDictionary",
+            ))
+            .chain(std::iter::once(Row::note(crate::strings::terms::FIELDS)))
+            .chain(
+                TERM_FIELD_PATHS
+                    .iter()
+                    .zip(crate::strings::terms::FIELD_NAMES)
+                    .map(|(path, (_, name))| {
+                        Row::toggle(name, path).enabled_when(On("termDictionary"))
+                    }),
+            )
+            .map(|row| row.visible_when(terms()))
+            .collect(),
+            footer: Some(crate::strings::terms::NOTE),
+            footer_variants: &[],
+        },
     ]
 }
+
+/// 専門用語の辞書の分野ごとの設定の項目(strings::terms::FIELD_NAMES と同じ並び)
+const TERM_FIELD_PATHS: &[&str] = &[
+    "termFields.computing",
+    "termFields.medicine",
+    "termFields.biology",
+    "termFields.chemistry",
+    "termFields.physics",
+    "termFields.mathematics",
+    "termFields.earth",
+    "termFields.engineering",
+    "termFields.architecture",
+    "termFields.law",
+    "termFields.economics",
+    "termFields.business",
+    "termFields.linguistics",
+    "termFields.philosophy",
+    "termFields.religion",
+    "termFields.music",
+    "termFields.design",
+    "termFields.food",
+    "termFields.sports",
+    "termFields.games",
+    "termFields.military",
+    "termFields.agriculture",
+    "termFields.performingArts",
+    "termFields.history",
+];
 
 /// ユーザー辞書のページで出している一覧(画面の中だけの値．設定のファイルには書かない)
 pub const DICTIONARY_TAB: &str = "page.dictionaryTab";
 pub const DICTIONARY_TAB_IMPORTED: &str = "imported";
 /// 登録した単語の一覧(単語の登録で開くときに出す)
 pub const DICTIONARY_TAB_WORDS: &str = "words";
+pub const DICTIONARY_TAB_TERMS: &str = "terms";
 const DICTIONARY_TABS: &[Choice] = &[
     (DICTIONARY_TAB_WORDS, dictionaries::USER_WORDS),
     (DICTIONARY_TAB_IMPORTED, dictionaries::IMPORTED),
+    (DICTIONARY_TAB_TERMS, dictionaries::TERMS),
 ];
 
 /// 画面の中だけの値(開いている一覧など)の道筋か
@@ -2079,6 +2145,20 @@ pub fn holds(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn 専門用語の辞書の分野の項目は名前と同じ並び() {
+        assert_eq!(
+            TERM_FIELD_PATHS.len(),
+            crate::strings::terms::FIELD_NAMES.len()
+        );
+        for (path, (id, _)) in TERM_FIELD_PATHS
+            .iter()
+            .zip(crate::strings::terms::FIELD_NAMES)
+        {
+            assert_eq!(*path, format!("termFields.{id}"));
+        }
+    }
+
     use super::*;
 
     #[test]

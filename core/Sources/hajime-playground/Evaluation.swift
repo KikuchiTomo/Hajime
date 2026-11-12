@@ -30,7 +30,7 @@ enum Evaluation {
     static let candidateWindow = 10
 
     /// 評価用の文を変換して，期待どおりになった割合・上位の候補に正解が入った割合・1 回の変換の時間を出す
-    static func conversion(cases: [EvaluationCase], engine: AzooKeyConverterEngine) {
+    static func conversion(cases: [EvaluationCase], engine: AzooKeyConverterEngine, terms: (any TermDictionaryLookup)? = nil) {
         let clock = ContinuousClock()
         var passed = 0
         var listed = 0
@@ -38,7 +38,7 @@ enum Evaluation {
         var durations: [Duration] = []
         for item in cases {
             // 文ごとに新しいセッションにして，前の文の変換や学習の影響を受けないようにする
-            let session = newSession(engine, context: item.leftContext)
+            let session = newSession(engine, context: item.leftContext, terms: terms)
             var candidates: [String] = []
             durations.append(clock.measure { candidates = wholeCandidates(session, item.reading) })
             let output = candidates.first ?? item.reading
@@ -347,12 +347,12 @@ enum Evaluation {
     }
 
     /// アプリと同じく，エンジンの候補に記号・日付・並べ替え(SupplementedConverter)を既定の設定で足したもの
-    private static func newSession(_ engine: AzooKeyConverterEngine, context: String?) -> any KanaKanjiConverting {
-        newSession(engine.makeSession(), context: context)
+    private static func newSession(_ engine: AzooKeyConverterEngine, context: String?, terms: (any TermDictionaryLookup)? = nil) -> any KanaKanjiConverting {
+        newSession(engine.makeSession(), context: context, terms: terms)
     }
 
-    private static func newSession(_ base: any KanaKanjiConverting, context: String?) -> any KanaKanjiConverting {
-        let session = SupplementedConverter(base, settings: StaticSettings(DefaultSettings.settings), calendar: SystemCalendar(clock: { Date() }))
+    private static func newSession(_ base: any KanaKanjiConverting, context: String?, terms: (any TermDictionaryLookup)? = nil) -> any KanaKanjiConverting {
+        let session = SupplementedConverter(base, settings: StaticSettings(DefaultSettings.settings), calendar: SystemCalendar(clock: { Date() }), terms: terms)
         session.setLeftContext(context)
         return session
     }

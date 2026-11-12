@@ -28,6 +28,10 @@ NESTED = {
     "correction": ("CorrectionCustomization", ROOT / "core/Sources/HajimeDomain/Correction/CorrectionCustomization.swift"),
     "wordLanguage": ("WordLanguageSettings", ROOT / "core/Sources/HajimeDomain/Correction/WordLanguage.swift"),
 }
+# 中の項目の名前を enum の case から決める値(項目の名前が enum の rawValue)と，その enum がある場所
+NESTED_ENUMS = {
+    "termFields": ("TermField", ROOT / "core/Sources/HajimeDomain/Dictionary/TermDictionary.swift"),
+}
 MACOS = ROOT / "apps/macos/Hajime/Settings"
 WINDOWS_PAGES = ROOT / "apps/windows/crates/settings/src/pages.rs"
 TESTS = ROOT / "core/Tests"
@@ -68,6 +72,21 @@ def coding_keys(text: str, type_name: str | None = None) -> list[str]:
     return [name for line in re.findall(r"\bcase ([^\n]+)", block.group(1)) for name in re.findall(r"\w+", line)]
 
 
+def enum_cases(text: str, type_name: str) -> list[str]:
+    """enum の case の名前(switch の「case .x:」は除く)"""
+    start = re.search(rf"\benum {type_name}\b[^{{]*\{{", text)
+    if not start:
+        raise ValueError(f"{type_name} が見つかりません")
+    names: list[str] = []
+    for line in text[start.end():].split("\n"):
+        if re.match(r"\s*(?:public |private )?(?:var|func|init|static)\b", line):
+            break
+        case = re.match(r"\s*case ([a-z]\w*(?:, *[a-z]\w*)*)\s*$", line)
+        if case:
+            names.extend(name.strip() for name in case.group(1).split(","))
+    return names
+
+
 def setting_paths() -> list[str]:
     """確かめる項目の道筋．中に項目を持つ値は中の項目にする"""
     paths: list[str] = []
@@ -75,6 +94,9 @@ def setting_paths() -> list[str]:
         if field in NESTED:
             type_name, source = NESTED[field]
             paths.extend(f"{field}.{name}" for name in coding_keys(source.read_text(encoding="utf-8"), type_name))
+        elif field in NESTED_ENUMS:
+            type_name, source = NESTED_ENUMS[field]
+            paths.extend(f"{field}.{name}" for name in enum_cases(source.read_text(encoding="utf-8"), type_name))
         else:
             paths.append(field)
     return paths

@@ -37,7 +37,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
              "conversionMacros", "macroSkipsSameReading", "zenzaiModel", "englishTermCandidates", "contextualSegmentCandidates", "listSegmentAlternatives", "candidateReranking"]
         case .correction: ["correction", "wordLanguage"]
         case .symbols: ["symbolRules", "macros", "palette", "paletteClosesAfterInsert", "paletteRecordsHistory"]
-        case .dictionary: ["userDictionary", "englishTerms"]
+        case .dictionary: ["userDictionary", "englishTerms", "termDictionary", "termFields"]
         case .importedDictionaries: ["importedDictionaries"]
         case .associationDictionaries: ["associationDictionaries"]
         case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID",

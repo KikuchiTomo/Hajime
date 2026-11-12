@@ -144,9 +144,17 @@ enum UIStrings {
         }
     }
 
+    /// 専門用語の辞書(R-29)．分野の名前は core の TermField.name(分岐図と同じ名前)
+    enum Terms {
+        static let enabled = "専門用語の辞書を使う"
+        static let fields = "使う分野"
+        static let note = "医学・法律・情報技術などの専門用語のうち、通常の辞書に無い語を候補に足します。通常の辞書にある語は、ここで切っても出ます。語は JMdict と Wikidata から集めています。"
+    }
+
     enum Dictionaries {
         static let userWords = "登録した単語"
         static let imported = "取り込んだ辞書"
+        static let terms = "専門用語"
         static let empty = "取り込んだ辞書はありません"
         static let importFile = "辞書をインポート…"
         static let reimport = "再読み込み…"
@@ -1137,6 +1145,7 @@ extension UIStrings {
             "recordsUsage": UIStrings.Settings.recordsUsage, "keyboardLayout": Choice.keyboardLayout, "keymap": Keys.tab,
             "symbolRules": Features.symbolsPage, "userDictionary": UIStrings.Settings.dictionaryTab,
             "importedDictionaries": Dictionaries.imported, "associationDictionaries": Association.dictionaries,
+            "termDictionary": Terms.enabled, "termFields": "専門用語の辞書の分野",
             "handShiftCorrection": Extras.handShift, "looseReadings": Extras.looseReadings, "phoneticSpelling": Extras.phoneticSpelling,
             "dynamicDictionary": Extras.dynamicDictionary, "conversionMacros": Extras.conversionMacros, "macros": Extras.macrosSection,
             "macroSkipsSameReading": Extras.macroSkipsSameReading,
