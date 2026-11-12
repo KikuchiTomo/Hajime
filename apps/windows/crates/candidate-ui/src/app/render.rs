@@ -8,8 +8,8 @@ use crate::theme::{Color, Face, Font, FontSpec, ResolvedTheme, Weight};
 use std::collections::HashMap;
 use std::sync::OnceLock;
 use windows::Win32::Graphics::Direct2D::Common::{
-    D2D1_BEZIER_SEGMENT, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_HOLLOW, D2D1_FIGURE_END_CLOSED,
-    D2D1_FIGURE_END_OPEN, D2D_RECT_F,
+    D2D1_BEZIER_SEGMENT, D2D1_COLOR_F, D2D1_FIGURE_BEGIN_FILLED, D2D1_FIGURE_BEGIN_HOLLOW,
+    D2D1_FIGURE_END_CLOSED, D2D1_FIGURE_END_OPEN, D2D_RECT_F,
 };
 use windows::Win32::Graphics::Direct2D::{
     D2D1CreateFactory, ID2D1Factory, ID2D1Geometry, ID2D1RenderTarget, ID2D1SolidColorBrush,
@@ -87,17 +87,6 @@ pub struct TextMeasure {
     /// OS の書体の集まり．書式が書体の集まりを持たないときに字を探す
     system: Option<IDWriteFontCollection>,
 }
-
-const FONTS: [Font; 8] = [
-    Font::Candidate,
-    Font::Trunk,
-    Font::Label,
-    Font::Emphasis,
-    Font::Note,
-    Font::Key,
-    Font::SplitKey,
-    Font::Mode,
-];
 
 impl TextMeasure {
     fn format(&self, font: Font) -> Option<&IDWriteTextFormat> {
@@ -263,7 +252,7 @@ impl Renderer {
         sized: &[Font],
     ) -> Result<TextMeasure> {
         let mut formats = HashMap::new();
-        for font in FONTS.iter().chain(sized) {
+        for font in Font::ALL.iter().chain(sized) {
             formats.insert(*font, self.format(&theme.font(*font, font_size))?);
         }
         Ok(TextMeasure {
@@ -494,6 +483,26 @@ impl Painter<'_> {
                 };
                 // SAFETY: 同上
                 unsafe { self.target.FillEllipse(&ellipse, self.brush) };
+            }
+            Draw::Polygon { points, color } => {
+                let Some((first, rest)) = points.split_first() else {
+                    return Ok(());
+                };
+                // SAFETY: factory は生きている COM の参照．sink は閉じるまでこの関数の中だけで使う
+                let geometry = unsafe {
+                    let path = self.renderer.d2d.CreatePathGeometry()?;
+                    let sink = path.Open()?;
+                    sink.BeginFigure(vector!(first.x, first.y), D2D1_FIGURE_BEGIN_FILLED);
+                    let rest: Vec<_> = rest.iter().map(|point| vector!(point.x, point.y)).collect();
+                    sink.AddLines(&rest);
+                    sink.EndFigure(D2D1_FIGURE_END_CLOSED);
+                    sink.Close()?;
+                    path
+                };
+                let geometry: ID2D1Geometry = geometry.into();
+                self.color(*color);
+                // SAFETY: target・brush・geometry は生きている COM の参照
+                unsafe { self.target.FillGeometry(&geometry, self.brush, None) };
             }
             Draw::Curve {
                 from,

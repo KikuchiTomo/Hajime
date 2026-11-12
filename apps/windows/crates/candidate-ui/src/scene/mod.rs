@@ -7,8 +7,8 @@
 mod association;
 mod branch;
 mod fitting;
-mod homophone;
 mod list;
+mod meaning;
 pub(crate) mod paint;
 pub mod sample;
 mod small;
@@ -17,6 +17,7 @@ pub use crate::geometry::{Frame, Point};
 pub use crate::theme::{Color, Font, ResolvedTheme};
 pub use branch::branch_map;
 pub use list::candidate_list;
+pub use meaning::CardReservation;
 pub use small::{mode, note, prediction};
 
 use crate::keys::Icon;
@@ -38,6 +39,11 @@ pub enum Draw {
     },
     Ellipse {
         frame: Frame,
+        color: Color,
+    },
+    /// 多角形を塗る．点を順につなぎ，最後の点から最初の点へ閉じる
+    Polygon {
+        points: Vec<Point>,
         color: Color,
     },
     /// 3 次ベジェの曲線(端は丸い)
@@ -100,6 +106,13 @@ impl Draw {
             },
             Self::Ellipse { frame, color } => Self::Ellipse {
                 frame: frame.offset(dx, dy),
+                color,
+            },
+            Self::Polygon { points, color } => Self::Polygon {
+                points: points
+                    .into_iter()
+                    .map(|point| point.offset(dx, dy))
+                    .collect(),
                 color,
             },
             Self::Curve {
@@ -221,6 +234,9 @@ pub struct Look<'a> {
     /// 窓の大きさ(影の分を含む)を外から決める．窓の大きさが変わる途中に，地と縁をその大きさで描く．
     /// 中身は中身に合わせた配置のまま描き，はみ出した分は窓で切れる．None なら中身に合わせる
     pub size: Option<(f32, f32)>,
+    /// 候補の右に空けておく語の意味のカードの高さ(CardReservation が前の窓から決める)．
+    /// 意味の無い候補を選んでいても，この高さの空いたカードを出して窓の大きさを変えない．None なら空けない
+    pub reserved_card: Option<f32>,
 }
 
 impl<'a> Look<'a> {
@@ -233,6 +249,7 @@ impl<'a> Look<'a> {
             ),
             rest_opacity: 1.0,
             size: None,
+            reserved_card: None,
         }
     }
 

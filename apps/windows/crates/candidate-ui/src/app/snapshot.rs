@@ -8,11 +8,12 @@ use crate::palette::{
     self,
     layout::{cell_size, Fonts, Layout},
 };
-use crate::scene::{self, Look, Scene, Surround};
+use crate::scene::{self, CardReservation, Look, Scene, Surround};
 use crate::theme::{ResolvedTheme, SystemLook};
 use ipc::{
     BranchColumn, BranchMap, BranchSplit, CandidateEntry, CandidateFocus, CandidateList,
-    CandidateVariant, Color as WireColor, CustomTheme, KeyHint,
+    CandidateVariant, Color as WireColor, CustomTheme, HomophoneNote, HomophoneSense, KeyHint,
+    MeaningPlacement, PartOfSpeech,
 };
 use std::path::{Path, PathBuf};
 use windows::Win32::Foundation::GENERIC_WRITE;
@@ -105,15 +106,67 @@ fn render_all(output: &Path) -> Result<()> {
         let font_size = tokens::size::candidate::FONT_SIZE;
         let measure = renderer.measure(&theme, font_size)?;
         let look = Look::new(&theme, font_size);
-        let scenes: [(&str, Scene); 10] = [
+        // 意味のある候補から意味の無い候補に移ったところは，前の窓で空けたカードの場所を引き継ぐ(描く層と同じ手順)
+        let mut reservation = CardReservation::default();
+        reservation.list(&meaning_list(), &look, &measure);
+        let empty_list = Look {
+            reserved_card: reservation.list(&meaning_empty_list(), &look, &measure),
+            ..look
+        };
+        reservation.branch(
+            &homophone_branch(MeaningPlacement::Side, 1),
+            &look,
+            &measure,
+        );
+        let empty_branch = Look {
+            reserved_card: reservation.branch(
+                &homophone_branch(MeaningPlacement::Side, 2),
+                &look,
+                &measure,
+            ),
+            ..look
+        };
+        let scenes: [(&str, Scene); 15] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "homophone-list",
-                scene::candidate_list(&homophone_list(), &look, &measure),
+                scene::candidate_list(&homophone_list(MeaningPlacement::Side), &look, &measure),
+            ),
+            (
+                "homophone-list-below",
+                scene::candidate_list(&homophone_list(MeaningPlacement::Below), &look, &measure),
             ),
             (
                 "meaning-list",
                 scene::candidate_list(&meaning_list(), &look, &measure),
+            ),
+            (
+                "meaning-list-empty",
+                scene::candidate_list(&meaning_empty_list(), &empty_list, &measure),
+            ),
+            (
+                "homophone-branch",
+                scene::branch_map(
+                    &homophone_branch(MeaningPlacement::Side, 1),
+                    &look,
+                    &measure,
+                ),
+            ),
+            (
+                "homophone-branch-below",
+                scene::branch_map(
+                    &homophone_branch(MeaningPlacement::Below, 1),
+                    &look,
+                    &measure,
+                ),
+            ),
+            (
+                "homophone-branch-empty",
+                scene::branch_map(
+                    &homophone_branch(MeaningPlacement::Side, 2),
+                    &empty_branch,
+                    &measure,
+                ),
             ),
             (
                 "command-list",
@@ -156,6 +209,7 @@ fn render_all(output: &Path) -> Result<()> {
             ("palette-emoji", palette::sample::emoji()),
             ("palette-search", palette::sample::search()),
             ("palette-symbol", palette::sample::symbol()),
+            ("palette-kaomoji", palette::sample::kaomoji()),
         ] {
             let fonts = Fonts::new(cell_size(&panel));
             let measure = renderer.measure_with(&theme, font_size, &fonts.all())?;
@@ -284,8 +338,27 @@ fn list() -> CandidateList {
     }
 }
 
-/// 同音異義語の使い分け(R-08)を一覧で出したところ(macOS の homophoneListView)
-fn homophone_list() -> CandidateList {
+/// 同音異義語の使い分け(R-08．macOS の SamplePanels.homophone)．意味が 2 つあるもの
+fn homophone() -> HomophoneNote {
+    HomophoneNote {
+        word: "撮る".into(),
+        part_of_speech: Some(PartOfSpeech::Verb),
+        senses: vec![
+            HomophoneSense {
+                meaning: "写真や動画を写す".into(),
+                example: Some("記念写真を撮った".into()),
+            },
+            HomophoneSense {
+                meaning: "映画やテレビ番組などを撮影する".into(),
+                example: Some("ドラマを撮る".into()),
+            },
+        ],
+        others: strings(&["取る", "採る", "執る", "捕る"]),
+    }
+}
+
+/// 同音異義語の使い分けを一覧で出したところ(macOS の homophoneListView)．既定では候補の右のカードにし，選んでいる候補を三角で指す
+fn homophone_list(placement: MeaningPlacement) -> CandidateList {
     CandidateList {
         variants: vec![],
         entries: entries(&["撮る", "取る", "採る", "執る"]),
@@ -293,44 +366,83 @@ fn homophone_list() -> CandidateList {
         selected_entry: Some(0),
         position: 1,
         total: 6,
-        homophone: Some(ipc::HomophoneNote {
-            word: "撮る".into(),
-            senses: vec![
-                ipc::HomophoneSense {
-                    meaning: "写真や動画を写す".into(),
-                    example: Some("写真を撮る".into()),
-                },
-                ipc::HomophoneSense {
-                    meaning: "映画などを撮影する".into(),
-                    example: Some("映画を撮る".into()),
-                },
-            ],
-            others: strings(&["取る", "採る", "執る", "捕る"]),
-            part_of_speech: None,
-        }),
+        homophone: Some(homophone()),
+        meaning_placement: Some(placement),
         ..list()
     }
 }
 
-/// 同音異義語の無い語の意味(R-08)を一覧で出したところ(macOS の meaningListView)．ほかの語の行を出さない
+/// 同音異義語の無い語の意味を一覧で出したところ(macOS の meaningListView)．同音語の行を出さず，長い意味は折り返す
 fn meaning_list() -> CandidateList {
     CandidateList {
-        variants: vec![],
         entries: entries(&["動く", "うごく", "ウゴク"]),
         hints: None,
         selected_entry: Some(0),
         position: 1,
         total: 3,
-        homophone: Some(ipc::HomophoneNote {
+        homophone: Some(HomophoneNote {
             word: "動く".into(),
-            senses: vec![ipc::HomophoneSense {
-                meaning: "位置や状態が変わる".into(),
-                example: Some("車が動く".into()),
-            }],
+            part_of_speech: Some(PartOfSpeech::Verb),
+            senses: vec![
+                HomophoneSense {
+                    meaning: "位置や姿勢が変わる。止まっていたものが移る".into(),
+                    example: Some("車がゆっくり動く".into()),
+                },
+                HomophoneSense {
+                    meaning: "機械などが作動する".into(),
+                    example: Some("時計が動き始める".into()),
+                },
+                HomophoneSense {
+                    meaning: "気持ちが変わる。心が揺れる".into(),
+                    example: Some("心が動く".into()),
+                },
+            ],
             others: vec![],
-            part_of_speech: None,
         }),
+        meaning_placement: Some(MeaningPlacement::Side),
         ..list()
+    }
+}
+
+/// 意味のある候補から意味の無い候補(ひらがな)に移ったところ(macOS の meaningEmptyListView)．
+/// カードの場所は空けたままにし，窓の大きさを変えない
+fn meaning_empty_list() -> CandidateList {
+    CandidateList {
+        homophone: None,
+        meaning_placement: None,
+        selected_entry: Some(1),
+        position: 2,
+        ..meaning_list()
+    }
+}
+
+/// 同音異義語の使い分けを分岐図で出したところ(macOS の homophoneBranchView)．既定では選んでいる候補の先に線を伸ばしてカードをつなぐ．
+/// 同音語の札には枝に出ていない語だけを出す．selected を意味の無い候補(2)にすると，カードの場所を空けたままにする
+fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
+    let alternatives = strings(&["取る", "撮る", "とる", "採る"]);
+    let has_meaning = selected == 1;
+    BranchMap {
+        association: None,
+        association_hint: None,
+        association_key: None,
+        columns: vec![
+            column("写真を"),
+            BranchColumn {
+                text: alternatives[selected].clone(),
+                selected_alternative: Some(selected as u32),
+                is_focused: true,
+                is_uncertain: true,
+                homophone: has_meaning.then(homophone),
+                alternative_notes: vec![None; alternatives.len()],
+                alternatives,
+                ..column("撮る")
+            },
+        ],
+        position: 1,
+        total: 7,
+        note: None,
+        hints: vec![],
+        meaning_placement: has_meaning.then_some(placement),
     }
 }
 

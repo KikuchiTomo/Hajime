@@ -404,6 +404,7 @@ pub enum RuleList {
     SymbolSequences,
     SymbolReadings,
     EnglishTerms,
+    HiddenPredictions,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -1665,6 +1666,7 @@ impl fmt::Debug for BranchMap {
 pub enum PaletteKind {
     Emoji,
     Symbol,
+    Kaomoji,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -1845,6 +1847,9 @@ pub struct PalettePanel {
     pub hints: Vec<KeyHint>,
     #[serde(rename = "cellSize")]
     pub cell_size: f64,
+    #[serde(rename = "cellsPerRow")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cells_per_row: Option<u32>,
 }
 
 impl fmt::Debug for PalettePanel {
@@ -1868,6 +1873,7 @@ impl fmt::Debug for PalettePanel {
             .field("message", &REDACTED)
             .field("hints", &self.hints)
             .field("cellSize", &self.cell_size)
+            .field("cellsPerRow", &self.cells_per_row)
             .finish()
     }
 }

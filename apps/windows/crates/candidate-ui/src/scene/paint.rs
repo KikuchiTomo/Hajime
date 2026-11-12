@@ -217,7 +217,8 @@ impl<'a> Painter<'a> {
         self.centered(label, font, color, frame);
     }
 
-    fn icon(&mut self, icon: Icon, frame: Frame, color: Color) {
+    /// アイコンを frame の中に線画で描く
+    pub fn icon(&mut self, icon: Icon, frame: Frame, color: Color) {
         self.draws.push(Draw::Icon {
             icon,
             frame,

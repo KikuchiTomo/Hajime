@@ -1,13 +1,18 @@
 /// 絵文字と記号のパレットに並べる 1 つの文字(同梱の表 data/palette/palette.tsv の 1 行)
 public struct PaletteItem: Sendable, Equatable, Hashable {
+    /// 種類．並びはパレットの種類の切り替えの順
     public enum Kind: String, Sendable, Hashable, CaseIterable {
         case emoji
         case symbol
+        case kaomoji
+
+        /// マス目のマスの形
+        public var cellShape: PaletteCellShape { self == .kaomoji ? .wide : .square }
     }
 
     public var kind: Kind
     public var category: PaletteCategory
-    /// 入れる文字．絵文字は肌の色を変えていない形
+    /// 入れる文字．絵文字は肌の色を変えていない形．顔文字は何文字もある
     public var text: String
     /// 絵文字が入った Unicode の絵文字のバージョン．記号は nil
     public var version: EmojiVersion?
@@ -49,6 +54,13 @@ public struct PaletteItem: Sendable, Equatable, Hashable {
     public var hasSkinTones: Bool { !skinTones.isEmpty }
 }
 
+/// パレットのマスの形．顔文字は横に長いので，四角いマスをいくつかつなげた広いマスに並べる．
+/// 形の違う種類は，ピン留め・よく使う文字・探した結果でも同じマス目に混ぜない
+public enum PaletteCellShape: String, Sendable, Hashable, CaseIterable {
+    case square
+    case wide
+}
+
 /// Unicode の絵文字のバージョン(「15.1」)
 public struct EmojiVersion: Sendable, Hashable, Comparable, CustomStringConvertible {
     public var major: Int
@@ -87,7 +99,8 @@ public enum SkinTone: String, Sendable, Hashable, Codable, CaseIterable {
     public static let allTones: [SkinTone] = [.light, .mediumLight, .medium, .mediumDark, .dark]
 }
 
-/// パレットのまとまり．絵文字は Unicode の絵文字のまとまり，記号は tools/palette/symbols.txt のまとまり．並びはパレットのタブの順
+/// パレットのまとまり．絵文字は Unicode の絵文字のまとまり，記号は tools/palette/symbols.txt のまとまり，
+/// 顔文字は Mozc の顔文字のまとまりと読みから tools/palette/build.py が決めたまとまり．並びはパレットのタブの順
 public enum PaletteCategory: String, Sendable, Hashable, Codable, CaseIterable {
     case smileys
     case people
@@ -108,11 +121,20 @@ public enum PaletteCategory: String, Sendable, Hashable, Codable, CaseIterable {
     case shapes
     case lines
     case misc
+    case joy
+    case sorrow
+    case sweat
+    case anger
+    case surprise
+    case greeting
+    case animals
+    case otherFaces
 
     public var kind: PaletteItem.Kind {
         switch self {
         case .smileys, .people, .nature, .food, .travel, .activities, .objects, .symbols, .flags: .emoji
         case .punctuation, .brackets, .arrows, .math, .letters, .units, .enclosed, .shapes, .lines, .misc: .symbol
+        case .joy, .sorrow, .sweat, .anger, .surprise, .greeting, .animals, .otherFaces: .kaomoji
         }
     }
 
@@ -138,10 +160,18 @@ public enum PaletteCategory: String, Sendable, Hashable, Codable, CaseIterable {
         case .shapes: "図形"
         case .lines: "罫線"
         case .misc: "その他の記号"
+        case .joy: "笑顔"
+        case .sorrow: "悲しみ"
+        case .sweat: "焦り"
+        case .anger: "怒り"
+        case .surprise: "驚き"
+        case .greeting: "挨拶と動作"
+        case .animals: "動物"
+        case .otherFaces: "その他の顔文字"
         }
     }
 
-    /// タブにアイコンを描けないときに代わりに見せる，まとまりを表す文字
+    /// タブにアイコンを描けないときに代わりに見せる，まとまりを表す文字．顔文字は短い顔(タブの幅に収まらなければ描く側が縮める)
     public var symbol: String {
         switch self {
         case .smileys: "😀"
@@ -163,6 +193,14 @@ public enum PaletteCategory: String, Sendable, Hashable, Codable, CaseIterable {
         case .shapes: "★"
         case .lines: "┼"
         case .misc: "♪"
+        case .joy: "^^"
+        case .sorrow: "T_T"
+        case .sweat: "^^;"
+        case .anger: "`д´"
+        case .surprise: "ﾟдﾟ"
+        case .greeting: "ﾉｼ"
+        case .animals: "ΦωΦ"
+        case .otherFaces: "☆彡"
         }
     }
 }

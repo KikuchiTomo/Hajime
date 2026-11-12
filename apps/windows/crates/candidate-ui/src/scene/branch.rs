@@ -6,14 +6,16 @@
 //! - 確信の低い文節は幹の文字に点線を引き，注目していなければ次の候補を 1 つだけ薄く添える
 //! - 選び直した文節は実線を引く
 //! - 文節を区切っているときは，注目している文節の幹を切れ目で分け，切れ目に小さな番号の丸を挟む．枝は出さない
+//! - 語の意味のカードは，候補の枝の先に置いて選んでいる候補から線でつなぐか，枝と足元のあいだに窓の幅いっぱいに出す
 //!
 //! 角丸のテーマは曲線の枝と角丸の選択，platinum と desk は 1 ドットの直線の枝で描く
 
+use super::meaning::{self, Slot};
 use super::paint::{Painter, TagStyle};
 use super::{Draw, Frame, Look, Measure, Point, Scene};
 use crate::strings;
 use crate::theme::Font;
-use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind, KeyHint};
+use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind, KeyHint, MeaningPlacement};
 use tokens::size::{branch, candidate, glass};
 
 /// テーマごとの寸法．角丸のテーマは余白と行を広く取る
@@ -67,9 +69,13 @@ impl Metrics {
 struct Layout {
     trunk_x: Vec<f32>,
     trunk_width: Vec<f32>,
-    lower_rows: usize,
     trunk_y: f32,
     branch_width: f32,
+    /// 下の枝の高さ(候補の枝と，候補の右に出すカードの高い方)
+    lower_height: f32,
+    /// 語の意味のカードと，その枠．カードを出さなければ None
+    slot: Option<Slot>,
+    card: Option<Frame>,
     width: f32,
     height: f32,
 }
@@ -101,7 +107,8 @@ fn split_pieces(split: &BranchSplit, painter: &Painter) -> SplitPieces {
     pieces
 }
 
-fn focused(map: &BranchMap) -> Option<(usize, &BranchColumn)> {
+/// 注目している文節の位置と文節
+pub(super) fn focused(map: &BranchMap) -> Option<(usize, &BranchColumn)> {
     map.columns
         .iter()
         .enumerate()
@@ -119,7 +126,42 @@ fn position(map: &BranchMap) -> String {
     }
 }
 
-fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
+/// 候補の下に出すカードの上下の空き
+fn below_margin() -> f32 {
+    candidate::PADDING_X / 2.0
+}
+
+/// 注目している文節で出す語の意味のカード．区切っているあいだは出さない．
+/// 候補の右は幅が決まっているので content_width を使わず，候補の下は content_width(窓の中身の幅)で折り返す
+fn meaning_slot(
+    map: &BranchMap,
+    painter: &Painter,
+    reserved: Option<f32>,
+    content_width: Option<f32>,
+) -> Option<Slot> {
+    let (_, column) = focused(map)?;
+    if column.split.is_some() {
+        return None;
+    }
+    match meaning::placement(map.meaning_placement) {
+        MeaningPlacement::Side => {
+            let card = column.homophone.as_ref().map(|note| {
+                meaning::branch_card(painter, note, column, glass::MEANING_BRANCH_WIDTH)
+            });
+            meaning::side_slot(card, glass::MEANING_BRANCH_WIDTH, reserved)
+        }
+        MeaningPlacement::Below => {
+            let note = column.homophone.as_ref()?;
+            let width =
+                (content_width? - glass::MEANING_PADDING * 2.0).max(glass::MEANING_CARD_WIDTH);
+            Some(meaning::below_slot(meaning::branch_card(
+                painter, note, column, width,
+            )))
+        }
+    }
+}
+
+fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Option<f32>) -> Layout {
     let padding = candidate::PADDING_X;
     let mut x = metrics.inset;
     let mut trunk_x = Vec::new();
@@ -177,23 +219,34 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
         + label_width
         + note_width
         + padding * 2.0;
-    let branch_right = focused.map_or(metrics.inset, |(index, _)| trunk_x[index]) + branch_width;
+    // 候補の右に出すカードは，候補の枝の先に続けて置く(枝の一部として幅に数える)
+    let side = meaning_slot(map, painter, reserved, None)
+        .filter(|slot| slot.placement == MeaningPlacement::Side);
+    let card_extent = side
+        .as_ref()
+        .map_or(0.0, |slot| glass::MEANING_GAP + slot.width);
+    let branch_right =
+        focused.map_or(metrics.inset, |(index, _)| trunk_x[index]) + branch_width + card_extent;
     let preview_rows = usize::from(map.columns.iter().any(|column| column.preview.is_some()));
     let upper_rows = column.map_or(0, |column| column.variants.len());
     let lower_rows = column
         .map_or(0, |column| column.alternatives.len())
         .max(preview_rows);
+    let lower_height = (metrics.row_height * lower_rows as f32).max(
+        side.as_ref()
+            .map_or(0.0, |slot| slot.height + padding / 2.0),
+    );
     let footer =
         footer_width(map, painter) + painter.width(&position(map), Font::Label) + padding * 3.0;
-    // 使い分けや誤用の注釈と，IME からの知らせは，枝と足元のあいだに 1 行ずつ出す
+    // 使い分けや誤用の注釈と，IME からの知らせは，枝と足元のあいだに 1 行ずつ出す．候補の下のカードは窓の幅をカードの幅まで広げる
+    let below = map.meaning_placement == Some(MeaningPlacement::Below)
+        && column.is_some_and(|column| column.homophone.is_some() && column.split.is_none());
     let note = [
         column
             .and_then(|column| column.usage_note.as_deref())
             .map(|text| painter.width(text, Font::Label)),
         map.note.as_ref().map(|note| painter.note_width(note)),
-        column
-            .and_then(|column| column.homophone.as_ref())
-            .map(|note| super::homophone::width(painter, note)),
+        below.then_some(glass::MEANING_CARD_WIDTH + glass::MEANING_PADDING * 2.0),
     ]
     .into_iter()
     .flatten()
@@ -211,28 +264,53 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
         .max(heading + metrics.inset * 2.0);
     let trunk_y =
         metrics.inset + heading_height(map, metrics) + upper_rows as f32 * metrics.row_height;
+    let width = width.ceil();
     let extra_rows = usize::from(column.is_some_and(|column| column.usage_note.is_some()))
         + usize::from(map.note.is_some());
-    let homophone_height = column
-        .and_then(|column| column.homophone.as_ref())
-        .map_or(0.0, super::homophone::height);
+    // 候補の下のカードは，窓の中身の幅で折り返す
+    let slot =
+        side.or_else(|| meaning_slot(map, painter, reserved, Some(width - metrics.inset * 2.0)));
+    let below_height = slot
+        .as_ref()
+        .filter(|slot| slot.placement == MeaningPlacement::Below)
+        .map_or(0.0, |slot| slot.height + below_margin() * 2.0);
     let height = trunk_y
-        + metrics.row_height * (1 + lower_rows) as f32
+        + metrics.row_height
+        + lower_height
         + candidate::FRAME_WIDTH
-        + homophone_height
+        + below_height
         + metrics.footer_height * (1 + extra_rows) as f32
         + if painter.theme.is_rounded() {
             0.0
         } else {
             metrics.inset
         };
+    let card = slot
+        .as_ref()
+        .zip(focused)
+        .map(|(slot, (index, _))| match slot.placement {
+            MeaningPlacement::Side => Frame::new(
+                trunk_x[index] + branch_width + glass::MEANING_GAP,
+                trunk_y + metrics.row_height + padding / 4.0,
+                slot.width,
+                slot.height,
+            ),
+            MeaningPlacement::Below => Frame::new(
+                metrics.inset,
+                trunk_y + metrics.row_height + lower_height + below_margin(),
+                width - metrics.inset * 2.0,
+                slot.height,
+            ),
+        });
     Layout {
         trunk_x,
         trunk_width,
-        lower_rows,
         trunk_y,
         branch_width,
-        width: width.ceil(),
+        lower_height,
+        slot,
+        card,
+        width,
         height: height.ceil(),
     }
 }
@@ -275,7 +353,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     let metrics = Metrics::new(look, measure);
     let mut painter = Painter::new(look, measure);
     let theme = look.theme;
-    let layout = layout(map, &metrics, &painter);
+    let layout = layout(map, &metrics, &painter, look.reserved_card);
     let (width, height) = look.sized(
         layout.width + metrics.shadow,
         layout.height + metrics.shadow,
@@ -298,11 +376,18 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         painter.separator(row.max_y(), line_inset, body.width - line_inset);
     }
     let focused_index = focused(map).map(|(index, _)| index);
-    // 注目している文節の枝が重なる範囲には，ほかの文節の添え書きを描かない
+    // 注目している文節の枝(候補の右のカードを含む)が重なる範囲には，ほかの文節の添え書きを描かない
+    let side_card = layout
+        .slot
+        .as_ref()
+        .zip(layout.card)
+        .filter(|(slot, _)| slot.placement == MeaningPlacement::Side);
     let branch_range = focused_index.map(|index| {
         (
             layout.trunk_x[index],
-            layout.trunk_x[index] + layout.branch_width,
+            side_card.map_or(layout.trunk_x[index] + layout.branch_width, |(_, card)| {
+                card.max_x()
+            }),
         )
     });
     for (index, column) in map.columns.iter().enumerate() {
@@ -372,6 +457,22 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
                     );
                 }
             }
+            if let Some((slot, card)) = side_card {
+                // 選んでいる候補の枝の先から，カードの見出しへ線でつなぐ
+                let selected = column
+                    .selected_alternative
+                    .filter(|index| (*index as usize) < column.alternatives.len());
+                if let (Some(selected), Some(content)) = (selected, &slot.card) {
+                    let row_y = node.max_y() + selected as f32 * metrics.row_height;
+                    let start = Point::new(
+                        (node.x + layout.branch_width).round(),
+                        (row_y + metrics.row_height / 2.0).round(),
+                    );
+                    let end = Point::new(card.x, content.header_mid_y(card));
+                    meaning::connector(&mut painter, start, end);
+                }
+                meaning::draw(&mut painter, slot.card.as_ref(), card, None);
+            }
         } else if let Some(preview) = column.preview.as_deref() {
             let overlaps =
                 branch_range.is_some_and(|(from, to)| node.x <= to && node.max_x() >= from);
@@ -393,17 +494,14 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             }
         }
     }
-    let mut footer_y = layout.trunk_y + metrics.row_height * (1 + layout.lower_rows) as f32;
+    let mut footer_y = layout.trunk_y + metrics.row_height + layout.lower_height;
     let content_width = body.width - metrics.inset * 2.0;
-    if let Some(note) = focused(map).and_then(|(_, column)| column.homophone.as_ref()) {
-        let area = Frame::new(
-            metrics.inset,
-            footer_y,
-            content_width,
-            super::homophone::height(note),
-        );
-        super::homophone::draw(&mut painter, note, area);
-        footer_y += super::homophone::height(note);
+    if let (Some(slot), Some(card)) = (&layout.slot, layout.card) {
+        if slot.placement == MeaningPlacement::Below {
+            // 候補の下: 枝と足元のあいだに，窓の幅いっぱいのカードを出す
+            meaning::draw(&mut painter, slot.card.as_ref(), card, None);
+            footer_y = card.max_y() + below_margin();
+        }
     }
     if let Some(note) = focused(map).and_then(|(_, column)| column.usage_note.as_deref()) {
         let row = Frame::new(
@@ -1150,6 +1248,177 @@ mod tests {
                 Some(20.0 + branch::SPLIT_BADGE_SIZE + branch::SPLIT_BADGE_GAP * 2.0)
             );
         }
+    }
+
+    /// 「撮る」の文節で候補の枝を開き，2 番目の「撮る」を選んだ分岐図(意味のカードを出す)
+    fn meaning_map(placement: ipc::MeaningPlacement) -> BranchMap {
+        let mut focused = column("撮る", true);
+        focused.alternatives = vec!["取る".into(), "撮る".into(), "とる".into()];
+        focused.alternative_notes = vec![None, None, None];
+        focused.selected_alternative = Some(1);
+        focused.homophone = Some(ipc::HomophoneNote {
+            word: "撮る".into(),
+            part_of_speech: Some(ipc::PartOfSpeech::Verb),
+            senses: vec![ipc::HomophoneSense {
+                meaning: "写真や動画を写す".into(),
+                example: Some("記念写真を撮った".into()),
+            }],
+            others: vec!["取る".into(), "採る".into()],
+        });
+        BranchMap {
+            columns: vec![column("写真を", false), focused],
+            note: None,
+            meaning_placement: Some(placement),
+            ..map()
+        }
+    }
+
+    #[test]
+    fn 語の意味は選んでいる候補の枝の先にカードを置き_線でつなぐ() {
+        for name in ["washi", "platinum", "automatic"] {
+            let theme = theme(name);
+            let look = Look::new(&theme, 15.0);
+            let scene = branch_map(&meaning_map(ipc::MeaningPlacement::Side), &look, &Fixed);
+            let texts = texts(&scene);
+            for text in ["写真や動画を写す", "動詞", "同音語", "採る"] {
+                assert!(
+                    texts.iter().any(|(shown, _)| shown == text),
+                    "{name}: {text}"
+                );
+            }
+            // 同音語の札には，枝に出ている語(取る)を出さない
+            let tags = texts.iter().filter(|(shown, _)| shown == "取る").count();
+            assert_eq!(tags, 1, "{name}");
+            // カードは候補の枝の右に置く
+            let meaning = text_frame(&scene, "写真や動画を写す").expect("意味を描く");
+            let branch = scene
+                .hits
+                .iter()
+                .find(|hit| hit.target == ipc::PointerTarget::Alternative { index: 1 })
+                .map(|hit| hit.frame)
+                .expect("選んでいる枝");
+            assert!(meaning.x >= branch.max_x() + glass::MEANING_GAP, "{name}");
+            // 端の丸は選んでいる枝の高さより下(カードの見出し)にあり，カードの左の辺に付く
+            let dot = scene
+                .draws
+                .iter()
+                .find_map(|draw| match draw {
+                    Draw::Ellipse { frame, color }
+                        if frame.width == glass::MEANING_DOT_SIZE && *color == theme.selection =>
+                    {
+                        Some(*frame)
+                    }
+                    _ => None,
+                })
+                .expect("端の丸");
+            assert_eq!(dot.mid_x(), branch.max_x() + glass::MEANING_GAP, "{name}");
+            if theme.curved_branches() {
+                assert!(scene.draws.iter().any(|draw| matches!(draw,
+                    Draw::Curve { from, to, .. } if from.x == branch.max_x().round() && to.x == dot.mid_x())), "{name}");
+            }
+            // 一覧と違って三角で指さない
+            assert!(
+                !scene
+                    .draws
+                    .iter()
+                    .any(|draw| matches!(draw, Draw::Polygon { .. })),
+                "{name}"
+            );
+            let plain = branch_map(
+                &BranchMap {
+                    meaning_placement: None,
+                    columns: meaning_map(ipc::MeaningPlacement::Side)
+                        .columns
+                        .into_iter()
+                        .map(|column| BranchColumn {
+                            homophone: None,
+                            ..column
+                        })
+                        .collect(),
+                    ..meaning_map(ipc::MeaningPlacement::Side)
+                },
+                &look,
+                &Fixed,
+            );
+            assert!(
+                scene.width >= plain.width + glass::MEANING_BRANCH_WIDTH,
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn 分岐図で候補の下に出す設定では枝と足元のあいだに窓の幅いっぱいのカードを出す() {
+        for name in ["washi", "platinum"] {
+            let theme = theme(name);
+            let look = Look::new(&theme, 15.0);
+            let scene = branch_map(&meaning_map(ipc::MeaningPlacement::Below), &look, &Fixed);
+            let meaning = text_frame(&scene, "写真や動画を写す").expect("意味を描く");
+            let last = text_frame(&scene, "とる").expect("最後の枝");
+            let footer = text_frame(&scene, "候補").expect("足元の案内");
+            assert!(
+                meaning.y > last.max_y() && meaning.max_y() < footer.y,
+                "{name}"
+            );
+            // 線でつながない
+            assert!(
+                !scene.draws.iter().any(|draw| matches!(draw,
+                Draw::Ellipse { frame, .. } if frame.width == glass::MEANING_DOT_SIZE)),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn 分岐図で意味の無い候補に移っても空けておいたカードで窓の大きさを変えない() {
+        let theme = theme("washi");
+        let look = Look::new(&theme, 15.0);
+        let mut reservation = crate::scene::CardReservation::default();
+        let shown = meaning_map(ipc::MeaningPlacement::Side);
+        let first = branch_map(
+            &shown,
+            &Look {
+                reserved_card: reservation.branch(&shown, &look, &Fixed),
+                ..look
+            },
+            &Fixed,
+        );
+        let mut moved = shown.clone();
+        moved.columns[1].selected_alternative = Some(2);
+        moved.columns[1].text = "とる".into();
+        moved.columns[1].homophone = None;
+        moved.meaning_placement = None;
+        let empty = branch_map(
+            &moved,
+            &Look {
+                reserved_card: reservation.branch(&moved, &look, &Fixed),
+                ..look
+            },
+            &Fixed,
+        );
+        assert_eq!((empty.width, empty.height), (first.width, first.height));
+        assert!(text_frame(&empty, "写真や動画を写す").is_none());
+        assert!(empty.draws.iter().any(|draw| matches!(
+            draw,
+            Draw::Icon {
+                icon: crate::keys::Icon::Book,
+                ..
+            }
+        )));
+        // 空いたカードへは線を引かない
+        assert!(!empty.draws.iter().any(|draw| matches!(draw,
+            Draw::Ellipse { frame, .. } if frame.width == glass::MEANING_DOT_SIZE)));
+    }
+
+    #[test]
+    fn 区切っているあいだは語の意味のカードを出さない() {
+        let theme = theme("washi");
+        let mut splitting = meaning_map(ipc::MeaningPlacement::Side);
+        splitting.columns[1].split = Some(BranchSplit {
+            pieces: vec!["撮".into(), "る".into()],
+        });
+        let scene = branch_map(&splitting, &Look::new(&theme, 15.0), &Fixed);
+        assert!(text_frame(&scene, "写真や動画を写す").is_none());
     }
 
     #[test]

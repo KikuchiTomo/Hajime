@@ -11,6 +11,12 @@ enum PaletteKeyUpgrade {
     }
 
     static func upgraded(_ keymap: Keymap) -> Keymap {
+        adding(added, to: keymap, previousStandard: previousStandard)
+    }
+
+    /// 標準のひな形のまま(previousStandard と同じ)なら今の標準の表にし，変えた表には，コマンドが無く
+    /// どの状態でもキーが空いている行だけを足す．顔文字のパレットのキー(KaomojiKeyUpgrade)でも使う
+    static func adding(_ added: [KeymapEntry], to keymap: Keymap, previousStandard: Keymap) -> Keymap {
         if keymap.entries == previousStandard.entries {
             var standard = KeymapPreset.standard.keymap
             standard.unknownEntries = keymap.unknownEntries
@@ -29,8 +35,8 @@ enum PaletteKeyUpgrade {
         KeymapPreset.standard.keymap.entries.filter { $0.command == .emojiPalette || $0.command == .symbolPalette }
     }
 
-    /// バージョン 9 の標準の表．今の標準の表から足した行を除いたもの
+    /// バージョン 9 の標準の表．バージョン 10 の標準の表から足した行を除いたもの
     static var previousStandard: Keymap {
-        Keymap(KeymapPreset.standard.keymap.entries.filter { !added.contains($0) })
+        Keymap(KaomojiKeyUpgrade.previousStandard.entries.filter { !added.contains($0) })
     }
 }

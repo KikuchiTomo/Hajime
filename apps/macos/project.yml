@@ -17,7 +17,7 @@ settings:
     MACOSX_DEPLOYMENT_TARGET: "14.0"
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
-    # IME の本体と更新用のアプリで同じバージョンにする(tools/release/bump_version.sh が書き換える)
+    # IME の本体と補助のアプリ(更新・入力ソースの登録)で同じバージョンにする(tools/release/bump_version.sh が書き換える)
     MARKETING_VERSION: "0.2.7"
     CURRENT_PROJECT_VERSION: "25"
 packages:
@@ -88,6 +88,13 @@ targets:
     dependencies:
       # 更新用のアプリを Contents/Helpers に入れる(R-19)
       - target: HajimeUpdater
+        embed: true
+        codeSign: false
+        copy:
+          destination: wrapper
+          subpath: Contents/Helpers
+      # 入力ソースの登録を直す補助のアプリも Contents/Helpers に入れる(HajimeInputSourceHelper/main.swift)
+      - target: HajimeInputSourceHelper
         embed: true
         codeSign: false
         copy:
@@ -180,6 +187,31 @@ targets:
           PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.develop.Updater
         Debug:
           PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.debug.Updater
+  # 入力ソースの登録を直す補助のアプリ．OS が入れた IME を入力ソースの一覧から外したとき，IME の本体はサンドボックスの中から
+  # 登録し直せないので，このアプリが登録し直す．キー入力は受け取らず，通信もしない．入力ソースの一覧はサンドボックスの外で
+  # 共有されているので，サンドボックスには入れない(ハードンドランタイムは付ける)
+  HajimeInputSourceHelper:
+    type: application
+    platform: macOS
+    sources:
+      - path: HajimeInputSourceHelper
+        excludes:
+          - "Info.plist"
+    settings:
+      base:
+        PRODUCT_NAME: "Hajime IME Input Source Helper"
+        PRODUCT_MODULE_NAME: HajimeInputSourceHelper
+        PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.Hajime.InputSourceHelper
+        INFOPLIST_FILE: HajimeInputSourceHelper/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Manual
+        CODE_SIGN_IDENTITY: "-"
+        SKIP_INSTALL: YES
+      configs:
+        Dev:
+          PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.develop.InputSourceHelper
+        Debug:
+          PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.debug.InputSourceHelper
 schemes:
   Hajime:
     build:
