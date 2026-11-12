@@ -1,0 +1,8 @@
+{{- /*
+画像を付けない機能の一覧．中に hajime/catalog-group を並べる
+@example {{< hajime/catalog title="そのほかの機能" >}}{{< hajime/catalog-group title="入力" >}}{{< hajime/catalog-item title="…" link="…" >}}説明{{< /hajime/catalog-item >}}{{< /hajime/catalog-group >}}{{< /hajime/catalog >}}
+*/ -}}
+<section class="hajime-catalog not-prose">
+  {{- with .Get "title" }}<h2 class="hajime-catalog__title">{{ . }}</h2>{{ end }}
+  {{- .Inner -}}
+</section>

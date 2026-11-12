@@ -1,0 +1,11 @@
+{{- /*
+機能の一覧の 1 項目．title が名前，中身が説明，link は詳しい説明のページ
+*/ -}}
+{{- $link := .Get "link" -}}
+{{- $href := cond (hasPrefix $link "/") ($link | relURL) $link -}}
+<li class="hajime-catalog__item">
+  <h4 class="hajime-catalog__name">
+    {{- if $link }}<a href="{{ $href }}">{{ .Get "title" }}</a>{{ else }}{{ .Get "title" }}{{ end -}}
+  </h4>
+  <p class="hajime-catalog__text">{{ trim .Inner "\n " }}</p>
+</li>
