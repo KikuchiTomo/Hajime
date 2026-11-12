@@ -401,6 +401,7 @@ fn list(entries: Vec<CandidateEntry>, selected: usize) -> CandidateList {
         homophone: None,
         shows_numbers: None,
         meaning_placement: None,
+        column_length: None,
     }
 }
 

@@ -1895,6 +1895,10 @@
         {
           "name": "meaningPlacement",
           "type": "MeaningPlacement?"
+        },
+        {
+          "name": "columnLength",
+          "type": "u32?"
         }
       ]
     },

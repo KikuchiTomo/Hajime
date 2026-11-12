@@ -44,12 +44,17 @@ struct FooterHintsTests {
         var list = CandidatePanel(variants: variants, selectedVariant: nil, entries: [.init(text: "変換", annotation: nil)], selectedEntry: 0,
                                   focus: .candidate, position: 1, total: 1, note: nil)
         var settings = DefaultSettings.settings
-        #expect(FooterHints.make(for: list, settings: settings) == [WireKeyHint(keys: "Shift+Space", label: "文字種")])
+        #expect(FooterHints.make(for: list, settings: settings) == [WireKeyHint(keys: "Shift+Space", label: "文字種"), WireKeyHint(keys: "Alt+↓", label: "表に広げる")])
 
         // 表で前の候補を ↑ だけにすると，案内も ↑ にする
         settings.keymap.entries.removeAll { $0.command == .previousCandidate }
         settings.keymap.entries.append(KeymapEntry(.converting, KeyStroke(.up), .previousCandidate))
-        #expect(FooterHints.make(for: list, settings: settings) == [WireKeyHint(keys: "↑", label: "文字種")])
+        #expect(FooterHints.make(for: list, settings: settings) == [WireKeyHint(keys: "↑", label: "文字種"), WireKeyHint(keys: "Alt+↓", label: "表に広げる")])
+
+        // 表に広げているときは，列を移るキーと戻すキー
+        var grid = list
+        grid.columnLength = 9
+        #expect(FooterHints.make(for: grid, settings: settings) == [WireKeyHint(keys: "←→", label: "列"), WireKeyHint(keys: "Alt+↓", label: "戻す")])
 
         list.focus = .variants
         list.selectedVariant = 0

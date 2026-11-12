@@ -11,6 +11,20 @@ enum SamplePanels {
         selectedEntry: 1, focus: .candidate, position: 2, total: 12, note: nil
     )
 
+    /// 候補を表に広げた一覧(キー設定の表の「候補を表に広げる」)．9 行 × 4 列で，2 列目の候補を選んでいる．番号は選んでいる列にだけ振る
+    static let grid: CandidatePanel = {
+        let words = ["高", "校", "考", "効", "行", "公", "工", "功", "好", "光", "口", "向", "項", "幸", "構", "港", "稿", "鋼",
+                     "講", "購", "候", "交", "甲", "江", "孝", "抗", "拘", "肯", "荒", "香", "航", "康", "黄", "侯", "坑", "后"]
+        var panel = CandidatePanel(
+            variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) },
+            selectedVariant: nil,
+            entries: words.map { .init(text: $0, annotation: nil) },
+            selectedEntry: 11, focus: .candidate, position: 12, total: 58, note: nil
+        )
+        panel.columnLength = DefaultSettings.candidatesPerPage
+        return panel
+    }()
+
     /// 打っているあいだの候補の窓．読みの変換の候補だけを並べ(続く語句の予測は別の窓)，選び始めるまで番号を振らず，
     /// 足元に選び始めるキーを出す．予測の窓を出していないときは Tab でも選び始める
     static let suggestion: CandidatePanel = {

@@ -191,6 +191,7 @@ mod tests {
             total: 2,
             note: None,
             meaning_placement: None,
+            column_length: None,
             hints: None,
         }
     }

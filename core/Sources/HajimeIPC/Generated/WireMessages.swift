@@ -1769,8 +1769,9 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
     public var homophone: WireHomophoneNote?
     public var showsNumbers: Bool?
     public var meaningPlacement: WireMeaningPlacement?
+    public var columnLength: UInt32?
 
-    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint]? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, homophone: WireHomophoneNote? = nil, showsNumbers: Bool? = nil, meaningPlacement: WireMeaningPlacement? = nil) {
+    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint]? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, homophone: WireHomophoneNote? = nil, showsNumbers: Bool? = nil, meaningPlacement: WireMeaningPlacement? = nil, columnLength: UInt32? = nil) {
         self.variants = variants
         self.selectedVariant = selectedVariant
         self.entries = entries
@@ -1786,6 +1787,7 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
         self.homophone = homophone
         self.showsNumbers = showsNumbers
         self.meaningPlacement = meaningPlacement
+        self.columnLength = columnLength
     }
 }
 

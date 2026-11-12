@@ -22,6 +22,7 @@
     "branchCandidatesPerPage",
     "calculation",
     "candidateFontSize",
+    "candidateGridColumns",
     "candidatePresentation",
     "candidateReranking",
     "commands",
@@ -45,6 +46,7 @@
     "englishTermCandidates",
     "englishTerms",
     "escapeSwitchesToDirect",
+    "expandsGridOnPaging",
     "handShiftCorrection",
     "handwriting",
     "hiddenPredictions",
@@ -183,6 +185,10 @@
     "candidateFontSize" : [
       12,
       24
+    ],
+    "candidateGridColumns" : [
+      2,
+      6
     ],
     "candidatesPerPage" : [
       3,

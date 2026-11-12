@@ -281,6 +281,7 @@ enum UIStrings {
             case .firstCandidate: "先頭の候補"
             case .lastCandidate: "末尾の候補"
             case .associate: "連想変換"
+            case .expandCandidates: "候補を表に広げる"
             case .nextSegment: "右の文節"
             case .previousSegment: "左の文節"
             case .firstSegment: "先頭の文節"
@@ -350,6 +351,7 @@ enum UIStrings {
             case .associate: "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"
             case .registerWord: "ユーザー辞書の画面を開き、入力中の語句か、選択中の文字を単語の欄に入れます"
             case .openMenu: "入力メニューの項目を入力位置に表示します"
+            case .expandCandidates: "候補を何列かの表に広げ、一度に多くの候補を表示します。表では文節の移動のキーで列を移り、数字キーは選択中の列から選びます。もう一度押すか Esc で元に戻します"
             case .englishAutoStyle: "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
@@ -984,6 +986,9 @@ enum UIStrings {
         static let candidates = "候補"
         static let branchCandidates = "分岐図の候補数"
         static let listCandidates = "一覧の候補数"
+        static let gridColumns = "表の列数"
+        static let expandsGridOnPaging = "候補を送り続けたら表に広げる"
+        static let gridColumnsNote = "変換中にキー設定の「候補を表に広げる」のキーを押すと、候補を「一覧の候補数」の行 × この列数の表に広げます。"
         static let contextualSegmentCandidates = "前後の文脈で候補を並べ替え"
         static let contextualSegmentCandidatesNote = "分岐図・文節ごとの一覧・入力中の候補で、前後の語句とのつながりがよい候補を上に表示します。"
         static let listSegmentAlternatives = "一覧に文節を入れ替えた候補を表示"
@@ -1134,7 +1139,7 @@ extension UIStrings {
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "predictionPrefersHistory": Choice.predictionPrefersHistory,
             "predictionFromCorrection": Choice.predictionFromCorrection, "hiddenPredictions": Choice.hiddenPredictions, "suggestionSkipCount": More.suggestionSkipCount,
-            "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
+            "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates, "candidateGridColumns": More.gridColumns, "expandsGridOnPaging": More.expandsGridOnPaging,
             "contextualSegmentCandidates": More.contextualSegmentCandidates, "listSegmentAlternatives": More.listSegmentAlternatives,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
             "lateCorrectionTimeout": More.lateCorrectionTimeout, "remembersRejectedCorrections": More.remembersRejectedCorrections, "correctionSensitivity": More.correctionSensitivity,

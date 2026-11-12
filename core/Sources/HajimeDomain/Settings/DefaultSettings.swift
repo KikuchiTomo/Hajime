@@ -47,6 +47,8 @@ public enum DefaultSettings {
 
     /// 候補一覧に一度に出す数．番号キーの 1〜9 に対応させる
     public static let candidatesPerPage = 9
+    /// 候補を表に広げたとき(KeymapCommand.expandCandidates)の列の数．1 列の行の数は一覧の候補の数(9 なら 9 行 × 4 列で 36 件)
+    public static let candidateGridColumns = 4
     /// エンジンに求める候補の数
     public static let engineCandidateCount = 20
     /// 打っているあいだに出す変換の候補の数．続く語句の予測を求める数も同じ
@@ -308,6 +310,8 @@ public enum DefaultSettings {
     public static let minimumMarkContrast = 3.0
     /// 1 ページに出す候補の数を選べる範囲(番号キー 1〜9 で選べる数まで)
     public static let candidatesPerPageRange = 3...9
+    /// 候補を表に広げたときの列の数を選べる範囲
+    public static let candidateGridColumnsRange = 2...6
     /// ライブ変換で漢字にするまでの待ち時間・打ち間違いを見直すまでの待ち時間・モードの表示の時間を選べる範囲(秒)
     public static let liveConversionDelayRange = 0.1...1.5
     /// ライブ変換しない読みの長さを選べる範囲(文字)．0 はすべてライブ変換する

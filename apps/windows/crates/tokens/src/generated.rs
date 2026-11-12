@@ -260,6 +260,7 @@ pub mod size {
         pub const MIN_WIDTH: f32 = 180.0;
         pub const VARIANT_INSET_Y: f32 = 1.0;
         pub const MAX_WIDTH: f32 = 720.0;
+        pub const GRID_MAX_WIDTH: f32 = 960.0;
         pub const SCREEN_MARGIN: f32 = 16.0;
         pub const TRUNCATION_CONTEXT: f32 = 4.0;
         pub const DETAIL_GAP: f32 = 8.0;

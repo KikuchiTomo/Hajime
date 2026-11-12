@@ -160,6 +160,7 @@ pub fn emoji_placement(settings: EmojiSettings) -> CandidateList {
         homophone: None,
         shows_numbers: None,
         meaning_placement: None,
+        column_length: None,
     }
 }
 

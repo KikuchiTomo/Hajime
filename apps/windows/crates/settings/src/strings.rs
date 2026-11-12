@@ -278,6 +278,10 @@ pub mod more {
     pub const APPS: &str = "アプリ";
     pub const BRANCH_CANDIDATES: &str = "分岐図の候補数";
     pub const LIST_CANDIDATES: &str = "一覧の候補数";
+    pub const GRID_COLUMNS: &str = "表の列数";
+    pub const EXPANDS_GRID_ON_PAGING: &str = "候補を送り続けたら表に広げる";
+    pub const GRID_COLUMNS_NOTE: &str =
+        "変換中にキー設定の「候補を表に広げる」のキーを押すと、候補を「一覧の候補数」の行 × この列数の表に広げます。";
     pub const CONTEXTUAL_SEGMENT_CANDIDATES: &str = "前後の文脈で候補を並べ替え";
     pub const CONTEXTUAL_SEGMENT_CANDIDATES_NOTE: &str =
         "分岐図・文節ごとの一覧・入力中の候補で、前後の語句とのつながりがよい候補を上に表示します。";
@@ -518,6 +522,7 @@ pub mod keys {
         ("openMenu", "入力メニューを開く"),
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
+        ("expandCandidates", "候補を表に広げる"),
     ];
     /// コマンドの説明(UIStrings.Keys.help(for:))．名前で分かるコマンドは並べない
     pub const COMMAND_HELP: &[(&str, &str)] = &[
@@ -559,6 +564,7 @@ pub mod keys {
         ("associate", "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"),
         ("registerWord", "ユーザー辞書の画面を開き、入力中の語句か、選択中の文字を単語の欄に入れます"),
         ("openMenu", "入力メニューの項目を入力位置に表示します"),
+        ("expandCandidates", "候補を何列かの表に広げ、一度に多くの候補を表示します。表では文節の移動のキーで列を移り、数字キーは選択中の列から選びます。もう一度押すか Esc で元に戻します"),
     ];
 }
 
@@ -763,6 +769,8 @@ pub mod sync {
         ("suggestionSkipCount", "入力中の候補を表示しない件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),
+        ("candidateGridColumns", "表の列数"),
+        ("expandsGridOnPaging", "候補を送り続けたら表に広げる"),
         ("contextualSegmentCandidates", "前後の文脈で候補を並べ替え"),
         (
             "listSegmentAlternatives",
