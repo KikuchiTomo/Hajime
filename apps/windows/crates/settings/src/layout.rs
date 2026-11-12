@@ -6,7 +6,7 @@
 //! 注記は前の行のカードの中に，名前の下の説明として入れる．窓が狭く名前の欄が足りないときは，部品を名前の下に置く
 
 use crate::pages::{Control, ListButtons, Row, Section, TryKind};
-use crate::strings::{keys, more};
+use crate::strings::more;
 use tokens::size::settings as size_settings;
 use tokens::size::settings_windows as size;
 use tokens::size::space as size_space;
@@ -103,9 +103,7 @@ fn trailing_width(control: &Control, metrics: &dyn Metrics) -> f32 {
     match control {
         Control::Toggle => size::TOGGLE_WIDTH,
         Control::Stepper(_) => size::STEPPER_WIDTH,
-        Control::Preset => {
-            size::CONTROL_WIDTH + size::CONTROL_GAP + button_width(keys::LOAD, metrics)
-        }
+        Control::Preset => size::CONTROL_WIDTH,
         Control::LabeledAction(_, label) => button_width(label, metrics),
         Control::InfoAction(_, _, label) => {
             size::CONTROL_WIDTH + size::CONTROL_GAP + button_width(label, metrics)
@@ -455,7 +453,6 @@ fn place_labeled(
     );
     // ボタンを右に添える部品は，ボタンを右の端に置き，残りを部品の欄にする
     let button = match &row.control {
-        Control::Preset => Some(button_width(keys::LOAD, metrics)),
         Control::InfoAction(_, _, label) => Some(button_width(label, metrics)),
         _ => None,
     };
