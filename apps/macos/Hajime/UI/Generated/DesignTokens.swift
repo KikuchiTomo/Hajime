@@ -264,7 +264,7 @@ enum DesignTokens {
             static let keyFontSize: CGFloat = 10.5
             static let badgeSize: CGFloat = 16
             static let badgeGap: CGFloat = 8
-            static let selectionRadius: CGFloat = 7
+            static let selectionRadius: CGFloat = 8
             static let keycapRadius: CGFloat = 4
             static let keycapPaddingX: CGFloat = 4
             static let keycapPaddingY: CGFloat = 3
