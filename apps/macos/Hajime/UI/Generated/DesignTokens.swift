@@ -366,7 +366,7 @@ enum DesignTokens {
             static let cardGap: CGFloat = 4
             static let cardRadius: CGFloat = 4
             static let cardPaddingX: CGFloat = 16
-            static let rowHeight: CGFloat = 68
+            static let rowHeight: CGFloat = 48
             static let controlHeight: CGFloat = 32
             static let dropdownHeight: CGFloat = 384
             static let controlWidth: CGFloat = 240
@@ -434,7 +434,7 @@ enum DesignTokens {
             static let sliderThumbSize: CGFloat = 20
             static let sliderThumbInner: CGFloat = 12
             static let sliderThumbInnerHover: CGFloat = 14
-            static let cardPaddingY: CGFloat = 16
+            static let cardPaddingY: CGFloat = 12
             static let footerGap: CGFloat = 8
             static let labelMinWidth: CGFloat = 160
             static let radioSize: CGFloat = 20
