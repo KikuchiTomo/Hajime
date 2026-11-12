@@ -14,13 +14,17 @@
 /// | dddd・ddd | 曜日(「月曜日」「月」) |
 /// | EEEE・EEE | 英語の曜日(「Monday」「Mon」) |
 /// | GG・E | 元号(「令和」)と元号の年(「8」) |
+/// | EE | 元号の年．1 年は「元」(「令和元年」) |
+/// | FFFF・FF | 年度(4 月始まり．4 桁・下 2 桁) |
+/// | NN | 和風月名(「霜月」) |
+/// | JJ | 年の干支(「丙午」) |
 /// | WW・W | ISO 8601 の週番号(2 桁・そのまま) |
 /// | Q | 四半期(1〜4) |
 /// | ZZ | 時間帯(「+09:00」) |
 public enum DateTimeFormat {
     private static let symbols = [
-        "YYYY", "MMMM", "DDDD", "dddd", "EEEE", "MMM", "DDD", "ddd", "EEE",
-        "YY", "MM", "DD", "hh", "mm", "ss", "KK", "AA", "GG", "WW", "ZZ",
+        "YYYY", "MMMM", "DDDD", "dddd", "EEEE", "FFFF", "MMM", "DDD", "ddd", "EEE",
+        "YY", "MM", "DD", "hh", "mm", "ss", "KK", "AA", "GG", "WW", "ZZ", "EE", "FF", "NN", "JJ",
         "M", "D", "h", "m", "s", "K", "A", "E", "W", "Q",
     ].sorted { $0.count > $1.count }
     private static let weekdays = ["日", "月", "火", "水", "木", "金", "土"]
@@ -81,6 +85,13 @@ public enum DateTimeFormat {
         case "EEE": return String(englishWeekdays[weekday].prefix(3))
         case "GG": return Era.of(date).name
         case "E": return String(Era.of(date).year)
+        case "EE":
+            let year = Era.of(date)
+            return year.year == 1 && !year.name.isEmpty ? "元" : String(year.year)
+        case "FFFF": return String(JapaneseCalendar.fiscalYear(of: date))
+        case "FF": return pad(JapaneseCalendar.fiscalYear(of: date) % 100)
+        case "NN": return JapaneseCalendar.monthName(date.month)
+        case "JJ": return JapaneseCalendar.sexagenaryYear(date.year)
         case "WW": return pad(date.isoWeek)
         case "W": return String(date.isoWeek)
         case "Q": return String(date.quarter)

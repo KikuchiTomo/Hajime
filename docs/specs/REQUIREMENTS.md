@@ -227,7 +227,7 @@ JIS キーボードの ¥ キーで何を入れるかを，設定ひとつで変
 
 - ユーザー辞書の読みはひらがなのほか，ローマ字・英字でも登録できる(「gh」→ GitHub，「toyota」→ トヨタ)．ローマ字の読みは打ったときと同じ決まりでかなにして引く(`ReadingNormalization`)．かなにならない読みは読み全体が一致したときだけ出す
 - 他の IME の書き出し(Google 日本語入力・Microsoft IME の UTF-16・ATOK・macOS のユーザ辞書の plist・SKK)を，ユーザー辞書にも辞書の取り込み(R-16)にもそのまま読み込める．英字の読みも読む
-- 動的な語: 設定でオンにすると，単語に書いた `{datetime:YYYY/MM/DD hh:mm:ss}`・`{date}`・`{time}`・`{utc}`・`{unixtime}`・`{uuid}`・`{random:a-b}`・`{alnum:n}`・`{hex:n}`・`{pick:A,B}` と，`{名前|upper}` などの変換(`TextFilter`．大文字・かなの種類・幅・ヘボン式のローマ字・snake_case などの書き方・URL の形・文字数)を入れるときの値にする(`TextTemplate`)．クリップボードや画面の中身を読む名前，プログラムを動かす名前は作らない
+- 動的な語: 設定でオンにすると，単語に書いた `{datetime:YYYY/MM/DD hh:mm:ss}`・`{date}`・`{time}`・`{utc}`・`{unixtime}`・`{holiday}`・`{season}`・`{greeting}`・`{days:M/D}`・`{age:Y-M-D}`・`{uuid}`・`{random:a-b}`・`{alnum:n}`・`{hex:n}`・`{pick:A,B}` と，`{名前|upper}` などの変換(`TextFilter`．大文字・かなの種類・幅・ヘボン式のローマ字・snake_case などの書き方・URL の形・文字数・漢数字・大字・3 桁区切り・丸数字・HTML・Base64)を入れるときの値にする(`TextTemplate`)．日時は営業日(土日と祝日を除く日．祝日は `JapaneseCalendar`)でもずらせ，書式に年度・和風月名・干支を書ける．クリップボードや画面の中身を読む名前，プログラムを動かす名前は作らない
 - 日時は分・時間・日・週・月・年でずらし(`{time+30m}`・`{date+1M}`)，その週(月曜から日曜)の曜日・その月の日・月末に合わせられる(`{date+1w@mon}`・`{date@end}`)．暦の計算は先発グレゴリオ暦で core が行い，OS の暦に頼らない(`CalendarArithmetic`)．元号は始まりの日で切り替える
 - 「にちじ」で日付と時刻を合わせた形(`YYYY/MM/DD hh:mm:ss`・ISO 8601 など 8 通り)を出す
 - 受け入れ条件: 「gh」を登録して gh を変換すると GitHub が出る．「{datetime:YYYY}年」を登録すると今年が出る．「{date+1M@1:M/D}」を登録すると来月 1 日が出る

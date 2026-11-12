@@ -5,6 +5,8 @@ extension CalendarDate {
     /// ずらす単位
     public enum Unit: Sendable, Equatable {
         case minute, hour, day, week, month, year
+        /// 平日(JapaneseCalendar.isBusinessDay．土日と祝日を飛ばす)
+        case businessDay
     }
 
     /// 合わせる先
@@ -23,6 +25,17 @@ extension CalendarDate {
         case .hour: return moved(days: 0, seconds: amount * 3600)
         case .day: return moved(days: amount, seconds: 0)
         case .week: return moved(days: amount * 7, seconds: 0)
+        case .businessDay:
+            // 祝日の表は年が変わったときだけ作り直す
+            var date = self
+            var holidays = (year: year, days: JapaneseCalendar.holidays(in: year))
+            for _ in 0..<abs(amount) {
+                repeat {
+                    date = date.moved(days: amount < 0 ? -1 : 1, seconds: 0)
+                    if date.year != holidays.year { holidays = (date.year, JapaneseCalendar.holidays(in: date.year)) }
+                } while date.weekday == 1 || date.weekday == 7 || holidays.days[date.daysSinceEpoch] != nil
+            }
+            return date
         case .month, .year:
             let months = year * 12 + (month - 1) + (unit == .month ? amount : amount * 12)
             let newYear = Self.floorDivision(months, 12)
@@ -47,6 +60,9 @@ extension CalendarDate {
     public var inUTC: CalendarDate {
         Self(days: daysSinceEpoch, seconds: secondsOfDay - utcOffsetSeconds, utcOffsetSeconds: 0)
     }
+
+    /// この日から other の日までの日数(時刻は数えない．other が前なら負)
+    public func days(until other: CalendarDate) -> Int { other.daysSinceEpoch - daysSinceEpoch }
 
     /// その年の何日目か(1 月 1 日が 1)
     public var dayOfYear: Int { daysSinceEpoch - Self.days(year: year, month: 1, day: 1) + 1 }
@@ -79,7 +95,7 @@ extension CalendarDate {
 
     private var secondsOfDay: Int { hour * 3600 + minute * 60 + second }
 
-    private var daysSinceEpoch: Int { Self.days(year: year, month: month, day: day) }
+    var daysSinceEpoch: Int { Self.days(year: year, month: month, day: day) }
 
     /// 1970 年 1 月 1 日からの日数と，その日の 0 時からの秒(範囲の外なら日に繰り入れる)から作る．曜日も数え直す
     private init(days: Int, seconds: Int, utcOffsetSeconds: Int) {
@@ -103,7 +119,7 @@ extension CalendarDate {
     }
 
     /// 1970 年 1 月 1 日(木曜)からの日数の曜日．1 が日曜
-    private static func weekday(days: Int) -> Int {
+    static func weekday(days: Int) -> Int {
         ((days % 7 + 7) % 7 + 4) % 7 + 1
     }
 
