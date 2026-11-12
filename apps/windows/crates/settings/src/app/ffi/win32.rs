@@ -418,6 +418,28 @@ pub fn add_input_method_once() {
     }
 }
 
+/// この利用者の画面の状態(書き方のチップを開いているかなど)．HKCU の Hajime IME のキーの DWORD．無ければ false
+pub fn user_switch(name: &str) -> bool {
+    user_flag(PCWSTR(windows_core::HSTRING::from(name).as_ptr()))
+}
+
+/// この利用者の画面の状態を書く(user_switch)
+pub fn set_user_switch(name: &str, on: bool) {
+    let name = windows_core::HSTRING::from(name);
+    let value = u32::from(on);
+    // SAFETY: name と value はこの関数の中の値で，大きさを正しく渡す．キーが無ければ作る
+    let _ = unsafe {
+        RegSetKeyValueW(
+            HKEY_CURRENT_USER,
+            USER_KEY,
+            PCWSTR(name.as_ptr()),
+            REG_DWORD.0,
+            Some((&raw const value).cast()),
+            std::mem::size_of::<u32>() as u32,
+        )
+    };
+}
+
 fn user_flag(name: PCWSTR) -> bool {
     let mut value = 0u32;
     let mut size = std::mem::size_of::<u32>() as u32;

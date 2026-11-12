@@ -642,7 +642,6 @@ pub mod size {
         pub const THEME_SWATCH_RADIUS: f32 = 6.0;
         pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;
         pub const ABOUT_ICON: f32 = 64.0;
-        pub const TEMPLATE_NOW_WIDTH: f32 = 160.0;
         pub const KEYMAP_LIST_HEIGHT: f32 = 400.0;
         pub const SEGMENT_INSET: f32 = 2.0;
         pub const LIST_ARROW_WIDTH: f32 = 24.0;
@@ -719,6 +718,9 @@ pub mod motion {
     pub mod candidate_window {
         pub const RESIZE: f32 = 150.0;
         pub const UPDATE: f32 = 120.0;
+    }
+    pub mod settings {
+        pub const DISCLOSURE: f32 = 167.0;
     }
     pub mod settings_windows {
         pub const PAGE_ENTER: f32 = 167.0;

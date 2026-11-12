@@ -82,7 +82,6 @@ PENDING_SECTIONS: dict[str, str] = {
 }
 PENDING_FILES: dict[str, str] = {
     "apps/macos/Hajime/Settings/AssociationSection.swift": FOLLOW_UP_SETTINGS,
-    "apps/macos/Hajime/Settings/DictionaryPage.swift": FOLLOW_UP_SETTINGS,
     "apps/windows/crates/candidate-ui/src/app/preview.rs": FOLLOW_UP_SETTINGS,
     "apps/windows/crates/settings/src/app/page.rs": FOLLOW_UP_SETTINGS,
     "apps/windows/crates/settings/src/app/paint.rs": FOLLOW_UP_SETTINGS,

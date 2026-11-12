@@ -109,7 +109,7 @@ public enum TextTemplate {
         var result = ""
         for token in tokens(of: template) {
             switch token {
-            case .literal(let text):
+            case .literal(let text), .unclosed(let text):
                 result += text
             case .placeholder(let body):
                 result += value(of: body, values: values) ?? "{\(body)}"
@@ -119,9 +119,23 @@ public enum TextTemplate {
         return result
     }
 
+    /// 語の中の書き方の誤り(置き換えられない部分)．知らない名前・読めない引数の `{…}` と，閉じていない `{` から次の `{` の前まで．
+    /// 設定の画面で，単語の欄の下の結果に印を付けて見せる
+    public static func problems(in template: String, values: Values) -> [String] {
+        tokens(of: template).compactMap { token in
+            switch token {
+            case .literal: nil
+            case .unclosed(let text): text
+            case .placeholder(let body): value(of: body, values: values) == nil ? "{\(body)}" : nil
+            }
+        }
+    }
+
     private enum Token: Equatable {
         case literal(String)
         case placeholder(String)
+        /// 閉じていない `{` から次の `{` の前まで(文字のまま入る)
+        case unclosed(String)
     }
 
     private static func tokens(of text: String) -> [Token] {
@@ -141,6 +155,13 @@ public enum TextTemplate {
                 literal = ""
                 tokens.append(.placeholder(String(characters[..<end])))
                 characters = characters[characters.index(after: end)...]
+            } else if character == "{" {
+                // 閉じていない {．次の { の前までをひとまとまりにする(その中に } は無い)
+                if !literal.isEmpty { tokens.append(.literal(literal)) }
+                literal = ""
+                let end = characters.firstIndex(of: "{") ?? characters.endIndex
+                tokens.append(.unclosed("{" + String(characters[..<end])))
+                characters = characters[end...]
             } else {
                 literal.append(character)
             }
@@ -254,4 +275,72 @@ public enum TextTemplate {
 
     private static let alphanumerics = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
     private static let hexDigits = Array("0123456789abcdef")
+}
+
+// MARK: - 書いている語に足す(設定の画面の書き方の早見表)
+
+extension TextTemplate {
+    /// text の最後の置き換える部分(`{…}`)の中身．最後が置き換える部分で終わっていなければ nil(`{{` `}}` は文字なので数えない)
+    private static func trailingPlaceholder(of text: String) -> String? {
+        guard case .placeholder(let body) = tokens(of: text).last, text.hasSuffix("{\(body)}") else { return nil }
+        return body
+    }
+
+    /// text の最後の置き換える部分に，値の変え方(`|upper` の upper)を足した語．最後が置き換える部分で終わっていなければ nil
+    public static func addingFilter(_ name: String, to text: String) -> String? {
+        guard trailingPlaceholder(of: text) != nil else { return nil }
+        return String(text.dropLast()) + "|\(name)}"
+    }
+
+    /// text の最後の日時の書き方(`{date:M/D}`)の書式の末尾に，書式の記号(`ddd`)を足した語．
+    /// 最後が書式を書いた日時の書き方で終わっていなければ nil(書式の無い `{date}` に足すと，既定の書式が記号だけに置き換わるため)
+    public static func addingFormatSymbol(_ symbol: String, to text: String) -> String? {
+        guard let body = trailingPlaceholder(of: text) else { return nil }
+        let parts = parts(of: body)
+        guard formattedDateNames.contains(String(parts.name)), let argument = parts.argument else { return nil }
+        let filters = parts.filters.map { "|\($0)" }.joined()
+        return String(text.dropLast(body.count + 2)) + "{\(parts.name)\(parts.steps):\(argument)\(symbol)\(filters)}"
+    }
+
+    /// 書式の記号(DateTimeFormat)を引数に書ける日時の名前
+    private static let formattedDateNames: Set<String> = ["datetime", "date", "time", "utc"]
+
+    /// 入力位置の前で打ちかけの書き方(閉じていない `{` から入力位置まで)．何を打っているかで分ける
+    public enum Typing: Sendable, Equatable {
+        /// 名前を打っている(`{da` の da．`{` だけなら空)．ずらす量(`+1d`)も含む
+        case name(String)
+        /// 値の変え方を打っている(`{reading|ka` の ka)
+        case filter(String)
+        /// 日時の書式を打っている(`{date:YY` の YY．書式の末尾の英字)
+        case format(String)
+        /// そのほかの引数を打っている(`{random:1-`)
+        case argument
+    }
+
+    /// prefix(欄の入力位置より前)の末尾の打ちかけの書き方(`{da`)．閉じていれば・打ちかけでなければ nil(`{{` は文字の「{」)
+    public static func openPlaceholder(before prefix: String) -> String? {
+        guard case .unclosed(let text) = tokens(of: prefix).last, prefix.hasSuffix(text) else { return nil }
+        return text
+    }
+
+    /// prefix の末尾で打ちかけの書き方を，何を打っているかで分けたもの
+    public static func typing(before prefix: String) -> Typing? {
+        guard let text = openPlaceholder(before: prefix) else { return nil }
+        let body = String(text.dropFirst())
+        if let bar = body.lastIndex(of: "|") { return .filter(String(body[body.index(after: bar)...])) }
+        let parts = parts(of: body)
+        guard let argument = parts.argument else { return .name(body) }
+        guard formattedDateNames.contains(String(parts.name)) else { return .argument }
+        return .format(String(argument.reversed().prefix { $0.isASCII && $0.isLetter }.reversed()))
+    }
+
+    /// 書き方の中身(`date+1d:M/D|upper`)の名前(`date`)
+    public static func name(of body: String) -> String {
+        String(parts(of: body).name)
+    }
+
+    /// 打ちかけの名前(`date+1d`)が，書式の記号を引数に書ける日時の名前か
+    public static func acceptsFormat(_ name: String) -> Bool {
+        parts(of: name).argument == nil && formattedDateNames.contains(String(parts(of: name).name))
+    }
 }

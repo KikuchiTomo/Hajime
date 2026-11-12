@@ -63,38 +63,10 @@ enum UIStrings {
         static let englishTermsNote = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。"
         static let invalidEnglishTerm = "語は \(DefaultSettings.englishTermLengthRange.lowerBound)〜\(DefaultSettings.englishTermLengthRange.upperBound) 文字の英字にしてください"
         static let dynamicDictionary = "単語に書いた日付や時刻などを入力時の値にする"
-        static let templateSyntax = "書き方"
-        static let templateMeaning = "入るもの"
-        static let templateNow = "今入れると"
-        /// 単語に書ける書き方(TextTemplate)と，入るもの．「今入れると」の列は書き方を今の値に置き換えて出す
-        static let templateRows: [(syntax: String, meaning: String)] = [
-            ("{date}", "今日の日付"),
-            ("{time}", "今の時刻"),
-            ("{datetime:YYYY/MM/DD hh:mm:ss}", "書式を決めた日時"),
-            ("{datetime+1d:MM/DD}", "日をずらした日付（-7d なら 7 日前）"),
-            ("{time+30m}", "ずらした時刻（m 分・h 時間・d 日・w 週・M 月・y 年）"),
-            ("{date+1w@mon:M/D(ddd)}", "来週の月曜（@mon〜@sun その週の曜日、@1〜@31 その月の日、@end 月末）"),
-            ("{date+3b:M/D(ddd)}", "3 営業日後（b は土日と祝日を除いて数える）"),
-            ("{date:GGEE年M月D日|kansuji}", "漢数字の和暦（1 年は「元年」）"),
-            ("{date:FFFF年度 NN JJ}", "年度・和風月名・干支"),
-            ("{utc}", "協定世界時の日時"),
-            ("{unixtime}", "UNIX 時間（秒）"),
-            ("{holiday:平日}", "祝日の名前（祝日でなければ : のあとの文字）"),
-            ("{season}", "その月の時候の挨拶"),
-            ("{greeting}", "時刻に合った挨拶"),
-            ("{days:12/25}", "その日までの日数（2027-03-31 のように年も書ける）"),
-            ("{age:1990-04-01}", "その日に生まれた人の満年齢"),
-            ("{uuid}", "UUID（入れるたびに変わる）"),
-            ("{random:1-6}", "範囲の中の整数（入れるたびに変わる）"),
-            ("{alnum:8}", "英数字 8 文字（{hex:8} なら 16 進数。入れるたびに変わる）"),
-            ("{pick:はい,いいえ}", "並べたうちのどれか 1 つ（入れるたびに変わる）"),
-            ("{date|fullwidth}", "| のあとの名前で変えた値"),
-            ("{{ }}", "「{」と「}」の文字そのもの"),
-        ]
         static let commandsPage = "コマンド"
         static let commandsSection = "コマンド"
         static let launcherCommands = "読みでコマンドを呼び出す"
-        static let commandsNote = "読みを変換すると、候補の一覧に「コマンド」のタグを付けた名前が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。"
+        static let commandsNote = "コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。"
         static let commandReading = "読み"
         static let commandTitle = "名前"
         static let commandKind = "動作"
@@ -113,7 +85,6 @@ enum UIStrings {
         static let targetPlaceholderShortcut = "ショートカットの名前"
         static let macrosSection = "変換マクロ"
         static let conversionMacros = "連想変換のキーで変換マクロを表示"
-        static let macrosNote = "変換中に連想変換のキーを押すと、選んでいる語を整えた形が「整形」に並びます。チェックを入れた形だけを出します。{text} が語、{reading} が読みです。日時・乱数・{reading|romaji} のような変換も使えます。"
         static let macroPattern = "形"
         static let macrosEmpty = "マクロはありません"
         static let invalidMacro = "{text} か {reading} を含めてください"
@@ -121,7 +92,6 @@ enum UIStrings {
         static let tryMacros = "変換マクロを試す"
         static let tryMacroWord = "試す語"
         static let tryMacroReading = "読み"
-        static let macroDraftResult = "入力中の形: "
 
         static func label(for kind: LauncherCommand.Kind) -> String {
             switch kind {
@@ -131,6 +101,149 @@ enum UIStrings {
             case .runShortcut: "ショートカットを実行"
             }
         }
+    }
+
+    /// 単語と変換マクロに書ける書き方のチップ(R-21・R-22．TemplateReference)．見出しは短い言葉だけにし，意味はチップにポインターを載せたときに出す．
+    /// まとまりとチップは Windows の strings.rs の templates と同じ(tools/check/check_strings.py が確かめる)
+    enum Templates {
+        /// 単語に書ける書き方(ユーザー辞書)
+        static let word = TemplateReference(groups)
+        /// 変換マクロに書ける書き方．単語に書けるものに，選んでいる語と読みを足す
+        static let macro = TemplateReference([textGroup] + groups)
+        /// 欄の右の「{ }」のボタン(チップを開け閉めする)の読み上げとツールチップ
+        static let button = "書き方"
+        static let buttonHelp = "日付・時刻・乱数などの書き方"
+
+        private static let textGroup = TemplateReference.Group(title: "語", kind: .syntax, items: [
+            .init("{text}", "選んでいる語"),
+            .init("{reading}", "読み"),
+            .init("{reading|katakana}", "読みのカタカナ"),
+            .init("{reading|romaji}", "読みのローマ字"),
+        ])
+
+        private static let groups: [TemplateReference.Group] = [
+            .init(title: "日時", kind: .syntax, items: [
+                .init("{date}", "今日の日付"),
+                .init("{time}", "今の時刻"),
+                .init("{datetime}", "今の日時"),
+                .init("{date:M月D日(ddd)}", "書式を決めた日付"),
+                .init("{time:A K時m分}", "書式を決めた時刻"),
+                .init("{utc}", "協定世界時の日時"),
+                .init("{unixtime}", "UNIX 時間（秒）"),
+            ]),
+            .init(title: "ずらす", kind: .syntax, items: [
+                .init("{date+1d}", "明日"),
+                .init("{date-1d}", "昨日"),
+                .init("{date+1w}", "1 週間後"),
+                .init("{date+1M}", "1 か月後"),
+                .init("{date+1y}", "1 年後"),
+                .init("{time+30m}", "30 分後"),
+                .init("{time+2h}", "2 時間後"),
+                .init("{date+3b}", "3 営業日後（土日と祝日を除く）"),
+                .init("{date@fri}", "今週の金曜日"),
+                .init("{date+1w@mon}", "来週の月曜日"),
+                .init("{date@1}", "今月 1 日"),
+                .init("{date@end}", "今月末"),
+                .init("{date+1M@1}", "来月 1 日"),
+            ]),
+            .init(title: "暦", kind: .syntax, items: [
+                .init("{date:GGE年M月D日}", "和暦"),
+                .init("{date:GGEE年}", "1 年を「元年」と書く和暦"),
+                .init("{date:GGEE年M月D日|kansuji}", "漢数字の和暦"),
+                .init("{date:FFFF年度}", "年度（4 月始まり）"),
+                .init("{date:NN}", "和風月名"),
+                .init("{date:JJ}", "干支"),
+                .init("{holiday}", "祝日の名前（祝日でなければ空）"),
+                .init("{holiday:平日}", "祝日の名前（祝日でなければ「平日」）"),
+            ]),
+            .init(title: "数", kind: .syntax, items: [
+                .init("{days:12/25}", "12 月 25 日までの日数"),
+                .init("{days:2027-03-31}", "2027 年 3 月 31 日までの日数"),
+                .init("{age:1990-04-01}", "1990 年 4 月 1 日生まれの満年齢"),
+                .init("{date:DDD}", "年の何日目か"),
+                .init("{date:WW}", "週番号（ISO 8601）"),
+                .init("{date:Q}", "四半期"),
+            ]),
+            .init(title: "挨拶", kind: .syntax, items: [
+                .init("{season}", "その月の時候の挨拶"),
+                .init("{greeting}", "時刻に合った挨拶"),
+            ]),
+            .init(title: "乱数", kind: .syntax, items: [
+                .init("{uuid}", "UUID", codeValue: true),
+                .init("{uuid|lower}", "小文字の UUID", codeValue: true),
+                .init("{random:1-6}", "1〜6 の整数"),
+                .init("{alnum:8}", "英数字 8 文字", codeValue: true),
+                .init("{hex:8}", "16 進数 8 桁", codeValue: true),
+                .init("{pick:はい,いいえ}", "並べたうちのどれか"),
+            ]),
+            .init(title: "括弧", kind: .syntax, items: [
+                .init("{{", "「{」の文字"),
+                .init("}}", "「}」の文字"),
+            ]),
+            .init(title: "変換", kind: .filter, items: [
+                .init("|upper", "大文字", sample: "{date:MMM|upper}"),
+                .init("|lower", "小文字", sample: "{date:EEE|lower}"),
+                .init("|capitalize", "先頭だけ大文字", sample: "{date:EEE|lower|capitalize}"),
+                .init("|katakana", "カタカナ", sample: "{greeting|katakana}"),
+                .init("|hiragana", "ひらがな", sample: "{greeting|katakana|hiragana}"),
+                .init("|halfwidth", "半角カタカナ", sample: "{greeting|halfwidth}"),
+                .init("|fullwidth", "全角英数", sample: "{date|fullwidth}"),
+                .init("|ascii", "半角英数", sample: "{date|fullwidth|ascii}"),
+                .init("|romaji", "ローマ字", sample: "{greeting|romaji}"),
+                .init("|snake", "小文字を _ でつなぐ", sample: "{date:MMMM EEEE|snake}", codeValue: true),
+                .init("|camel", "2 語目から先頭を大文字にしてつなぐ", sample: "{date:MMMM EEEE|camel}", codeValue: true),
+                .init("|pascal", "語の先頭を大文字にしてつなぐ", sample: "{date:MMMM EEEE|pascal}", codeValue: true),
+                .init("|kebab", "小文字を - でつなぐ", sample: "{date:MMMM EEEE|kebab}", codeValue: true),
+                .init("|url", "URL に入れる形", sample: "{date:NN|url}", codeValue: true),
+                .init("|length", "文字数", sample: "{greeting|length}"),
+                .init("|kansuji", "漢数字", sample: "{date:YYYY|kansuji}"),
+                .init("|kanjidigits", "1 字ずつの漢数字", sample: "{date:YYYY|kanjidigits}"),
+                .init("|daiji", "大字", sample: "{date:YYYY|daiji}"),
+                .init("|comma", "3 桁区切り", sample: "{unixtime|comma}"),
+                .init("|circled", "丸数字", sample: "{date:D|circled}"),
+                .init("|html", "HTML に入れる形", sample: "{pick:<b>|html}", codeValue: true),
+                .init("|base64", "Base64", sample: "{date|base64}", codeValue: true),
+                .init("|upper|fullwidth", "左から順にかける", sample: "{date:MMM|upper|fullwidth}"),
+            ]),
+            .init(title: "書式", kind: .formatSymbol, items: [
+                .init("YYYY", "年", sample: "{date:YYYY}"),
+                .init("YY", "年（下 2 桁）", sample: "{date:YY}"),
+                .init("MM", "月（2 桁）", sample: "{date:MM}"),
+                .init("M", "月", sample: "{date:M}"),
+                .init("MMMM", "英語の月", sample: "{date:MMMM}"),
+                .init("MMM", "英語の月（略）", sample: "{date:MMM}"),
+                .init("DD", "日（2 桁）", sample: "{date:DD}"),
+                .init("D", "日", sample: "{date:D}"),
+                .init("DDDD", "年の何日目か（3 桁）", sample: "{date:DDDD}"),
+                .init("DDD", "年の何日目か", sample: "{date:DDD}"),
+                .init("dddd", "曜日", sample: "{date:dddd}"),
+                .init("ddd", "曜日（略）", sample: "{date:ddd}"),
+                .init("EEEE", "英語の曜日", sample: "{date:EEEE}"),
+                .init("EEE", "英語の曜日（略）", sample: "{date:EEE}"),
+                .init("hh", "時（24 時間制、2 桁）", sample: "{time:hh}"),
+                .init("h", "時（24 時間制）", sample: "{time:h}"),
+                .init("KK", "時（12 時間制、2 桁）", sample: "{time:KK}"),
+                .init("K", "時（12 時間制）", sample: "{time:K}"),
+                .init("A", "午前・午後", sample: "{time:A}"),
+                .init("AA", "AM・PM", sample: "{time:AA}"),
+                .init("mm", "分（2 桁）", sample: "{time:mm}"),
+                .init("m", "分", sample: "{time:m}"),
+                .init("ss", "秒（2 桁）", sample: "{time:ss}"),
+                .init("s", "秒", sample: "{time:s}"),
+                .init("GG", "元号", sample: "{date:GG}"),
+                .init("E", "元号の年", sample: "{date:E}"),
+                .init("EE", "元号の年（1 年は「元」）", sample: "{date:EE}"),
+                .init("FFFF", "年度（4 月始まり）", sample: "{date:FFFF}"),
+                .init("FF", "年度（下 2 桁）", sample: "{date:FF}"),
+                .init("NN", "和風月名", sample: "{date:NN}"),
+                .init("JJ", "干支", sample: "{date:JJ}"),
+                .init("WW", "週番号（2 桁）", sample: "{date:WW}"),
+                .init("W", "週番号", sample: "{date:W}"),
+                .init("Q", "四半期", sample: "{date:Q}"),
+                .init("ZZ", "時間帯", sample: "{time:ZZ}"),
+                .init("'Q'", "' で囲んだ文字はそのまま入る", sample: "{date:'Q'Q}"),
+            ]),
+        ]
     }
 
     /// 専門用語の辞書(R-29)．分野の名前は core の TermField.name(分岐図と同じ名前)
@@ -428,6 +541,8 @@ enum UIStrings {
         static let update = "更新"
         static let edit = "編集"
         static let enabled = "有効"
+        /// 一覧の行を入れたときの結果の列(変換マクロ)
+        static let result = "結果"
         /// 列の見出しを押したときの読み上げの案内
         static let sortHint = "並べ替え"
         static func overwrites(_ key: String) -> String { "「\(key)」はすでにあります。追加すると上書きします。" }

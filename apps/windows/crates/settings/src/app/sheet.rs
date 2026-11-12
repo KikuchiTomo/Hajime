@@ -386,6 +386,9 @@ mod tests {
         fn wrapped_height(&self, _: &str, _: TextStyle, _: f32) -> f32 {
             20.0
         }
+        fn baseline(&self, _: &str, _: TextStyle) -> f32 {
+            16.0
+        }
     }
 
     #[test]

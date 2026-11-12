@@ -12,7 +12,7 @@ use crate::files::FileTask;
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
-use crate::pages::{Action, DictionaryList, Page, TryKind};
+use crate::pages::{Action, DictionaryList, Page, TryKind, MACROS_PATH};
 use crate::store::StoreError;
 use crate::strings::{
     association, dictionaries, features, keys, more, rule_list, settings, sync as sync_text,
@@ -319,7 +319,23 @@ impl App {
                 warning: true,
             });
         }
+        if let Event::TemplatePanel { target, open } = event {
+            // 開いているかをページごとに覚える(見本のエンジンで開いたときは覚えない)
+            if open {
+                self.templates_open.insert(target);
+            } else {
+                self.templates_open.remove(&target);
+            }
+            if !self.offline {
+                ffi::set_user_switch(target.storage_name(), open);
+            }
+            self.refresh();
+            self.arrange();
+            return None;
+        }
         if event == Event::Relayout {
+            // 書き方のチップのまとまりを切り替えたら，そのまとまりの今の値を読み直す
+            self.refresh();
             self.arrange();
             return None;
         }
@@ -431,6 +447,7 @@ impl App {
             | Event::ListMove { .. }
             | Event::ListSet { .. }
             | Event::Relayout
+            | Event::TemplatePanel { .. }
             | Event::Action(
                 Action::SyncNow
                 | Action::ChooseSyncFolder
@@ -507,9 +524,43 @@ impl App {
                 preceding,
                 draft,
             } => {
-                let shown = macro_preview(model, &text, &preceding, &draft);
+                // 試す欄にはオンの形をすべて当てた結果を並べ，書いている途中の形の結果は形の欄のすぐ下に出す
+                let shown = macro_preview(model, &text, &preceding);
                 self.extras.macro_preview.clone_from(&shown);
                 self.view.show_preview(TryKind::Macros, &shown);
+                let result = draft_result(model, &text, &preceding, &draft);
+                let problems = draft_problems(model, &text, &preceding, &draft);
+                let resized = self.view.show_result(MACROS_PATH, &result, problems);
+                // 一覧の行に添える結果も，試す語と読みで求め直す
+                let results = macro_results(model, &text, &preceding);
+                if results != self.extras.macro_results {
+                    self.extras.macro_results = results;
+                    self.refresh();
+                }
+                // 結果の行を出す・消すので置き直す
+                if resized {
+                    self.arrange();
+                }
+                return None;
+            }
+            Event::DraftResult { path, draft } => {
+                // 書き方の無い単語と，書き方を値にしない設定(スイッチがオフ)では結果を出さない(そのまま入る)
+                let dynamic = model
+                    .value("dynamicDictionary")
+                    .and_then(serde_json::Value::as_bool)
+                    == Some(true);
+                let (result, problems) = if dynamic && draft.contains('{') {
+                    (
+                        draft_result(model, "", "", &draft),
+                        draft_problems(model, "", "", &draft),
+                    )
+                } else {
+                    (String::new(), Vec::new())
+                };
+                if self.view.show_result(path, &result, problems) {
+                    // 結果の行を出す・消すので置き直す
+                    self.arrange();
+                }
                 return None;
             }
             Event::Preview {
@@ -1201,37 +1252,109 @@ pub fn macro_preview(
     model: &SettingsModel<Store>,
     text: &str,
     reading: &str,
-    draft: &str,
 ) -> crate::engine::PreviewShown {
     model
         .store()
-        .preview_macros(text, reading, draft)
-        .map(|results| crate::engine::macro_preview_text(&results, !draft.trim().is_empty()))
+        .preview_macros(text, reading, "")
+        .map(|results| crate::engine::PreviewShown {
+            chips: results,
+            ..Default::default()
+        })
         .unwrap_or_default()
 }
 
-/// 入れるたびに変わる書き方(UUID・乱数・選ぶ)．macOS と同じく，ページを開いたときの例を 1 つ出したままにする
-const CHANGING_TEMPLATES: &[&str] = &["{uuid}", "{random:1-6}", "{alnum:8}", "{pick:はい,いいえ}"];
-
-/// 単語に書ける書き方を今入れたときの値(macOS の TemplateReference)．エンジンが変換マクロを試すときと
-/// 同じ値(日時・乱数)で置き換える．入れるたびに変わる書き方は，前に求めた値があればそのまま使う．読めなければ空
-pub fn template_values(model: &SettingsModel<Store>, previous: &[String]) -> Vec<String> {
-    let expand = |template: &str| -> Option<String> {
-        model
-            .store()
-            .preview_macros("", "", template)
-            .ok()
-            .and_then(|results| results.into_iter().next())
-    };
-    crate::strings::extras::TEMPLATE_ROWS
-        .iter()
-        .enumerate()
-        .map(|(index, (syntax, _))| {
-            let kept = previous.get(index).filter(|value| !value.is_empty());
-            match kept {
-                Some(value) if CHANGING_TEMPLATES.contains(syntax) => value.clone(),
-                _ => expand(syntax).unwrap_or_default(),
+/// 書いている途中の形(書き方を書いた単語)の中の，置き換えられない部分(書き方の誤り．core の TextTemplate.problems)．
+/// 閉じていない { は画面の側で見つけ，知らない名前・読めない引数は，その書き方だけをエンジンに試してもらい，
+/// 書き方のまま返ってきたもの
+pub fn draft_problems(
+    model: &SettingsModel<Store>,
+    text: &str,
+    reading: &str,
+    draft: &str,
+) -> Vec<String> {
+    use crate::template_reference::{pieces, Piece};
+    pieces(draft)
+        .into_iter()
+        .filter_map(|piece| match piece {
+            Piece::Literal(_) => None,
+            Piece::Unclosed(text) => Some(text),
+            Piece::Placeholder(body) => {
+                let token = format!("{{{body}}}");
+                (draft_result(model, text, reading, &token) == token).then_some(token)
             }
+        })
+        .collect()
+}
+
+/// 変換マクロの一覧の行ごとの形を，試す語と読みに当てた結果(一覧と同じ並び．読めなければ空)
+pub fn macro_results(model: &SettingsModel<Store>, text: &str, reading: &str) -> Vec<String> {
+    let patterns: Vec<String> = model
+        .value(MACROS_PATH)
+        .and_then(serde_json::Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .map(|item| {
+                    item.get("pattern")
+                        .and_then(serde_json::Value::as_str)
+                        .unwrap_or_default()
+                        .to_string()
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    patterns
+        .iter()
+        .map(|pattern| draft_result(model, text, reading, pattern))
+        .collect()
+}
+
+/// 書いている途中の形(書き方を書いた単語)を，試す語と読みに当てた結果(空なら出さない)．
+/// エンジンの変換マクロを試す頼みに形として渡す(単語の書き方も同じ決まりで置き換わる)
+pub fn draft_result(
+    model: &SettingsModel<Store>,
+    text: &str,
+    reading: &str,
+    draft: &str,
+) -> String {
+    if draft.trim().is_empty() {
+        return String::new();
+    }
+    model
+        .store()
+        .preview_macros(text, reading, draft)
+        .ok()
+        .and_then(|results| results.into_iter().next())
+        .unwrap_or_default()
+}
+
+/// 入れるたびに変わる書き方の名前(UUID・乱数・選ぶ)．macOS と同じく，ページを開いたときの値を 1 つ出したままにする
+const CHANGING_NAMES: &[&str] = &["uuid", "random", "alnum", "hex", "pick"];
+
+/// 書き方のチップに添える今の値(macOS の TemplatePalette)．エンジンが変換マクロを試すときと同じ値(日時・乱数)で置き換える．
+/// 変換マクロのチップは試す語と読み(text・reading)を {text} と {reading} に入れる．
+/// 入れるたびに変わる書き方は，前に求めた値があればそのまま使う．読めなければ空(チップは決めておいた例を出す)．
+/// 値はチップの値を求める書き方(Item::sample)と組にして返す
+pub fn template_values(
+    model: &SettingsModel<Store>,
+    items: &[crate::template_reference::Item],
+    (text, reading): (&str, &str),
+    previous: &[(&'static str, String)],
+) -> Vec<(&'static str, String)> {
+    items
+        .iter()
+        .map(|item| {
+            let changing = CHANGING_NAMES
+                .iter()
+                .any(|name| item.sample.contains(&format!("{{{name}")));
+            let before = previous
+                .iter()
+                .find(|(sample, value)| *sample == item.sample && !value.is_empty());
+            let value = match before {
+                Some((_, value)) if changing => value.clone(),
+                _ => draft_result(model, text, reading, item.sample),
+            };
+            (item.sample, value)
         })
         .collect()
 }

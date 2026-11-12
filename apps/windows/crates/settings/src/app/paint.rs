@@ -81,6 +81,8 @@ pub trait Measure {
     fn width(&self, text: &str, style: TextStyle) -> f32;
     /// width で折り返したときの高さ
     fn wrapped_height(&self, text: &str, style: TextStyle, width: f32) -> f32;
+    /// 1 行目の上端からベースラインまで(書体の違う文字をベースラインでそろえる)
+    fn baseline(&self, text: &str, style: TextStyle) -> f32;
 }
 
 pub trait Canvas: Measure {
@@ -707,6 +709,9 @@ mod tests {
         }
         fn wrapped_height(&self, _: &str, _: TextStyle, _: f32) -> f32 {
             20.0
+        }
+        fn baseline(&self, _: &str, _: TextStyle) -> f32 {
+            15.0
         }
     }
 
