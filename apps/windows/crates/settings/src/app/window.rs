@@ -191,7 +191,7 @@ pub struct App {
     focused_edit: Option<Window>,
     hover: Option<Target>,
     /// 説明の吹き出し(文と，ポインターの位置と，載せた時刻)
-    tooltip: Option<(&'static str, f32, f32, f64)>,
+    tooltip: Option<(String, f32, f32, f64)>,
     pressed: Option<Target>,
     flyout: Option<Flyout>,
     /// 出しているコマンドのシート(macOS の CommandsPage の CommandEditor)
@@ -905,7 +905,7 @@ impl App {
                 .theme_sheet()
                 .map(|layout| (layout, self.theme_sheet_state())),
         };
-        let tooltip = self.tooltip.filter(|(.., since)| {
+        let tooltip = self.tooltip.as_ref().filter(|(.., since)| {
             now - since >= f64::from(TOOLTIP_DELAY) && self.pressed.is_none()
         });
         let sheet = self.sheet.as_ref();
@@ -942,7 +942,7 @@ impl App {
                     sheet::paint(canvas, sheet, layout, &sheet_frame);
                 }
                 if let Some((text, x, y, _)) = tooltip {
-                    paint_tooltip(canvas, &theme, text, (x, y), (width, height));
+                    paint_tooltip(canvas, &theme, text, (*x, *y), (width, height));
                 }
                 canvas.pop_clip();
                 canvas.translate(0.0, -title_bar);
@@ -1344,12 +1344,32 @@ impl App {
             _ => {}
         }
         let target = self.target_at(x, y);
-        if target != self.hover {
+        // 表の中で切れた文字は，その欄に載せたときに全文を説明の吹き出しに出す(欄が変われば出し直す)
+        let cell = match target {
+            Some(Target::Page(element)) if element.part == Part::Table => {
+                let page_x = x - nav_width(width);
+                let page_y = y + self.scroll.offset(now);
+                self.view
+                    .table_cell(element.row, page_x, page_y, now)
+                    .filter(|(text, cell, style)| self.graphics.width(text, *style) > *cell)
+                    .map(|(text, _, _)| text)
+            }
+            _ => None,
+        };
+        let cell_changed = cell.as_deref()
+            != self
+                .tooltip
+                .as_ref()
+                .filter(|_| matches!(target, Some(Target::Page(element)) if element.part == Part::Table))
+                .map(|(text, ..)| text.as_str());
+        if target != self.hover || cell_changed {
             self.hover = target;
-            self.tooltip = match target {
-                Some(Target::Page(element)) => {
-                    self.view.tooltip(element).map(|text| (text, x, y, now))
-                }
+            self.tooltip = match (target, cell) {
+                (_, Some(text)) => Some((text, x, y, now)),
+                (Some(Target::Page(element)), None) => self
+                    .view
+                    .tooltip(element)
+                    .map(|text| (text.to_string(), x, y, now)),
                 _ => None,
             };
             if self.tooltip.is_some() {

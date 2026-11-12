@@ -1968,6 +1968,35 @@ impl PageView {
     }
 
     /// ポインターを載せたときに出す説明(絵だけのボタン．macOS の .help)
+    /// 表の (x, y)(ページの中の座標)の欄の文字と，欄の幅と書体．文字の欄でなければ None
+    /// (切れた文字の全文を説明の吹き出しに出すため．macOS の表は切れた文字に全文の説明を出す)
+    pub fn table_cell(
+        &self,
+        row_index: usize,
+        x: f32,
+        y: f32,
+        now: f64,
+    ) -> Option<(String, f32, TextStyle)> {
+        let row = self.rows.get(row_index)?;
+        let rect = row.part_rect(Part::Table)?;
+        let position = self.table_position(row_index, y, now)?;
+        let layout = row.row.control.table_layout();
+        let padding = size::FIELD_PADDING_X;
+        let spans = layout.spans(rect.width, padding);
+        let (column, (_, width)) = layout
+            .columns
+            .iter()
+            .zip(&spans)
+            .find(|(_, (left, width))| x >= rect.x + left && x < rect.x + left + width)?;
+        let style = match column.cell {
+            Cell::Mono => TextStyle::Code,
+            Cell::Text | Cell::Secondary => TextStyle::Body,
+            _ => return None,
+        };
+        let text = row.table.shown_row(position)?.get(column.source)?.clone();
+        Some((text, (width - padding).max(0.0), style))
+    }
+
     pub fn tooltip(&self, element: Element) -> Option<&'static str> {
         match element.part {
             Part::Reset => Some(features::RESTORE_DEFAULT),
