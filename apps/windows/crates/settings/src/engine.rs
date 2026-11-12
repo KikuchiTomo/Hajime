@@ -317,8 +317,8 @@ impl<E: Engine> SettingsStore for EngineStore<E> {
 }
 
 /// 試した結果を 1 行の文にする(「make → make(英語)」を全角の空白で区切る)
-pub fn preview_text(words: &[PreviewWord]) -> String {
-    words
+pub fn preview_text(words: &[PreviewWord]) -> PreviewShown {
+    let chips = words
         .iter()
         .map(|word| {
             let language = options::WORD_LANGUAGES
@@ -327,17 +327,33 @@ pub fn preview_text(words: &[PreviewWord]) -> String {
                 .map_or(word.language.as_str(), |(_, label)| label);
             format!("{} → {}({language})", word.typed, word.shown)
         })
-        .collect::<Vec<_>>()
-        .join("\u{3000}")
+        .collect();
+    PreviewShown {
+        chips,
+        line: String::new(),
+    }
 }
 
-/// 変換マクロを試した結果を 1 つの文にする(全角の空白で区切る)．書いている途中の形の結果なら頭に「入力中の形: 」を付ける
-pub fn macro_preview_text(results: &[String], drafting: bool) -> String {
+/// 試した結果の出し方．chips は札にして折り返して並べる語(macOS の WrappingStack)，line は札にしない 1 行
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PreviewShown {
+    pub chips: Vec<String>,
+    pub line: String,
+}
+
+/// 変換マクロを試した結果．書いている途中の形の結果なら札にせず，頭に「入力中の形: 」を付けた 1 行にする
+pub fn macro_preview_text(results: &[String], drafting: bool) -> PreviewShown {
     if drafting {
         let shown = results.first().map_or("", String::as_str);
-        return format!("{}{shown}", crate::strings::extras::MACRO_DRAFT_RESULT);
+        return PreviewShown {
+            chips: Vec::new(),
+            line: format!("{}{shown}", crate::strings::extras::MACRO_DRAFT_RESULT),
+        };
     }
-    results.join("\u{3000}")
+    PreviewShown {
+        chips: results.to_vec(),
+        line: String::new(),
+    }
 }
 
 fn parse(values: &str) -> Result<Fields, StoreError> {
@@ -519,8 +535,8 @@ mod tests {
             },
         ];
         assert_eq!(
-            preview_text(&words),
-            "make → make(英語)\u{3000}sushi → すし(日本語)"
+            preview_text(&words).chips,
+            vec!["make → make(英語)", "sushi → すし(日本語)"]
         );
     }
 
@@ -562,15 +578,11 @@ mod tests {
     #[test]
     fn 変換マクロを試した結果を文にする() {
         let results = vec!["「東京」".to_string(), "【東京】".to_string()];
-        assert_eq!(
-            macro_preview_text(&results, false),
-            "「東京」\u{3000}【東京】"
-        );
-        assert_eq!(
-            macro_preview_text(&results[..1], true),
-            "入力中の形: 「東京」"
-        );
-        assert_eq!(macro_preview_text(&[], true), "入力中の形: ");
+        assert_eq!(macro_preview_text(&results, false).chips, results);
+        let drafting = macro_preview_text(&results[..1], true);
+        assert!(drafting.chips.is_empty());
+        assert_eq!(drafting.line, "入力中の形: 「東京」");
+        assert_eq!(macro_preview_text(&[], true).line, "入力中の形: ");
     }
 
     /// 登録した単語を total 個持ち，頼まれた範囲を返す
