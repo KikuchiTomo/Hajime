@@ -46,18 +46,18 @@ private struct UserWordsView: View {
             Section {
                 RuleListEditor(
                     labels: .init(key: UIStrings.Settings.reading, value: UIStrings.Settings.word,
-                                  empty: UIStrings.Settings.dictionaryEmpty),
+                                  empty: UIStrings.Settings.dictionaryEmpty, note: UIStrings.Settings.comment, notePrompt: UIStrings.Settings.commentPrompt),
                     items: model.settings.userDictionary.map {
                         RuleItem(id: "\($0.reading)\t\($0.word)", key: $0.reading, value: $0.word, kind: $0.wordClass.rawValue,
-                                 kindTitle: UIStrings.Settings.label(for: $0.wordClass))
+                                 kindTitle: UIStrings.Settings.label(for: $0.wordClass), note: $0.comment)
                     },
                     kinds: Self.wordClasses,
                     problem: { reading, word in
                         UserDictionaryEntry(reading: reading, word: word).isValid ? nil : UIStrings.Settings.invalidEntry
                     },
-                    save: { reading, word, kind, editing in
+                    save: { reading, word, kind, comment, editing in
                         model.saveEntry(replacing: editing.map { UserDictionaryEntry(reading: $0.key, word: $0.value) }, reading: reading, word: word,
-                                        wordClass: kind.flatMap(WordClass.init(rawValue:)) ?? DefaultSettings.userWordClass)
+                                        wordClass: kind.flatMap(WordClass.init(rawValue:)) ?? DefaultSettings.userWordClass, comment: comment ?? "")
                     },
                     remove: { items in
                         model.removeEntries(items.map { UserDictionaryEntry(reading: $0.key, word: $0.value) })

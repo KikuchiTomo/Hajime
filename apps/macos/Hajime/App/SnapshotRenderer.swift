@@ -59,6 +59,8 @@ enum SnapshotRenderer {
                 render(commandListView(theme: look.theme, appearance: appearance, selected: 0), name: "command-list-\(look.name)", to: output, appearance: appearance)
                 render(commandListView(theme: look.theme, appearance: appearance, selected: 1), name: "command-list-selected-\(look.name)", to: output, appearance: appearance)
                 render(commandBranchView(theme: look.theme, appearance: appearance), name: "command-branch-\(look.name)", to: output, appearance: appearance)
+                render(commentListView(theme: look.theme, appearance: appearance), name: "comment-list-\(look.name)", to: output, appearance: appearance)
+                render(commentBranchView(theme: look.theme, appearance: appearance), name: "comment-branch-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.emoji, theme: look.theme, appearance: appearance), name: "palette-emoji-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.search, theme: look.theme, appearance: appearance), name: "palette-search-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.flag, theme: look.theme, appearance: appearance), name: "palette-flag-\(look.name)", to: output, appearance: appearance)
@@ -132,7 +134,8 @@ enum SnapshotRenderer {
                                          CorrectionRule(typed: "adn", word: "and")]
             settings.customRomaji = [RomajiRule(keys: "wyi", kana: "ゐ"), RomajiRule(keys: "wye", kana: "ゑ")]
             settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "Hajime IME", wordClass: .properNoun),
-                                       UserDictionaryEntry(reading: "かいしゃ", word: "会社"), UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .surname),
+                                       UserDictionaryEntry(reading: "かいしゃ", word: "会社", comment: "東京都千代田区千代田1-1"),
+                                       UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .surname),
                                        UserDictionaryEntry(reading: "おつ", word: "お疲れさまでした", wordClass: .abbreviation)]
             settings.symbolRules = [SymbolRule(kind: .sequence, input: "->", output: "⇢"), SymbolRule(kind: .sequence, input: "<<", output: "«"),
                                     SymbolRule(kind: .sequence, input: "=>", output: "⇒", isEnabled: false)]
@@ -483,35 +486,53 @@ enum SnapshotRenderer {
     }
 
     /// 押した位置から対象を求める処理(候補をマウスで選ぶ)を確かめる．窓を細かく区切って押してみて，
-    /// 見えている幹・枝・行・字種がどれも押せることと，上から下への並びが候補の順と合うことを確かめ，合わなければ知らせる
+    /// 見えている幹・枝・行・字種・コメントの札がどれも押せることと，上から下への並びが候補の順と合うことを確かめ，合わなければ知らせる．
+    /// コメントの札は，札の中を押すとコメントに，札の外の行を押すと候補になることも確かめる
     private static func checkPointerTargets() {
         for (name, theme) in [("glass", ThemeChoice(.automatic)), ("platinum", ThemeChoice(.platinum))] {
-            let branch = BranchView()
-            branch.theme = ResolvedTheme.resolve(theme, appearance: NSAppearance(named: .aqua))
-            branch.panel = SamplePanels.lattice
-            branch.frame = NSRect(origin: .zero, size: branch.fittingSize(for: SamplePanels.lattice))
-            let list = CandidateView()
-            list.theme = branch.theme
-            list.panel = SamplePanels.list
-            list.frame = NSRect(origin: .zero, size: list.fittingSize(for: SamplePanels.list))
-            for (view, find) in [(branch as NSView, branch.target(at:)), (list as NSView, list.target(at:))] {
+            let resolved = ResolvedTheme.resolve(theme, appearance: NSAppearance(named: .aqua))
+            var checks: [(sample: String, view: NSView, find: (NSPoint) -> PointerTarget?, expected: Set<PointerTarget>)] = []
+            for (sample, panel) in [("分岐図", SamplePanels.lattice), ("分岐図・コメント", SamplePanels.commentLattice)] {
+                let branch = BranchView()
+                branch.theme = resolved
+                branch.panel = panel
+                branch.frame = NSRect(origin: .zero, size: branch.fittingSize(for: panel))
+                checks.append((sample, branch, branch.target(at:), expectedTargets(panel)))
+            }
+            for (sample, panel) in [("一覧", SamplePanels.list), ("一覧・コメント", SamplePanels.comment)] {
+                let list = CandidateView()
+                list.theme = resolved
+                list.panel = panel
+                list.frame = NSRect(origin: .zero, size: list.fittingSize(for: panel))
+                checks.append((sample, list, list.target(at:), expectedTargets(panel)))
+            }
+            for check in checks {
                 var found: [PointerTarget] = []
-                for y in stride(from: 0, to: view.bounds.height, by: 2) {
-                    for x in stride(from: 0, to: view.bounds.width, by: 4) {
-                        if let target = find(NSPoint(x: x, y: y)), found.last != target, !found.contains(target) { found.append(target) }
+                for y in stride(from: 0, to: check.view.bounds.height, by: 2) {
+                    for x in stride(from: 0, to: check.view.bounds.width, by: 4) {
+                        if let target = check.find(NSPoint(x: x, y: y)), found.last != target, !found.contains(target) { found.append(target) }
                     }
                 }
-                let focused = SamplePanels.lattice.columns.first(where: \.isFocused)
-                let expected: Set<PointerTarget> = view === branch
-                    ? Set(SamplePanels.lattice.columns.indices.map(PointerTarget.segment) + (focused?.alternatives.indices.map(PointerTarget.alternative) ?? [])
-                          + (focused?.variants.indices.map(PointerTarget.variant) ?? []))
-                    : Set(SamplePanels.list.entries.indices.map(PointerTarget.entry)
-                          + SamplePanels.list.variants.indices.filter { SamplePanels.list.variants[$0].isAvailable }.map(PointerTarget.listVariant))
                 let rows = found.compactMap { if case .alternative(let index) = $0 { index } else if case .entry(let index) = $0 { index } else { nil } }
-                let ok = Set(found) == expected && rows == rows.sorted()
-                print("押した位置の確かめ(\(name)・\(view === branch ? "分岐図" : "一覧")): \(ok ? "ok" : "合わない \(found)")")
+                let ok = Set(found) == check.expected && rows == rows.sorted()
+                print("押した位置の確かめ(\(name)・\(check.sample)): \(ok ? "ok" : "合わない \(found)")")
             }
         }
+    }
+
+    /// 分岐図で押せるはずの対象．幹の文節と，注目している文節の上下の枝と，コメントの札
+    private static func expectedTargets(_ panel: LatticePanel) -> Set<PointerTarget> {
+        let focused = panel.columns.first(where: \.isFocused)
+        let comments = focused.map { column in column.alternatives.indices.filter { column.comment(at: $0) != nil } } ?? []
+        return Set(panel.columns.indices.map(PointerTarget.segment) + (focused?.alternatives.indices.map(PointerTarget.alternative) ?? [])
+                   + (focused?.variants.indices.map(PointerTarget.variant) ?? []) + comments.map(PointerTarget.comment))
+    }
+
+    /// 一覧で押せるはずの対象．候補の行と，使える字種と，コメントの札
+    private static func expectedTargets(_ panel: CandidatePanel) -> Set<PointerTarget> {
+        Set(panel.entries.indices.map(PointerTarget.entry)
+            + panel.variants.indices.filter { panel.variants[$0].isAvailable }.map(PointerTarget.listVariant)
+            + panel.entries.indices.filter { panel.entries[$0].comment != nil }.map(PointerTarget.comment))
     }
 
     private static let longSentence = ["今日は", "朝から", "とても", "良い", "天気だったので", "近所の", "公園まで", "散歩に", "出かけて", "久しぶりに",
@@ -705,6 +726,28 @@ enum SnapshotRenderer {
         column.alternativeNotes = list.entries.map(\.annotation)
         column.alternativeCommands = list.entries.map(\.command)
         let panel = LatticePanel(columns: [column], position: 1, total: list.entries.count, note: list.note)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// ユーザー辞書の語のコメント(R-21)を札に出した一覧．選んでいる行の札は選択の地の上に描く
+    private static func commentListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        let panel = SamplePanels.comment
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// ユーザー辞書の語のコメントを下の枝に添えた分岐図
+    private static func commentBranchView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        let panel = SamplePanels.commentLattice
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

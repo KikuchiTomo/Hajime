@@ -2748,9 +2748,30 @@ public final class InputSession {
             selection.focus = .variant(ScriptVariant.allCases[index])
             phase = .selecting(selection)
             return commitAll()
+        case (.selecting, .comment(let index)):
+            // 一覧の行を選び，その候補をコメントに置き換えて確定する
+            guard selectByNumber(index + 1), case .selecting(var selection) = phase, case .candidate(let focused) = selection.focus,
+                  let replaced = Self.commentCandidate(for: selection.candidates[focused], prefix: selection.shownPrefix) else { return [] }
+            selection.candidates[focused] = replaced
+            phase = .selecting(selection)
+            return commitAll()
+        case (.lattice(var lattice), .comment(let index)):
+            // 下の枝の候補を選び，その文節をコメントに置き換える(番号キーで選んだのと同じに進む)
+            guard lattice.select(number: index + 1, perPage: latticePerPage), case .candidate(let chosen) = lattice.focused.choice,
+                  let replaced = Self.commentCandidate(for: lattice.focused.selected, prefix: "") else { return [] }
+            lattice.segments[lattice.focusedIndex].candidates[chosen] = replaced
+            return advance(after: lattice, context: context)
         default:
             return []
         }
+    }
+
+    /// 候補をユーザー辞書のコメントに置き換えた候補．読みの長さはそのまま．prefix は候補の頭の一覧に出さない字(前の文節)で，残す．
+    /// コメントが無ければ nil
+    private static func commentCandidate(for candidate: Candidate, prefix: String) -> Candidate? {
+        guard let comment = candidate.comment, !comment.isEmpty else { return nil }
+        let kept = !prefix.isEmpty && candidate.text.hasPrefix(prefix) ? prefix : ""
+        return Candidate(text: kept + comment, readingCount: candidate.readingCount, origin: .userDictionary)
     }
 
     /// 注目している文節の読み

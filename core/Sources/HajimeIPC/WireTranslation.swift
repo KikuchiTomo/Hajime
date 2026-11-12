@@ -185,7 +185,9 @@ extension WireCandidateList {
                 return WireCandidateEntry(text: entry.text, annotation: entry.annotation,
                                           correctedStart: corrected.map { UInt32(clamping: $0.start) },
                                           correctedLength: corrected.map { UInt32(clamping: $0.length) },
-                                          command: entry.command.map(WireCommandKind.init))
+                                          command: entry.command.map(WireCommandKind.init),
+                                          // コメントでなければ送らない
+                                          hasComment: entry.hasComment ? true : nil)
             },
             selectedEntry: panel.selectedEntry.map(UInt32.init(clamping:)),
             focus: panel.focus == .candidate ? .candidate : .variants,
@@ -207,13 +209,14 @@ extension WireCandidateList {
 
 extension WireDictionaryEntry {
     public init(_ entry: UserDictionaryEntry) {
-        self.init(reading: entry.reading, word: entry.word, wordClass: WireWordClass(rawValue: entry.wordClass.rawValue))
+        self.init(reading: entry.reading, word: entry.word, wordClass: WireWordClass(rawValue: entry.wordClass.rawValue),
+                  comment: entry.comment.isEmpty ? nil : entry.comment)
     }
 
     /// 品詞を送らない設定の画面(品詞を選べるようになる前のもの)から来た語は，登録するときの既定の品詞にする
     public var entry: UserDictionaryEntry {
         UserDictionaryEntry(reading: reading, word: word,
-                            wordClass: wordClass.flatMap { WordClass(rawValue: $0.rawValue) } ?? DefaultSettings.userWordClass)
+                            wordClass: wordClass.flatMap { WordClass(rawValue: $0.rawValue) } ?? DefaultSettings.userWordClass, comment: comment ?? "")
     }
 }
 
@@ -296,6 +299,7 @@ extension WireBranchMap {
                     homophone: column.homophone.map(WireHomophoneNote.init),
                     alternativeNotes: column.alternativeNotes,
                     alternativeCommands: column.alternativeCommands.isEmpty ? nil : column.alternativeCommands.map { $0.map(WireCommandKind.init) },
+                    alternativeComments: column.alternativeComments.isEmpty ? nil : column.alternativeComments,
                     sourceName: column.sourceName,
                     split: column.split.map { WireBranchSplit(pieces: $0.pieces) }
                 )

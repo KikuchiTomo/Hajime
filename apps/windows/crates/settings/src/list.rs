@@ -19,6 +19,8 @@ pub struct Field {
     pub key: bool,
     /// キーの書き方の欄(keys::canonical で整え，読めなければ足さない)
     pub notation: bool,
+    /// 空のままでも足せる欄(ユーザー辞書のコメント)
+    pub optional: bool,
 }
 
 impl Field {
@@ -30,6 +32,7 @@ impl Field {
             choices: None,
             key: true,
             notation: false,
+            optional: false,
         }
     }
 
@@ -40,6 +43,7 @@ impl Field {
             choices: None,
             key,
             notation: false,
+            optional: false,
         }
     }
 
@@ -55,6 +59,7 @@ impl Field {
             choices: Some(choices),
             key,
             notation: false,
+            optional: false,
         }
     }
 
@@ -66,6 +71,15 @@ impl Field {
             choices: None,
             key,
             notation: true,
+            optional: false,
+        }
+    }
+
+    /// 空のままでも足せる欄にする
+    pub const fn optional(self) -> Self {
+        Self {
+            optional: true,
+            ..self
         }
     }
 
@@ -287,10 +301,9 @@ impl ListSpec {
 
     /// 打つ欄が埋まっているか(足すボタンを使えるか)
     pub fn is_filled(&self, values: &[String]) -> bool {
-        self.fields
-            .iter()
-            .zip(values)
-            .all(|(field, value)| field.choices.is_some() || !value.trim().is_empty())
+        self.fields.iter().zip(values).all(|(field, value)| {
+            field.choices.is_some() || field.optional || !value.trim().is_empty()
+        })
     }
 
     /// 表に出す文字
