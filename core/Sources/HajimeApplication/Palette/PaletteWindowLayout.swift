@@ -8,9 +8,10 @@ import HajimeDomain
 ///   まとまりの中(マスの見出しとマス目)は metrics.itemGap
 /// - 中身の右の端は 1 か所(探す欄・種類の切り替え・区切りの線・スクロールの位置の線・肌の色のボタンの右の端)
 ///
-/// 窓の大きさは列数・行数・マスの大きさと説明に出す項目の設定だけで決め，選んでいる文字や種類では変えない．
+/// 窓の大きさは列数・行数・マスの大きさ・説明に出す項目の設定と種類で決め，選んでいる文字では変えない．
 /// 説明の欄は種類ごとに出る行の分の高さにし(PalettePreviewLayout.height)，いちばん高い種類(絵文字)との差は，
-/// マスの行に回せる分をマス目の行に回す(extraRows)．回しきれない端の高さは，マス目と説明のあいだの区切りの上と下に等しく分ける．
+/// マスの行に回せる分をマス目の行に回す(extraRows．core の PaletteSession が visibleRows に足す)．
+/// 回しきれない端の高さは余白に回さず，窓をその分だけ低くする(種類を替えると窓の下の端が動く)．区切りの線の上と下はどの種類でも同じ．
 /// macOS の PaletteView が使い，Windows の候補ウィンドウ(palette::layout)は同じ決め方を Rust で持つ
 public struct PaletteWindowLayout: Sendable, Equatable {
     public typealias Box = PalettePreviewLayout.Box
@@ -79,19 +80,15 @@ public struct PaletteWindowLayout: Sendable, Equatable {
 
     /// - Parameters:
     ///   - visibleRows: 今の種類で見せるマス目の行の数(extraRows を足したもの)
-    ///   - windowRows: 窓の高さを決めるマス目の行の数(設定の行の数)
     ///   - modeWidths: 種類の切り替えのそれぞれの幅
     ///   - previewHeight: 今の種類の説明の欄の高さ．出さない設定なら nil
-    ///   - windowPreviewHeight: 窓の高さを決める説明の欄の高さ(いちばん高い種類)
-    public init(columns: Int, visibleRows: Int, windowRows: Int, cellSize: Double, tabCount: Int, modeWidths: [Double], previewHeight: Double?,
-                windowPreviewHeight: Double?, metrics: Metrics) {
+    public init(columns: Int, visibleRows: Int, cellSize: Double, tabCount: Int, modeWidths: [Double], previewHeight: Double?, metrics: Metrics) {
         let inset = metrics.border + metrics.padding
         let gridWidth = Double(columns) * cellSize
         let contentWidth = gridWidth + metrics.groupGap + metrics.scrollbarWidth
-        let preview = previewHeight.map { ($0, windowPreviewHeight ?? $0) }
         var bodyHeight = inset * 2 + metrics.controlHeight + metrics.sectionGap + metrics.controlHeight + metrics.groupGap + metrics.textRowHeight
-            + metrics.itemGap + Double(windowRows) * cellSize + metrics.sectionGap + metrics.lineWidth + metrics.sectionGap + metrics.footerHeight
-        if let (_, window) = preview { bodyHeight += window + metrics.sectionGap + metrics.lineWidth + metrics.sectionGap }
+            + metrics.itemGap + Double(visibleRows) * cellSize + metrics.sectionGap + metrics.lineWidth + metrics.sectionGap + metrics.footerHeight
+        if let previewHeight { bodyHeight += previewHeight + metrics.sectionGap + metrics.lineWidth + metrics.sectionGap }
         width = inset * 2 + contentWidth + metrics.shadow
         height = bodyHeight + metrics.shadow
         body = Box(x: 0, y: 0, width: inset * 2 + contentWidth, height: bodyHeight)
@@ -116,12 +113,10 @@ public struct PaletteWindowLayout: Sendable, Equatable {
         let grid = Box(x: content.x, y: y, width: gridWidth, height: Double(visibleRows) * cellSize)
         self.grid = grid
         scrollbar = Box(x: content.maxX - metrics.scrollbarWidth, y: grid.y, width: metrics.scrollbarWidth, height: grid.height)
-        // 窓の高さに対して余った高さ(回しきれなかった分)を，区切りの上と下に等しく分ける
-        let spare = max(Double(windowRows - visibleRows) * cellSize + (preview.map { $0.1 - $0.0 } ?? 0), 0)
-        y = grid.maxY + metrics.sectionGap + (spare / 2).rounded(.down)
+        y = grid.maxY + metrics.sectionGap
         separators = [y]
-        y += metrics.lineWidth + metrics.sectionGap + spare - (spare / 2).rounded(.down)
-        if let (height, _) = preview {
+        y += metrics.lineWidth + metrics.sectionGap
+        if let height = previewHeight {
             self.preview = Box(x: content.x, y: y, width: content.width, height: height)
             y += height + metrics.sectionGap
             separators.append(y)

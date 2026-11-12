@@ -6,7 +6,7 @@ import HajimeDomain
 ///
 /// 何を出すかは core(PaletteSession)が決めた PalettePanel のとおりにし，ここでは描くことと，押した位置を PaletteTarget にすることだけをする．
 /// 部品の位置と余白は core の PaletteWindowLayout が決める(余白は間隔の段階 size.space だけを使う)．
-/// 窓の大きさは列数・行数・マスの大きさ・説明の項目だけで決め，中身(探した結果の数や種類)では変えない．
+/// 窓の大きさは列数・行数・マスの大きさ・説明の項目と種類で決め，中身(探した結果の数や選んでいる文字)では変えない．
 /// 顔文字はマス目の幅を 1 行のマスの数(cellsPerRow)で割った広いマスに，テーマの文字の書体で描く．
 ///
 /// core が添えた動き(PalettePanel.Motion)があれば，選択の枠・種類の切り替えとタブの印を滑らせ，マス目の中身を送り，
@@ -54,7 +54,7 @@ final class PaletteView: NSView {
 
     // MARK: - 大きさと位置
 
-    /// 窓の大きさ．列数・行数・マスの大きさ・説明の項目だけで決まる
+    /// 窓の大きさ．列数・行数・マスの大きさ・説明の項目と種類で決まり，選んでいる文字では変えない
     func fittingSize(for panel: PalettePanel) -> NSSize {
         let layout = windowLayout(for: panel)
         return NSSize(width: CGFloat(layout.width).rounded(.up), height: CGFloat(layout.height).rounded(.up))
@@ -63,10 +63,9 @@ final class PaletteView: NSView {
     private func windowLayout(for panel: PalettePanel) -> PaletteWindowLayout {
         let modeFont = theme.labelFont(size: Size.modeFontSize)
         let modeWidths = panel.modes.map { Double(($0.title.size(withAttributes: [.font: modeFont]).width + Size.controlPaddingX * 2).rounded(.up)) }
-        let height = { (kind: PaletteItem.Kind) in panel.showsPreview ? PalettePreviewDrawing.height(for: panel.previewFields, kind: kind) : nil }
-        return PaletteWindowLayout(columns: panel.columns, visibleRows: panel.visibleRows, windowRows: panel.windowRows, cellSize: cellSize,
-                                   tabCount: panel.tabs.count, modeWidths: modeWidths, previewHeight: height(Self.kind(of: panel)),
-                                   windowPreviewHeight: height(.emoji), metrics: .tokens(border: border, shadow: dropShadowOffset))
+        let previewHeight = panel.showsPreview ? PalettePreviewDrawing.height(for: panel.previewFields, kind: Self.kind(of: panel)) : nil
+        return PaletteWindowLayout(columns: panel.columns, visibleRows: panel.visibleRows, cellSize: cellSize, tabCount: panel.tabs.count,
+                                   modeWidths: modeWidths, previewHeight: previewHeight, metrics: .tokens(border: border, shadow: dropShadowOffset))
     }
 
     private struct Layout {
@@ -486,7 +485,6 @@ final class PaletteView: NSView {
     /// 一部だけを描き直すときは，描き直す範囲に掛からないマスを描かない
     private func drawCells(_ panel: PalettePanel, layout: Layout, offset: CGPoint, alpha: CGFloat, time: CFTimeInterval, slidesSelection: Bool = true) {
         guard alpha > 0 else { return }
-        let emojiFont = NSFont(name: PaletteIcons.emojiFontName, size: (cellSize * Size.emojiScale).rounded()) ?? .systemFont(ofSize: cellSize * Size.emojiScale)
         let symbolFont = theme.candidateFont(size: (cellSize * Size.symbolScale).rounded())
         let isWide = Self.isWide(panel)
         let context = NSGraphicsContext.current?.cgContext
@@ -522,8 +520,12 @@ final class PaletteView: NSView {
                     drawFitted(cell.text, size: (cellSize * Size.kaomojiScale).rounded(), color: theme.text, in: rect.insetBy(dx: Size.kaomojiPaddingX, dy: 0))
                     continue
                 }
-                let font = Self.isEmoji(cell.text) ? emojiFont : symbolFont
-                GlassDrawing.drawCentered(cell.text, attributes: [.font: font, .foregroundColor: theme.text], in: rect)
+                if Self.isEmoji(cell.text) {
+                    // 絵文字は外形がマスの余白の内側に収まる大きさにし，外形の中心をマスの中心に合わせる(横に広い絵文字も欠けない)
+                    drawEmoji(cell.text, in: rect, padding: Size.cellPadding)
+                } else {
+                    GlassDrawing.drawCentered(cell.text, attributes: [.font: symbolFont, .foregroundColor: theme.text], in: rect)
+                }
             }
         }
     }
@@ -586,7 +588,9 @@ final class PaletteView: NSView {
         GlassDrawing.drawHints(fitting, x: footer.minX, midY: footer.midY, theme: theme)
         let button = layout.skinToneButton
         GlassDrawing.drawKeycap(button, theme: theme)
-        drawEmoji(PaletteStrings.skinToneSample.text(skinTone: panel.skinTone), in: button, padding: Size.skinButtonPadding)
+        // 余白は札の縁(platinum と desk は立体の縁)の内側から測る．キーの札の中の記号と同じ余白
+        let border = GlassDrawing.keycapBorder(theme: theme)
+        drawEmoji(PaletteStrings.skinToneSample.text(skinTone: panel.skinTone), in: button.insetBy(dx: border, dy: border), padding: Size.skinButtonPadding)
     }
 
     private func drawPicker(_ picker: PalettePanel.SkinTonePicker, layout: Layout) {
@@ -620,7 +624,7 @@ final class PaletteView: NSView {
                 fill(inner, color: theme.focusTint, radius: Size.cellRadius)
                 stroke(inner, color: theme.selection, radius: Size.cellRadius, width: Size.selectionStroke)
             }
-            drawEmoji(option, in: rect, padding: Size.pickerCellPadding)
+            drawEmoji(option, in: rect, padding: Size.cellPadding)
         }
     }
 

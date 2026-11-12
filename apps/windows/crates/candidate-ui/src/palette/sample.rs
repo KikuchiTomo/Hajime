@@ -230,7 +230,6 @@ pub fn emoji() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: None,
-        window_rows: None,
         motion: None,
         preview_fields: None,
     }
@@ -375,7 +374,6 @@ pub fn search() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: None,
-        window_rows: None,
         motion: None,
         preview_fields: None,
     }
@@ -411,7 +409,6 @@ pub fn flag() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: None,
-        window_rows: None,
         motion: None,
         preview_fields: None,
     }
@@ -499,7 +496,6 @@ pub fn symbol() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: None,
-        window_rows: None,
         motion: None,
         preview_fields: None,
     }
@@ -557,7 +553,6 @@ pub fn kaomoji() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: Some(KAOMOJI_CELLS_PER_ROW),
-        window_rows: Some(VISIBLE_ROWS),
         motion: None,
         preview_fields: None,
     }

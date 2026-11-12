@@ -11,9 +11,9 @@
 //!   まとまりの中(マスの見出しとマス目)は item-gap
 //! - 中身の右の端は 1 か所(探す欄・種類の切り替え・区切りの線・スクロールの位置の線・肌の色のボタンの右の端)
 //!
-//! 窓の大きさは列数・行数・マスの大きさと説明に出す項目の設定だけで決め，選んでいる文字や種類では変えない．
-//! 説明の欄は種類ごとに出る行の分の高さにし，いちばん高い種類(絵文字)との差は，core がマス目の行に回す(visible_rows と window_rows)．
-//! 回しきれない端の高さは，マス目と説明のあいだの区切りの上と下に等しく分ける
+//! 窓の大きさは列数・行数・マスの大きさ・説明に出す項目の設定と種類で決め，選んでいる文字では変えない．
+//! 説明の欄は種類ごとに出る行の分の高さにし，いちばん高い種類(絵文字)との差は，core がマス目の行に回す(visible_rows に足してある)．
+//! 回しきれない端の高さは余白に回さず，窓をその分だけ低くする．区切りの線の上と下はどの種類でも同じ
 
 use super::emoji::SKIN_TONES;
 use super::preview;
@@ -23,27 +23,39 @@ use crate::theme::{Font, ResolvedTheme, Role};
 use ipc::{PaletteKind, PalettePanel, PaletteTarget};
 use tokens::size::{candidate, glass, palette};
 
-/// 外形に合わせて大きさを決める絵文字の書体の候補の数．目当ての大きさから 1 ポイントずつ小さくする
-pub const EMOJI_FIT_STEPS: usize = 6;
+/// 外形に合わせて大きさを決める絵文字の書体の候補の数．目当ての一辺より 2 ポイント大きいものから 1 ポイントずつ小さくする
+/// (書体によって外形が書体の大きさより小さいことも大きいこともある)
+pub const EMOJI_FIT_STEPS: usize = 8;
+/// 候補の大きさのうち，目当ての一辺より大きくする分
+const EMOJI_FIT_ABOVE: f32 = 2.0;
 
-/// 外形に合わせて大きさを決める絵文字の書体の候補(大きい順)と，外形を収める一辺
+/// 外形に合わせて大きさを決める絵文字の書体の候補(大きい順)．描くときに箱から余白を除いた一辺に外形が収まるものを選ぶ
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EmojiSizes {
     pub fonts: [Font; EMOJI_FIT_STEPS],
-    /// 外形を収める一辺(箱の一辺から余白を除いたもの)
-    pub target: u16,
 }
 
 impl EmojiSizes {
-    /// 一辺 side の箱の上下左右に padding を空けた中に外形を収める
-    fn new(side: f32, padding: f32) -> Self {
-        let target = (side - padding * 2.0).max(1.0);
+    /// 外形を一辺 target(箱の一辺から余白を除いたもの)に収める候補
+    fn new(target: f32) -> Self {
+        let largest = target.max(1.0) + EMOJI_FIT_ABOVE;
         Self {
             fonts: std::array::from_fn(|step| {
-                Font::sized(Role::Emoji, (target - step as f32).max(1.0))
+                Font::sized(Role::Emoji, (largest - step as f32).max(1.0))
             }),
-            target: target.round() as u16,
         }
+    }
+
+    /// 外形を測れないときに使う書体(大きさが一辺 target にいちばん近いもの)
+    pub fn nearest(&self, target: f32) -> Font {
+        self.fonts
+            .iter()
+            .copied()
+            .min_by_key(|font| match font {
+                Font::Sized(_, size) => (f32::from(*size) - target).abs().round() as u32,
+                _ => u32::MAX,
+            })
+            .unwrap_or(self.fonts[0])
     }
 }
 
@@ -57,7 +69,8 @@ pub struct Fonts {
     /// タブにアイコンを描けないときの代わりの文字
     pub tab_symbol: Font,
     pub heading: Font,
-    pub cell_emoji: Font,
+    /// マス目の絵文字．外形がマスの余白(cell-padding)の内側に収まる大きさを候補から選ぶ
+    pub cell_emoji: EmojiSizes,
     pub cell_symbol: Font,
     /// 顔文字の広いマスの文字．収まらなければ kaomoji_small に縮める
     pub cell_kaomoji: Font,
@@ -91,7 +104,7 @@ impl Fonts {
                 palette::TAB_ICON_SIZE + candidate::FRAME_WIDTH,
             ),
             heading: Font::sized(Role::Label, palette::HEADING_FONT_SIZE),
-            cell_emoji: Font::sized(Role::Emoji, cell_size * palette::EMOJI_SCALE),
+            cell_emoji: EmojiSizes::new(cell_size - palette::CELL_PADDING * 2.0),
             cell_symbol: Font::sized(Role::Candidate, cell_size * palette::SYMBOL_SCALE),
             cell_kaomoji: Font::sized(Role::Candidate, cell_size * palette::KAOMOJI_SCALE),
             kaomoji_small: Font::sized(Role::Candidate, palette::KAOMOJI_MIN_FONT_SIZE),
@@ -100,23 +113,33 @@ impl Fonts {
             code: Font::sized(Role::Code, palette::CODE_FONT_SIZE),
             code_small: Font::sized(Role::Code, palette::PREVIEW_CHIP_SMALL_FONT_SIZE),
             label: Font::sized(Role::Annotation, palette::PREVIEW_LABEL_FONT_SIZE),
-            preview_emoji: EmojiSizes::new(palette::TILE_SIZE, palette::TILE_PADDING),
+            preview_emoji: EmojiSizes::new(palette::TILE_SIZE - palette::TILE_PADDING * 2.0),
             preview_symbol: Font::sized(
                 Role::Candidate,
                 palette::PREVIEW_GLYPH_SIZE * palette::SYMBOL_SCALE * palette::PREVIEW_SYMBOL_BOOST,
             ),
             preview_kaomoji: Font::sized(Role::Candidate, palette::PREVIEW_KAOMOJI_FONT_SIZE),
-            button_emoji: EmojiSizes::new(glass::KEYCAP_HEIGHT, palette::SKIN_BUTTON_PADDING),
-            picker_emoji: EmojiSizes::new(palette::PICKER_CELL_SIZE, palette::PICKER_CELL_PADDING),
+            // 札の縁(角丸のテーマと desk は線 1，platinum は外枠と立体の縁 2)の内側から余白を空ける．縁の細いほうで候補を作る
+            button_emoji: EmojiSizes::new(
+                glass::KEYCAP_HEIGHT
+                    - candidate::FRAME_WIDTH * 2.0
+                    - palette::SKIN_BUTTON_PADDING * 2.0,
+            ),
+            picker_emoji: EmojiSizes::new(palette::PICKER_CELL_SIZE - palette::CELL_PADDING * 2.0),
         }
     }
 
     /// 使う書体のすべて(重なりを除く)．描く側が前もって書式を作る
     pub fn all(&self) -> Vec<Font> {
         let mut unique = Vec::new();
-        let fitted = [self.preview_emoji, self.button_emoji, self.picker_emoji]
-            .into_iter()
-            .flat_map(|sizes| sizes.fonts);
+        let fitted = [
+            self.cell_emoji,
+            self.preview_emoji,
+            self.button_emoji,
+            self.picker_emoji,
+        ]
+        .into_iter()
+        .flat_map(|sizes| sizes.fonts);
         for font in [
             self.search,
             self.search_icon,
@@ -124,7 +147,6 @@ impl Fonts {
             self.tab_icon,
             self.tab_symbol,
             self.heading,
-            self.cell_emoji,
             self.cell_symbol,
             self.cell_kaomoji,
             self.kaomoji_small,
@@ -167,7 +189,7 @@ pub fn kind(panel: &PalettePanel) -> PaletteKind {
 }
 
 /// 今の種類のマス目に回す行の数．説明の欄がいちばん高い種類(絵文字)より低い分を，マスの一辺で割って切り捨てる
-/// (core の PaletteWindowLayout.extraRows．見本を作るときに使う)
+/// (core の PaletteWindowLayout.extraRows．core が visible_rows に足して送る．見本を作るときに使う)
 pub fn extra_rows(preview_height: f32, window_preview_height: f32, cell: f32) -> u32 {
     if cell <= 0.0 {
         return 0;
@@ -213,7 +235,7 @@ pub struct Layout {
 }
 
 impl Layout {
-    /// 窓の大きさは列数・行数(window_rows)・マスの大きさ・説明を出すかと説明に出す項目だけで決まり，中身や種類では変えない
+    /// 窓の大きさは列数・行数・マスの大きさ・説明を出すかと説明に出す項目と種類で決まり，中身(探した結果の数や選んでいる文字)では変えない
     pub fn new(panel: &PalettePanel, theme: &ResolvedTheme, measure: &dyn Measure) -> Self {
         let cell = cell_size(panel);
         let fonts = Fonts::new(cell);
@@ -234,15 +256,9 @@ impl Layout {
         let footer_height = glass::KEYCAP_HEIGHT;
         let kind = kind(panel);
         let visible_rows = panel.visible_rows;
-        let window_rows = panel.window_rows.unwrap_or(visible_rows);
         let fields = preview::fields(panel.preview_fields.as_ref());
-        // 今の種類の説明の欄の高さと，窓の高さを決める説明の欄の高さ(いちばん高い種類)
-        let preview_heights = panel.shows_preview.then(|| {
-            (
-                preview::height(&fields, kind),
-                preview::height(&fields, PaletteKind::Emoji),
-            )
-        });
+        // 今の種類の説明の欄の高さ
+        let preview_height = panel.shows_preview.then(|| preview::height(&fields, kind));
         let grid_width = panel.columns as f32 * cell;
         let content_width = grid_width + palette::GROUP_GAP + palette::SCROLLBAR_WIDTH;
         let mut body_height = inset * 2.0
@@ -252,13 +268,13 @@ impl Layout {
             + palette::GROUP_GAP
             + palette::TEXT_ROW_HEIGHT
             + palette::ITEM_GAP
-            + window_rows as f32 * cell
+            + visible_rows as f32 * cell
             + palette::SECTION_GAP
             + line
             + palette::SECTION_GAP
             + footer_height;
-        if let Some((_, window)) = preview_heights {
-            body_height += window + palette::SECTION_GAP + line + palette::SECTION_GAP;
+        if let Some(height) = preview_height {
+            body_height += height + palette::SECTION_GAP + line + palette::SECTION_GAP;
         }
         let body = Frame::new(0.0, 0.0, inset * 2.0 + content_width, body_height);
         let content = body.inset(inset, inset);
@@ -315,15 +331,10 @@ impl Layout {
             palette::SCROLLBAR_WIDTH,
             grid.height,
         );
-        // 窓の高さに対して余った高さ(回しきれなかった分)を，区切りの上と下に等しく分ける
-        let spare = (window_rows as f32 - visible_rows as f32) * cell
-            + preview_heights.map_or(0.0, |(shown, window)| window - shown);
-        let spare = spare.max(0.0);
-        let above = (spare / 2.0).floor();
-        y = grid.max_y() + palette::SECTION_GAP + above;
+        y = grid.max_y() + palette::SECTION_GAP;
         let mut separators = vec![y];
-        y += line + palette::SECTION_GAP + spare - above;
-        let preview = preview_heights.map(|(height, _)| {
+        y += line + palette::SECTION_GAP;
+        let preview = preview_height.map(|height| {
             let frame = Frame::new(content.x, y, content.width, height);
             y += height + palette::SECTION_GAP;
             separators.push(y);
@@ -588,20 +599,20 @@ mod tests {
     }
 
     #[test]
-    fn 窓の大きさは種類で変えず_説明の欄が低い種類はマス目の行を増やす() {
+    fn 説明の欄が低い種類は回せる分をマス目の行に回し_回しきれない端の分だけ窓を低くする() {
         for name in ["automatic", "platinum", "desk"] {
             let emoji = layout(&sample::emoji(), name);
             let symbol = layout(&sample::symbol(), name);
             let kaomoji = layout(&sample::kaomoji(), name);
             for other in [&symbol, &kaomoji] {
-                assert_eq!(
-                    (other.width, other.height),
-                    (emoji.width, emoji.height),
-                    "{name}"
-                );
+                assert_eq!(other.width, emoji.width, "{name}");
             }
-            // 顔文字は説明の欄が低い分をマス目の行に回す
-            assert!(kaomoji.grid.height > emoji.grid.height, "{name}");
+            // 顔文字は説明の欄が 68 低い．1 行(36)をマス目に回し，残りの 32 だけ窓を低くする
+            assert_eq!(kaomoji.grid.height, emoji.grid.height + 36.0, "{name}");
+            assert_eq!(emoji.height - kaomoji.height, 32.0, "{name}");
+            // 記号は 20 低いので行は回さず，20 だけ窓を低くする
+            assert_eq!(symbol.grid.height, emoji.grid.height, "{name}");
+            assert_eq!(emoji.height - symbol.height, 20.0, "{name}");
             let fields = preview::fields(None);
             assert_eq!(
                 kaomoji.preview.map(|frame| frame.height),
@@ -646,9 +657,17 @@ mod tests {
                 let preview = layout.preview.unwrap();
                 let line = candidate::FRAME_WIDTH;
                 assert_eq!(layout.separators.len(), 2);
-                let above = layout.separators[0] - layout.grid.max_y();
-                let below = preview.y - (layout.separators[0] + line);
-                assert!((above - below).abs() <= 1.0, "{name} {above} {below}");
+                // 区切りの線の上と下は，どの種類でも区画のあいだ(端数を余白に回さない)
+                assert_eq!(
+                    layout.separators[0] - layout.grid.max_y(),
+                    palette::SECTION_GAP,
+                    "{name}"
+                );
+                assert_eq!(
+                    preview.y - (layout.separators[0] + line),
+                    palette::SECTION_GAP,
+                    "{name}"
+                );
                 assert_eq!(layout.separators[1] - preview.max_y(), palette::SECTION_GAP);
                 assert_eq!(
                     layout.footer.y - (layout.separators[1] + line),
@@ -898,8 +917,10 @@ mod tests {
         let all = fonts.all();
         // 知らせと説明の読みは同じ書体
         assert!(all.contains(&fonts.detail));
-        assert!(all.contains(&fonts.cell_emoji));
-        assert_eq!(fonts.cell_emoji, Font::Sized(Role::Emoji, 25));
+        assert!(fonts.cell_emoji.fonts.iter().all(|font| all.contains(font)));
+        // マスの絵文字の候補は，マスから余白を除いた一辺(28)より 2 大きいものから
+        assert_eq!(fonts.cell_emoji.fonts[0], Font::Sized(Role::Emoji, 30));
+        assert_eq!(fonts.cell_emoji.nearest(28.0), Font::Sized(Role::Emoji, 28));
         assert_eq!(fonts.cell_symbol, Font::Sized(Role::Candidate, 20));
         for (index, font) in all.iter().enumerate() {
             assert!(!all[index + 1..].contains(font), "{font:?}");

@@ -10,7 +10,7 @@ use super::preview::{self, Part, Role};
 use crate::geometry::Frame;
 use crate::scene::paint::Painter;
 use crate::scene::{Draw, Look, Measure, Scene};
-use crate::theme::{Color, Font, ResolvedTheme};
+use crate::theme::{Color, Font, Kind, ResolvedTheme};
 use ipc::{PaletteContentMotion, PalettePanel, PalettePreview, PaletteSkinTonePicker};
 use tokens::opacity;
 use tokens::size::{candidate, glass, palette};
@@ -208,23 +208,34 @@ impl Drawing<'_> {
         });
     }
 
-    /// 絵文字を，外形が frame の上下左右に余白を空けた中(sizes.target の一辺)に収まる大きさの書体で，外形の中心を frame の中心に合わせて描く
-    fn emoji(&mut self, text: &str, sizes: EmojiSizes, frame: Frame) {
-        let target = f32::from(sizes.target) + 0.5;
-        let fits = |font: &Font| {
+    /// 絵文字を，外形が frame の上下左右に padding を空けた中に収まる大きさの書体で，外形の中心を frame の中心に合わせて描く．
+    /// 外形を測れなければ，大きさが余白の内側の一辺にいちばん近い書体で行の箱の真ん中に置く
+    fn emoji(&mut self, text: &str, sizes: EmojiSizes, frame: Frame, padding: f32) {
+        let side = frame.width.min(frame.height) - padding * 2.0;
+        let extent = |font: Font| {
             self.measure
-                .ink(text, *font)
-                .is_some_and(|ink| ink.width.max(ink.height) <= target)
+                .ink(text, font)
+                .map(|ink| ink.width.max(ink.height))
         };
-        let font = if self.measure.ink(text, sizes.fonts[0]).is_none() {
-            sizes.fonts[0]
-        } else {
-            sizes
-                .fonts
-                .iter()
-                .copied()
-                .find(fits)
-                .unwrap_or(sizes.fonts[EMOJI_FIT_STEPS - 1])
+        let size = |font: Font| match font {
+            Font::Sized(_, size) => f32::from(size),
+            _ => 0.0,
+        };
+        let largest = sizes.fonts[0];
+        let font = match extent(largest) {
+            None => sizes.nearest(side),
+            Some(width) if width <= side + 0.25 => largest,
+            Some(width) => {
+                // 外形は書体の大きさにほぼ比例するので，いちばん大きい候補の外形から見当を付け，収まるまで小さくする
+                let guess = size(largest) * side / width;
+                sizes
+                    .fonts
+                    .iter()
+                    .copied()
+                    .filter(|font| size(*font) <= guess.ceil())
+                    .find(|font| extent(*font).is_some_and(|width| width <= side + 0.25))
+                    .unwrap_or(sizes.fonts[EMOJI_FIT_STEPS - 1])
+            }
         };
         self.centered_by_ink(text, font, self.theme.text, frame, false);
     }
@@ -528,12 +539,12 @@ impl Drawing<'_> {
             );
             return;
         }
-        let font = if is_emoji(text) {
-            fonts.cell_emoji
+        if is_emoji(text) {
+            // 絵文字は外形がマスの余白の内側に収まる大きさにし，外形の中心をマスの中心に合わせる(横に広い絵文字も欠けない)
+            self.emoji(text, fonts.cell_emoji, frame, palette::CELL_PADDING);
         } else {
-            fonts.cell_symbol
-        };
-        self.painter.centered(text, font, color, frame);
+            self.painter.centered(text, fonts.cell_symbol, color, frame);
+        }
     }
 
     /// 全体の行がマス目に収まらないときだけ，右に見えている位置を示すつまみを描く
@@ -589,7 +600,12 @@ impl Drawing<'_> {
             self.fill(tile, theme.badge, palette::CELL_RADIUS);
             if is_emoji(&shown.text) {
                 // 絵文字は外形が四角の余白の内側に収まる大きさにし，外形の中心を四角の中心に合わせる
-                self.emoji(&shown.text, fonts.preview_emoji, tile);
+                self.emoji(
+                    &shown.text,
+                    fonts.preview_emoji,
+                    tile,
+                    palette::TILE_PADDING,
+                );
             } else {
                 self.centered_by_ink(&shown.text, fonts.preview_symbol, theme.text, tile, true);
             }
@@ -694,10 +710,13 @@ impl Drawing<'_> {
         );
         self.painter.hints(&hints, footer.x, footer.mid_y());
         self.painter.keycap(button);
+        // 余白は札の縁(platinum は外枠と立体の縁)の内側から測る．キーの札の中の記号と同じ余白
+        let border = keycap_border(self.theme);
         self.emoji(
             &skin_tone_sample(self.panel.skin_tone),
             self.layout.fonts.button_emoji,
-            button,
+            button.inset(border, border),
+            palette::SKIN_BUTTON_PADDING,
         );
     }
 
@@ -739,10 +758,24 @@ impl Drawing<'_> {
                     if index == picker.selected as usize {
                         drawing.selection(*frame);
                     }
-                    drawing.emoji(option, drawing.layout.fonts.picker_emoji, *frame);
+                    drawing.emoji(
+                        option,
+                        drawing.layout.fonts.picker_emoji,
+                        *frame,
+                        palette::CELL_PADDING,
+                    );
                 }
             });
         });
+    }
+}
+
+/// キーの札の縁の太さ．platinum は外枠と立体の縁，ほかは縁の線(scene::paint の keycap と同じ形)
+fn keycap_border(theme: &ResolvedTheme) -> f32 {
+    if theme.kind == Kind::Platinum {
+        candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
+    } else {
+        candidate::FRAME_WIDTH
     }
 }
 
@@ -843,9 +876,12 @@ mod tests {
         assert!(layout.wide);
         assert!(fonts.contains(&("(^o^)".into(), layout.fonts.cell_kaomoji)));
         // 絵文字の字(✧)を含む顔文字も絵文字の書体にしない
-        assert!(!fonts
-            .iter()
-            .any(|(text, font)| text.contains('✧') && *font == layout.fonts.cell_emoji));
+        assert!(
+            !fonts
+                .iter()
+                .any(|(text, font)| text.contains('✧')
+                    && layout.fonts.cell_emoji.fonts.contains(font))
+        );
         // 広いマス(幅 108 から余白を除いた 100)に収まらない 23 文字の顔文字は，下限の大きさにして末尾を省く
         let long = fonts
             .iter()
@@ -950,14 +986,22 @@ mod tests {
     fn 絵文字は絵文字の書体で記号は候補の書体で描く() {
         let (layout, emoji) = draw(&sample::emoji(), "automatic", &Fixed);
         let fonts = fonts_of(&emoji);
-        assert!(fonts.contains(&("😀".into(), layout.fonts.cell_emoji)));
-        assert!(fonts.contains(&("☺\u{FE0F}".into(), layout.fonts.cell_emoji)));
+        // 外形を測れなければ，大きさがマスから余白を除いた一辺にいちばん近い書体
+        let cell = layout
+            .fonts
+            .cell_emoji
+            .nearest(layout.cell - palette::CELL_PADDING * 2.0);
+        assert!(fonts.contains(&("😀".into(), cell)));
+        assert!(fonts.contains(&("☺\u{FE0F}".into(), cell)));
         let (layout, symbol) = draw(&sample::symbol(), "automatic", &Fixed);
         let fonts = fonts_of(&symbol);
         assert!(fonts.contains(&("⇐".into(), layout.fonts.cell_symbol)));
         assert!(fonts.contains(&("⇒".into(), layout.fonts.preview_symbol)));
         // 肌の色のボタンは絵文字の書体
-        assert!(fonts.contains(&("👋".into(), layout.fonts.button_emoji.fonts[0])));
+        let button = glass::KEYCAP_HEIGHT
+            - candidate::FRAME_WIDTH * 2.0
+            - palette::SKIN_BUTTON_PADDING * 2.0;
+        assert!(fonts.contains(&("👋".into(), layout.fonts.button_emoji.nearest(button))));
     }
 
     #[test]
@@ -1373,16 +1417,23 @@ mod tests {
             .collect();
         let preview = layout.preview.unwrap();
         let tile = Frame::new(preview.x, preview.y, palette::TILE_SIZE, palette::TILE_SIZE);
+        // 肌の色のボタンは札の縁(角丸のテーマは線 1)の内側から余白を空ける
+        let line = candidate::FRAME_WIDTH;
         let mut boxes = vec![
-            (layout.skin_tone_button, palette::SKIN_BUTTON_PADDING),
+            (
+                layout.skin_tone_button.inset(line, line),
+                palette::SKIN_BUTTON_PADDING,
+            ),
             (tile, palette::TILE_PADDING),
         ];
         boxes.extend(
             layout
                 .picker_cells(6)
                 .into_iter()
-                .map(|cell| (cell, palette::PICKER_CELL_PADDING)),
+                .map(|cell| (cell, palette::CELL_PADDING)),
         );
+        // マス目の絵文字(探した結果の 3 つ)も同じ決め方
+        boxes.extend((0..3).map(|column| (layout.cell_frame(0, column), palette::CELL_PADDING)));
         for (frame, padding) in boxes {
             let (ink, font) = inks
                 .iter()

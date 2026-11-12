@@ -209,8 +209,6 @@ public struct PalettePanel: Sendable, Equatable {
     /// 列の数と，一度に見せる行の数．顔文字のように説明の欄が低い種類は，その分の行を足してある
     public var columns: Int
     public var visibleRows: Int
-    /// 窓の高さを決める行の数(設定の行の数)．窓の大きさはこれと列の数・マスの大きさ・説明の項目で決まり，種類によって変えない
-    public var windowRows: Int
     /// 1 行のマスの数．四角いマスなら columns と同じ．顔文字の広いマスなら少なく，マスの幅はマス目の幅をこれで割ったもの
     public var cellsPerRow: Int
     public var selection: Position?
@@ -230,7 +228,7 @@ public struct PalettePanel: Sendable, Equatable {
     public var motion: Motion
 
     public init(modes: [Mode], query: String, placeholder: String, tabs: [Tab], heading: String, rows: [Row], rowCount: Int, firstRow: Int,
-                columns: Int, visibleRows: Int, windowRows: Int? = nil, cellsPerRow: Int? = nil, selection: Position?, preview: Preview?, showsPreview: Bool,
+                columns: Int, visibleRows: Int, cellsPerRow: Int? = nil, selection: Position?, preview: Preview?, showsPreview: Bool,
                 previewFields: PreviewFields = PreviewFields(), skinTone: SkinTone, skinTonePicker: SkinTonePicker?, message: String?, hints: [Hint],
                 motion: Motion = Motion()) {
         self.modes = modes
@@ -243,7 +241,6 @@ public struct PalettePanel: Sendable, Equatable {
         self.firstRow = firstRow
         self.columns = columns
         self.visibleRows = visibleRows
-        self.windowRows = windowRows ?? visibleRows
         self.cellsPerRow = max(min(cellsPerRow ?? columns, columns), 1)
         self.selection = selection
         self.preview = preview

@@ -110,9 +110,7 @@ extension WirePalettePanel {
             // 動くものが無ければ送らない
             motion: panel.motion.isEmpty ? nil : WirePaletteMotion(panel.motion),
             previewFields: WirePalettePreviewFields(unicodeName: panel.previewFields.unicodeName, readings: panel.previewFields.readings,
-                                                    shortcodes: panel.previewFields.shortcodes, codePoints: panel.previewFields.codePoints),
-            // 種類で行を足していなければ省く(候補ウィンドウは visibleRows を窓の行の数にする)
-            windowRows: panel.windowRows == panel.visibleRows ? nil : UInt32(clamping: panel.windowRows)
+                                                    shortcodes: panel.previewFields.shortcodes, codePoints: panel.previewFields.codePoints)
         )
     }
 }

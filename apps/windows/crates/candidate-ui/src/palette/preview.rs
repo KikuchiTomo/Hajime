@@ -405,51 +405,57 @@ impl Planner<'_> {
         let value_x = self.value_x();
         let value_width = content.max_x() - value_x;
         let pitch = rows.table.pitch;
+        // 行は出す項目ごとに決まった高さ(Unicode の名前は unicode_lines 行，ほかは 1 行)を取り，値が短くても空でも詰めない．
+        // 同じ種類の中では最後の行の位置が変わらず，欄の下の端までの間隔がそろう(札が何行にもなるときだけ伸びる)
         // Unicode の名前(並びは英語の名前)．値の x にそろえて折り返す
-        if options.unicode_name && self.fields.unicode_name && !self.shown.english_name.is_empty() {
+        if options.unicode_name && self.fields.unicode_name {
             y += gap;
-            let label = if self.shown.english_name_source.as_deref()
-                == Some(strings::PALETTE_UNICODE_SOURCE)
-            {
-                strings::PALETTE_UNICODE_NAME
-            } else {
-                strings::PALETTE_ENGLISH_NAME
-            };
-            let lines = fitting::wrapped(
-                &self.shown.english_name,
-                value_width,
-                options.unicode_lines,
-                &self.metrics.measuring(Role::Value),
-            );
-            for (index, line) in lines.iter().enumerate() {
-                let baseline = y + rows.table.ascent + pitch * index as f32;
-                if index == 0 {
-                    parts.push(self.text(label.to_string(), Role::Label, left, baseline));
+            if !self.shown.english_name.is_empty() {
+                let label = if self.shown.english_name_source.as_deref()
+                    == Some(strings::PALETTE_UNICODE_SOURCE)
+                {
+                    strings::PALETTE_UNICODE_NAME
+                } else {
+                    strings::PALETTE_ENGLISH_NAME
+                };
+                let lines = fitting::wrapped(
+                    &self.shown.english_name,
+                    value_width,
+                    options.unicode_lines,
+                    &self.metrics.measuring(Role::Value),
+                );
+                for (index, line) in lines.iter().enumerate() {
+                    let baseline = y + rows.table.ascent + pitch * index as f32;
+                    if index == 0 {
+                        parts.push(self.text(label.to_string(), Role::Label, left, baseline));
+                    }
+                    parts.push(self.text(line.clone(), Role::Value, value_x, baseline));
                 }
-                parts.push(self.text(line.clone(), Role::Value, value_x, baseline));
             }
-            y += rows.table.height(lines.len());
+            y += rows.table.height(options.unicode_lines);
         }
         // 読み．入る数だけ「、」でつなぎ，残りの数を添える
-        if options.readings && self.fields.readings && !self.shown.readings.is_empty() {
+        if options.readings && self.fields.readings {
             y += gap;
-            let baseline = y + rows.table.ascent;
-            parts.push(self.text(
-                strings::PALETTE_READINGS.to_string(),
-                Role::Label,
-                left,
-                baseline,
-            ));
-            let (text, rest) = self.fitting_readings(value_width);
-            let width = self.metrics.width(&text, Role::Value);
-            parts.push(self.text(text, Role::Value, value_x, baseline));
-            if rest > 0 {
+            if !self.shown.readings.is_empty() {
+                let baseline = y + rows.table.ascent;
                 parts.push(self.text(
-                    strings::more(rest),
-                    Role::More,
-                    value_x + width + palette::ITEM_GAP,
+                    strings::PALETTE_READINGS.to_string(),
+                    Role::Label,
+                    left,
                     baseline,
                 ));
+                let (text, rest) = self.fitting_readings(value_width);
+                let width = self.metrics.width(&text, Role::Value);
+                parts.push(self.text(text, Role::Value, value_x, baseline));
+                if rest > 0 {
+                    parts.push(self.text(
+                        strings::more(rest),
+                        Role::More,
+                        value_x + width + palette::ITEM_GAP,
+                        baseline,
+                    ));
+                }
             }
             y += rows.table.height(1);
         }
@@ -472,10 +478,14 @@ impl Planner<'_> {
                 self.fields.code_points,
             ),
         ] {
-            if !shown || values.is_empty() {
+            if !shown {
                 continue;
             }
             y += gap;
+            if values.is_empty() {
+                y += rows.table.height(1);
+                continue;
+            }
             parts.push(self.text(label.to_string(), Role::Label, left, y + rows.table.ascent));
             let (chips, lines) = self.flow_chips(values, y, value_x, value_width);
             parts.extend(chips);
@@ -913,6 +923,50 @@ mod tests {
         assert_eq!(symbol, emoji - 20.0);
         // 顔文字は見出しと読みだけなので，見本の高さ
         assert_eq!(kaomoji, palette::TILE_SIZE);
+    }
+
+    #[test]
+    fn 行は項目ごとに決まった高さを取り_最後の行は欄の下の端に付く() {
+        // 記号の Unicode の名前が 1 行でも 2 行分を取り，読みはその下から始める
+        let symbol = sample::symbol();
+        let placed = setup(
+            symbol.preview.as_ref().unwrap(),
+            &fields(None),
+            PaletteKind::Symbol,
+            palette::TILE_SIZE,
+        );
+        assert_aligned(&placed);
+        let labels = texts(&placed.placed, Role::Label);
+        let baseline = |name: &str| {
+            labels
+                .iter()
+                .find(|(text, _, _)| text == name)
+                .map(|(_, _, baseline)| *baseline)
+                .unwrap()
+        };
+        assert_eq!(
+            texts(&placed.placed, Role::Value)[0].0,
+            "RIGHTWARDS DOUBLE ARROW"
+        );
+        assert_eq!(
+            baseline("読み") - baseline("Unicode"),
+            palette::TEXT_ROW_HEIGHT * 2.0 + palette::ITEM_GAP
+        );
+        // 最後の行(コードポイント)の下の端は欄の下の端．絵文字と同じ間隔
+        assert_eq!(placed.placed.rows_bottom, placed.area.content.max_y());
+        let emoji = sample::emoji();
+        let smile = setup(
+            emoji.preview.as_ref().unwrap(),
+            &fields(None),
+            PaletteKind::Emoji,
+            palette::TILE_SIZE,
+        );
+        assert_eq!(smile.placed.rows_bottom, smile.area.content.max_y());
+        let last = |setup: &Setup| {
+            let labels = texts(&setup.placed, Role::Label);
+            setup.area.content.max_y() - labels.last().unwrap().2
+        };
+        assert_eq!(last(&placed), last(&smile));
     }
 
     #[test]

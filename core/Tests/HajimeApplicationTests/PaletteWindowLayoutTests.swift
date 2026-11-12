@@ -19,8 +19,8 @@ struct PaletteWindowLayoutTests {
             fields.map { PalettePreviewLayout.height(fields: $0, kind: kind, tileHeight: 48, metrics: Self.previewMetrics) }
         }
         let extra = Layout.extraRows(previewHeight: height(kind), windowPreviewHeight: height(.emoji), cellSize: cellSize)
-        return Layout(columns: 9, visibleRows: rows + extra, windowRows: rows, cellSize: cellSize, tabCount: 10, modeWidths: [52, 40, 52],
-                      previewHeight: height(kind), windowPreviewHeight: height(.emoji), metrics: metrics)
+        return Layout(columns: 9, visibleRows: rows + extra, cellSize: cellSize, tabCount: 10, modeWidths: [52, 40, 52], previewHeight: height(kind),
+                      metrics: metrics)
     }
 
     @Test("R-26: 窓の内側の余白は上下左右とも同じで，中身の右の端は 1 か所にそろう")
@@ -41,17 +41,16 @@ struct PaletteWindowLayoutTests {
         }
     }
 
-    @Test("R-26: 区切りの線の上と下の間隔は同じ．種類で説明の欄が低くなっても同じ")
+    @Test("R-26: 区切りの線の上と下の間隔は，どの種類でも区画のあいだの 12")
     func separators() {
         for kind in PaletteItem.Kind.allCases {
             let layout = layout(kind: kind)
             let preview = try! #require(layout.preview)
             #expect(layout.separators.count == 2)
-            let above = layout.separators[0] - layout.grid.maxY
-            let below = preview.y - (layout.separators[0] + 1)
-            #expect(above == below || abs(above - below) <= 1, "\(kind)")
-            #expect(layout.separators[1] - preview.maxY == 12)
-            #expect(layout.footer.y - (layout.separators[1] + 1) == 12)
+            #expect(layout.separators[0] - layout.grid.maxY == 12, "\(kind)")
+            #expect(preview.y - (layout.separators[0] + 1) == 12, "\(kind)")
+            #expect(layout.separators[1] - preview.maxY == 12, "\(kind)")
+            #expect(layout.footer.y - (layout.separators[1] + 1) == 12, "\(kind)")
         }
         // 説明を出さなければ，マス目と足元のあいだの区切り 1 本だけ
         let hidden = layout(kind: .emoji, fields: nil)
@@ -60,19 +59,20 @@ struct PaletteWindowLayoutTests {
         #expect(hidden.footer.y - (hidden.separators[0] + 1) == 12)
     }
 
-    @Test("R-26: 窓の大きさは種類で変えず，説明の欄が低い種類はマス目の行を増やす")
+    @Test("R-26: 説明の欄が低い種類は，回せる分をマス目の行に回し，回しきれない端の分だけ窓を低くする．幅は変えない")
     func rowsByKind() {
         let emoji = layout(kind: .emoji)
         let symbol = layout(kind: .symbol)
         let kaomoji = layout(kind: .kaomoji)
         for other in [symbol, kaomoji] {
             #expect(other.width == emoji.width)
-            #expect(other.height == emoji.height)
         }
-        #expect(kaomoji.grid.height > emoji.grid.height)
-        // 回しきれない端の高さは，区切りの上と下に分けても行の一辺より小さい
-        let spare = (kaomoji.preview.map { kaomoji.separators[0] - kaomoji.grid.maxY + $0.y - kaomoji.separators[0] - 1 } ?? 0) - 24
-        #expect(spare >= 0 && spare < 36)
+        // 顔文字は説明の欄が 68 低い．1 行(36)をマス目に回し，残りの 32 だけ窓を低くする
+        #expect(kaomoji.grid.height == emoji.grid.height + 36)
+        #expect(emoji.height - kaomoji.height == 32)
+        // 記号は 20 低いので行は回さず，20 だけ窓を低くする
+        #expect(symbol.grid.height == emoji.grid.height)
+        #expect(emoji.height - symbol.height == 20)
     }
 
     @Test("R-26: 足元のキーの札と肌の色のボタンは同じ高さと縦の中心で，上下の余白が等しい")

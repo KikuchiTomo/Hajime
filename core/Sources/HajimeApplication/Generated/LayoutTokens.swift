@@ -97,6 +97,7 @@ public enum LayoutTokens {
         public static let selectionRadius: Double = 7
         public static let keycapRadius: Double = 4
         public static let keycapPaddingX: Double = 5
+        public static let keycapPaddingY: Double = 3
         public static let keycapHeight: Double = 17
         public static let hintGap: Double = 10
         public static let footerHeight: Double = 28
@@ -212,9 +213,9 @@ public enum LayoutTokens {
         public static let detailFontSize: Double = 11
         public static let codeFontSize: Double = 10
         public static let previewChipSmallFontSize: Double = 8
-        public static let skinButtonPadding: Double = 2
+        public static let skinButtonPadding: Double = 3
         public static let pickerCellSize: Double = 36
-        public static let pickerCellPadding: Double = 4
+        public static let cellPadding: Double = 4
         public static let probeFontSize: Double = 20
         public static let openRise: Double = 6
         public static let contentShift: Double = 18

@@ -226,7 +226,7 @@ enum SamplePalettes {
         return PalettePanel(
             modes: modes(.kaomoji), query: "", placeholder: PaletteStrings.kaomojiPlaceholder, tabs: tabs, heading: PaletteStrings.frequent,
             rows: rows(Array(texts.prefix(visibleRows)), titles: titles, starts: [0, 1]), rowCount: 48, firstRow: 0, columns: 9,
-            visibleRows: visibleRows, windowRows: 6, cellsPerRow: 3,
+            visibleRows: visibleRows, cellsPerRow: 3,
             selection: .init(row: 0, column: 2),
             preview: preview(shobon),
             showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)

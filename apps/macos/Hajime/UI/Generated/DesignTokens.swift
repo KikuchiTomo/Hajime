@@ -216,6 +216,7 @@ enum DesignTokens {
             static let selectionRadius: CGFloat = 7
             static let keycapRadius: CGFloat = 4
             static let keycapPaddingX: CGFloat = 5
+            static let keycapPaddingY: CGFloat = 3
             static let keycapHeight: CGFloat = 17
             static let hintGap: CGFloat = 10
             static let footerHeight: CGFloat = 28
@@ -331,9 +332,9 @@ enum DesignTokens {
             static let detailFontSize: CGFloat = 11
             static let codeFontSize: CGFloat = 10
             static let previewChipSmallFontSize: CGFloat = 8
-            static let skinButtonPadding: CGFloat = 2
+            static let skinButtonPadding: CGFloat = 3
             static let pickerCellSize: CGFloat = 36
-            static let pickerCellPadding: CGFloat = 4
+            static let cellPadding: CGFloat = 4
             static let probeFontSize: CGFloat = 20
             static let openRise: CGFloat = 6
             static let contentShift: CGFloat = 18

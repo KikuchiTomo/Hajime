@@ -331,6 +331,7 @@ pub mod size {
         pub const SELECTION_RADIUS: f32 = 7.0;
         pub const KEYCAP_RADIUS: f32 = 4.0;
         pub const KEYCAP_PADDING_X: f32 = 5.0;
+        pub const KEYCAP_PADDING_Y: f32 = 3.0;
         pub const KEYCAP_HEIGHT: f32 = 17.0;
         pub const HINT_GAP: f32 = 10.0;
         pub const FOOTER_HEIGHT: f32 = 28.0;
@@ -446,9 +447,9 @@ pub mod size {
         pub const DETAIL_FONT_SIZE: f32 = 11.0;
         pub const CODE_FONT_SIZE: f32 = 10.0;
         pub const PREVIEW_CHIP_SMALL_FONT_SIZE: f32 = 8.0;
-        pub const SKIN_BUTTON_PADDING: f32 = 2.0;
+        pub const SKIN_BUTTON_PADDING: f32 = 3.0;
         pub const PICKER_CELL_SIZE: f32 = 36.0;
-        pub const PICKER_CELL_PADDING: f32 = 4.0;
+        pub const CELL_PADDING: f32 = 4.0;
         pub const PROBE_FONT_SIZE: f32 = 20.0;
         pub const OPEN_RISE: f32 = 6.0;
         pub const CONTENT_SHIFT: f32 = 18.0;

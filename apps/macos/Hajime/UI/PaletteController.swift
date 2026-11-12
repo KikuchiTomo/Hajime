@@ -37,7 +37,7 @@ final class PaletteController {
         _ = FloatingPanel.attach(view, to: window, backdrop: resolved.isRounded ? backdrop : nil)
         let size = view.fittingSize(for: panel)
         if wasVisible {
-            // 出ているあいだは上の辺と左の辺を保つ(大きさは設定を変えたときだけ変わる)
+            // 出ているあいだは上の辺と左の辺を保つ(大きさは設定を変えたときと種類を替えたときに変わり，下の辺が動く)
             let current = window.frame
             if current.size != size {
                 window.setFrame(NSRect(x: current.minX, y: current.maxY - size.height, width: size.width, height: size.height), display: true)
