@@ -258,13 +258,11 @@ pub(super) fn receive(window: Window) {
                 });
             }
             Message::Checked(Ok(Check::UpToDate)) => {
-                with_app(|app| set_stage(app, Stage::Idle));
-                ffi::message(
-                    window,
-                    text::TITLE,
-                    &text::up_to_date(env!("CARGO_PKG_VERSION")),
-                    false,
-                );
+                // 最新だった結果は情報のページの下の知らせの帯に出す(尋ねることは無いので MessageBox にしない)
+                with_app(|app| {
+                    set_stage(app, Stage::Idle);
+                    app.show_notice(text::up_to_date(env!("CARGO_PKG_VERSION")), false);
+                });
             }
             Message::Checked(Ok(Check::Available(offer))) => {
                 let question = text::available(

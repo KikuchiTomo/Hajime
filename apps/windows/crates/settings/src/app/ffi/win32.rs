@@ -44,11 +44,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     LoadCursorW, LoadIconW, MessageBoxW, PostMessageW, PostQuitMessage, RegisterClassExW,
     SendMessageW, SetTimer, SetWindowPos, SetWindowTextW, SetWindowsHookExW, ShowWindow,
     SystemParametersInfoW, TranslateMessage, UnhookWindowsHookEx, CS_DBLCLKS, CS_DROPSHADOW,
-    CS_HREDRAW, CS_VREDRAW, HCBT_ACTIVATE, HHOOK, HMENU, IDC_ARROW, IDOK, IDYES,
-    MB_ICONINFORMATION, MB_ICONQUESTION, MB_ICONWARNING, MB_OK, MB_OKCANCEL, MB_YESNO, MINMAXINFO,
-    MSG, SPI_GETCLIENTAREAANIMATION, SPI_GETHIGHCONTRAST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE,
-    SWP_NOZORDER, SW_HIDE, SW_SHOW, SW_SHOWNA, SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
-    WH_CBT, WINDOW_EX_STYLE, WINDOW_STYLE, WM_SETFONT, WNDCLASSEXW, WNDPROC,
+    CS_HREDRAW, CS_VREDRAW, HCBT_ACTIVATE, HHOOK, HMENU, IDC_ARROW, IDOK, IDYES, MB_ICONQUESTION,
+    MB_OKCANCEL, MB_YESNO, MINMAXINFO, MSG, SPI_GETCLIENTAREAANIMATION, SPI_GETHIGHCONTRAST,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SW_HIDE, SW_SHOW, SW_SHOWNA,
+    SW_SHOWNORMAL, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS, WH_CBT, WINDOW_EX_STYLE, WINDOW_STYLE,
+    WM_SETFONT, WNDCLASSEXW, WNDPROC,
 };
 use windows_core::{w, BOOL, HSTRING, PCWSTR};
 
@@ -897,23 +897,6 @@ pub fn confirm(owner: HWND, title: &str, text: &str) -> bool {
         )
     });
     result == IDOK
-}
-
-pub fn message(owner: HWND, title: &str, text: &str, warning: bool) {
-    let icon = if warning {
-        MB_ICONWARNING
-    } else {
-        MB_ICONINFORMATION
-    };
-    // SAFETY: owner はこのスレッドの窓．文字列は呼び出しの間生きている
-    centered(owner, || unsafe {
-        MessageBoxW(
-            Some(owner),
-            &HSTRING::from(text),
-            &HSTRING::from(title),
-            MB_OK | icon,
-        )
-    });
 }
 
 /// 最小の大きさを WM_GETMINMAXINFO に書く

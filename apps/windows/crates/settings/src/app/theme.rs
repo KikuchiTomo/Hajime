@@ -73,6 +73,8 @@ pub struct Glyphs {
     pub edit: &'static str,
     pub copy: &'static str,
     pub delete: &'static str,
+    /// 知らせの帯を閉じるボタン(WinUI の InfoBar の Cancel)
+    pub close: &'static str,
 }
 
 pub const GLYPHS: Glyphs = Glyphs {
@@ -91,6 +93,7 @@ pub const GLYPHS: Glyphs = Glyphs {
     edit: "\u{E70F}",
     copy: "\u{E8C8}",
     delete: "\u{E74D}",
+    close: "\u{E711}",
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]

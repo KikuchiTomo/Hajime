@@ -90,10 +90,13 @@ pub enum After {
 
 pub fn run_after(window: Window, after: Option<After>) {
     match after {
+        // 結果の知らせは窓の外の MessageBox でなく，ページの下の知らせの帯に出す(WinUI の InfoBar)
         Some(After::Message { text, warning }) => {
-            ffi::message(window, settings::WINDOW_TITLE, &text, warning)
+            with_app(|app| app.show_notice(text.into_owned(), warning));
         }
-        Some(After::Notice(text)) => ffi::message(window, settings::WINDOW_TITLE, &text, false),
+        Some(After::Notice(text)) => {
+            with_app(|app| app.show_notice(text, false));
+        }
         Some(After::OpenSetup) => {
             // 見本の値で開いた画面からは，ウィザードも見本の値で開く(利用者の設定に触れない)
             if with_app(|app| app.offline).unwrap_or(false) {

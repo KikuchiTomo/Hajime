@@ -17,6 +17,8 @@ pub mod settings {
     }
     pub const OK: &str = "OK";
     pub const CANCEL: &str = "キャンセル";
+    /// 知らせの帯を閉じるボタンの読み上げ
+    pub const CLOSE: &str = "閉じる";
     pub const SAVE: &str = "保存";
     pub const INPUT_TAB: &str = "入力";
     pub const CONVERSION_TAB: &str = "変換";

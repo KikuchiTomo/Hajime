@@ -20,16 +20,18 @@ use windows::Win32::UI::Accessibility::{
     ISelectionItemProvider, ISelectionItemProvider_Impl, IToggleProvider, IToggleProvider_Impl,
     IValueProvider, IValueProvider_Impl, NavigateDirection, NavigateDirection_FirstChild,
     NavigateDirection_LastChild, NavigateDirection_NextSibling, NavigateDirection_Parent,
-    NavigateDirection_PreviousSibling, ProviderOptions, ProviderOptions_ServerSideProvider,
-    ProviderOptions_UseComThreading, ToggleState, ToggleState_Off, ToggleState_On,
-    UIA_AutomationFocusChangedEventId, UIA_AutomationIdPropertyId, UIA_ButtonControlTypeId,
-    UIA_CheckBoxControlTypeId, UIA_ComboBoxControlTypeId, UIA_ControlTypePropertyId,
-    UIA_DocumentControlTypeId, UIA_EditControlTypeId, UIA_ExpandCollapsePatternId,
-    UIA_HasKeyboardFocusPropertyId, UIA_InvokePatternId, UIA_IsEnabledPropertyId,
-    UIA_IsKeyboardFocusablePropertyId, UIA_ListControlTypeId, UIA_ListItemControlTypeId,
-    UIA_NamePropertyId, UIA_RadioButtonControlTypeId, UIA_SelectionItemPatternId,
-    UIA_SliderControlTypeId, UIA_TogglePatternId, UIA_ValuePatternId, UiaAppendRuntimeId,
-    UiaClientsAreListening, UiaHostProviderFromHwnd, UiaRaiseAutomationEvent, UiaRect,
+    NavigateDirection_PreviousSibling, NotificationKind_ActionCompleted,
+    NotificationProcessing_ImportantMostRecent, ProviderOptions,
+    ProviderOptions_ServerSideProvider, ProviderOptions_UseComThreading, ToggleState,
+    ToggleState_Off, ToggleState_On, UIA_AutomationFocusChangedEventId, UIA_AutomationIdPropertyId,
+    UIA_ButtonControlTypeId, UIA_CheckBoxControlTypeId, UIA_ComboBoxControlTypeId,
+    UIA_ControlTypePropertyId, UIA_DocumentControlTypeId, UIA_EditControlTypeId,
+    UIA_ExpandCollapsePatternId, UIA_HasKeyboardFocusPropertyId, UIA_InvokePatternId,
+    UIA_IsEnabledPropertyId, UIA_IsKeyboardFocusablePropertyId, UIA_ListControlTypeId,
+    UIA_ListItemControlTypeId, UIA_NamePropertyId, UIA_RadioButtonControlTypeId,
+    UIA_SelectionItemPatternId, UIA_SliderControlTypeId, UIA_TextControlTypeId,
+    UIA_TogglePatternId, UIA_ValuePatternId, UiaAppendRuntimeId, UiaClientsAreListening,
+    UiaHostProviderFromHwnd, UiaRaiseAutomationEvent, UiaRaiseNotificationEvent, UiaRect,
     UiaReturnRawElementProvider, UiaRootObjectId, UIA_E_ELEMENTNOTAVAILABLE, UIA_PATTERN_ID,
     UIA_PROPERTY_ID,
 };
@@ -52,6 +54,8 @@ pub enum Role {
     Slider,
     /// 選ぶ印(選んでいるかは Node::selected)
     RadioButton,
+    /// 文(知らせの帯の文など．操作はしない)
+    Text,
 }
 
 /// 要素(窓が今の状態から作る)
@@ -151,6 +155,26 @@ pub fn focus_changed(window: HWND, id: i32) {
         ComObject::new(NodeProvider { window, id }).to_interface();
     // SAFETY: provider は生きている COM の参照
     let _ = unsafe { UiaRaiseAutomationEvent(&provider, UIA_AutomationFocusChangedEventId) };
+}
+
+/// 読み上げに文を知らせる(結果の知らせの帯．フォーカスは動かさない)．id は文を持つ要素
+pub fn announce(window: HWND, id: i32, text: &str) {
+    // SAFETY: 引数なしで状態を読むだけ
+    if !unsafe { UiaClientsAreListening() }.as_bool() {
+        return;
+    }
+    let provider: IRawElementProviderSimple =
+        ComObject::new(NodeProvider { window, id }).to_interface();
+    // SAFETY: provider は生きている COM の参照．文字列は呼び出しの間生きている
+    let _ = unsafe {
+        UiaRaiseNotificationEvent(
+            &provider,
+            NotificationKind_ActionCompleted,
+            NotificationProcessing_ImportantMostRecent,
+            &BSTR::from(text),
+            &BSTR::from("Hajime.Notice"),
+        )
+    };
 }
 
 fn not_available() -> Error {
@@ -339,7 +363,7 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
             }
             Role::Slider => patternid == UIA_ValuePatternId,
             // 打つ欄の値の読み書きは標準の EDIT(host)が答える
-            Role::List | Role::Document | Role::Edit => false,
+            Role::List | Role::Document | Role::Edit | Role::Text => false,
         };
         if supported {
             Ok(self.to_interface())
@@ -360,6 +384,7 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
             Role::Edit => UIA_EditControlTypeId,
             Role::Slider => UIA_SliderControlTypeId,
             Role::RadioButton => UIA_RadioButtonControlTypeId,
+            Role::Text => UIA_TextControlTypeId,
         };
         Ok(match propertyid {
             UIA_NamePropertyId => variant_text(&node.name),

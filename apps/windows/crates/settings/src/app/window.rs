@@ -9,6 +9,7 @@ use super::ffi::d2d::{self, Graphics, PreviewPixels, Surface};
 use super::ffi::uia;
 use super::ffi::{self, edit, Window};
 use super::import_sheet::{self, ImportLayout, ImportPart, ImportSheet, PendingImport};
+use super::notice::{self, Notice, NoticeLayout};
 use super::page::{
     self, Availability, Described, EditorAction, Element, Event, Extras, Frame, PageView, Part,
 };
@@ -89,17 +90,20 @@ enum Shot {
     ImportPreview,
     /// キー設定の表から確定の行を消した(キーの無い知らせと「既定のキーを追加」)
     MissingKeys,
+    /// 取り込んだ結果をページの下の知らせの帯に出した
+    Notice,
 }
 
 impl Shot {
     /// ふつうの 1 枚のほかに写すページと状態
-    const TEMPLATES: [(Page, Shot); 6] = [
+    const TEMPLATES: [(Page, Shot); 7] = [
         (Page::Dictionary, Shot::Open),
         (Page::Dictionary, Shot::Typing),
         (Page::Dictionary, Shot::DynamicOff),
         (Page::Commands, Shot::Open),
         (Page::Dictionary, Shot::ImportPreview),
         (Page::Keys, Shot::MissingKeys),
+        (Page::Dictionary, Shot::Notice),
     ];
 
     fn suffix(self) -> &'static str {
@@ -110,6 +114,7 @@ impl Shot {
             Shot::DynamicOff => "-templates-off",
             Shot::ImportPreview => "-import-preview",
             Shot::MissingKeys => "-missing-keys",
+            Shot::Notice => "-notice",
         }
     }
 }
@@ -199,6 +204,8 @@ pub enum Focus {
     Page(Element),
     /// カスタムテーマの編集の画面の下のボタン
     ThemeSheet(EditorAction),
+    /// 知らせの帯を閉じるボタン
+    NoticeClose,
 }
 
 /// ポインターを載せている・押しているところ
@@ -212,6 +219,8 @@ enum Target {
     InnerScrollbar(Element),
     /// カスタムテーマの編集の画面の下のボタン
     ThemeSheet(EditorAction),
+    /// 知らせの帯を閉じるボタン
+    NoticeClose,
 }
 
 /// ページを送る場所(窓の中のタイトルバーの下の上端・下端，DIP)と，ページの中の座標を窓の中の座標にずらす量
@@ -323,6 +332,9 @@ pub struct App {
     pub(super) import_preview: super::actions::PreviewInbox,
     /// 取り込む前に中身を見せているシート
     pub(super) import_sheet: Option<ImportSheet>,
+    /// ページの下に出している結果の知らせ(WinUI の InfoBar)と，閉じるボタンにポインターを載せているか
+    notice: Option<Notice>,
+    notice_hover: bool,
     /// 見本のエンジンで開いた(--offline)
     pub(super) offline: bool,
     /// 書き方のチップを開いている一覧(ページごとに覚える．見本のエンジンで開いたときは覚えない)
@@ -442,6 +454,8 @@ pub fn open(
         dictionary_import: super::actions::ImportInbox::default(),
         import_preview: super::actions::PreviewInbox::default(),
         import_sheet: None,
+        notice: None,
+        notice_hover: false,
         offline: options.offline,
         templates_open: if options.offline {
             std::collections::HashSet::new()
@@ -730,6 +744,13 @@ impl App {
     pub(super) fn open_page(&mut self, page: Page) {
         // シートは前のページのコマンドを書いているので，ページを替える前に閉じる
         self.close_sheet();
+        // 知らせはそのページの結果なので，ほかのページに移ったら消す(同じページを作り直すときは残す)
+        if page != self.view.page {
+            self.notice = None;
+            if self.focus == Focus::NoticeClose {
+                self.focus = Focus::Nav;
+            }
+        }
         let start = Instant::now();
         // 編集の画面を開いたままページを作り直すとき(つなぎ直しなど)は，編集の画面を閉じる
         if self.editor.take().is_some() {
@@ -839,10 +860,12 @@ impl App {
     /// ページの題の場所(layout の title)を見本の帯の下に隠す
     fn page_frame(&self) -> PageFrame {
         let (_, height) = self.size();
+        // 知らせの帯を出しているあいだは，ページをその上までで送る(帯が部品を隠さない)
+        let notice = self.notice_layout().map_or(0.0, |layout| layout.reserved());
         match self.theme_sheet() {
             Some(sheet) => PageFrame {
                 top: sheet.band.max_y(),
-                bottom: sheet.footer.y,
+                bottom: sheet.footer.y - notice,
                 shift: sheet.band.max_y() + size::PAGE_PADDING_TOP - page_header(),
             },
             None => PageFrame {
@@ -851,10 +874,55 @@ impl App {
                 } else {
                     0.0
                 },
-                bottom: height,
+                bottom: height - notice,
                 shift: 0.0,
             },
         }
+    }
+
+    /// 結果の知らせの帯の置き場所(ページの列の下の端．編集の画面ではボタンの帯の上)
+    fn notice_layout(&self) -> Option<NoticeLayout> {
+        let notice = self.notice.as_ref()?;
+        let (width, height) = self.size();
+        let nav_width = nav_width(width);
+        let (left, content) = crate::layout::content_frame(width - nav_width);
+        let bottom = self.theme_sheet().map_or(height, |sheet| sheet.footer.y);
+        Some(NoticeLayout::new(
+            nav_width + left,
+            content,
+            bottom,
+            notice,
+            &self.graphics,
+        ))
+    }
+
+    /// 結果をページの下の知らせの帯に出す(前の知らせは置き換える)．フォーカスは動かさず，読み上げに知らせる
+    pub(super) fn show_notice(&mut self, text: String, warning: bool) {
+        self.notice = Some(Notice {
+            text: text.clone(),
+            warning,
+        });
+        self.notice_hover = false;
+        self.arrange();
+        uia::announce(self.window, NODE_NOTICE, &text);
+    }
+
+    /// 知らせの帯を閉じる．閉じるボタンにフォーカスがあれば，ページの最後の部品(無ければ左の一覧)に移す
+    fn close_notice(&mut self) {
+        if self.notice.take().is_none() {
+            return;
+        }
+        self.notice_hover = false;
+        if self.focus == Focus::NoticeClose {
+            let next = self
+                .view
+                .focusable()
+                .last()
+                .copied()
+                .map_or(Focus::Nav, Focus::Page);
+            self.set_focus(next);
+        }
+        self.arrange();
     }
 
     /// 窓の中の y(DIP)をページの中の y にする
@@ -1109,6 +1177,14 @@ impl App {
         });
         let sheet = self.sheet.as_ref();
         let sheet_layout = self.sheet_layout();
+        let notice = self.notice.as_ref();
+        let notice_layout = self.notice_layout();
+        let notice_state = paint::State {
+            enabled: true,
+            hover: if self.notice_hover { 1.0 } else { 0.0 },
+            pressed: self.pressed == Some(Target::NoticeClose),
+            focus_visible: self.focus_visible && self.focus == Focus::NoticeClose,
+        };
         let import = self.import_sheet.as_ref();
         let import_layout = self.import_sheet_layout();
         let sheet_frame = sheet::SheetFrame {
@@ -1139,6 +1215,9 @@ impl App {
                 canvas.translate(0.0, title_bar);
                 canvas.push_clip(Rect::new(0.0, 0.0, width, height));
                 paint_window(canvas, &state, nav, nav_scroll, view, scroll);
+                if let (Some(notice), Some(layout)) = (notice, &notice_layout) {
+                    notice::paint(canvas, &theme, notice, layout, notice_state);
+                }
                 if let (Some(sheet), Some(layout)) = (sheet, &sheet_layout) {
                     sheet::paint(canvas, sheet, layout, &sheet_frame);
                 }
@@ -1454,6 +1533,15 @@ impl App {
         let (width, height) = self.size();
         let nav_width = nav_width(width);
         let now = self.now();
+        // 知らせの帯は閉じるボタンだけを押せる(帯の下のページは押せない)
+        if let Some(layout) = self.notice_layout() {
+            if layout.close.contains(x, y) {
+                return Some(Target::NoticeClose);
+            }
+            if layout.bar.contains(x, y) {
+                return None;
+            }
+        }
         // 編集の画面を開いているあいだは左の一覧を使えない．下のボタンだけを押せる
         if let Some(sheet) = self.theme_sheet() {
             if x < nav_width {
@@ -1519,6 +1607,13 @@ impl App {
         if self.sheet.is_some() {
             self.sheet_mouse_move(x, y);
             return;
+        }
+        let over_close = self
+            .notice_layout()
+            .is_some_and(|layout| layout.close.contains(x, y));
+        if over_close != self.notice_hover {
+            self.notice_hover = over_close;
+            ffi::invalidate(self.window);
         }
         let now = self.now();
         let (width, height) = self.size();
@@ -1736,6 +1831,7 @@ impl App {
             }
             Some(Target::Nav(_)) => self.set_focus(Focus::Nav),
             Some(Target::ThemeSheet(action)) => self.focus = Focus::ThemeSheet(action),
+            Some(Target::NoticeClose) => self.focus = Focus::NoticeClose,
             Some(Target::Page(element)) if matches!(element.part, Part::TableChoice(_)) => {
                 // 表の行の中の選ぶ欄は，その行を選んでから(離したときに)一覧を開く
                 self.set_focus(Focus::Page(Element {
@@ -1840,6 +1936,7 @@ impl App {
             {
                 self.dispatch(Some(Event::ThemeEditor(action)));
             }
+            (Some(Target::NoticeClose), Some(Target::NoticeClose)) => self.close_notice(),
             _ => {}
         }
         ffi::invalidate(self.window);
@@ -1920,7 +2017,7 @@ impl App {
         let window = match focus {
             Focus::Search => Some(self.search),
             Focus::Page(element) => self.view.edit(element),
-            Focus::Nav | Focus::ThemeSheet(_) => None,
+            Focus::Nav | Focus::ThemeSheet(_) | Focus::NoticeClose => None,
         };
         match window {
             Some(window) => ffi::focus(window),
@@ -1952,6 +2049,10 @@ impl App {
         };
         if self.availability() == Availability::Ready {
             stops.extend(self.view.focusable().into_iter().map(Focus::Page));
+        }
+        // 知らせの帯の閉じるボタン(ページの下に出すので，ページの部品の次)
+        if self.notice.is_some() {
+            stops.push(Focus::NoticeClose);
         }
         if let Some(sheet) = self.theme_sheet() {
             stops.extend(
@@ -1992,6 +2093,11 @@ impl App {
             self.dispatch(Some(Event::ThemeEditor(EditorAction::Cancel)));
             return true;
         }
+        // 知らせの帯は Esc でも閉じる
+        if key == VK_ESCAPE.0 && self.notice.is_some() {
+            self.close_notice();
+            return true;
+        }
         self.focus_visible = true;
         // 編集の画面を開いているあいだは左の一覧でページを移らない
         if self.editor.is_some() && matches!(self.focus, Focus::Nav | Focus::Search) {
@@ -2001,6 +2107,13 @@ impl App {
             Focus::ThemeSheet(action) => {
                 if key == VK_SPACE.0 || key == VK_RETURN.0 {
                     self.dispatch(Some(Event::ThemeEditor(action)));
+                    return true;
+                }
+                self.page_key(key, control)
+            }
+            Focus::NoticeClose => {
+                if key == VK_SPACE.0 || key == VK_RETURN.0 {
+                    self.close_notice();
                     return true;
                 }
                 self.page_key(key, control)
@@ -2236,6 +2349,7 @@ impl App {
                 Some(NODE_PAGE + PageView::element_id(element))
             }
             Focus::ThemeSheet(action) => Some(NODE_THEME_SHEET + theme_sheet_index(action)),
+            Focus::NoticeClose => Some(NODE_NOTICE + 1),
             _ => None,
         }
     }
@@ -2280,6 +2394,7 @@ impl App {
                 })
                 .collect();
             nodes.extend(self.page_nodes(now));
+            nodes.extend(self.notice_nodes());
             return nodes;
         }
         let mut nodes = vec![uia::Node {
@@ -2314,7 +2429,44 @@ impl App {
             });
         }
         nodes.extend(self.page_nodes(now));
+        nodes.extend(self.notice_nodes());
         nodes
+    }
+
+    /// 知らせの帯の文と閉じるボタン
+    fn notice_nodes(&self) -> Vec<uia::Node> {
+        let (Some(notice), Some(layout)) = (self.notice.as_ref(), self.notice_layout()) else {
+            return Vec::new();
+        };
+        let node = |id: i32, role: uia::Role, name: &str, rect: Rect, focused: bool| uia::Node {
+            id,
+            role,
+            name: name.to_string(),
+            rect: self.screen_rect(rect),
+            enabled: true,
+            focused,
+            toggled: None,
+            expanded: None,
+            value: None,
+            selected: None,
+            host: None,
+        };
+        vec![
+            node(
+                NODE_NOTICE,
+                uia::Role::Text,
+                &notice.text,
+                layout.text,
+                false,
+            ),
+            node(
+                NODE_NOTICE + 1,
+                uia::Role::Button,
+                settings::CLOSE,
+                layout.close,
+                self.focus == Focus::NoticeClose,
+            ),
+        ]
     }
 
     /// ページの部品の読み上げの節
@@ -2416,6 +2568,14 @@ impl App {
         }
         if self.sheet.is_some() {
             self.sheet_act(id, act);
+            return;
+        }
+        if id == NODE_NOTICE + 1 && self.notice.is_some() {
+            match act {
+                uia::Act::Focus => self.set_focus(Focus::NoticeClose),
+                _ => self.close_notice(),
+            }
+            ffi::invalidate(self.window);
             return;
         }
         if let Some(sheet) = self.theme_sheet() {
@@ -2908,7 +3068,7 @@ impl App {
         // 書き方のチップ: 開いているか(閉じた状態はふつうの 1 枚)と，「入力時の値にする」のオン・オフ
         self.templates_open = if matches!(
             shot,
-            Shot::Plain | Shot::DynamicOff | Shot::ImportPreview | Shot::MissingKeys
+            Shot::Plain | Shot::DynamicOff | Shot::ImportPreview | Shot::MissingKeys | Shot::Notice
         ) {
             std::collections::HashSet::new()
         } else {
@@ -2959,15 +3119,21 @@ impl App {
         if shot == Shot::ImportPreview {
             self.open_import_sheet(import_sample());
         }
+        // 知らせの帯: 見本のファイルを取り込んだ結果(帯はページの下に置くので，窓の大きさで写す)
+        self.notice = (shot == Shot::Notice).then(|| Notice {
+            text: crate::files::FileTask::ImportUserDictionary.imported(3),
+            warning: false,
+        });
         self.scroll.jump_to(0.0);
         let (width, height) = self.size();
         let content = self.view.arrange(width - nav_width(width), &self.graphics);
-        // シートは窓の真ん中に出すので，窓の大きさで写す
-        let total = if self.import_sheet.is_some() {
+        // シートは窓の真ん中に出し，知らせの帯は窓の下に出すので，窓の大きさで写す
+        let total = if self.import_sheet.is_some() || self.notice.is_some() {
             height
         } else {
             content.max(height)
         };
+        let notice_layout = self.notice_layout();
         let now = self.now() + SNAPSHOT_SETTLE;
         let name = format!(
             "settings-{}{}-{}.png",
@@ -2992,10 +3158,10 @@ impl App {
             availability: self.availability(),
             search: self.search_rect(),
             nav_top: self.nav_top(),
-            // ページは中身の高さまで伸ばして 1 枚にする(送らずに全体を写す)
+            // ページは中身の高さまで伸ばして 1 枚にする(送らずに全体を写す)．知らせの帯の分は上で切る
             frame: PageFrame {
                 top: page_header(),
-                bottom: total,
+                bottom: total - notice_layout.map_or(0.0, |layout| layout.reserved()),
                 shift: 0.0,
             },
             theme_sheet: None,
@@ -3016,6 +3182,9 @@ impl App {
                     &self.view,
                     &self.scroll,
                 );
+                if let (Some(notice), Some(layout)) = (self.notice.as_ref(), &notice_layout) {
+                    notice::paint(canvas, &self.theme, notice, layout, paint::State::enabled());
+                }
                 if let (Some(sheet), Some(layout)) =
                     (self.import_sheet.as_ref(), self.import_sheet_layout())
                 {
@@ -3030,6 +3199,7 @@ impl App {
             },
         );
         self.import_sheet = None;
+        self.notice = None;
         if let Err(error) = written {
             eprintln!("{name} を書き出せませんでした: {error}");
         }
@@ -4183,6 +4353,8 @@ fn theme_sheet_index(action: EditorAction) -> i32 {
 }
 /// 読み上げの番号: 検索欄(左の一覧の項目の番号とページの部品の番号のあいだ)
 const NODE_SEARCH: i32 = 900;
+/// 読み上げの番号: 知らせの帯の文(次が閉じるボタン．編集の画面のボタンとページの部品の番号のあいだ)
+const NODE_NOTICE: i32 = 960;
 /// シートの部品の読み上げの番号の始まり
 const NODE_SHEET: i32 = 800;
 /// 取り込む前に中身を見せるシートの部品の読み上げの番号(切り替えは NODE_IMPORT_FILTER から，表の行は NODE_IMPORT_ROW から)

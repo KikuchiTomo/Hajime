@@ -4,6 +4,7 @@ mod actions;
 mod editor;
 mod ffi;
 mod import_sheet;
+mod notice;
 mod page;
 mod paint;
 mod sheet;

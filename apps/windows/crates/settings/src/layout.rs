@@ -36,6 +36,11 @@ impl Rect {
     pub fn max_y(&self) -> f32 {
         self.y + self.height
     }
+
+    /// (x, y) が中にあるか(右と下の端は含まない)
+    pub fn contains(&self, x: f32, y: f32) -> bool {
+        x >= self.x && x < self.max_x() && y >= self.y && y < self.max_y()
+    }
 }
 
 /// 測る文字の種類(本文と注記)
@@ -1303,6 +1308,16 @@ mod tests {
             |_| true,
             &Estimate,
         )
+    }
+
+    #[test]
+    fn 四角は左と上の端を含み_右と下の端を含まない() {
+        let rect = Rect::new(10.0, 20.0, 30.0, 40.0);
+        assert!(rect.contains(10.0, 20.0));
+        assert!(rect.contains(39.9, 59.9));
+        assert!(!rect.contains(40.0, 30.0));
+        assert!(!rect.contains(20.0, 60.0));
+        assert!(!rect.contains(9.9, 30.0));
     }
 
     #[test]
