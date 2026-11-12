@@ -301,6 +301,7 @@ pub mod size {
         pub const TAG_GLYPH_GAP: f32 = 2.0;
         pub const TAG_RADIUS: f32 = 4.0;
         pub const BADGE_SIZE: f32 = 16.0;
+        pub const BADGE_GAP: f32 = 8.0;
         pub const ICON_SIZE: f32 = 16.0;
         pub const ICON_PADDING: f32 = 3.0;
         pub const ICON_RADIUS: f32 = 4.0;
@@ -400,6 +401,7 @@ pub mod size {
         pub const LABEL_FONT_SIZE: f32 = 11.5;
         pub const KEY_FONT_SIZE: f32 = 10.5;
         pub const BADGE_SIZE: f32 = 16.0;
+        pub const BADGE_GAP: f32 = 8.0;
         pub const SELECTION_RADIUS: f32 = 7.0;
         pub const KEYCAP_RADIUS: f32 = 4.0;
         pub const KEYCAP_PADDING_X: f32 = 4.0;

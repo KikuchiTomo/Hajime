@@ -102,7 +102,7 @@ struct WordLanguagePage: View {
 
     /// 試した結果の 1 語．入る文字と，英語か日本語かを並べる
     private func resultChip(_ word: WordLanguagePreview.Word) -> some View {
-        VStack(spacing: 2) {
+        VStack(spacing: DesignTokens.Size.Space.fine) {
             Text(word.shown)
             Text(UIStrings.Features.label(for: word.language))
                 .font(.caption2)

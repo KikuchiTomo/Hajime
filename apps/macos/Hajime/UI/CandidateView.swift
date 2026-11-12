@@ -47,7 +47,7 @@ final class CandidateView: NSView {
     /// 行の背景の内側の左右の余白．番号の丸(番号)の左と注釈のタグの右，足元の案内と位置の左右の端をここにそろえる
     private var rowPaddingX: CGFloat { theme.isRounded ? Glass.rowPaddingX : Size.paddingX }
     /// 番号の幅(番号から候補の文字まで)
-    private var lead: CGFloat { theme.isRounded ? Glass.badgeSize + Size.paddingX : Size.indexWidth }
+    private var lead: CGFloat { theme.isRounded ? Glass.badgeSize + Glass.badgeGap : Size.indexWidth }
 
     // MARK: - 語の意味
 
