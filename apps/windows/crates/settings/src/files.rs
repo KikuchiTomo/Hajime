@@ -184,7 +184,7 @@ mod tests {
         );
         assert_eq!(
             FileTask::ImportUserDictionary.imported(3),
-            "3 件を追加しました"
+            "3 単語を追加しました"
         );
         assert_eq!(
             FileTask::ImportProfileRules.imported(2),

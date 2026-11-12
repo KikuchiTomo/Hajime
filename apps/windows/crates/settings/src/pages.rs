@@ -2190,7 +2190,7 @@ fn dictionary() -> Vec<Section> {
             )
             .map(|row| row.visible_when(terms()))
             .collect(),
-            footer: Some(crate::strings::terms::NOTE),
+            footer: None,
             footer_variants: &[],
         },
     ]
@@ -2877,7 +2877,7 @@ mod tests {
             sidebar(BUILT, "記号のパレットを開くキー")[0].1,
             vec![Page::Palette]
         );
-        assert!(Page::Conversion.matches("連想の辞書"));
+        assert!(Page::Conversion.matches("連想辞書"));
     }
 
     #[test]

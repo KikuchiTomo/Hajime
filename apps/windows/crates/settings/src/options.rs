@@ -77,9 +77,9 @@ pub const MEANING_PLACEMENTS: &[Choice] = &[("side", "吹き出し"), ("below", 
 pub const INITIAL_FOCUS: &[Choice] = &[("start", "先頭"), ("end", "末尾"), ("automatic", "自動")];
 
 pub const SUGGESTION_DISPLAY: &[Choice] = &[
-    ("off", "表示しない"),
+    ("off", "オフ"),
     ("whenLiveConversionOff", "ライブ変換がオフのとき"),
-    ("always", "常に表示"),
+    ("always", "常に"),
 ];
 
 pub const TYPO_CORRECTION: &[Choice] = &[
@@ -97,7 +97,7 @@ pub const CORRECTION_SENSITIVITY: &[Choice] = &[
 pub const OKURIGANA: &[Choice] = &[
     ("standard", "本則"),
     ("allowed", "許容"),
-    ("engine", "変換の順のまま"),
+    ("engine", "優先しない"),
 ];
 
 /// かな漢字変換に使う Zenzai のモデル(ZenzaiModelChoice)．UIStrings.Settings.label(for: ZenzaiModelChoice)
@@ -112,7 +112,7 @@ pub const JINEN_MODELS: &[Choice] = &[
     ("automatic", "自動"),
     ("small", "small"),
     ("xsmall", "xsmall"),
-    ("off", "使わない"),
+    ("off", "オフ"),
 ];
 
 pub const LEARNING: &[Choice] = &[
@@ -126,7 +126,7 @@ pub const WORD_LANGUAGES: &[Choice] = &[("english", "英語"), ("japanese", "日
 
 /// 語の前(WordLanguageContext)．UIStrings.Features.label(for: WordLanguageContext)
 pub const WORD_CONTEXTS: &[Choice] = &[
-    ("sentenceStart", "文の頭"),
+    ("sentenceStart", "文頭"),
     ("afterEnglish", "英語"),
     ("afterJapanese", "日本語"),
 ];
@@ -154,8 +154,8 @@ pub const SYNC_GROUPS: &[Choice] = &[
     ("correction", "補正"),
     ("symbols", "記号"),
     ("dictionary", "ユーザー辞書"),
-    ("importedDictionaries", "取り込んだ辞書"),
-    ("associationDictionaries", "連想の辞書"),
+    ("importedDictionaries", "インポートした辞書"),
+    ("associationDictionaries", "連想辞書"),
     ("appearance", "外観"),
     ("exclusions", "除外設定"),
     ("usage", "統計"),
@@ -164,11 +164,11 @@ pub const SYNC_GROUPS: &[Choice] = &[
 /// アプリごとの扱い(AppProfile)．標準はアプリを一覧から消すのと同じなので並べない(macOS の ExclusionsPage と同じ)
 pub const APP_PROFILES: &[Choice] = &[
     ("direct", "IME を使わない"),
-    ("imeOff", "IME をオフ"),
-    ("imeOn", "IME をオン"),
-    ("remembersMode", "IME のオンオフを記憶"),
-    ("programming", "記号を半角"),
-    ("terminal", "コマンドを英字"),
+    ("imeOff", "IME オフ"),
+    ("imeOn", "IME オン"),
+    ("remembersMode", "IME のオン・オフを記憶"),
+    ("programming", "記号は半角"),
+    ("terminal", "コマンドは英字"),
 ];
 
 /// 選べる外観．native は標準と同じ見た目なので並べない(古い設定のファイルにあっても標準として読む)
@@ -177,7 +177,7 @@ pub const THEMES: &[Choice] = &[
     ("washi", "和紙"),
     ("nordic", "北欧"),
     ("neon", "ネオン"),
-    ("terminal", "端末"),
+    ("terminal", "ターミナル"),
     ("contrast", "高コントラスト"),
     ("platinum", "プラチナ"),
     ("desk", "夜のデスク"),

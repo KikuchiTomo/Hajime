@@ -437,7 +437,7 @@ mod tests {
             ratio: 2.2,
             minimum: 4.5,
         });
-        assert_eq!(text, "補助の文字と背景 2.2 : 1(目安 4.5 : 1 以上)");
+        assert_eq!(text, "補助の文字と背景 2.2:1(推奨 4.5:1 以上)");
     }
 
     #[test]

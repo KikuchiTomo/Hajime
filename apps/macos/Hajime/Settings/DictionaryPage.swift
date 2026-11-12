@@ -87,8 +87,6 @@ struct TermDictionaryView: View {
         Form {
             Section {
                 ResettableToggle(model: model, title: UIStrings.Terms.enabled, keyPath: \.termDictionary)
-            } footer: {
-                Text(UIStrings.Terms.note).font(.caption).foregroundStyle(.secondary)
             }
             Section(UIStrings.Terms.fields) {
                 ForEach(Self.fields, id: \.0) { field, keyPath in
