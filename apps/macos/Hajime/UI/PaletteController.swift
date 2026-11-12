@@ -45,9 +45,25 @@ final class PaletteController {
             }
         } else {
             let placed = FloatingPanel.place(size, caret: caret, keeping: nil, holding: nil).frame
-            window.setFrame(NSRect(x: placed.x, y: placed.y, width: placed.width, height: placed.height), display: true)
-            window.invalidateShadow()
-            window.orderFrontRegardless()
+            let frame = NSRect(x: placed.x, y: placed.y, width: placed.width, height: placed.height)
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                window.alphaValue = 1
+                window.setFrame(frame, display: true)
+                window.invalidateShadow()
+                window.orderFrontRegardless()
+            } else {
+                // 少し下から浮かび上がりながら濃くなる．動かすのは窓の位置と濃さだけで，中身は描き直さない
+                window.alphaValue = 0
+                window.setFrame(frame.offsetBy(dx: 0, dy: -DesignTokens.Size.Palette.openRise), display: true)
+                window.invalidateShadow()
+                window.orderFrontRegardless()
+                NSAnimationContext.runAnimationGroup { context in
+                    context.duration = DesignTokens.Motion.Palette.open / 1000
+                    context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+                    window.animator().alphaValue = 1
+                    window.animator().setFrameOrigin(frame.origin)
+                }
+            }
         }
         announce(panel)
     }
@@ -56,6 +72,8 @@ final class PaletteController {
         lastAnnounced = nil
         view.panel = nil
         window.orderOut(nil)
+        // 開く動きの途中で閉じたときも，次に開くときは濃さを初めからにする
+        window.alphaValue = 1
     }
 
     /// VoiceOver が動いているときだけ，選んでいる文字の名前と探した結果の数を読み上げる
