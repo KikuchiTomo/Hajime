@@ -68,8 +68,8 @@ struct ImportPreviewSheet: View {
 
     private enum Filter: Hashable { case all, defaulted, unreadable }
     @State private var filter = Filter.all
-    /// 表で選んでいる行(shownRows の番号)．表にフォーカスがあるとき色を付け，↑↓ で移る
-    @State private var selection = 0
+    /// 表で選んでいる行(shownRows の番号)．開いたときは選ばず，表で ↑↓ を押すか行を押すと選ぶ．表にフォーカスがあるとき色を付ける
+    @State private var selection: Int?
     @FocusState private var tableFocused: Bool
     /// VoiceOver の読む行を選んだ行に合わせる
     @AccessibilityFocusState private var spokenRow: Int?
@@ -165,7 +165,7 @@ struct ImportPreviewSheet: View {
                                 .id(index)
                                 .accessibilityElement(children: .ignore)
                                 .accessibilityLabel(rowLabel(row))
-                                .accessibilityAddTraits(index == selection ? .isSelected : [])
+                                .accessibilityAddTraits(index == selection ? [.isStaticText, .isSelected] : .isStaticText)
                                 .accessibilityFocused($spokenRow, equals: index)
                         }
                     }
@@ -175,27 +175,30 @@ struct ImportPreviewSheet: View {
             .background(.background, in: RoundedRectangle(cornerRadius: Part.fieldRadius))
             .overlay(RoundedRectangle(cornerRadius: Part.fieldRadius).strokeBorder(.separator))
             .clipShape(RoundedRectangle(cornerRadius: Part.fieldRadius))
+            // フォーカスの輪は表の角の丸みに沿わせる
+            .contentShape(.focusEffect, RoundedRectangle(cornerRadius: Part.fieldRadius))
             .focusable()
             .focused($tableFocused)
             .onMoveCommand { direction in
+                // まだ選んでいなければ，先頭の行から選ぶ
                 switch direction {
-                case .up: select(selection - 1, in: rows.count, proxy)
-                case .down: select(selection + 1, in: rows.count, proxy)
+                case .up: select(selection.map { $0 - 1 } ?? 0, in: rows.count, proxy)
+                case .down: select(selection.map { $0 + 1 } ?? 0, in: rows.count, proxy)
                 default: break
                 }
             }
             .onKeyPress(keys: [.pageUp, .pageDown, .home, .end]) { press in
                 let page = max(Int(Size.importPreviewTableHeight / Part.rowHeight) - 2, 1)
                 switch press.key {
-                case .pageUp: select(selection - page, in: rows.count, proxy)
-                case .pageDown: select(selection + page, in: rows.count, proxy)
+                case .pageUp: select(selection.map { $0 - page } ?? 0, in: rows.count, proxy)
+                case .pageDown: select(selection.map { $0 + page } ?? 0, in: rows.count, proxy)
                 case .home: select(0, in: rows.count, proxy)
                 default: select(rows.count - 1, in: rows.count, proxy)
                 }
                 return .handled
             }
             .onChange(of: filter) {
-                selection = 0
+                selection = nil
                 proxy.scrollTo(0, anchor: .top)
             }
             .accessibilityElement(children: .contain)
@@ -206,9 +209,10 @@ struct ImportPreviewSheet: View {
     /// 表の行を選び(端で止める)，見えるところまで送る．VoiceOver もその行を読む
     private func select(_ index: Int, in count: Int, _ proxy: ScrollViewProxy) {
         guard count > 0 else { return }
-        selection = min(max(index, 0), count - 1)
-        proxy.scrollTo(selection)
-        spokenRow = selection
+        let row = min(max(index, 0), count - 1)
+        selection = row
+        proxy.scrollTo(row)
+        spokenRow = row
     }
 
     /// 選んだ行はシステムの選択の色，ほかは 1 行おきに薄く敷く(表の縞)
