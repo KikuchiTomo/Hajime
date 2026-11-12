@@ -49,12 +49,14 @@
     { "id": 25, "body": { "type": "readUserDictionary", "offset": 0, "limit": 100 } },
     { "id": 26, "body": { "type": "addUserDictionaryEntry", "entry": { "reading": "えすきゅー", "word": "はじめ" } } },
     { "id": 26, "body": { "type": "addUserDictionaryEntry", "entry": { "reading": "やまだ", "word": "山田", "wordClass": "surname" } } },
+    { "id": 26, "body": { "type": "addUserDictionaryEntry", "entry": { "reading": "かいしゃ", "word": "会社", "wordClass": "noun", "comment": "東京都千代田区" } } },
     { "id": 27, "body": { "type": "removeUserDictionaryEntry", "entry": { "reading": "えすきゅー", "word": "はじめ" } } },
     { "id": 28, "body": { "type": "mergeUserDictionary", "entries": [{ "reading": "よみ", "word": "語句" }] } },
     { "id": 29, "body": { "type": "handwritingChosen", "text": "鬱" } },
     { "id": 30, "body": { "type": "handwritingClosed" } },
     { "id": 31, "body": { "type": "chooseCandidate", "target": { "type": "alternative", "index": 2 } } },
     { "id": 32, "body": { "type": "chooseCandidate", "target": { "type": "listVariant", "index": 0 } } },
+    { "id": 32, "body": { "type": "chooseCandidate", "target": { "type": "comment", "index": 1 } } },
     { "id": 33, "body": { "type": "choosePalette", "target": { "type": "cell", "row": 3, "column": 1 } } },
     { "id": 34, "body": { "type": "choosePalette", "target": { "type": "tab", "section": "smileys" } } },
     { "id": 35, "body": { "type": "choosePalette", "target": { "type": "scroll", "rows": -2 } } },
@@ -154,7 +156,7 @@
       "list": {
         "variants": [{ "label": "ひらがな", "isAvailable": true }, { "label": "全角英数", "isAvailable": false }],
         "selectedVariant": 0,
-        "entries": [{ "text": "変換" }, { "text": "へんかん", "annotation": "入力のまま" }, { "text": "今日は良い", "correctedStart": 3, "correctedLength": 2 }],
+        "entries": [{ "text": "変換" }, { "text": "へんかん", "annotation": "入力のまま" }, { "text": "今日は良い", "correctedStart": 3, "correctedLength": 2 }, { "text": "ピヨ株式会社", "annotation": "本社", "hasComment": true }],
         "selectedEntry": 1,
         "focus": "candidate",
         "position": 2,
@@ -186,6 +188,7 @@
             "shorter": "今日",
             "usageNote": "使い分け",
             "alternativeNotes": [null, "修正"],
+            "alternativeComments": [false, false],
             "sourceName": "医療"
           },
           {

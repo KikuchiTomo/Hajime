@@ -472,6 +472,7 @@ public enum WirePointerTarget: Sendable, Equatable, Codable {
     case variant(index: UInt32)
     case entry(index: UInt32)
     case listVariant(index: UInt32)
+    case comment(index: UInt32)
 
     private enum CodingKeys: String, CodingKey {
         case type, index
@@ -491,6 +492,8 @@ public enum WirePointerTarget: Sendable, Equatable, Codable {
             self = try .entry(index: container.decode(UInt32.self, forKey: .index))
         case "listVariant":
             self = try .listVariant(index: container.decode(UInt32.self, forKey: .index))
+        case "comment":
+            self = try .comment(index: container.decode(UInt32.self, forKey: .index))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -514,6 +517,9 @@ public enum WirePointerTarget: Sendable, Equatable, Codable {
         case .listVariant(let index):
             try container.encode("listVariant", forKey: .type)
             try container.encode(index, forKey: .index)
+        case .comment(let index):
+            try container.encode("comment", forKey: .type)
+            try container.encode(index, forKey: .index)
         }
     }
 }
@@ -526,6 +532,7 @@ extension WirePointerTarget: CustomStringConvertible, CustomDebugStringConvertib
         case .variant: "WirePointerTarget.variant"
         case .entry: "WirePointerTarget.entry"
         case .listVariant: "WirePointerTarget.listVariant"
+        case .comment: "WirePointerTarget.comment"
         }
     }
     public var debugDescription: String { description }
@@ -826,11 +833,13 @@ public struct WireDictionaryEntry: Sendable, Equatable, Codable {
     public var reading: String
     public var word: String
     public var wordClass: WireWordClass?
+    public var comment: String?
 
-    public init(reading: String, word: String, wordClass: WireWordClass? = nil) {
+    public init(reading: String, word: String, wordClass: WireWordClass? = nil, comment: String? = nil) {
         self.reading = reading
         self.word = word
         self.wordClass = wordClass
+        self.comment = comment
     }
 }
 
@@ -1537,13 +1546,15 @@ public struct WireCandidateEntry: Sendable, Equatable, Codable {
     public var correctedStart: UInt32?
     public var correctedLength: UInt32?
     public var command: WireCommandKind?
+    public var hasComment: Bool?
 
-    public init(text: String, annotation: String? = nil, correctedStart: UInt32? = nil, correctedLength: UInt32? = nil, command: WireCommandKind? = nil) {
+    public init(text: String, annotation: String? = nil, correctedStart: UInt32? = nil, correctedLength: UInt32? = nil, command: WireCommandKind? = nil, hasComment: Bool? = nil) {
         self.text = text
         self.annotation = annotation
         self.correctedStart = correctedStart
         self.correctedLength = correctedLength
         self.command = command
+        self.hasComment = hasComment
     }
 }
 
@@ -1753,10 +1764,11 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
     public var homophone: WireHomophoneNote?
     public var alternativeNotes: [String?]
     public var alternativeCommands: [WireCommandKind?]?
+    public var alternativeComments: [Bool]?
     public var sourceName: String?
     public var split: WireBranchSplit?
 
-    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, isCorrected: Bool? = nil, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, homophone: WireHomophoneNote? = nil, alternativeNotes: [String?], alternativeCommands: [WireCommandKind?]? = nil, sourceName: String? = nil, split: WireBranchSplit? = nil) {
+    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, isCorrected: Bool? = nil, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, homophone: WireHomophoneNote? = nil, alternativeNotes: [String?], alternativeCommands: [WireCommandKind?]? = nil, alternativeComments: [Bool]? = nil, sourceName: String? = nil, split: WireBranchSplit? = nil) {
         self.text = text
         self.alternatives = alternatives
         self.selectedAlternative = selectedAlternative
@@ -1773,6 +1785,7 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
         self.homophone = homophone
         self.alternativeNotes = alternativeNotes
         self.alternativeCommands = alternativeCommands
+        self.alternativeComments = alternativeComments
         self.sourceName = sourceName
         self.split = split
     }
