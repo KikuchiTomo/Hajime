@@ -62,6 +62,18 @@ impl Resize {
     }
 }
 
+/// 語の意味の吹き出しを今の位置 shown から target へ滑らせて動かすか．
+/// 候補の窓を置き直した(入力位置が変わった・画面や拡大率が変わった)ときは，前の場所から画面を横切らないように
+/// 窓に付けてすぐ移す．滑らせるのは，同じ場所の窓の中で選んでいる候補が変わったときだけ
+pub fn glides_bubble(
+    shown: Option<(f32, f32)>,
+    target: (f32, f32),
+    window_moved: bool,
+    reduce_motion: bool,
+) -> bool {
+    !reduce_motion && !window_moved && shown.is_some_and(|shown| shown != target)
+}
+
 /// 重ね変わりの濃さ(0〜1)．新しい中身をこの濃さで前の中身の上に描く
 pub fn crossfade_opacity(start: Instant, now: Instant) -> f32 {
     ease_out(progress(start, now, crossfade_duration()))
@@ -103,6 +115,18 @@ mod tests {
         assert_eq!(resize.size_at(start + Resize::duration()), (200.0, 50.0));
         assert!(resize.is_done(start + Resize::duration()));
         assert!(!resize.is_done(start));
+    }
+
+    #[test]
+    fn 吹き出しは同じ場所の窓の中で選び直したときだけ滑らせる() {
+        let (shown, target) = ((100.0, 200.0), (100.0, 260.0));
+        assert!(glides_bubble(Some(shown), target, false, false));
+        // 候補の窓を置き直したとき(入力位置が変わった・別の画面に移った)は，すぐ移す
+        assert!(!glides_bubble(Some(shown), target, true, false));
+        // 初めて出すとき・同じ位置のとき・アニメーション効果がオフのとき
+        assert!(!glides_bubble(None, target, false, false));
+        assert!(!glides_bubble(Some(target), target, false, false));
+        assert!(!glides_bubble(Some(shown), target, false, true));
     }
 
     #[test]
