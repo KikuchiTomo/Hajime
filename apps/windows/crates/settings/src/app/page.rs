@@ -289,6 +289,8 @@ pub struct Extras {
     pub macro_preview: crate::engine::PreviewShown,
     /// OS に入っている書体(外観のページを初めて開いたときに読む)
     pub fonts: Vec<InstalledFace>,
+    /// 単語に書ける書き方を今入れたときの値(extras::TEMPLATE_ROWS と同じ並び．読めなければ空)
+    pub template_values: Vec<String>,
 }
 
 impl Extras {
@@ -411,6 +413,8 @@ struct RowState {
     /// 数を選ぶ部品の選択肢
     numbers: Vec<f64>,
     /// 統計・情報・バージョン・知らせの文
+    /// 書き方の表の「今入れると」の値(書き方の行と同じ並び)
+    lines: Vec<String>,
     text: String,
     /// 色のボタンに出す色(「#RRGGBB」)
     color: String,
@@ -575,6 +579,7 @@ impl RowState {
             font_items: Vec::new(),
             numbers,
             text,
+            lines: Vec::new(),
             color: String::new(),
             table: Table::default(),
             table_scroll: Scroller::default(),
@@ -1342,6 +1347,7 @@ impl PageView {
                     row.text = crate::keys::assigned(values.value("keymap"), command)
                 }
                 Control::KeymapReport => row.text = extras.keymap_report.clone(),
+                Control::TemplateReference => row.lines.clone_from(&extras.template_values),
                 Control::Preview(TryKind::Macros) => {
                     row.preview_result = extras.macro_preview.clone();
                 }
@@ -1456,7 +1462,14 @@ impl PageView {
 
     /// 打つ欄を置く．origin はページの左上の窓の中の位置(DIP)，scroll は送った量．hidden なら隠す(ページの入りの動きのあいだ)．
     /// ページの上の端より上へ送った欄も隠す
-    pub fn place_fields(&self, theme: &Theme, origin: (f32, f32), scroll: f32, hidden: bool) {
+    pub fn place_fields(
+        &self,
+        theme: &Theme,
+        origin: (f32, f32),
+        header: f32,
+        scroll: f32,
+        hidden: bool,
+    ) {
         for row in &self.rows {
             let shown = !hidden && row.visible && row.card.is_some();
             for part in row.parts() {
@@ -1470,8 +1483,8 @@ impl PageView {
                 let line = size::BODY_LINE_HEIGHT;
                 let x = origin.0 + rect.x + size::FIELD_PADDING_X;
                 let y = origin.1 + rect.y - scroll + (rect.height - line) / 2.0;
-                // 欄は窓なので，描いた絵のようにページの枠で切れない．ページの上(タイトルバー)へ出たら隠す
-                if y < origin.1 {
+                // 欄は窓なので，描いた絵のようにページの枠で切れない．上に留めた題の帯(header)へ出たら隠す
+                if y < origin.1 + header {
                     ffi::show(window, false);
                     continue;
                 }
@@ -2785,17 +2798,12 @@ impl PageView {
                     paint::focus_ring(canvas, theme, card.card, size::CARD_RADIUS);
                 }
             }
+            // 切り替えの帯(macOS の segmented の Picker)．溝は薄い灰色で，選んだところだけを浮かせて描く
             Control::Segmented(_) => {
                 canvas.fill_round(
                     card.control,
                     size::CONTROL_RADIUS,
-                    Color::from(palette.control),
-                );
-                canvas.stroke_round(
-                    card.control,
-                    size::CONTROL_RADIUS,
-                    1.0,
-                    Color::from(palette.control_stroke),
+                    Color::from(palette.nav_selected),
                 );
                 for part in row.parts() {
                     if let (Part::Segment(position), Some(rect)) = (part, row.part_rect(part)) {
@@ -2899,6 +2907,7 @@ impl PageView {
                 );
             }
             Control::Acknowledgement(_) => self.paint_acknowledgement(canvas, frame, index, row),
+            Control::TemplateReference => paint_template(canvas, frame.theme, row),
             Control::Version => {
                 canvas.preview(card.icon);
                 canvas.text(
@@ -3779,7 +3788,7 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
             for field in spec.fields {
                 let input = match field.choices {
                     Some(_) => Input::Choice(0),
-                    None => match fields.take(field.label) {
+                    None => match fields.take(field.prompt.unwrap_or(field.label)) {
                         Some(window) => {
                             // キーの書き方の欄は押したらキーを記録する(macOS の KeyField)
                             edit::set_record_on_click(
@@ -3802,6 +3811,118 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
                 row.search = fields.take(prompt);
             }
         }
+    }
+}
+
+/// 単語に書ける書き方の表(macOS の TemplateReference)の置き場所．見出し・区切り線・書き方の行を上から並べる．
+/// 書き方は等幅の文字で 1 行，入るものは折り返し，今入れたときの値は 1 行にする
+struct TemplateLayout {
+    /// 列の左端と幅(書き方・入るもの・今入れると)
+    columns: [(f32, f32); 3],
+    header: Rect,
+    /// 書き方の行ごとの上端と高さ
+    rows: Vec<(f32, f32)>,
+    height: f32,
+}
+
+impl TemplateLayout {
+    fn new((x, y, width): (f32, f32, f32), measure: &dyn paint::Measure) -> Self {
+        let spacing = tokens::size::settings::TABLE_COLUMN_SPACING;
+        let syntax = extras::TEMPLATE_ROWS
+            .iter()
+            .map(|(syntax, _)| measure.width(syntax, TextStyle::Code))
+            .fold(
+                measure.width(extras::TEMPLATE_SYNTAX, TextStyle::Caption),
+                f32::max,
+            )
+            .min(width * 0.45)
+            .ceil();
+        let now = size::TEMPLATE_NOW_WIDTH.min(width * 0.3);
+        let meaning = (width - syntax - now - spacing * 2.0).max(0.0);
+        let columns = [
+            (x, syntax),
+            (x + syntax + spacing, meaning),
+            (x + syntax + spacing + meaning + spacing, now),
+        ];
+        let mut top = y + size::CARD_PADDING_Y;
+        let header = Rect::new(x, top, width, size::NOTE_LINE_HEIGHT);
+        top = header.max_y() + size::CONTROL_GAP;
+        let rows = extras::TEMPLATE_ROWS
+            .iter()
+            .map(|(_, text)| {
+                let height = measure
+                    .wrapped_height(text, TextStyle::Body, meaning)
+                    .max(size::BODY_LINE_HEIGHT);
+                let row = (top, height);
+                top += height + size::TABLE_ROW_INSET * 2.0;
+                row
+            })
+            .collect();
+        Self {
+            columns,
+            header,
+            rows,
+            height: top + size::CARD_PADDING_Y - y,
+        }
+    }
+}
+
+/// 単語に書ける書き方の表を描く(macOS の TemplateReference)．row.lines は今入れたときの値
+fn paint_template(canvas: &mut dyn Canvas, theme: &Theme, row: &RowState) {
+    let Some(card) = &row.card else {
+        return;
+    };
+    let palette = &theme.palette;
+    let rect = card.control;
+    let layout = TemplateLayout::new((rect.x, rect.y, rect.width), canvas);
+    let secondary = Color::from(palette.text_secondary);
+    for ((left, width), title) in layout.columns.iter().zip([
+        extras::TEMPLATE_SYNTAX,
+        extras::TEMPLATE_MEANING,
+        extras::TEMPLATE_NOW,
+    ]) {
+        canvas.text(
+            Rect::new(*left, layout.header.y, *width, layout.header.height),
+            title,
+            TextStyle::Caption,
+            secondary,
+            TextLayout::LINE,
+        );
+    }
+    let divider = |canvas: &mut dyn Canvas, y: f32| {
+        canvas.fill_rect(
+            Rect::new(rect.x, y, rect.width, 1.0),
+            Color::from(palette.card_stroke),
+        );
+    };
+    divider(canvas, layout.header.max_y() + size::CONTROL_GAP / 2.0);
+    for (index, ((syntax, meaning), (top, height))) in
+        extras::TEMPLATE_ROWS.iter().zip(&layout.rows).enumerate()
+    {
+        let [(syntax_x, syntax_w), (meaning_x, meaning_w), (now_x, now_w)] = layout.columns;
+        let top = top + size::TABLE_ROW_INSET;
+        canvas.text(
+            Rect::new(syntax_x, top, syntax_w, size::BODY_LINE_HEIGHT),
+            syntax,
+            TextStyle::Code,
+            Color::from(palette.text),
+            TextLayout::LINE,
+        );
+        canvas.text(
+            Rect::new(meaning_x, top, meaning_w, *height),
+            meaning,
+            TextStyle::Body,
+            secondary,
+            TextLayout::WRAP,
+        );
+        let value = row.lines.get(index).map_or("", String::as_str);
+        canvas.text(
+            Rect::new(now_x, top, now_w, size::BODY_LINE_HEIGHT),
+            value,
+            TextStyle::Body,
+            Color::from(palette.text),
+            TextLayout::LINE,
+        );
     }
 }
 
@@ -4078,6 +4199,10 @@ impl Metrics for Measured<'_> {
     }
 
     fn height(&self, row: &Row, width: f32) -> Option<f32> {
+        let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
+        if row.control == Control::TemplateReference {
+            return Some(TemplateLayout::new((0.0, 0.0, inner), self.measure).height);
+        }
         let Control::Acknowledgement(index) = row.control else {
             return None;
         };

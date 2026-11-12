@@ -68,6 +68,14 @@ public struct HexColor: Sendable, Equatable, Hashable, Codable {
         self.init(red: UInt8(value >> 16 & 0xFF), green: UInt8(value >> 8 & 0xFF), blue: UInt8(value & 0xFF))
     }
 
+    /// 0〜1 の sRGB の成分(色を選ぶ部品が返す色)から作る．範囲の外の成分(拡張 sRGB の色)は 0 か 1 に寄せる
+    public init(srgbRed red: Double, green: Double, blue: Double) {
+        func channel(_ value: Double) -> UInt8 {
+            UInt8((min(max(value.isNaN ? 0 : value, 0), 1) * 255).rounded())
+        }
+        self.init(red: channel(red), green: channel(green), blue: channel(blue))
+    }
+
     public var hex: String {
         let digits = "0123456789ABCDEF".map { $0 }
         return "#" + [red, green, blue].map { "\(digits[Int($0 >> 4)])\(digits[Int($0 & 0x0F)])" }.joined()

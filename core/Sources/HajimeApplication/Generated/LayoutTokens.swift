@@ -30,7 +30,7 @@ public enum LayoutTokens {
     }
     public enum Part {
         public static let windowRadius: Double = 12
-        public static let cardRadius: Double = 8
+        public static let cardRadius: Double = 12
         public static let rowHeight: Double = 28
         public static let rowPaddingX: Double = 4
         public static let rowRadius: Double = 8
@@ -45,6 +45,7 @@ public enum LayoutTokens {
         public static let tagRadius: Double = 4
         public static let badgeSize: Double = 16
         public static let iconSize: Double = 16
+        public static let iconPadding: Double = 3
         public static let iconRadius: Double = 4
         public static let stroke: Double = 1
     }
@@ -206,8 +207,22 @@ public enum LayoutTokens {
         public static let frameWidth: Double = 1
         public static let guideDash: Double = 4
         public static let anchorGap: Double = 4
-        public static let candidateGap: Double = 6
+        public static let candidateGap: Double = 8
         public static let candidateFontSize: Double = 18
+        public static let titleHeight: Double = 32
+        public static let captionButtonWidth: Double = 46
+        public static let captionFontSize: Double = 12
+        public static let captionIconSize: Double = 10
+        public static let controlHeight: Double = 32
+        public static let controlRadius: Double = 4
+        public static let controlPaddingX: Double = 12
+        public static let labelFontSize: Double = 14
+        public static let iconButtonWidth: Double = 32
+        public static let iconSize: Double = 16
+        public static let resizeBorder: Double = 6
+        public static let scrollFade: Double = 20
+        public static let wheelStep: Double = 48
+        public static let promptPaddingY: Double = 4
     }
     public enum Prediction {
         public static let gap: Double = 8
@@ -367,7 +382,9 @@ public enum LayoutTokens {
         public static let themeSwatchRadius: Double = 6
         public static let themeSwatchFontSize: Double = 11
         public static let aboutIcon: Double = 64
+        public static let templateNowWidth: Double = 160
         public static let keymapListHeight: Double = 400
+        public static let segmentInset: Double = 2
         public static let listArrowWidth: Double = 24
         public static let titleBarHeight: Double = 32
         public static let titleBarIconSize: Double = 16

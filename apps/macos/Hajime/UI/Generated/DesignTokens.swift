@@ -149,7 +149,7 @@ enum DesignTokens {
         }
         enum Part {
             static let windowRadius: CGFloat = 12
-            static let cardRadius: CGFloat = 8
+            static let cardRadius: CGFloat = 12
             static let rowHeight: CGFloat = 28
             static let rowPaddingX: CGFloat = 4
             static let rowRadius: CGFloat = 8
@@ -164,6 +164,7 @@ enum DesignTokens {
             static let tagRadius: CGFloat = 4
             static let badgeSize: CGFloat = 16
             static let iconSize: CGFloat = 16
+            static let iconPadding: CGFloat = 3
             static let iconRadius: CGFloat = 4
             static let stroke: CGFloat = 1
         }
@@ -325,8 +326,22 @@ enum DesignTokens {
             static let frameWidth: CGFloat = 1
             static let guideDash: CGFloat = 4
             static let anchorGap: CGFloat = 4
-            static let candidateGap: CGFloat = 6
+            static let candidateGap: CGFloat = 8
             static let candidateFontSize: CGFloat = 18
+            static let titleHeight: CGFloat = 32
+            static let captionButtonWidth: CGFloat = 46
+            static let captionFontSize: CGFloat = 12
+            static let captionIconSize: CGFloat = 10
+            static let controlHeight: CGFloat = 32
+            static let controlRadius: CGFloat = 4
+            static let controlPaddingX: CGFloat = 12
+            static let labelFontSize: CGFloat = 14
+            static let iconButtonWidth: CGFloat = 32
+            static let iconSize: CGFloat = 16
+            static let resizeBorder: CGFloat = 6
+            static let scrollFade: CGFloat = 20
+            static let wheelStep: CGFloat = 48
+            static let promptPaddingY: CGFloat = 4
         }
         enum Prediction {
             static let gap: CGFloat = 8
@@ -486,7 +501,9 @@ enum DesignTokens {
             static let themeSwatchRadius: CGFloat = 6
             static let themeSwatchFontSize: CGFloat = 11
             static let aboutIcon: CGFloat = 64
+            static let templateNowWidth: CGFloat = 160
             static let keymapListHeight: CGFloat = 400
+            static let segmentInset: CGFloat = 2
             static let listArrowWidth: CGFloat = 24
             static let titleBarHeight: CGFloat = 32
             static let titleBarIconSize: CGFloat = 16

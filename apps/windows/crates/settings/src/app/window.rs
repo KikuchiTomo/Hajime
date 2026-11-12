@@ -53,6 +53,10 @@ const WARM_ID: u16 = 50;
 const RECONNECT_TIMER: usize = 1;
 /// 説明の吹き出しを出すまでの時計の番号
 const TOOLTIP_TIMER: usize = 2;
+/// ユーザー辞書の書き方の表の今の値を読み直す間隔のタイマー
+const TEMPLATE_TIMER: usize = 3;
+/// 書き方の表の今の値を読み直す間隔(ミリ秒．秒の値が変わるので 1 秒)
+const TEMPLATE_INTERVAL: u32 = 1000;
 /// ポインターを載せてから説明の吹き出しを出すまで(ミリ秒．OS のツールチップと同じくらい)
 const TOOLTIP_DELAY: u32 = 500;
 /// 読み込みのスレッドが終わった知らせ
@@ -608,6 +612,12 @@ impl App {
             if self.view.page == Page::Keys {
                 self.extras.keymap_report = super::actions::keymap_report(model);
             }
+            // ユーザー辞書の書き方の表は今の値を出す．開いているあいだは 1 秒ごとに読み直す(macOS の TimelineView)
+            if self.view.page == Page::Dictionary {
+                self.extras.template_values =
+                    super::actions::template_values(model, &self.extras.template_values);
+                ffi::set_timer(self.window, TEMPLATE_TIMER, TEMPLATE_INTERVAL);
+            }
             // 変換マクロの一覧やオン・オフが変わったら，試した結果も読み直す
             if let Some((text, reading, draft)) = self.view.macro_preview_inputs() {
                 self.extras.macro_preview =
@@ -688,6 +698,7 @@ impl App {
         self.view.place_fields(
             &self.theme,
             (nav_width(width), self.title_bar()),
+            page_header(),
             self.scroll.offset(now),
             entering,
         );
@@ -1054,6 +1065,10 @@ impl App {
             return self.nav.hit(local).map(Target::Nav);
         }
         if self.availability() != Availability::Ready {
+            return None;
+        }
+        // ページの題の帯は送らずに上に留めるので，その下に送ったページの部品は押せない
+        if y < page_header() {
             return None;
         }
         if self.scroll.can_scroll() && x >= width - size::SCROLLBAR_HIT && y < height {
@@ -2085,6 +2100,11 @@ struct PaintState<'a> {
     nav_top: f32,
 }
 
+/// 上に留めるページの題の帯の高さ(DIP)．ページはこの下で送る
+fn page_header() -> f32 {
+    size::PAGE_PADDING_TOP + size::TITLE_HEIGHT
+}
+
 fn paint_window(
     canvas: &mut dyn Canvas,
     state: &PaintState,
@@ -2095,8 +2115,32 @@ fn paint_window(
 ) {
     let theme = state.theme;
     let nav_width = nav_width(state.width);
-    let page_area = Rect::new(nav_width, 0.0, state.width - nav_width, state.height);
+    let ready = state.availability == Availability::Ready;
+    // ページの題は送らずに上に留める(macOS のツールバーの題・Windows 11 の設定アプリの見出しと同じ)．
+    // ページはその下で送る．読み込み中などの知らせは題も含めて知らせの側で描く
+    let header = if ready { page_header() } else { 0.0 };
+    let page_area = Rect::new(
+        nav_width,
+        header,
+        state.width - nav_width,
+        (state.height - header).max(0.0),
+    );
     paint_nav(canvas, state, nav, nav_scroll, nav_width, view.page);
+    if ready {
+        let (left, content) = crate::layout::content_frame(state.width - nav_width);
+        canvas.text(
+            Rect::new(
+                nav_width + left,
+                size::PAGE_PADDING_TOP,
+                content,
+                size::TITLE_HEIGHT,
+            ),
+            view.page.title(),
+            TextStyle::Title,
+            Color::from(theme.palette.text),
+            TextLayout::LINE,
+        );
+    }
     canvas.push_clip(page_area);
     let offset = (1.0 - state.enter) * size::PAGE_ENTER_OFFSET;
     let scroll_offset = scroll.offset(state.now);
@@ -2492,6 +2536,25 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         }
         WM_WARM => {
             with_app(App::warm_fields);
+            Some(LRESULT(0))
+        }
+        WM_TIMER if wparam.0 == TEMPLATE_TIMER => {
+            with_app(|app| {
+                let Some(model) = &app.model else {
+                    ffi::kill_timer(app.window, TEMPLATE_TIMER);
+                    return;
+                };
+                if app.view.page != Page::Dictionary {
+                    // ほかのページに移ったら読み直さない(開いたときの例も捨てる)
+                    ffi::kill_timer(app.window, TEMPLATE_TIMER);
+                    app.extras.template_values.clear();
+                    return;
+                }
+                // 値を部品に映す(読み直しは refresh の中で行う)
+                let _ = model;
+                app.refresh();
+                ffi::invalidate(app.window);
+            });
             Some(LRESULT(0))
         }
         WM_TIMER if wparam.0 == TOOLTIP_TIMER => {

@@ -317,8 +317,8 @@ fn place(
             size::EMOJI_PREVIEW_HEIGHT,
             metrics,
         ),
-        // 謝辞は中身(名前・出どころ・ライセンスの全文)を画面の側で測って置く．部品の欄はカードの中の全体
-        Control::Acknowledgement(_) => {
+        // 謝辞と書き方の表は中身を画面の側で測って置く．部品の欄はカードの中の全体
+        Control::Acknowledgement(_) | Control::TemplateReference => {
             let height = metrics.height(row, frame.width).unwrap_or(size::ROW_HEIGHT);
             let mut card = empty(frame.card(height), position);
             card.control = Rect::new(frame.inner_left(), frame.y, frame.inner_width(), height);
@@ -717,6 +717,7 @@ pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     field_widths: &[],
     toolbar: false,
     trailing_bottom: 0,
+    note_line: false,
 };
 
 const NO_BUTTONS: ListButtons = ListButtons {
@@ -729,6 +730,7 @@ const NO_BUTTONS: ListButtons = ListButtons {
     field_widths: &[],
     toolbar: false,
     trailing_bottom: 0,
+    note_line: false,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -779,6 +781,10 @@ fn place_inputs(
         .map(|label| button_width(label, metrics))
         .collect();
     let buttons_width: f32 = widths.iter().map(|width| width + size::CONTROL_GAP).sum();
+    // 添え書きの欄(最後の欄)を次の行に置くときは，1 行目に並べる欄から外す
+    let note_line = buttons.note_line && fields >= 2;
+    let all_fields = fields;
+    let fields = if note_line { fields - 1 } else { fields };
     // 決まった幅の欄(キー設定の状態とキー)を除いた欄で残りを分ける
     let fixed: Vec<f32> = buttons.field_widths.iter().copied().take(fields).collect();
     let fixed_total: f32 = fixed.iter().sum();
@@ -802,11 +808,18 @@ fn place_inputs(
         parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
         cursor += width + size::CONTROL_GAP;
     }
-    let list_top = if fields + buttons.top.len() == 0 {
+    // 入力欄の並びの上の帯は 1 行目の欄・ボタンのあとに置く(parts の順: 入力欄・上のボタン)．
+    // 添え書きの欄は 2 行目に幅いっぱいで置き，1 行目の欄のすぐあとの parts に入れる(入力欄の番号の順)
+    let mut list_top = if all_fields + buttons.top.len() == 0 {
         top
     } else {
         top + size::CONTROL_HEIGHT + size::CONTROL_GAP
     };
+    if note_line {
+        let note = Rect::new(x, list_top, inner, size::CONTROL_HEIGHT);
+        parts.insert(fields, note);
+        list_top += size::CONTROL_HEIGHT + size::CONTROL_GAP;
+    }
     // 表の下の帯: 左の組(下のボタン)と右の組(右に寄せる下のボタン・絞り込み・検索欄・ファイルのボタン)
     let split = buttons.bottom.len().saturating_sub(buttons.trailing_bottom);
     let leading: Vec<f32> = buttons.bottom[..split]
@@ -1054,14 +1067,17 @@ mod tests {
     }
 
     #[test]
-    fn 説明の長い行は部品を名前の高さに置く() {
+    fn 書き方の表は切り替えと同じカードに置く() {
         let page = sections(Page::Dictionary).unwrap();
         let layout = layout(&page, 800.0, |_| true, &Estimate);
-        // 単語に書ける書き方の表を説明に持つ行(ユーザー辞書の 2 つ目の区切り)
-        let card = &layout.sections[1].cards[0];
-        assert!(card.descriptions.len() > 5);
-        assert!(card.card.height > size::ROW_HEIGHT * 2.0);
-        assert!(card.control.max_y() <= card.card.y + size::ROW_HEIGHT);
+        // ユーザー辞書の 2 つ目の区切り: 切り替えと，その下の書き方の表(macOS の UserWordsView)
+        let section = &layout.sections[1];
+        assert_eq!(section.cards.len(), 2);
+        let (toggle, table) = (&section.cards[0], &section.cards[1]);
+        assert!(toggle.descriptions.is_empty());
+        assert_eq!(page[1].rows[table.row].control, Control::TemplateReference);
+        // 間を空けずに続ける(1 枚のカードに区切り線で並べる)
+        assert_eq!(table.card.y, toggle.card.max_y());
     }
 
     #[test]

@@ -343,6 +343,9 @@ pub enum Control {
     Acknowledgement(usize),
     /// キー設定の表の問題(使われない行・キーの無い確定など)．無ければ出さない
     KeymapReport,
+    /// 単語に書ける書き方の表(書き方・入るもの・今入れると)と，登録の例・付けられる名前・日時の書式の記号
+    /// (macOS の UserWordsView の TemplateReference)．高さは画面の側で測る
+    TemplateReference,
     /// キー設定のひな形を選んで読み込む
     Preset,
     /// 登録した単語．数が多くなるので設定の値としてではなく，エンジンに分けて読んでもらい，1 語ずつ足す・消す
@@ -525,6 +528,8 @@ pub struct ListButtons {
     pub toolbar: bool,
     /// 表の下のボタンのうち，右に寄せる末尾のボタンの数(キー設定の既定に戻す)
     pub trailing_bottom: usize,
+    /// 最後の入力欄を次の行に幅いっぱいで置く(ユーザー辞書のコメント．macOS の RuleListEditor の添え書きの欄)
+    pub note_line: bool,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -696,6 +701,7 @@ impl Control {
             field_widths,
             toolbar: keymap,
             trailing_bottom: usize::from(keymap),
+            note_line: matches!(self, Control::Dictionary(_)),
         })
     }
 
@@ -1838,7 +1844,9 @@ const DICTIONARY_FIELDS: &[Field] = &[
         options::WORD_CLASSES,
         false,
     ),
-    Field::named("comment", settings::COMMENT, false).optional(),
+    Field::named("comment", settings::COMMENT, false)
+        .optional()
+        .prompt(settings::COMMENT_PROMPT),
 ];
 
 /// ユーザー辞書の注記に入れ替えて出す文(品詞の欄で選んでいる値と文)
@@ -1926,15 +1934,14 @@ fn dictionary() -> Vec<Section> {
         )]),
         Section {
             title: None,
-            // 書き方を 1 つずつ注記の行にして並べる(macOS の書き方の表と同じ中身)
-            rows: std::iter::once(Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"))
-                .chain(
-                    crate::strings::windows::TEMPLATE_ROWS
-                        .iter()
-                        .map(|text| Row::note(text)),
-                )
-                .map(|row| row.visible_when(words()))
-                .collect(),
+            // macOS の UserWordsView と同じく，切り替えと書き方の表(書き方・入るもの・今入れると)を 1 枚のカードに並べる
+            rows: vec![
+                Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"),
+                Row::new("", "", Control::TemplateReference),
+            ]
+            .into_iter()
+            .map(|row| row.visible_when(words()))
+            .collect(),
             footer: None,
             footer_variants: &[],
         },

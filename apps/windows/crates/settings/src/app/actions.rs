@@ -151,11 +151,10 @@ pub fn run_after(window: Window, after: Option<After>) {
             run_after(window, after);
         }
         Some(After::ChooseColor { path, current }) => {
-            let Some((red, green, blue)) = ffi::choose_color(window, crate::themes::rgb(&current))
-            else {
+            let Some(chosen) = ffi::choose_color(window, crate::themes::rgb(&current)) else {
                 return;
             };
-            let value = serde_json::Value::String(format!("#{red:02X}{green:02X}{blue:02X}"));
+            let value = serde_json::Value::String(crate::themes::hex_of(chosen));
             let after = with_app(|app| {
                 app.handle(Event::Set {
                     path,
@@ -677,8 +676,7 @@ impl App {
     fn edit_theme(&mut self, path: &str, value: &serde_json::Value) -> Option<After> {
         let id = self.editing_theme.clone()?;
         let model = self.model.as_mut()?;
-        let changed = crate::themes::edited(model.value(crate::themes::THEMES), &id, path, value)?;
-        if let Err(error) = model.set(crate::themes::THEMES, changed) {
+        if let Err(error) = crate::themes::write(model, &id, path, value)? {
             return self.failure(error);
         }
         self.check_theme();
@@ -1045,6 +1043,32 @@ pub fn macro_preview(
         .preview_macros(text, reading, draft)
         .map(|results| crate::engine::macro_preview_text(&results, !draft.trim().is_empty()))
         .unwrap_or_default()
+}
+
+/// 入れるたびに変わる書き方(UUID・乱数・選ぶ)．macOS と同じく，ページを開いたときの例を 1 つ出したままにする
+const CHANGING_TEMPLATES: &[&str] = &["{uuid}", "{random:1-6}", "{alnum:8}", "{pick:はい,いいえ}"];
+
+/// 単語に書ける書き方を今入れたときの値(macOS の TemplateReference)．エンジンが変換マクロを試すときと
+/// 同じ値(日時・乱数)で置き換える．入れるたびに変わる書き方は，前に求めた値があればそのまま使う．読めなければ空
+pub fn template_values(model: &SettingsModel<Store>, previous: &[String]) -> Vec<String> {
+    let expand = |template: &str| -> Option<String> {
+        model
+            .store()
+            .preview_macros("", "", template)
+            .ok()
+            .and_then(|results| results.into_iter().next())
+    };
+    crate::strings::extras::TEMPLATE_ROWS
+        .iter()
+        .enumerate()
+        .map(|(index, (syntax, _))| {
+            let kept = previous.get(index).filter(|value| !value.is_empty());
+            match kept {
+                Some(value) if CHANGING_TEMPLATES.contains(syntax) => value.clone(),
+                _ => expand(syntax).unwrap_or_default(),
+            }
+        })
+        .collect()
 }
 
 /// 標準のひな形の値(KeymapPreset.standard)
