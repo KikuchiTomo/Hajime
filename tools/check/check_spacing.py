@@ -43,12 +43,12 @@ SPACING_NAME = re.compile(r"(padding|gap|inset|margin|indent|spacing)")
 
 # 決まりから外れてよいトークンと理由
 ALLOWED_TOKENS: dict[str, tuple[str, ...]] = {
-    "Windows 11 の設定アプリ(WinUI 3 の NavigationView・SettingsCard・TitleBar・TextBox)と同じ寸法にする(ADR 0013)": (
+    "Windows 11 の設定アプリと標準の部品(WinUI 3 の NavigationView・SettingsCard・TitleBar・TextBox・Button)と同じ寸法にする(ADR 0013)": (
         "settings-windows.page-padding-x", "settings-windows.page-padding-top", "settings-windows.section-gap",
         "settings-windows.card-padding-x", "settings-windows.card-padding-y", "settings-windows.button-padding-x",
         "settings-windows.field-padding-x", "settings-windows.nav-padding-x", "settings-windows.nav-icon-gap",
         "settings-windows.nav-group-gap", "settings-windows.control-gap", "settings-windows.title-bar-padding-x",
-        "settings-windows.table-indicator-inset",
+        "settings-windows.table-indicator-inset", "handwriting.control-padding-x",
     ),
     "macOS の表(Table)が描く行の字の位置に，表の外の見出しをそろえる": (
         "settings.table-header-inset", "settings.table-column-spacing", "settings.table-popup-text-inset",
@@ -76,12 +76,12 @@ SKIPPED_DIRS = {"Generated"}
 MOTION_FILES = {"motion.rs", "anim.rs", "PaletteMotion.swift"}
 
 # 決まりを入れる前からの画面で，あとの PR で直すもの(トークンの節とファイル)．直したら外す
-FOLLOW_UP_CANDIDATE = "#430 の次の PR で直す(候補の窓・分岐図・語の意味・案内と，予測・モードの札・手書きの窓)"
-FOLLOW_UP_SETTINGS = "設定の画面と初期設定の PR で直す"
+FOLLOW_UP_CANDIDATE = "#430 の次の PR で直す(候補の窓・分岐図・語の意味・案内と，予測・モードの札)"
+FOLLOW_UP_SETTINGS = "設定の画面の PR で直す(template-ui が作り直し中)"
 PENDING_SECTIONS: dict[str, str] = {
     "candidate": FOLLOW_UP_CANDIDATE, "glass": FOLLOW_UP_CANDIDATE, "branch": FOLLOW_UP_CANDIDATE, "meaning": FOLLOW_UP_CANDIDATE,
-    "mode-indicator": FOLLOW_UP_CANDIDATE, "prediction": FOLLOW_UP_CANDIDATE, "handwriting": FOLLOW_UP_CANDIDATE,
-    "settings": FOLLOW_UP_SETTINGS, "settings-windows": FOLLOW_UP_SETTINGS, "onboarding": FOLLOW_UP_SETTINGS,
+    "mode-indicator": FOLLOW_UP_CANDIDATE, "prediction": FOLLOW_UP_CANDIDATE,
+    "settings": FOLLOW_UP_SETTINGS, "settings-windows": FOLLOW_UP_SETTINGS,
 }
 PENDING_FILES: dict[str, str] = {
     "apps/macos/Hajime/UI/BranchView.swift": FOLLOW_UP_CANDIDATE,
@@ -98,13 +98,10 @@ PENDING_FILES: dict[str, str] = {
     "apps/macos/Hajime/Settings/KeymapPage.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/SettingsRows.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/WordLanguagePage.swift": FOLLOW_UP_SETTINGS,
-    "apps/macos/Hajime/Onboarding/OnboardingView.swift": FOLLOW_UP_SETTINGS,
-    "apps/macos/Hajime/Onboarding/OnboardingStage.swift": FOLLOW_UP_SETTINGS,
     "apps/windows/crates/candidate-ui/src/app/preview.rs": FOLLOW_UP_SETTINGS,
     "apps/windows/crates/settings/src/app/page.rs": FOLLOW_UP_SETTINGS,
     "apps/windows/crates/settings/src/app/paint.rs": FOLLOW_UP_SETTINGS,
     "apps/windows/crates/settings/src/app/window.rs": FOLLOW_UP_SETTINGS,
-    "apps/windows/crates/settings/src/app/wizard.rs": FOLLOW_UP_SETTINGS,
 }
 
 NUMBER = r"-?\d+(?:\.\d+)?"

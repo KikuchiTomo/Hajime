@@ -610,7 +610,9 @@ impl App {
         let now = self.now();
         if let Some(model) = &self.model {
             if self.view.page == Page::Keys {
-                self.extras.keymap_report = super::actions::keymap_report(model);
+                (self.extras.keymap_report, self.extras.keymap_issues) =
+                    super::actions::keymap_report(model);
+                self.extras.keymap_preset = super::actions::matching_preset(model);
             }
             // ユーザー辞書の書き方の表は今の値を出す．開いているあいだは 1 秒ごとに読み直す(macOS の TimelineView)
             if self.view.page == Page::Dictionary {
@@ -698,6 +700,7 @@ impl App {
         self.view.place_fields(
             &self.theme,
             (nav_width(width), self.title_bar()),
+            page_header(),
             self.scroll.offset(now),
             entering,
         );
@@ -1064,6 +1067,10 @@ impl App {
             return self.nav.hit(local).map(Target::Nav);
         }
         if self.availability() != Availability::Ready {
+            return None;
+        }
+        // ページの題の帯は送らずに上に留めるので，その下に送ったページの部品は押せない
+        if y < page_header() {
             return None;
         }
         if self.scroll.can_scroll() && x >= width - size::SCROLLBAR_HIT && y < height {
@@ -2095,6 +2102,11 @@ struct PaintState<'a> {
     nav_top: f32,
 }
 
+/// 上に留めるページの題の帯の高さ(DIP)．ページはこの下で送る
+fn page_header() -> f32 {
+    size::PAGE_PADDING_TOP + size::TITLE_HEIGHT
+}
+
 fn paint_window(
     canvas: &mut dyn Canvas,
     state: &PaintState,
@@ -2105,8 +2117,32 @@ fn paint_window(
 ) {
     let theme = state.theme;
     let nav_width = nav_width(state.width);
-    let page_area = Rect::new(nav_width, 0.0, state.width - nav_width, state.height);
+    let ready = state.availability == Availability::Ready;
+    // ページの題は送らずに上に留める(macOS のツールバーの題・Windows 11 の設定アプリの見出しと同じ)．
+    // ページはその下で送る．読み込み中などの知らせは題も含めて知らせの側で描く
+    let header = if ready { page_header() } else { 0.0 };
+    let page_area = Rect::new(
+        nav_width,
+        header,
+        state.width - nav_width,
+        (state.height - header).max(0.0),
+    );
     paint_nav(canvas, state, nav, nav_scroll, nav_width, view.page);
+    if ready {
+        let (left, content) = crate::layout::content_frame(state.width - nav_width);
+        canvas.text(
+            Rect::new(
+                nav_width + left,
+                size::PAGE_PADDING_TOP,
+                content,
+                size::TITLE_HEIGHT,
+            ),
+            view.page.title(),
+            TextStyle::Title,
+            Color::from(theme.palette.text),
+            TextLayout::LINE,
+        );
+    }
     canvas.push_clip(page_area);
     let offset = (1.0 - state.enter) * size::PAGE_ENTER_OFFSET;
     let scroll_offset = scroll.offset(state.now);

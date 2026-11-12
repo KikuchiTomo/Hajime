@@ -1082,9 +1082,10 @@ fn load_preset(model: &mut SettingsModel<Store>, preset: &str) -> Result<(), Sto
 }
 
 /// 今の表の問題を文にする．調べられなければ空
-pub fn keymap_report(model: &SettingsModel<Store>) -> String {
+/// キー設定の表の問題の文と，行ごとの問題(行の印に使う)
+pub fn keymap_report(model: &SettingsModel<Store>) -> (String, Vec<ipc::KeymapRowIssue>) {
     let Some(keymap) = model.value("keymap").cloned() else {
-        return String::new();
+        return (String::new(), Vec::new());
     };
     let entries: Vec<(String, String, String)> = keymap
         .as_array()
@@ -1107,8 +1108,26 @@ pub fn keymap_report(model: &SettingsModel<Store>) -> String {
     model
         .store()
         .check_keymap(&values)
-        .map(|report| crate::keys::report_lines(&report, &entries).join("\n"))
+        .map(|report| {
+            (
+                crate::keys::report_lines(&report, &entries).join("\n"),
+                report.rows,
+            )
+        })
         .unwrap_or_default()
+}
+
+/// 今のキー設定の表と同じひな形(keys::PRESETS の番号)．どれとも違えば None(macOS の KeymapPreset.matching)
+pub fn matching_preset(model: &SettingsModel<Store>) -> Option<usize> {
+    let current = model.value("keymap")?;
+    keys::PRESETS.iter().position(|(preset, _)| {
+        model
+            .store()
+            .read_keymap_preset(preset)
+            .ok()
+            .and_then(|fields| fields.get("keymap").cloned())
+            .is_some_and(|keymap| &keymap == current)
+    })
 }
 
 /// 確かめてから行う操作の題と文
