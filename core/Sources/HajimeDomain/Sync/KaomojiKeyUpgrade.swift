@@ -19,8 +19,8 @@ enum KaomojiKeyUpgrade {
         KeymapPreset.standard.keymap.entries.filter { $0.command == .kaomojiPalette }
     }
 
-    /// バージョン 10 の標準の表．今の標準の表から足した行を除いたもの
+    /// バージョン 10 の標準の表．バージョン 11 の標準の表から足した行を除いたもの
     static var previousStandard: Keymap {
-        Keymap(KeymapPreset.standard.keymap.entries.filter { !added.contains($0) })
+        Keymap(HidePredictionKeyUpgrade.previousStandard.entries.filter { !added.contains($0) })
     }
 }

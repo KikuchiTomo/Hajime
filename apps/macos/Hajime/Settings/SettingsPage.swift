@@ -87,6 +87,7 @@ extension SettingsView {
                           UIStrings.Settings.numberSeparators, UIStrings.Settings.alphanumericHyphen, UIStrings.Settings.questionExclamationCommits,
                           UIStrings.Settings.keypadCalculation, UIStrings.Settings.cyclesLetterCase]
             case .conversion: [UIStrings.Menu.liveConversion, UIStrings.Choice.presentation, UIStrings.Choice.initialFocus, UIStrings.Features.okurigana, UIStrings.Features.prefersKatakana,
+                               UIStrings.Choice.predictionDisplay, UIStrings.Choice.hiddenPredictions,
                                UIStrings.Features.calculation, UIStrings.Features.postalCode, UIStrings.Features.handwriting,
                                UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion, UIStrings.Settings.latexConversion,
                                UIStrings.Settings.numberFormConversion, UIStrings.Association.enabled,

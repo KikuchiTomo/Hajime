@@ -142,6 +142,7 @@ public final class InputSession {
     private let usage: (any UsageRecording)?
     /// 戻した補正を覚えるところ．無ければ覚えない
     private let rejections: (any CorrectionRejectionRecording)?
+    private let predictionHiding: (any PredictionHiding)?
     /// 連想変換の語を引く(R-18)
     private let associationFinder: AssociationFinder
     /// 候補ウィンドウの案内と注記に出すキーの名前の書き方
@@ -159,9 +160,10 @@ public final class InputSession {
     ///   - palette: 絵文字と記号のパレットに使うもの(R-26)．パレットを描けるアプリだけが渡す
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
-                rejections: (any CorrectionRejectionRecording)? = nil, usageDictionary: (any UsageDictionaryProviding)? = nil,
-                palette: PaletteServices? = nil) {
+                rejections: (any CorrectionRejectionRecording)? = nil, predictionHiding: (any PredictionHiding)? = nil,
+                usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil) {
         self.paletteServices = palette
+        self.predictionHiding = predictionHiding
         self.usageDictionary = usageDictionary
         self.keyNames = keyNames
         self.rejections = rejections
@@ -804,6 +806,11 @@ public final class InputSession {
                 break
             }
             return KeyResult(handled: true, actions: render(context: context))
+        case .hidePrediction:
+            // 予測の窓に出している語句を「予測に表示しない語句」に入れ，次の予測に替える
+            guard phase == .composing, let shown = shownPrediction, shown.reading == composition.conversionReading,
+                  predictionHiding?.hide(shown.prediction.text) == true else { return KeyResult(handled: true) }
+            return KeyResult(handled: true, actions: render(context: context) + [.showNote(PanelBuilder.predictionHiddenNote(shown.prediction.text))])
         case .forgetLastCommit:
             guard converter.forgetLastCommit() else { return KeyResult(handled: true) }
             showsTransientNote = true
@@ -1723,7 +1730,8 @@ public final class InputSession {
     /// 予測した語句のうち，見えている字・ひらがなとカタカナの読み・変換の候補のどれかと頭が重なる部分を打った部分にし，残りを補う部分にする
     /// (ライブ変換がオフで「きょう」と見えているときも，「今日は」を「今日」と「は」に分ける)．
     /// 確定した履歴(学習)にある語句を先に出す設定なら，それを先に選ぶ．
-    /// 「もしかして」と示しているときは示した読みから予測し，確定のキーは添えない(キーはまず読みを直す．直すと添える)
+    /// 「もしかして」と示しているときは示した読みから予測し，確定のキーは添えない(キーはまず読みを直す．直すと添える)．
+    /// 設定の「予測に表示しない語句」にある語句は出さない
     private func makePrediction(marked: MarkedText) -> ShownPrediction? {
         guard predictionsShown, corrector.active == nil,
             let key = keyLabel(.acceptSuggestion, in: .composing) else { return nil }
@@ -1737,7 +1745,8 @@ public final class InputSession {
         let whole = composition.conversionReading
         let ordered = settings.current.predictionPrefersHistory
             ? stored.candidates.filter(\.isLearned) + stored.candidates.filter { !$0.isLearned } : stored.candidates
-        for candidate in ordered where candidate.commandID == nil && !conversions.contains(candidate.text) {
+        for candidate in ordered where candidate.commandID == nil && !conversions.contains(candidate.text)
+            && !settings.current.hiddenPredictions.contains(candidate.text) {
             let characters = Array(candidate.text)
             let typedCount = typedForms.map { form in zip(characters, form).prefix { $0 == $1 }.count }.max() ?? 0
             // 見えている字と同じなら，補うものが無い

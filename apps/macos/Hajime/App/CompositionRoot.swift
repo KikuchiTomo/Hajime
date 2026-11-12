@@ -135,11 +135,13 @@ final class CompositionRoot {
         InputSession(converter: SupplementedConverter(engine.makeSession(), settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries, emoji: engine,
                                                          lexicon: lexicon, englishTerms: englishTerms),
                      lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                     rejections: correctionRejections, usageDictionary: usageDictionary, palette: paletteServices)
+                     rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices)
     }
 
     /// 戻した補正を設定の「直さない語句」に覚える(入力欄ごとのセッションで共有する)
     private lazy var correctionRejections = SettingsCorrectionRejections(settings: settings)
+    /// 予測に出した語句を設定の「予測に表示しない語句」に入れる(入力欄ごとのセッションで共有する)
+    private lazy var predictionHiding = SettingsPredictionHiding(settings: settings)
 
     /// 設定の画面．開くたびに作らず使い回す
     private(set) lazy var settingsWindow: SettingsWindowController = {

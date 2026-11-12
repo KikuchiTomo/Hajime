@@ -426,7 +426,8 @@
         "romaji",
         "symbolSequences",
         "symbolReadings",
-        "englishTerms"
+        "englishTerms",
+        "hiddenPredictions"
       ]
     },
     {

@@ -186,6 +186,11 @@ private struct ConversionTab: View {
                 }
                 .disabled(!model.settings.liveConversion)
             }
+            Section(UIStrings.Choice.hiddenPredictions) {
+                RuleListEditor(model: model, spec: .hiddenPredictions, labels: .init(
+                    key: UIStrings.Choice.hiddenPredictionPlaceholder, value: nil,
+                    empty: UIStrings.Choice.hiddenPredictionsEmpty))
+            }
             Section(UIStrings.More.candidates) {
                 ResettableRow(model: model, keyPath: \.branchCandidatesPerPage) {
                     Stepper(value: model.binding(\.branchCandidatesPerPage), in: DefaultSettings.candidatesPerPageRange) {
