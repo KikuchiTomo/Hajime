@@ -403,6 +403,7 @@ enum PaletteIcons {
             case .symbols: "heart"
             case .flags: "flag"
             case .punctuation, .brackets, .arrows, .math, .letters, .units, .enclosed, .shapes, .lines, .misc: nil
+            case .joy, .sorrow, .sweat, .anger, .surprise, .greeting, .animals, .otherFaces: nil
             }
         }
     }

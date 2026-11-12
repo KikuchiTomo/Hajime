@@ -105,8 +105,9 @@ public struct PaletteSearch: Sendable {
         }
     }
 
-    /// query に当たる項目を並べて返す
-    public func search(_ query: Query, ranking: Ranking = Ranking(), limit: Int = DefaultSettings.maximumPaletteSearchResults) -> [PaletteItem] {
+    /// query に当たる項目を並べて返す．shape を渡すと，そのマスの形の種類だけを探す(顔文字と絵文字・記号を同じ結果に混ぜない)
+    public func search(_ query: Query, ranking: Ranking = Ranking(), shape: PaletteCellShape? = nil,
+                       limit: Int = DefaultSettings.maximumPaletteSearchResults) -> [PaletteItem] {
         guard !query.isEmpty, limit > 0 else { return [] }
         let shortcode = query.shortcodePattern.map(FuzzyMatch.normalized)
         let typed = shortcode == nil ? FuzzyMatch.normalized(query.typed) : []
@@ -119,7 +120,7 @@ public struct PaletteSearch: Sendable {
             var preferred: Bool
         }
         var ranked: [Ranked] = []
-        for (index, entry) in entries.enumerated() {
+        for (index, entry) in entries.enumerated() where shape.map({ entry.item.kind.cellShape == $0 }) ?? true {
             var best: (tier: Tier, quality: Int)?
             func consider(_ pattern: [Unicode.Scalar], _ keys: [Key], allowsScattered: Bool) {
                 guard !pattern.isEmpty else { return }

@@ -197,6 +197,7 @@ pub fn emoji() -> PalettePanel {
         message: None,
         hints: hints(),
         cell_size: CELL_SIZE,
+        cells_per_row: None,
     }
 }
 
@@ -240,6 +241,7 @@ pub fn search() -> PalettePanel {
         message: None,
         hints: hints(),
         cell_size: CELL_SIZE,
+        cells_per_row: None,
     }
 }
 
@@ -277,5 +279,6 @@ pub fn symbol() -> PalettePanel {
         message: None,
         hints: hints(),
         cell_size: CELL_SIZE,
+        cells_per_row: None,
     }
 }
