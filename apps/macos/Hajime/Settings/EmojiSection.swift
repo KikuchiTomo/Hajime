@@ -17,14 +17,16 @@ struct EmojiSection: View {
                                   value: UIStrings.Settings.emojiCandidatePositionValue(model.settings.emojiCandidatePosition))
                 ResettableStepper(model: model, title: UIStrings.Settings.emojiCandidateCount, keyPath: \.emojiCandidateCount, range: DefaultSettings.emojiCandidateCountRange,
                                   value: "\(model.settings.emojiCandidateCount)")
-                ResettableToggle(model: model, title: UIStrings.Settings.showsEmojiNames, keyPath: \.showsEmojiNames)
+                // 見本は最後の行(名前の表示)のすぐ下に，項目の名前と同じ左の端から置く(足元の行を出さない小さな窓)．
+                // 同じ行に入れて区切りの線を引かず，項目との間は section の余白にする
+                VStack(alignment: .leading, spacing: DesignTokens.Size.Space.section) {
+                    ResettableToggle(model: model, title: UIStrings.Settings.showsEmojiNames, keyPath: \.showsEmojiNames)
+                    if let panel = SamplePanels.emojiPlacement(model.settings) {
+                        CandidatePreview(choice: ThemeChoice(model.settings), fontSize: model.settings.candidateFontSize, panel: panel)
+                    }
+                }
             }
             .disabled(model.settings.emojiPlacement == nil)
-            // 見本は設定の項目の名前と同じ左の端から置く(足元の行を出さない小さな窓)
-            if let panel = SamplePanels.emojiPlacement(model.settings) {
-                CandidatePreview(choice: ThemeChoice(model.settings), fontSize: model.settings.candidateFontSize, panel: panel)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
         }
     }
 
