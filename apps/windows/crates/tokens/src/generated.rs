@@ -361,7 +361,7 @@ pub mod size {
         pub const IMPORT_PREVIEW_KIND_COLUMN_WIDTH: f32 = 112.0;
         pub const RULE_SEARCH_WIDTH: f32 = 160.0;
         pub const PREVIEW_CHIP_PADDING_X: f32 = 8.0;
-        pub const PREVIEW_CHIP_PADDING_Y: f32 = 4.0;
+        pub const PREVIEW_CHIP_PADDING_Y: f32 = 2.0;
         pub const PREVIEW_CHIP_RADIUS: f32 = 6.0;
         pub const PREVIEW_CHIP_GAP: f32 = 4.0;
         pub const PREVIEW_BUTTON_GAP: f32 = 8.0;

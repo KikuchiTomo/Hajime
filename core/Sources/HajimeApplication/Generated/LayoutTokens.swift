@@ -104,7 +104,7 @@ public enum LayoutTokens {
         public static let importPreviewKindColumnWidth: Double = 112
         public static let ruleSearchWidth: Double = 160
         public static let previewChipPaddingX: Double = 8
-        public static let previewChipPaddingY: Double = 4
+        public static let previewChipPaddingY: Double = 2
         public static let previewChipRadius: Double = 6
         public static let previewChipGap: Double = 4
         public static let previewButtonGap: Double = 8

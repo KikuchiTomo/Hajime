@@ -117,8 +117,12 @@ struct CandidateExample: View {
         }
         .font(.callout)
         .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
-        .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
+        // 上下の余白は背景にだけ付ける．チップの高さを字の行に収め，見本を置いた行もほかの行と同じ高さにする
+        .background {
+            RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius)
+                .fill(.quaternary)
+                .padding(.vertical, -DesignTokens.Size.Settings.previewChipPaddingY)
+        }
         .accessibilityElement(children: .combine)
     }
 }

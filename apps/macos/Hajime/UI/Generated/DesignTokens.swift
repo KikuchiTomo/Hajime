@@ -223,7 +223,7 @@ enum DesignTokens {
             static let importPreviewKindColumnWidth: CGFloat = 112
             static let ruleSearchWidth: CGFloat = 160
             static let previewChipPaddingX: CGFloat = 8
-            static let previewChipPaddingY: CGFloat = 4
+            static let previewChipPaddingY: CGFloat = 2
             static let previewChipRadius: CGFloat = 6
             static let previewChipGap: CGFloat = 4
             static let previewButtonGap: CGFloat = 8
