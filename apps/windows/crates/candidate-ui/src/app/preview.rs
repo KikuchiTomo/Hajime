@@ -93,7 +93,7 @@ impl Preview {
         shown: Shown,
         theme: &ResolvedTheme,
         font_size: f32,
-    ) -> Result<super::render::TextMeasure> {
+    ) -> Result<std::rc::Rc<super::render::TextMeasure>> {
         match shown {
             Shown::Palette(panel) => {
                 let fonts =
