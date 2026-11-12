@@ -68,9 +68,11 @@ public final class FakeConverter: KanaKanjiConverting {
     public func languageModelScores(forKeys keys: [String]) -> [Double?] { keys.map { languageModelScores[$0] } }
     /// 確定した履歴(学習)にある予測の語句
     public var learnedPredictions: Set<String> = []
+    /// 予測をエンジンの候補(確定すると学ぶ)にするか．既定は学ばない候補
+    public var predictionsAreLearnable = false
     public func predictions(for reading: String) -> [Candidate] {
-        (predictionTexts[reading] ?? []).map { text in
-            var candidate = Candidate(text: text, readingCount: reading.count, origin: .variant(.hiragana))
+        (predictionTexts[reading] ?? []).enumerated().map { index, text in
+            var candidate = Candidate(text: text, readingCount: reading.count, origin: predictionsAreLearnable ? .engine(id: 2000 + index) : .variant(.hiragana))
             candidate.isLearned = learnedPredictions.contains(text)
             return candidate
         }

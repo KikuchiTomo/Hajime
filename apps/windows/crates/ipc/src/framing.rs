@@ -95,6 +95,7 @@ mod tests {
                         width: 1,
                         height: 18,
                     }),
+                    can_replace_preceding_text: None,
                 },
             },
         }

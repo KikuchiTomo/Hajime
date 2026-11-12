@@ -16,6 +16,7 @@ extension ClientAction: CustomStringConvertible, CustomDebugStringConvertible {
         case .selectInputStyle(let style): "selectInputStyle(\(style))"
         case .showNote(let note): "showNote(\(note.tone.rawValue), length: \(note.text.count))"
         case .showPrediction(let prediction): "showPrediction(\(prediction.map(String.init(describing:)) ?? "nil"))"
+        case .replacePrecedingText(let length): "replacePrecedingText(length: \(length))"
         case .openSettings: "openSettings"
         case .toggleLiveConversion: "toggleLiveConversion"
         case .showHandwriting: "showHandwriting"

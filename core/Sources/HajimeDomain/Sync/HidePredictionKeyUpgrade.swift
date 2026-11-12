@@ -1,6 +1,7 @@
 /// 入力中の予測を予測に表示しないキーを，バージョン 11 までに保存したキー設定の表に足す(SettingsSchema のバージョン 11 → 12)．
 ///
-/// - ひな形のまま保存した表は，今のそのひな形の表にする(標準は入力中の ⌃⌫，Windows 風・Mac 風・ATOK 風は入力中の Ctrl+Delete)
+/// - ひな形のまま保存した表は，バージョン 12 のそのひな形の表にする(標準は入力中の ⌃⌫，Windows 風・Mac 風・ATOK 風は入力中の Ctrl+Delete．
+///   その先はあとの移し替えが今のひな形の表にする)
 /// - 利用者が変えた表は，予測に表示しないキーが無く，入力中に標準のキーが空いていれば足す．利用者の決めたキーは変えない
 enum HidePredictionKeyUpgrade {
     static func upgrade(_ object: inout [String: JSONValue]) {
@@ -12,7 +13,7 @@ enum HidePredictionKeyUpgrade {
 
     static func upgraded(_ keymap: Keymap) -> Keymap {
         if let preset = KeymapPreset.allCases.first(where: { previous($0).entries == keymap.entries }) {
-            var current = preset.keymap
+            var current = PredictionUndoKeyUpgrade.previous(preset)
             current.unknownEntries = keymap.unknownEntries
             return current
         }
@@ -29,9 +30,9 @@ enum HidePredictionKeyUpgrade {
         preset.keymap.entries.filter { $0.command == .hidePrediction }
     }
 
-    /// バージョン 11 のひな形の表．今のひな形の表から足した行を除いたもの
+    /// バージョン 11 のひな形の表．バージョン 12 のひな形の表から足した行を除いたもの
     static func previous(_ preset: KeymapPreset) -> Keymap {
-        Keymap(preset.keymap.entries.filter { $0.command != .hidePrediction })
+        Keymap(PredictionUndoKeyUpgrade.previous(preset).entries.filter { $0.command != .hidePrediction })
     }
 
     /// バージョン 11 の標準の表
