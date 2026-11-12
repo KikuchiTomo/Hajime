@@ -36,6 +36,7 @@ enum SnapshotRenderer {
             // 色を今の外観で決める部品があるので，その外観を描くときの外観にして組み立てる
             (appearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
                 render(listView(theme: look.theme, appearance: appearance), name: "list-\(look.name)", to: output, appearance: appearance)
+                render(gridView(SamplePanels.grid, theme: look.theme, appearance: appearance), name: "list-grid-\(look.name)", to: output, appearance: appearance)
                 render(suggestionView(theme: look.theme, appearance: appearance), name: "suggestion-\(look.name)", to: output, appearance: appearance)
                 render(latticeView(theme: look.theme, appearance: appearance), name: "branch-\(look.name)", to: output, appearance: appearance)
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
@@ -88,7 +89,6 @@ enum SnapshotRenderer {
                     render(longLatticeView(theme: look.theme, appearance: appearance, focus: focus), name: "branch-long-\(focus)-\(look.name)", to: output, appearance: appearance)
                 }
                 render(longListView(theme: look.theme, appearance: appearance), name: "list-long-\(look.name)", to: output, appearance: appearance)
-                render(gridView(SamplePanels.grid, theme: look.theme, appearance: appearance), name: "list-grid-\(look.name)", to: output, appearance: appearance)
                 render(gridView(longGrid, theme: look.theme, appearance: appearance), name: "list-grid-long-\(look.name)", to: output, appearance: appearance)
             }
         }
