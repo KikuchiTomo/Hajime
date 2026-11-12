@@ -17,11 +17,12 @@
 /// - バージョン 13: キー設定の表のコマンド `undoPrediction`(予測の確定を取り消し)を足し，表に入力文字なしの Backspace か Ctrl+Backspace を足した
 ///   (PredictionUndoKeyUpgrade)
 /// - バージョン 14: 変換マクロの形(括弧・ルビ・ローマ字など)を足した．保存した一覧に無効のまま足す(MacroPresetUpgrade)
+/// - バージョン 15: 変換マクロの形(語の中の数字の漢数字・大字・3 桁区切り)を足した．保存した一覧に無効のまま足す(MacroPresetUpgrade)
 ///
 /// 項目の名前や形を変えるときは，バージョンを 1 つ上げ，`migrations` に移し替えを足す．移し替えは JSON のまま行い，
 /// 読み込む前に古いバージョンから順に当てる．新しいバージョンのファイルを古いバージョンで開いたときは移し替えず，知らない項目を残す(Settings.unknownFields)
 public enum SettingsSchema {
-    public static let currentVersion = 14
+    public static let currentVersion = 15
     public static let versionKey = "schemaVersion"
 
     /// バージョン n から n+1 への移し替え．添字 0 がバージョン 1 → 2
@@ -38,6 +39,7 @@ public enum SettingsSchema {
         { KaomojiKeyUpgrade.upgrade(&$0) },
         { HidePredictionKeyUpgrade.upgrade(&$0) },
         { PredictionUndoKeyUpgrade.upgrade(&$0) },
+        { MacroPresetUpgrade.upgrade(&$0) },
         { MacroPresetUpgrade.upgrade(&$0) },
     ]
 

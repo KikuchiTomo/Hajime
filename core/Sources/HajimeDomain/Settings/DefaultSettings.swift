@@ -563,6 +563,8 @@ public enum DefaultSettings {
     public static let maximumTemplateRandomRange = 1_000_000_000
     /// `{date+1d}` などでずらす数の上限(単位によらない)
     public static let maximumTemplateShift = 36_500
+    /// `{days:2027-03-31}` `{age:1990-04-01}` に書ける年
+    public static let templateYearRange = 1...9_999
     /// `{alnum}` `{hex}` の文字数の既定と上限
     public static let templateRandomTextLength = 8
     public static let maximumTemplateRandomTextLength = 64
@@ -594,7 +596,8 @@ public enum DefaultSettings {
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000009", pattern: "`{text}`"),
     ] + addedMacros
     /// あとから足した変換マクロ(MacroPresetUpgrade が保存済みの一覧にも足す)．
-    /// 括弧・フリガナ・ローマ字・pixiv と LaTeX のルビ・傍点・ハッシュタグ・打ち消し線・Wikipedia へのリンク
+    /// 括弧・フリガナ・ローマ字・pixiv と LaTeX のルビ・傍点・ハッシュタグ・打ち消し線・Wikipedia へのリンク(バージョン 14)，
+    /// 語の中の数字の漢数字・大字・3 桁区切り(バージョン 15．数字の無い語では元の語と同じになるので出ない)
     public static let addedMacros: [ConversionMacro] = [
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000A", pattern: "〈{text}〉", isEnabled: false),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-00000000000B", pattern: "“{text}”", isEnabled: false),
@@ -607,6 +610,9 @@ public enum DefaultSettings {
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000012", pattern: "#{text}", isEnabled: false),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000013", pattern: "~~{text}~~", isEnabled: false),
         ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000014", pattern: "[{text}](https://ja.wikipedia.org/wiki/{text|url})", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000015", pattern: "{text|kansuji}", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000016", pattern: "{text|daiji}", isEnabled: false),
+        ConversionMacro(id: "6A0C9E10-1B2D-4F3A-8C5D-000000000017", pattern: "{text|comma}", isEnabled: false),
     ]
     /// 設定の画面で変換マクロを試す見本の語と読み(語を打たなかったとき)
     public static let macroSampleText = "東京"

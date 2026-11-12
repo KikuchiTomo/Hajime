@@ -86,7 +86,7 @@ public enum NumberForms {
 
     // MARK: - 漢数字
 
-    private static let plainNumerals: [Character] = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
+    static let plainNumerals: [Character] = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
     /// 大字で書き換える数字(壱・弐・参)．ほかの数字はふつうの漢数字のまま書く
     private static let formalNumerals: [Character] = ["〇", "壱", "弐", "参", "四", "五", "六", "七", "八", "九"]
     /// 4 桁の中の位(千・百・十)と，4 桁ごとの位(万・億・兆)
