@@ -91,7 +91,6 @@ PENDING_FILES: dict[str, str] = {
     "apps/windows/crates/candidate-ui/src/scene/branch.rs": FOLLOW_UP_CANDIDATE,
     "apps/windows/crates/candidate-ui/src/scene/meaning.rs": FOLLOW_UP_CANDIDATE,
     "apps/windows/crates/candidate-ui/src/scene/association.rs": FOLLOW_UP_CANDIDATE,
-    "apps/windows/crates/candidate-ui/src/handwriting/layout.rs": FOLLOW_UP_CANDIDATE,
     "apps/macos/Hajime/UI/PaletteView.swift": FOLLOW_UP_PALETTE,
     "apps/windows/crates/candidate-ui/src/palette/scene.rs": FOLLOW_UP_PALETTE,
     "apps/macos/Hajime/Settings/AboutPage.swift": FOLLOW_UP_SETTINGS,
