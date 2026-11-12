@@ -13,7 +13,8 @@ enum UndoCommitKeyUpgrade {
 
     static func upgraded(_ keymap: Keymap) -> Keymap {
         if let preset = KeymapPreset.allCases.first(where: { previous($0).entries == keymap.entries }) {
-            var current = preset.keymap
+            // バージョン 16 のひな形の表にする(その先はあとの移し替えが今のひな形の表にする)
+            var current = WordToolKeyUpgrade.previous(preset)
             current.unknownEntries = keymap.unknownEntries
             return current
         }
@@ -30,11 +31,11 @@ enum UndoCommitKeyUpgrade {
         preset.keymap.entries.filter { $0.command == .undoCommit }
     }
 
-    /// バージョン 15 のひな形の表．今のひな形の表から足した行を除いたもの．
+    /// バージョン 15 のひな形の表．バージョン 16 のひな形の表から足した行を除いたもの．
     /// Windows 風・ATOK 風は，確定を取り消す行のキーで予測の確定だけを取り消していた
     static func previous(_ preset: KeymapPreset) -> Keymap {
         let undidPredictions = [KeymapPreset.windows, .atok].contains(preset)
-        return Keymap(preset.keymap.entries.compactMap { entry in
+        return Keymap(WordToolKeyUpgrade.previous(preset).entries.compactMap { entry in
             guard entry.command == .undoCommit else { return entry }
             return undidPredictions ? KeymapEntry(entry.state, entry.stroke, .undoPrediction) : nil
         })

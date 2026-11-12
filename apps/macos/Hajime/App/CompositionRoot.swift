@@ -170,7 +170,8 @@ final class CompositionRoot {
 
     /// 入力メニュー．入力欄ごとのコントローラで 1 つを共有する(InputMenuBuilder の説明)
     private(set) lazy var inputMenu = InputMenuBuilder(settings: settings, openSettings: { [unowned self] in self.settingsWindow.show() },
-                                                       checkForUpdates: Self.checkForUpdates)
+                                                       checkForUpdates: Self.checkForUpdates,
+                                                       openWordRegistration: { [unowned self] in self.settingsWindow.showUserDictionary(word: $0, reading: $1) })
 
     /// 「更新を確認」(R-19)．Contents/Helpers の更新用のアプリを起動し，確認・ダウンロード・インストールはそちらに任せる．
     /// この IME はサンドボックスの中で通信の権限を持たないまま(SECURITY-MODEL.md の通信)．
@@ -199,7 +200,9 @@ final class CompositionRoot {
 
     func makePresenter(session: InputSession) -> ClientActionPresenter {
         ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, prediction: prediction, settings: settings,
-                              openSettings: { [unowned self] in self.settingsWindow.show() }, handwriting: handwriting, palette: palette,
+                              openSettings: { [unowned self] in self.settingsWindow.show() },
+                              openWordRegistration: { [unowned self] in self.settingsWindow.showUserDictionary(word: $0, reading: $1) },
+                              readingOf: { [transcriber] in transcriber.reading(of: $0) }, handwriting: handwriting, palette: palette,
                               runCommand: { [unowned self] in self.commandLauncher.run($0) })
     }
 

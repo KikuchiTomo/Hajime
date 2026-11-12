@@ -43,6 +43,9 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         anywhere\tCtrl Option e\temojiPalette
         anywhere\tCtrl Option k\tsymbolPalette
         anywhere\tCtrl Option f\tkaomojiPalette
+        anywhere\tCtrl F7\tregisterWord
+        anywhere\tCtrl F10\topenMenu
+        anywhere\tCtrl Henkan\topenMenu
         anywhere\tEisu\tdirectMode
         anywhere\tKana\tjapaneseMode
         anywhere\tHankaku/Zenkaku\ttoggleMode

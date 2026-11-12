@@ -293,6 +293,11 @@ impl Engine for SampleEngine {
                     status: state.sync.clone(),
                 }
             }
+            // 見本では単語の登録を頼まれない(登録の欄は空のまま開く)
+            RequestBody::TakeWordRegistration => ResponseBody::WordRegistration {
+                word: None,
+                reading: None,
+            },
             // ファイルの読み書きと辞書の取り込みは見本では行わない(何も変えずに済んだことにする)
             RequestBody::ImportRuleList { .. }
             | RequestBody::ImportProfileRules { .. }
@@ -345,6 +350,7 @@ mod tests {
         let defaults = store.read(&["liveConversion".to_string()], true).unwrap();
         assert_eq!(defaults["liveConversion"], Value::Bool(true));
         assert!(!store.read_user_dictionary().unwrap().is_empty());
+        assert_eq!(store.take_word_registration(), Ok(None));
         assert!(!store
             .read_symbol_items(SymbolKind::Reading)
             .unwrap()

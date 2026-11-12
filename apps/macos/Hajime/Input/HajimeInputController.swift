@@ -62,6 +62,12 @@ final class HajimeInputController: IMKInputController {
         if result.actions.contains(.requestReconversion), !reconvert(client: client, context: context) {
             return false
         }
+        // 入力メニューのキー．入力位置の下に入力メニューと同じ項目を出す
+        if result.actions.contains(.openMenu) {
+            var line = NSRect.zero
+            _ = client.attributes(forCharacterIndex: 0, lineHeightRectangle: &line)
+            menuBuilder.popUp(actions: menuActions, target: self, at: NSPoint(x: line.minX, y: line.minY))
+        }
         if result.actions.contains(.awaitCorrections) {
             correctAfterConversion(client: client, context: context)
         } else {
@@ -268,9 +274,36 @@ final class HajimeInputController: IMKInputController {
 
     @MainActor
     override func menu() -> NSMenu! {
-        menuBuilder.menu(actions: .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), handwriting: #selector(openHandwriting(_:)),
-                                        palette: #selector(openPalette(_:)), openSettings: #selector(showPreferences(_:)),
-                                        checkForUpdates: #selector(checkForUpdates(_:))))
+        menuBuilder.menu(actions: menuActions)
+    }
+
+    @MainActor
+    private var menuActions: InputMenuBuilder.Actions {
+        .init(toggleLiveConversion: #selector(toggleLiveConversion(_:)), handwriting: #selector(openHandwriting(_:)),
+              palette: #selector(openPalette(_:)), openSettings: #selector(showPreferences(_:)),
+              checkForUpdates: #selector(checkForUpdates(_:)), registerWord: #selector(registerWord(_:)),
+              openUserDictionary: #selector(openUserDictionary(_:)))
+    }
+
+    /// 入力メニューの「単語の登録…」．入力先で選んでいる文字を単語の欄に，その読みを読みの欄に入れて，ユーザー辞書の画面を開く
+    @MainActor @objc func registerWord(_ sender: Any) {
+        let word = client().flatMap(Self.selectedWord) ?? ""
+        menuBuilder.handleRegisterWord(word: word, reading: word.isEmpty ? "" : root.transcriber.reading(of: word) ?? "")
+    }
+
+    /// 入力メニューの「ユーザー辞書…」
+    @MainActor @objc func openUserDictionary(_ sender: Any) {
+        menuBuilder.handleOpenUserDictionary()
+    }
+
+    /// 入力先で選んでいる文字(単語の登録に使う)．選んでいない・長すぎる・改行やタブを含むときは nil
+    @MainActor
+    static func selectedWord(of client: any IMKTextInput) -> String? {
+        let selection = client.selectedRange()
+        guard selection.location != NSNotFound, selection.length > 0, selection.length <= DefaultSettings.maximumUserDictionaryWordLength * 2,
+              let text = client.attributedSubstring(from: selection)?.string,
+              text.count <= DefaultSettings.maximumUserDictionaryWordLength, !text.contains(where: { $0.isNewline || $0 == "\t" }) else { return nil }
+        return text.trimmingCharacters(in: .whitespaces)
     }
 
     /// 再変換．入力先で選んでいる文字を読み，読みに戻して変換する．選んでいなければ何もしない．

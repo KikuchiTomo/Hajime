@@ -18,6 +18,10 @@ extension ClientAction: CustomStringConvertible, CustomDebugStringConvertible {
         case .showPrediction(let prediction): "showPrediction(\(prediction.map(String.init(describing:)) ?? "nil"))"
         case .replacePrecedingText(let length): "replacePrecedingText(length: \(length))"
         case .openSettings: "openSettings"
+        // 語と読みは入力内容なので，あるかどうかだけを出す
+        case .openWordRegistration(let word, _): "openWordRegistration(hasWord: \(word != nil))"
+        case .openUserDictionary: "openUserDictionary"
+        case .openMenu: "openMenu"
         case .toggleLiveConversion: "toggleLiveConversion"
         case .showHandwriting: "showHandwriting"
         case .showPalette(let panel): "showPalette(\(panel))"

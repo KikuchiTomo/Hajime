@@ -1661,8 +1661,10 @@ fn dictionary() -> Vec<Section> {
 /// ユーザー辞書のページで出している一覧(画面の中だけの値．設定のファイルには書かない)
 pub const DICTIONARY_TAB: &str = "page.dictionaryTab";
 pub const DICTIONARY_TAB_IMPORTED: &str = "imported";
+/// 登録した単語の一覧(単語の登録で開くときに出す)
+pub const DICTIONARY_TAB_WORDS: &str = "words";
 const DICTIONARY_TABS: &[Choice] = &[
-    ("words", dictionaries::USER_WORDS),
+    (DICTIONARY_TAB_WORDS, dictionaries::USER_WORDS),
     (DICTIONARY_TAB_IMPORTED, dictionaries::IMPORTED),
 ];
 

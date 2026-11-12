@@ -14,6 +14,10 @@ final class ClientActionPresenter {
     private let note: NoteController
     private let prediction: PredictionController
     private let openSettings: () -> Void
+    /// 設定のユーザー辞書の画面を開き，語と読みを登録の欄に入れる(空なら入れない)
+    private let openWordRegistration: (_ word: String, _ reading: String) -> Void
+    /// 語の読み(入力先で選んでいた文字を登録するとき)．分からなければ nil
+    private let readingOf: (String) -> String?
     private let handwriting: HandwritingController
     private let palette: PaletteController
     private let settings: any SettingsStoring
@@ -23,8 +27,12 @@ final class ClientActionPresenter {
 
     init(session: InputSession, candidatePanel: CandidatePanelController, modeIndicator: ModeIndicatorController, note: NoteController,
          prediction: PredictionController, settings: any SettingsStoring,
-         openSettings: @escaping () -> Void, handwriting: HandwritingController, palette: PaletteController, runCommand: @escaping (LauncherCommand) -> Void) {
+         openSettings: @escaping () -> Void, openWordRegistration: @escaping (_ word: String, _ reading: String) -> Void,
+         readingOf: @escaping (String) -> String?, handwriting: HandwritingController, palette: PaletteController,
+         runCommand: @escaping (LauncherCommand) -> Void) {
         self.session = session
+        self.openWordRegistration = openWordRegistration
+        self.readingOf = readingOf
         self.palette = palette
         self.runCommand = runCommand
         self.openSettings = openSettings
@@ -82,6 +90,15 @@ final class ClientActionPresenter {
                 break
             case .openSettings:
                 openSettings()
+            case .openWordRegistration(let word, let reading):
+                // 入力していなければ，入力先で選んでいる文字を登録する
+                let registered = word ?? HajimeInputController.selectedWord(of: client) ?? ""
+                openWordRegistration(registered, reading ?? (registered.isEmpty ? "" : readingOf(registered) ?? ""))
+            case .openUserDictionary:
+                openWordRegistration("", "")
+            case .openMenu:
+                // 入力コントローラが入力位置に入力メニューを出す(HajimeInputController.handle)
+                break
             case .runCommand(let command):
                 // 確定したときの設定にまだあり，使う設定のときだけ動かす(Windows の EngineService と同じ)
                 guard settings.current.launcherCommands, settings.current.commands.contains(command) else { break }
