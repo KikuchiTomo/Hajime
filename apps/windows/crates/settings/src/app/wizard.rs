@@ -1986,6 +1986,7 @@ impl Wizard {
             value: None,
             selected: None,
             host: None,
+            parent: None,
         };
         let mut nodes = Vec::new();
         if self.ready() {

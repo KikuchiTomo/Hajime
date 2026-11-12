@@ -2286,6 +2286,7 @@ impl App {
                     value: None,
                     selected: None,
                     host: None,
+                    parent: None,
                 })
                 .collect();
             nodes.extend(self.page_nodes(now));
@@ -2303,6 +2304,7 @@ impl App {
             value: None,
             selected: None,
             host: Some(self.search),
+            parent: None,
         }];
         // 見えている範囲の外の項目も入れる(読み上げの側が送って読めるように)
         for (index, item) in self.nav.items.iter().enumerate() {
@@ -2320,6 +2322,7 @@ impl App {
                 value: None,
                 selected: Some(selected),
                 host: None,
+                parent: None,
             });
         }
         nodes.extend(self.page_nodes(now));
@@ -2387,6 +2390,7 @@ impl App {
                 value,
                 selected,
                 host,
+                parent: None,
             });
         }
         nodes
@@ -3658,6 +3662,7 @@ impl App {
                     value: None,
                     selected,
                     host: None,
+                    parent: None,
                 }
             })
             .collect();
@@ -3682,6 +3687,8 @@ impl App {
                 value: None,
                 selected: Some(index == sheet.cursor),
                 host: None,
+                // 行は表の List の子(ナレーターが List の中の何件目として読む)
+                parent: Some(import_node(ImportPart::Table)),
             }
         }));
         Some(nodes)
@@ -3719,6 +3726,7 @@ impl App {
                         value,
                         selected: None,
                         host,
+                        parent: None,
                     }
                 })
                 .collect(),
