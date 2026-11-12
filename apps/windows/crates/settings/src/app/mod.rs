@@ -12,12 +12,14 @@ mod window;
 mod wizard;
 
 use crate::catalog::{Catalog, Timing};
-use crate::engine::{Engine, EngineStore};
+use crate::engine::{Done, Engine, EngineStore};
 use crate::sample::SampleEngine;
 use ipc::windows::{pipe_name, EngineClient};
 use ipc::{RequestBody, ResponseBody};
 use std::os::windows::process::CommandExt;
 use std::process::{Command, Stdio};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 /// 設定の画面と同じフォルダに置いたエンジン
@@ -32,15 +34,50 @@ pub struct Pipe {
     timeout: Duration,
     /// ファイルの読み書きを待つ時間(DefaultSettings.settingsAppFileTimeout)
     file_timeout: Duration,
+    /// 別のスレッドで応答を待っているファイルの読み書きの数
+    waiting: Arc<AtomicUsize>,
 }
 
 impl Engine for Pipe {
     fn request(&self, body: RequestBody) -> Option<ResponseBody> {
-        self.client.send(body).wait(self.timeout)
+        // エンジンは要求を順に受けるので，ファイルを読んでいるあいだの要求はその後になる．
+        // 読み終えるまで待つよう，ファイルの読み書きと同じだけ待つ
+        let timeout = if self.waiting.load(Ordering::Acquire) > 0 {
+            self.file_timeout + self.timeout
+        } else {
+            self.timeout
+        };
+        self.client.send(body).wait(timeout)
     }
 
     fn request_file(&self, body: RequestBody) -> Option<ResponseBody> {
         self.client.send(body).wait(self.file_timeout)
+    }
+
+    fn request_file_later(&self, body: RequestBody, done: Done) {
+        let pending = self.client.send(body);
+        let timeout = self.file_timeout;
+        let waiting = Arc::clone(&self.waiting);
+        waiting.fetch_add(1, Ordering::AcqRel);
+        // スレッドを作れなければ，その場で待つ(done を取り戻して呼ぶ)
+        let slot = Arc::new(Mutex::new(Some(done)));
+        let thread_slot = Arc::clone(&slot);
+        let thread_waiting = Arc::clone(&waiting);
+        let spawned = std::thread::Builder::new()
+            .name("settings-file-request".into())
+            .spawn(move || {
+                let response = pending.wait(timeout);
+                thread_waiting.fetch_sub(1, Ordering::AcqRel);
+                if let Some(done) = thread_slot.lock().ok().and_then(|mut slot| slot.take()) {
+                    done(response);
+                }
+            });
+        if spawned.is_err() {
+            waiting.fetch_sub(1, Ordering::AcqRel);
+            if let Some(done) = slot.lock().ok().and_then(|mut slot| slot.take()) {
+                done(None);
+            }
+        }
     }
 }
 
@@ -64,6 +101,13 @@ impl Engine for Link {
             Link::Sample(sample) => sample.request_file(body),
         }
     }
+
+    fn request_file_later(&self, body: RequestBody, done: Done) {
+        match self {
+            Link::Pipe(pipe) => pipe.request_file_later(body, done),
+            Link::Sample(sample) => sample.request_file_later(body, done),
+        }
+    }
 }
 
 type Store = EngineStore<Link>;
@@ -75,6 +119,7 @@ fn connect(timing: &Timing) -> Option<Store> {
         client,
         timeout: timing.response_timeout(),
         file_timeout: timing.file_timeout(),
+        waiting: Arc::new(AtomicUsize::new(0)),
     })))
 }
 

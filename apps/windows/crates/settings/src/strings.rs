@@ -687,12 +687,16 @@ pub mod dictionaries {
     pub const REIMPORT: &str = "再読み込み…";
     pub const NAME: &str = "名前";
     pub const FIELD: &str = "分野";
+    pub const FIELD_PROMPT: &str = "電気・法律など";
     pub const CONDITION: &str = "使う場面";
     pub const ALWAYS: &str = "常に";
     pub const APPS: &str = "選んだアプリ";
     pub const CONTEXT: &str = "文脈に合わせる";
+    pub const ADD_APP: &str = "アプリを追加…";
     pub const MOVE_UP: &str = "優先度を上げる";
     pub const MOVE_DOWN: &str = "優先度を下げる";
+    pub const SHOW_DETAILS: &str = "詳細を表示";
+    pub const HIDE_DETAILS: &str = "詳細を隠す";
     pub const IMPORT_FAILED: &str =
         "辞書を取り込めませんでした。大きすぎるか、対応していない形式です";
     pub const NOTE: &str =
@@ -965,11 +969,6 @@ pub mod windows {
     pub const TOGGLE_SYNC_SCOPE: &str = "範囲の切り替え";
     /// 記号の一覧の状態の列(macOS は行ごとのオン・オフと印で出す)
     pub const SYMBOL_STATE: &str = "状態";
-    pub const DISABLED: &str = "無効";
-    /// 取り込んだ辞書の一覧の内容の列(macOS は名前の下に小さく出す)
-    pub const DICTIONARY_SUMMARY: &str = "内容";
-    /// 取り込んだ辞書を使うアプリの欄(macOS はアプリを選んで足す)．実行ファイルの名前を「,」で区切る
-    pub const DICTIONARY_APPS: &str = "アプリの実行ファイル名";
     /// コマンドの行き先のファイルを選ぶ窓の種類の名前
     pub const ALL_FILES: &str = "すべてのファイル";
     /// 除外設定のアプリの打つ欄の案内(macOS はアプリを選んで足すだけ．Windows は実行ファイルの名前でも足せる)

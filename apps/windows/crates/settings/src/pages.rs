@@ -356,8 +356,9 @@ pub enum Control {
     Info(Info),
     /// 同期の項目ごとの範囲の表．選んだ項目の範囲を切り替える
     SyncFields(ListSpec),
-    /// 取り込んだ辞書・連想の辞書の一覧．入力欄で選んだ辞書の名前などを変え，下のボタンで取り込む・並べ替える・切り替える・消す
-    Dictionaries(DictionaryList, ListSpec),
+    /// 取り込んだ辞書・連想の辞書の一覧(macOS の ImportedDictionariesView・AssociationSection)．
+    /// 辞書ごとに開いて閉じる行(オン・オフ・名前・要約・並べ替え)にし，開いた行で名前などを変える．一覧の下に取り込むボタンを置く
+    Dictionaries(DictionaryList),
     /// カスタムテーマの 1 つ(一覧の番号)．既成のテーマと同じく選ぶ印・見本の色・名前を並べ，読みにくければ印を付け，
     /// 右のボタンで編集・複製・削除する(macOS の AppearancePage の CustomThemeRow)．
     /// ページを作るときに上限の数だけ並べ(with_custom_theme_rows)，今あるテーマの数だけ出す
@@ -479,6 +480,22 @@ impl DictionaryList {
             DictionaryList::Association => "associationDictionaries",
         }
     }
+
+    /// 一覧の下の取り込むボタンの名前
+    pub fn import_label(self) -> &'static str {
+        match self {
+            DictionaryList::Imported => dictionaries::IMPORT_FILE,
+            DictionaryList::Association => association::IMPORT_FILE,
+        }
+    }
+
+    /// 辞書が無いときに一覧に出す文
+    pub fn empty_text(self) -> &'static str {
+        match self {
+            DictionaryList::Imported => dictionaries::EMPTY,
+            DictionaryList::Association => association::EMPTY,
+        }
+    }
 }
 
 /// 使う場面(DictionaryCondition)の選択肢．値は設定のファイルの名前
@@ -487,38 +504,6 @@ pub const DICTIONARY_CONDITIONS: &[Choice] = &[
     ("apps", dictionaries::APPS),
     ("context", dictionaries::CONTEXT),
 ];
-
-const IMPORTED_FIELDS: &[Field] = &[
-    Field::named("name", dictionaries::NAME, false),
-    Field::named("field", dictionaries::FIELD, false),
-    Field::choice(
-        "condition",
-        dictionaries::CONDITION,
-        DICTIONARY_CONDITIONS,
-        false,
-    ),
-    Field::named("apps", crate::strings::windows::DICTIONARY_APPS, false),
-];
-
-const ASSOCIATION_FIELDS: &[Field] = &[Field::named("name", dictionaries::NAME, false)];
-
-const IMPORTED_SPEC: ListSpec = ListSpec {
-    path: "importedDictionaries",
-    fields: IMPORTED_FIELDS,
-    empty: dictionaries::EMPTY,
-    invalid: crate::strings::Text::Fixed(crate::strings::windows::INVALID_APP),
-    lowercase: false,
-    exclusive_with: None,
-};
-
-const ASSOCIATION_SPEC: ListSpec = ListSpec {
-    path: "associationDictionaries",
-    fields: ASSOCIATION_FIELDS,
-    empty: association::EMPTY,
-    invalid: crate::strings::Text::Fixed(""),
-    lowercase: false,
-    exclusive_with: None,
-};
 
 /// 一覧の入力欄の右のボタンと，表の下のボタン(並びは部品を作る順と同じ)
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -644,7 +629,6 @@ fn list_files(control: &Control) -> Option<ListFiles> {
 impl Control {
     /// 一覧の部品のボタン．一覧でなければ None
     pub fn list_buttons(&self) -> Option<ListButtons> {
-        use crate::strings::{rule_list, windows};
         // 足す一覧は macOS の RuleListEditor と同じく，入力欄の右に追加(書き換えているあいだは更新とキャンセル)，
         // 表の下の左に削除を置く．有効・無効は表の「有効」の列で切り替える
         const ADD_CANCEL: &[&str] = &[settings::ADD, settings::CANCEL];
@@ -681,28 +665,6 @@ impl Control {
             }
             // 項目ごとの同期は表の「同期する」の印で切り替える(macOS の項目ごとのスイッチ)
             Control::SyncFields(_) => (&[], &[]),
-            Control::Dictionaries(DictionaryList::Imported, _) => (
-                &[rule_list::UPDATE],
-                &[
-                    dictionaries::IMPORT_FILE,
-                    dictionaries::REIMPORT,
-                    dictionaries::MOVE_UP,
-                    dictionaries::MOVE_DOWN,
-                    windows::TOGGLE_ENABLED,
-                    settings::REMOVE,
-                ],
-            ),
-            Control::Dictionaries(DictionaryList::Association, _) => (
-                &[rule_list::UPDATE],
-                &[
-                    association::IMPORT_FILE,
-                    dictionaries::REIMPORT,
-                    dictionaries::MOVE_UP,
-                    dictionaries::MOVE_DOWN,
-                    windows::TOGGLE_ENABLED,
-                    settings::REMOVE,
-                ],
-            ),
             _ => return None,
         };
         // 除外設定・コマンド・判別ルールは行が少なく，macOS と同じく検索欄を置かない
@@ -784,8 +746,7 @@ impl Control {
             Control::List(spec, _)
             | Control::Dictionary(spec)
             | Control::Symbols(_, spec)
-            | Control::SyncFields(spec)
-            | Control::Dictionaries(_, spec) => Some(spec),
+            | Control::SyncFields(spec) => Some(spec),
             _ => None,
         }
     }
@@ -968,11 +929,6 @@ impl Control {
                 fields().chain([windows::SYMBOL_STATE]).collect()
             }
             Control::SyncFields(_) => vec![windows::SYNC_FIELD, windows::SYNC_SCOPE],
-            Control::Dictionaries(..) => vec![
-                dictionaries::NAME,
-                windows::DICTIONARY_SUMMARY,
-                windows::SYMBOL_STATE,
-            ],
             _ => fields().collect(),
         }
     }
@@ -1584,7 +1540,7 @@ fn conversion() -> Vec<Section> {
             rows: vec![Row::new(
                 "",
                 "",
-                Control::Dictionaries(DictionaryList::Association, ASSOCIATION_SPEC),
+                Control::Dictionaries(DictionaryList::Association),
             )],
             footer: Some(association::NOTE),
             footer_variants: &[],
@@ -2124,12 +2080,10 @@ fn dictionary() -> Vec<Section> {
         },
         Section {
             title: None,
-            rows: vec![Row::new(
-                "",
-                "",
-                Control::Dictionaries(DictionaryList::Imported, IMPORTED_SPEC),
-            )
-            .visible_when(imported())],
+            rows: vec![
+                Row::new("", "", Control::Dictionaries(DictionaryList::Imported))
+                    .visible_when(imported()),
+            ],
             footer: Some(dictionaries::NOTE),
             footer_variants: &[],
         },
