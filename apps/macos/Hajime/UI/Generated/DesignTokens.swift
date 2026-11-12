@@ -329,7 +329,7 @@ enum DesignTokens {
             static let frameWidth: CGFloat = 1
             static let guideDash: CGFloat = 4
             static let anchorGap: CGFloat = 4
-            static let candidateGap: CGFloat = 6
+            static let candidateGap: CGFloat = 8
             static let candidateFontSize: CGFloat = 18
             static let titleHeight: CGFloat = 32
             static let captionButtonWidth: CGFloat = 46
