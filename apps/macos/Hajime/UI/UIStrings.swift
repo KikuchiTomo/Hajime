@@ -257,7 +257,7 @@ enum UIStrings {
     enum Terms {
         static let enabled = "専門用語の辞書を使う"
         static let fields = "使う分野"
-        static let note = "通常の辞書にもある語は、分野を切っても出ます"
+        static let note = "通常の辞書にもある語は、分野をオフにしても出ます"
     }
 
     /// 辞書のファイルを取り込む前に中身を見せるシート(ImportPreview)

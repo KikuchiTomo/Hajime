@@ -914,7 +914,7 @@ pub mod rule_list {
 pub mod terms {
     pub const ENABLED: &str = "専門用語の辞書を使う";
     pub const FIELDS: &str = "使う分野";
-    pub const NOTE: &str = "通常の辞書にもある語は、分野を切っても出ます";
+    pub const NOTE: &str = "通常の辞書にもある語は、分野をオフにしても出ます";
 
     /// 分野の id と名前(core の TermField と同じ並びと名前．tools/check/check_strings.py が確かめる)
     pub const FIELD_NAMES: &[(&str, &str)] = &[
