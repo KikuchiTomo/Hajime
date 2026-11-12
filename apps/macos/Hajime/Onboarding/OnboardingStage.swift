@@ -8,6 +8,7 @@ struct OnboardingStage: NSViewRepresentable {
     let page: OnboardingPage
     let settings: HajimeDomain.Settings
     var spotlight: OnboardingSpotlight?
+    var appMode = AppProfile.imeOff
 
     func makeNSView(context: Context) -> DemoStageView {
         DemoStageView()
@@ -15,9 +16,9 @@ struct OnboardingStage: NSViewRepresentable {
 
     func updateNSView(_ view: DemoStageView, context: Context) {
         // 台本は時刻を含むことがある(日付の実演)ので，ページ・見せている機能・設定が変わったときだけ作り直す
-        let key = "\(page.rawValue)-\(spotlight?.rawValue ?? -1)"
+        let key = "\(page.rawValue)-\(spotlight?.rawValue ?? -1)-\(appMode.rawValue)"
         guard view.needsReplay(key: key, settings: settings) else { return }
-        view.play(DemoScripts.frames(for: page, settings: settings, spotlight: spotlight), settings: settings, key: key)
+        view.play(DemoScripts.frames(for: page, settings: settings, spotlight: spotlight, appMode: appMode), settings: settings, key: key)
     }
 }
 
@@ -139,7 +140,7 @@ final class DemoStageView: NSView {
 
     private var fieldRect: NSRect {
         // タイトルバーの下から，舞台の上 1/4 ほどに置く(下に候補の窓を広げる場所を空ける)
-        NSRect(x: Size.stagePadding, y: Size.stagePadding * 4, width: bounds.width - Size.stagePadding * 2, height: Size.fieldHeight)
+        NSRect(x: Size.stagePadding, y: Size.fieldTop, width: bounds.width - Size.stagePadding * 2, height: Size.fieldHeight)
     }
 
     private var textAttributes: [NSAttributedString.Key: Any] {
@@ -164,7 +165,7 @@ final class DemoStageView: NSView {
         let x = min(max(positions.markedStart - Size.cardPadding, Size.stagePadding), bounds.width - Size.stagePadding - size.width)
         panelHost.frame = NSRect(x: x.rounded(), y: top, width: size.width, height: size.height)
         let modeSize = mode.fittingSize
-        mode.frame = NSRect(x: min(positions.end + Size.demoGap / 2, bounds.width - Size.stagePadding - modeSize.width).rounded(),
+        mode.frame = NSRect(x: min(positions.end + DesignTokens.Size.Space.group, bounds.width - Size.stagePadding - modeSize.width).rounded(),
                             y: top, width: modeSize.width, height: modeSize.height)
     }
 
@@ -215,6 +216,27 @@ final class DemoStageView: NSView {
         if let application = current?.application {
             drawApplicationTab(application, above: field)
         }
+        if let key = current?.key {
+            drawKey(key, above: field)
+        }
+    }
+
+    /// 押したキーを，入力欄の右上にキーの札で出す．アプリの名前の札と同じ高さにそろえ，入力欄と同じ地と縁にする
+    private func drawKey(_ name: String, above field: NSRect) {
+        let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Size.applicationTabFontSize, weight: .semibold),
+                                                         .foregroundColor: NSColor.labelColor]
+        let text = name.size(withAttributes: attributes)
+        let height = text.height + DesignTokens.Size.Part.tagPaddingY * 2
+        let width = text.width + DesignTokens.Size.Part.fieldPaddingX * 2
+        let cap = NSRect(x: field.maxX - width, y: field.minY - DesignTokens.Size.Space.stack - height, width: width, height: height)
+        let radius = DesignTokens.Size.Part.tagRadius
+        let path = NSBezierPath(roundedRect: cap.insetBy(dx: 0.5, dy: 0.5), xRadius: radius, yRadius: radius)
+        NSColor.textBackgroundColor.withAlphaComponent(DesignTokens.Opacity.Onboarding.field).setFill()
+        path.fill()
+        NSColor.separatorColor.setStroke()
+        path.lineWidth = DesignTokens.Size.Part.stroke
+        path.stroke()
+        name.draw(at: NSPoint(x: cap.minX + DesignTokens.Size.Part.fieldPaddingX, y: cap.minY + DesignTokens.Size.Part.tagPaddingY), withAttributes: attributes)
     }
 
     /// 入力欄の上に，入力先のアプリの名前を窓の見出しのように出す
@@ -222,12 +244,14 @@ final class DemoStageView: NSView {
         let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Size.applicationTabFontSize, weight: .semibold),
                                                          .foregroundColor: NSColor.secondaryLabelColor]
         let text = name.size(withAttributes: attributes)
-        let tab = NSRect(x: field.minX, y: field.minY - Size.demoGap / 2 - text.height - Size.cardGap / 2,
-                         width: text.width + Size.cardGap * 2, height: text.height + Size.cardGap / 2)
+        // 札の形(1 行の欄の左右の余白，札の上下の余白)にし，入力欄の上に stack だけ離して置く
+        let height = text.height + DesignTokens.Size.Part.tagPaddingY * 2
+        let tab = NSRect(x: field.minX, y: field.minY - DesignTokens.Size.Space.stack - height,
+                         width: text.width + DesignTokens.Size.Part.fieldPaddingX * 2, height: height)
         let path = NSBezierPath(roundedRect: tab, xRadius: tab.height / 2, yRadius: tab.height / 2)
         NSColor.controlAccentColor.withAlphaComponent(DesignTokens.Opacity.Onboarding.cardSelected).setFill()
         path.fill()
-        name.draw(at: NSPoint(x: tab.minX + Size.cardGap, y: tab.minY + Size.cardGap / 4), withAttributes: attributes)
+        name.draw(at: NSPoint(x: tab.minX + DesignTokens.Size.Part.fieldPaddingX, y: tab.minY + DesignTokens.Size.Part.tagPaddingY), withAttributes: attributes)
     }
 }
 

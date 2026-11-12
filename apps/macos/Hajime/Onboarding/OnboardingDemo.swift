@@ -17,6 +17,8 @@ struct DemoFrame: Equatable {
     var mode: String?
     /// 入力欄の上に出すアプリの名前．アプリを切り替える実演で使う
     var application: String?
+    /// このコマで押したキー(「かな」「英数」)．入力欄の右上にキーの札で出す
+    var key: String?
     /// このコマを見せておく時間(秒)
     var duration: TimeInterval
 }
@@ -27,12 +29,14 @@ enum DemoScripts {
     private static var keystroke: TimeInterval { DesignTokens.Motion.Onboarding.keystroke / 1000 }
     private static var hold: TimeInterval { DesignTokens.Motion.Onboarding.hold / 1000 }
 
-    static func frames(for page: OnboardingPage, settings: Settings, spotlight: OnboardingSpotlight? = nil, now: Date = Date()) -> [DemoFrame] {
+    /// appMode は，アプリごとの入力モードのページでポインタを置いたカード(そのモードの動きを見せる)
+    static func frames(for page: OnboardingPage, settings: Settings, spotlight: OnboardingSpotlight? = nil,
+                       appMode: AppProfile = .imeOff, now: Date = Date()) -> [DemoFrame] {
         // 機能のページでは，ポインタを置いた機能だけを(オフでも)見せる
         if let spotlight, spotlight.page == page { return frames(for: spotlight, now: now) }
         return switch page {
         case .modeSwitch: modeSwitch(settings)
-        case .appModes: appModes()
+        case .appModes: appModes(appMode)
         case .correction: correction(settings)
         case .theme: theme()
         case .liveConversion: liveConversion(settings)
@@ -71,12 +75,15 @@ enum DemoScripts {
     // MARK: - ページ
 
     /// メモ(IME のオンオフを記憶)で日本語を打ち，ターミナル(IME をオフ)に切り替えると英数になり，メモに戻すと日本語に戻る
-    private static func appModes() -> [DemoFrame] {
+    /// アプリを切り替えたときに，モードの札が選んだカードのとおりに変わるのを見せる
+    /// - IME をオフ: メモで日本語を打ち，ターミナルに切り替えると英数になる
+    /// - IME をオン: ターミナルで英数を打ち，メモに切り替えると日本語になる
+    /// - オンオフを記憶: メモで英数に切り替えてからターミナルに移り，メモに戻ると英数のまま
+    private static func appModes(_ appMode: AppProfile) -> [DemoFrame] {
         let direct = UIStrings.ModeIndicator.label(for: InputMode.direct)
         let japanese = UIStrings.ModeIndicator.label(for: InputMode.japanese)
         let notes = UIStrings.Onboarding.demoNotes
         let terminal = UIStrings.Onboarding.demoTerminal
-        let command = "git status"
         func inApp(_ frames: [DemoFrame], _ application: String) -> [DemoFrame] {
             frames.map { frame in
                 var frame = frame
@@ -84,25 +91,43 @@ enum DemoScripts {
                 return frame
             }
         }
-        var frames = inApp([DemoFrame(mode: japanese, duration: hold / 2)] + typing("kyouha", mode: japanese), notes)
-        frames += inApp([converted([("今日は", .converted)]), DemoFrame(committed: "今日は", mode: japanese, duration: hold)], notes)
-        frames += inApp([DemoFrame(mode: direct, duration: hold / 2)], terminal)
-        frames += inApp(command.indices.map { DemoFrame(committed: String(command[...$0]), mode: direct, duration: keystroke) }, terminal)
-        frames += inApp([DemoFrame(committed: command, mode: direct, duration: hold)], terminal)
-        frames += inApp([DemoFrame(committed: "今日は", mode: japanese, duration: hold)], notes)
-        return frames
+        func typed(_ text: String, after committed: String = "", mode: String) -> [DemoFrame] {
+            text.indices.map { DemoFrame(committed: committed + String(text[...$0]), mode: mode, duration: keystroke) }
+        }
+        let japaneseInNotes = [DemoFrame(mode: japanese, duration: hold / 2)] + typing("kyouha", mode: japanese)
+            + [converted([("今日は", .converted)]), DemoFrame(committed: "今日は", mode: japanese, duration: hold)]
+        switch appMode {
+        case .imeOn:
+            return inApp([DemoFrame(mode: direct, duration: hold / 2)] + typed("ls", mode: direct)
+                         + [DemoFrame(committed: "ls", mode: direct, duration: hold)], terminal)
+                + inApp(japaneseInNotes, notes)
+        case .remembersMode:
+            return inApp(japaneseInNotes + [DemoFrame(committed: "今日は", mode: direct, key: UIStrings.Onboarding.demoKeyEisu, duration: hold / 2)]
+                         + typed("OK", after: "今日は", mode: direct), notes)
+                + inApp([DemoFrame(mode: direct, duration: hold / 2)] + typed("ls", mode: direct), terminal)
+                + inApp([DemoFrame(committed: "今日はOK", mode: direct, duration: hold)], notes)
+        case .imeOff, .standard, .programming, .terminal, .direct:
+            return inApp(japaneseInNotes, notes)
+                + inApp([DemoFrame(mode: direct, duration: hold / 2)] + typed("git status", mode: direct)
+                        + [DemoFrame(committed: "git status", mode: direct, duration: hold)], terminal)
+        }
     }
 
+    /// 英数で打ち，かなキーで日本語にして打ち，英数に戻す．戻すキーは選んだ使い方で変わる
+    /// (分けるなら英数キー，1 つのキーで切り替えるならもう一度かなキー)
     private static func modeSwitch(_ settings: Settings) -> [DemoFrame] {
         let direct = UIStrings.ModeIndicator.label(for: InputMode.direct)
         let japanese = UIStrings.ModeIndicator.label(for: InputMode.japanese)
+        let kana = UIStrings.Onboarding.demoKeyKana
+        let back = ModeSwitchStyle.current(in: settings.keymap) == .single ? kana : UIStrings.Onboarding.demoKeyEisu
         let english = "Mac で"
         var frames = [DemoFrame(mode: direct, duration: hold / 2)]
         frames += english.indices.map { DemoFrame(committed: String(english[...$0]), mode: direct, duration: keystroke) }
-        frames.append(DemoFrame(committed: english, mode: japanese, duration: hold / 2))
+        frames.append(DemoFrame(committed: english, mode: japanese, key: kana, duration: hold / 2))
         frames += typing("nihongo", committed: english, mode: japanese)
         frames.append(converted([("日本語", .converted)], committed: english))
-        frames.append(DemoFrame(committed: english + "日本語", duration: hold))
+        frames.append(DemoFrame(committed: english + "日本語", mode: japanese, duration: hold / 2))
+        frames.append(DemoFrame(committed: english + "日本語", mode: direct, key: back, duration: hold))
         return frames
     }
 
