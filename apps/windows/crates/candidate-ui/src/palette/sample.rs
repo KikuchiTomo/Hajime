@@ -13,6 +13,8 @@ use ipc::{
 const CELL_SIZE: f64 = 36.0;
 const COLUMNS: u32 = 9;
 const VISIBLE_ROWS: u32 = 6;
+/// 顔文字の 1 行の広いマスの数(列の数を core の DefaultSettings.paletteWideCellSpan で割ったもの)
+const KAOMOJI_CELLS_PER_ROW: u32 = 3;
 
 const EMOJI_ROWS: [&[&str]; 6] = [
     &["👍", "🙇", "😂", "🎉", "🙏", "✨", "👀", "🔥", "💯"],
@@ -30,6 +32,15 @@ const SYMBOL_ROWS: [&[&str]; 6] = [
     &["⟷", "⟹", "⟸", "⟺", "↦", "↤", "↩", "↪", "↺"],
     &["↻", "⤴", "⤵", "↰", "↱", "↲", "↳", "↴", "↵"],
     &["⇄", "⇅", "⇆", "⇇", "⇈", "⇉", "⇊", "⇋", "⇌"],
+];
+
+const KAOMOJI_ROWS: [&[&str]; 6] = [
+    &["(^o^)", "m(_ _)m", "(´・ω・｀)"],
+    &["＼(^o^)／", "(^o^)", "(^^)"],
+    &["(*^^*)", "^_^", ":D"],
+    &["・ω・", "(*´ω｀*)", "(^O^)"],
+    &["(^_^)", "(・∀・)", "(*^_^*)"],
+    &["ヾ(｡>﹏<｡)ﾉﾞ✧*。", "(((((((((((っ･ω･)っ ﾌﾞｰﾝ", "(*´∀｀*)"],
 ];
 
 /// 絵文字のまとまり: 送るときの名前・見出し・アイコンを描けないときの文字
@@ -58,6 +69,17 @@ const SYMBOL_SECTIONS: [(&str, &str, &str); 10] = [
     ("misc", "その他の記号", "♪"),
 ];
 
+const KAOMOJI_SECTIONS: [(&str, &str, &str); 8] = [
+    ("joy", "笑顔", "^^"),
+    ("sorrow", "悲しみ", "T_T"),
+    ("sweat", "焦り", "^^;"),
+    ("anger", "怒り", "`д´"),
+    ("surprise", "驚き", "ﾟдﾟ"),
+    ("greeting", "挨拶と動作", "ﾉｼ"),
+    ("animals", "動物", "ΦωΦ"),
+    ("otherFaces", "その他の顔文字", "☆彡"),
+];
+
 fn strings(texts: &[&str]) -> Vec<String> {
     texts.iter().map(|text| (*text).to_string()).collect()
 }
@@ -66,7 +88,7 @@ fn hints() -> Vec<KeyHint> {
     [
         ("Enter", "入力"),
         ("Tab", "分類"),
-        ("Ctrl+Tab", "絵文字と記号"),
+        ("Ctrl+Tab", "種類"),
         ("Shift+Enter", "続けて入力"),
         ("Alt+Enter", "肌の色"),
         ("Ctrl+D", "ピン留め"),
@@ -84,6 +106,7 @@ fn modes(kind: PaletteKind) -> Vec<PaletteMode> {
     [
         (PaletteKind::Emoji, "絵文字"),
         (PaletteKind::Symbol, "記号"),
+        (PaletteKind::Kaomoji, "顔文字"),
     ]
     .into_iter()
     .map(|(mode, title)| PaletteMode {
@@ -280,5 +303,43 @@ pub fn symbol() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: None,
+    }
+}
+
+/// 顔文字のパレット．よく使う行の下に笑顔のまとまりが広いマスで続く
+pub fn kaomoji() -> PalettePanel {
+    let titles = ["よく使う", "笑顔", "笑顔", "笑顔", "笑顔", "笑顔"];
+    PalettePanel {
+        modes: modes(PaletteKind::Kaomoji),
+        query: String::new(),
+        placeholder: "顔文字を検索".into(),
+        tabs: tabs(
+            tab("frequent", "よく使う", "🕘", false),
+            &KAOMOJI_SECTIONS,
+            "joy",
+        ),
+        heading: "よく使う".into(),
+        rows: rows(&KAOMOJI_ROWS, &titles, &[0, 1]),
+        row_count: 48,
+        first_row: 0,
+        columns: COLUMNS,
+        visible_rows: VISIBLE_ROWS,
+        selection: Some(PalettePosition { row: 0, column: 2 }),
+        preview: Some(preview(
+            "(´・ω・｀)",
+            "しょぼーん",
+            "",
+            &[],
+            &["しょんぼり", "がっかり"],
+            "",
+            false,
+        )),
+        shows_preview: true,
+        skin_tone: SkinTone::None,
+        skin_tone_picker: None,
+        message: None,
+        hints: hints(),
+        cell_size: CELL_SIZE,
+        cells_per_row: Some(KAOMOJI_CELLS_PER_ROW),
     }
 }

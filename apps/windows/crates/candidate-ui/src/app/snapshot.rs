@@ -209,6 +209,7 @@ fn render_all(output: &Path) -> Result<()> {
             ("palette-emoji", palette::sample::emoji()),
             ("palette-search", palette::sample::search()),
             ("palette-symbol", palette::sample::symbol()),
+            ("palette-kaomoji", palette::sample::kaomoji()),
         ] {
             let fonts = Fonts::new(cell_size(&panel));
             let measure = renderer.measure_with(&theme, font_size, &fonts.all())?;
