@@ -479,6 +479,8 @@ struct RowState {
     /// 部品を置いたカード(出さない行は None)
     card: Option<layout::CardLayout>,
     visible: bool,
+    /// 名前の横の見本を出す(条件付きの見本は条件を満たすときだけ)
+    shows_example: bool,
     enabled: bool,
     readable: bool,
     /// 既定に戻すボタンを出す
@@ -700,6 +702,7 @@ impl RowState {
             section,
             card: None,
             visible: true,
+            shows_example: true,
             enabled: true,
             readable: true,
             resettable: false,
@@ -1907,6 +1910,7 @@ impl PageView {
             };
             row.visible = row.row.visible.is_none_or(condition)
                 && (row.row.control != Control::KeymapReport || !extras.keymap_report.is_empty());
+            row.shows_example = row.row.example_visible.is_none_or(condition);
             row.readable = row.row.path.is_empty() || values.is_readable(row.row.path);
             row.enabled = row.readable && row.row.enabled.is_none_or(condition);
             row.resettable =
@@ -2069,6 +2073,7 @@ impl PageView {
     pub fn arrange(&mut self, width: f32, measure: &dyn paint::Measure) -> f32 {
         self.width = width;
         let visible: Vec<bool> = self.rows.iter().map(|row| row.visible).collect();
+        let examples: Vec<bool> = self.rows.iter().map(|row| row.shows_example).collect();
         let all: Vec<&Row> = self
             .sections
             .iter()
@@ -2108,6 +2113,7 @@ impl PageView {
             &self.sections,
             width,
             |row| metrics.position(row).is_none_or(|index| visible[index]),
+            |row| metrics.position(row).is_none_or(|index| examples[index]),
             &metrics,
         );
         for row in &mut self.rows {
@@ -3896,7 +3902,7 @@ impl PageView {
                 layout,
             );
         }
-        if let Some(example) = row.row.example {
+        if let Some(example) = row.row.example.filter(|_| row.shows_example) {
             example_chip(canvas, theme, card.icon, example, row.enabled);
         }
         for (position, rect) in &card.descriptions {

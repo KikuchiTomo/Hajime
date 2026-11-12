@@ -94,16 +94,28 @@ final class SettingsNavigation {
     }
 }
 
-/// 列挙の値を選ぶ項目．values を渡さなければすべての値を並べる
+/// 列挙の値を選ぶ項目．values を渡さなければすべての値を並べる．
+/// example を渡すと，名前のすぐ後ろにその値で出る見本をタグの形で添える(titleWidth はタグの左の端をそろえる名前の幅．ExampleToggle と同じ)
 struct ChoicePicker<Value: Hashable & CaseIterable>: View where Value.AllCases: RandomAccessCollection {
     let title: String
     let selection: Binding<Value>
     var values: [Value] = Array(Value.allCases)
+    var example: (reading: String, candidate: String)?
+    var titleWidth: CGFloat?
     let label: (Value) -> String
 
     var body: some View {
-        Picker(title, selection: selection) {
+        Picker(selection: selection) {
             ForEach(values, id: \.self) { Text(label($0)).tag($0) }
+        } label: {
+            if let example {
+                HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Size.Space.group) {
+                    Text(title).frame(minWidth: titleWidth, alignment: .leading)
+                    CandidateExample(reading: example.reading, candidate: example.candidate)
+                }
+            } else {
+                Text(title)
+            }
         }
     }
 }
@@ -114,13 +126,13 @@ private struct InputTab: View {
     var body: some View {
         Form {
             Section(UIStrings.Settings.inputStyleSection) {
-                ResettablePicker(model: model, title: UIStrings.Choice.inputStyle, keyPath: \.inputStyle, label: UIStrings.Choice.label(for:))
-                // 英字入力(自動)では，打った英文が日本語になる見本を出す
-                if model.settings.inputStyle == .englishAuto {
-                    CandidateExample(reading: UIStrings.Choice.englishAutoExample.reading, candidate: UIStrings.Choice.englishAutoExample.candidate)
-                }
+                // 英字入力(自動)を選んだときだけ，名前のすぐ後ろに打った英文が日本語になる見本を出す
+                let titleWidth = ExampleToggle.titleWidth([UIStrings.Choice.inputStyle, UIStrings.Choice.englishInputLiveConversion])
+                ResettablePicker(model: model, title: UIStrings.Choice.inputStyle, keyPath: \.inputStyle,
+                                 example: model.settings.inputStyle == .englishAuto ? UIStrings.Choice.englishAutoExample : nil, titleWidth: titleWidth,
+                                 label: UIStrings.Choice.label(for:))
                 ExampleToggle(model: model, title: UIStrings.Choice.englishInputLiveConversion, keyPath: \.englishInputLiveConversion,
-                              example: UIStrings.Choice.englishInputLiveConversionExample)
+                              example: UIStrings.Choice.englishInputLiveConversionExample, titleWidth: titleWidth)
                     .disabled(model.settings.inputStyle != .english)
                 ResettablePicker(model: model, title: UIStrings.Choice.keyboardLayout, keyPath: \.keyboardLayout, label: UIStrings.Choice.label(for:))
             }

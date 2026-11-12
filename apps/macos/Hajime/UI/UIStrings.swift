@@ -34,9 +34,8 @@ enum UIStrings {
         static let tooMany = "取り込める連想の辞書は \(DefaultSettings.maximumAssociationDictionaries) 個までです"
         static let importFailed = "連想の辞書を取り込めませんでした。大きすぎるか、対応していない形式です"
         static let note = "上の辞書ほど優先"
-        /// 読み込めるファイルの例の行(「,」で区切った行と，先頭に意味の説明を置いてタブで区切った行．タブは ⇥ で見せる)
+        /// 読み込めるファイルの例の行(同じ意味の単語を「,」で区切った 1 行)
         static let fileExample = "美しい,綺麗,麗しい"
-        static let tabFileExample = "見た目がよい ⇥ 美しい ⇥ 綺麗"
         static func imported(_ count: Int) -> String { "\(count) 件の意味を取り込みました" }
         static func summary(_ dictionary: AssociationDictionary) -> String { "\(dictionary.groupCount) 件の意味" }
         /// 連想の一覧の見出しの前に置く言葉
