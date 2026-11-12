@@ -520,6 +520,8 @@ public enum DefaultSettings {
     public static let palettePreviewReadings = 4
     /// 同梱のパレットの表のファイルの名前(アプリの中・Windows のインストール先に置く)
     public static let bundledPaletteFileName = "palette.tsv"
+    /// 同梱の絵文字の同じ意味の語の一覧のファイルの名前(パレットの表と同じ場所に置く)
+    public static let bundledEmojiSynonymsFileName = "emoji-synonyms.tsv"
     /// パレットの表のファイルの大きさの上限．同梱の表は 700KB ほど．壊れた大きなファイルを読み込まないため
     public static let maximumPaletteFileBytes = 4 * 1024 * 1024
     /// パレットの表の 1 つの文字の長さの上限(Character の数)．絵文字の組み合わせも 1 文字に数える

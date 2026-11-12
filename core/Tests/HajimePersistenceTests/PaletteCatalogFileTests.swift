@@ -32,6 +32,17 @@ struct PaletteCatalogFileTests {
         #expect(index.search.search(PaletteSearch.Query(typed: "", kana: "ならば")).first?.text == "⇒")
     }
 
+    @Test("R-26: 同じ場所の絵文字の同じ意味の語の一覧を読む．一覧の絵文字はどれもパレットの表にある")
+    func readsSynonyms() async throws {
+        let index = try #require(await PaletteCatalogFile(url: bundledFile, canRender: { _ in true }).waitForLoad())
+        let coffee = index.search.emoji(reading: "こーひー", word: EmojiWord(text: "コーヒー", isNoun: true), limit: 2)
+        #expect(coffee.first?.text == "☕")
+        let text = try String(contentsOf: bundledFile.deletingLastPathComponent().appendingPathComponent(DefaultSettings.bundledEmojiSynonymsFileName),
+                              encoding: .utf8)
+        let missing = EmojiSynonyms(text: text).allEmoji.filter { index.catalog.item(for: $0)?.kind != .emoji }
+        #expect(missing.isEmpty, "パレットの表に無い絵文字: \(missing.sorted())")
+    }
+
     @Test("R-26: 見本をどれも描けなければ絵文字を除かない．ファイルが無ければ表を渡さない")
     func fallbacks() async throws {
         let all = try #require(await PaletteCatalogFile(url: bundledFile, canRender: { _ in false }).waitForLoad())
