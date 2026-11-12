@@ -78,11 +78,9 @@ pub mod settings {
     pub const NUMBER_FORM_ROMAN: &str = "ローマ数字";
     pub const LEARNING: &str = "学習";
     pub const ZENZAI_MODEL: &str = "Zenzai のモデル";
-    pub const ZENZAI_MODEL_NOTE: &str =
-        "併用では、打っている間の表示を小さなモデルで速く求め、打鍵が止まったときと変換は大きなモデルで求め直します。小さなモデルが無いときは大きなモデルを使います。";
-    pub const CANDIDATE_RERANKING: &str = "Zenzai による候補の並べ替え";
-    pub const CANDIDATE_RERANKING_NOTE: &str =
-        "変換の候補の 2 番目以降を、Zenzai で前後の文に合う順に並べ替えます。第 1 候補は変わりません。";
+    /// 併用を選んだときに出す，入力中と変換で使うモデル
+    pub const ZENZAI_COMBINED_NOTE: &str = "入力中: 速さを優先 / 変換: 精度を優先";
+    pub const CANDIDATE_RERANKING: &str = "2 番目以降の候補を Zenzai で並べ替え";
     pub const RESET_LEARNING: &str = "学習結果を消去";
     pub const SAVE_FAILED: &str = "設定を保存できませんでした";
     pub const RESTORE_DEFAULTS: &str = "すべての設定を既定に戻す";
@@ -132,12 +130,10 @@ pub mod menu {
 pub mod choice {
     pub const INPUT_STYLE: &str = "入力方式";
     pub const KEYBOARD_LAYOUT: &str = "キー配列";
-    pub const KEYBOARD_LAYOUT_NOTE: &str = "ローマ字入力と英字入力で使用します。";
     pub const ENGLISH_INPUT_LIVE_CONVERSION: &str = "英字入力のライブ変換";
-    pub const ENGLISH_INPUT_LIVE_CONVERSION_NOTE: &str =
-        "英語の辞書にない単語をローマ字として読み、日本語に変換して表示します。Esc で英字に戻せます。";
-    pub const ENGLISH_AUTO_NOTE: &str =
-        "英語で入力しながら、日本語にできる語句を自動で日本語に変換します。判別方法は「英語と日本語」で変更できます。";
+    /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補)
+    pub const ENGLISH_INPUT_LIVE_CONVERSION_EXAMPLE: (&str, &str) = ("kyouha", "今日は");
+    pub const ENGLISH_AUTO_EXAMPLE: (&str, &str) = ("zoom dekaigi", "zoom で会議");
     pub const VARIANT_ROW: &str = "候補の上に文字種の行を表示";
     pub const KEY_HINTS: &str = "キーの案内を表示";
     pub const TYPO_CORRECTION: &str = "タイプミスの修正";
@@ -289,6 +285,13 @@ pub mod import_preview {
 
     pub fn filter(name: &str, count: u32) -> String {
         format!("{name} {}", super::thousands(count))
+    }
+
+    /// 表の行の読み上げ(行の番号・列の値・意味を「、」でつなぐ)
+    pub fn row(line: u32, values: &[&str]) -> String {
+        let mut parts = vec![format!("{} 行目", super::thousands(line))];
+        parts.extend(values.iter().map(|value| (*value).to_string()));
+        parts.join("、")
     }
 
     pub fn format(format: ImportFormat) -> &'static str {
@@ -597,14 +600,13 @@ pub mod more {
     pub const LIST_CANDIDATES: &str = "一覧の候補数";
     pub const GRID_COLUMNS: &str = "表の列数";
     pub const EXPANDS_GRID_ON_PAGING: &str = "候補を送り続けたら表に広げる";
-    pub const GRID_COLUMNS_NOTE: &str =
-        "変換中にキー設定の「候補を表に広げる」のキーを押すと、候補を「一覧の候補数」の行 × この列数の表に広げます。";
+    /// 表に広げたときの大きさ(一覧の候補数の行 × 列数．UIStrings.More.gridSize)
+    pub fn grid_size(rows: f64, columns: f64) -> String {
+        format!("{rows} 行 × {columns} 列")
+    }
     pub const CONTEXTUAL_SEGMENT_CANDIDATES: &str = "前後の文脈で候補を並べ替え";
-    pub const CONTEXTUAL_SEGMENT_CANDIDATES_NOTE: &str =
-        "分岐図・文節ごとの一覧・入力中の候補で、前後の語句とのつながりがよい候補を上に表示します。";
     pub const LIST_SEGMENT_ALTERNATIVES: &str = "一覧に文節を入れ替えた候補を表示";
-    pub const LIST_SEGMENT_ALTERNATIVES_NOTE: &str =
-        "一覧で、文節を 1 か所だけほかの候補に替えた文を、迷う文節から順に表示します。";
+    pub const LIST_SEGMENT_ALTERNATIVES_EXAMPLE: (&str, &str) = ("資料を送る", "資料を贈る");
     pub const LIVE_CONVERSION_DELAY: &str = "漢字にするまでの待ち時間";
     pub const LIVE_CONVERSION_SKIP_LENGTH: &str = "ライブ変換しない文字数";
     pub const ENGLISH_SKIP_LENGTH: &str = "英単語にしない文字数";
@@ -657,7 +659,7 @@ pub mod more {
 
     /// 読みにくい組み合わせの知らせ(UIStrings.More.lowContrast と同じ文)
     pub fn low_contrast(name: &str, ground: &str, ratio: f64, minimum: f64) -> String {
-        format!("{name}と{ground}の色が近く、読みにくくなっています。コントラスト比は {ratio:.1} で、{minimum:.1} 以上が目安です。")
+        format!("{name}と{ground} {ratio:.1} : 1(目安 {minimum:.1} : 1 以上)")
     }
     pub const FONT: &str = "書体";
     pub const BACKUP: &str = "バックアップ";
@@ -742,9 +744,8 @@ pub mod keys {
             format!("{shown} / {total} 行")
         }
     }
-    pub const PLAIN_CHARACTER: &str =
-        "修飾キーの無い文字のキーです。この状態ではその文字を入力できなくなります";
-    pub const MISSING_NOTE: &str = "キーが無いと、入力を確定したり取り消したりできなくなります。";
+    pub const PLAIN_CHARACTER: &str = "この状態ではこの文字を入力できなくなります";
+    pub const ADD_STANDARD_KEYS: &str = "既定のキーを追加";
 
     pub fn load_preset_message(name: &str) -> String {
         format!("今の表を「{name}」の行で置き換えます。")
@@ -852,45 +853,75 @@ pub mod keys {
     ];
     /// コマンドの説明(UIStrings.Keys.help(for:))．名前で分かるコマンドは並べない
     pub const COMMAND_HELP: &[(&str, &str)] = &[
-        ("nextInputStyle", "ローマ字入力・かな入力・英字入力・英字入力(自動)を順に切り替えます"),
-        ("englishAutoStyle", "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"),
-        ("insertSpace", "幅は「スペース幅」の設定に従います。入力中の文字は確定してから入力します"),
-        ("insertAlternateSpace", "「スペース幅」の設定と逆の幅の空白を入力します"),
+        ("nextInputStyle", "ローマ字 → かな → 英字 → 英字(自動)"),
+        ("englishAutoStyle", "kyou no meeting → 今日の meeting"),
+        ("insertSpace", "「スペース幅」の幅の空白を入力します"),
+        (
+            "insertAlternateSpace",
+            "「スペース幅」と逆の幅の空白を入力します",
+        ),
         ("convert", "英単語を修正した直後は、修正前に戻します"),
-        ("convertWithoutLearning", "学習した順位を使わずに変換し、確定しても学習しません"),
-        ("insertBoundary", "入力中に、現在の位置で文節を区切ります"),
-        ("acceptSuggestion", "「もしかして」で示した読みに修正します。示していないときは入力中の予測を確定し、予測も表示していなければ入力中の候補から選択します"),
-        ("switchKanaType", "ひらがな・全角カタカナ・半角カタカナを順に切り替えます"),
-        ("nextCandidate", "入力中に押すと変換を始めます。入力中の候補を表示しているときは、その候補から選択します"),
-        ("previousCandidate", "入力中に押すと変換を始めます。入力中の候補を表示しているときは、文字種から選択します。分岐図では上の枝の文字種へ進みます"),
-        ("nextUncertainSegment", "誤変換の可能性が高い文節に移動します"),
-        ("previousUncertainSegment", "誤変換の可能性が高い文節に移動します"),
-        ("extendSegmentToWord", "文節の終わりを次・前の単語の切れ目まで動かします"),
-        ("shrinkSegmentToWord", "文節の終わりを次・前の単語の切れ目まで動かします"),
-        ("splitSegment", "単語の切れ目に番号を表示し、数字キーで区切ります"),
-        ("editSegment", "選んでいる文節を消して読みを打ち直します。文節を移ると変換します"),
-        ("commitFirstSegment", "先頭の文節を確定し、残りの変換を続けます"),
-        ("cancel", "変換中は読みに戻し、修正した読みは入力したままに戻します。入力中は読みを削除します"),
-        ("backToReading", "変換をやめて全文を読みに戻します。ライブ変換がオンでも、読みを変更するまで読みのまま表示します"),
-        ("resumeEditing", "変換をやめて読みに戻り、末尾から入力を続けます"),
-        ("undoConversionEdit", "直前に変更した候補や文節の区切りを元に戻します。続けて押すと全文を読みに戻します"),
-        ("undoPrediction", "予測を確定した直後に押すと、確定した語句を削除して予測で補う前の読みに戻します。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"),
-        ("undoCommit", "確定した直後に押すと、確定した文字を削除して確定する前の変換に戻します。文節の区切りと選んだ候補も戻るので、そのまま選び直せます。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"),
-        ("segmentToHiragana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
-        ("segmentToKatakana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
-        ("segmentToHalfwidthKatakana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
+        (
+            "convertWithoutLearning",
+            "学習を使わずに変換し、学習もしません",
+        ),
+        ("insertBoundary", "今の位置で文節を区切ります"),
+        ("acceptSuggestion", "「もしかして」の読みに修正します"),
+        ("switchKanaType", "ひらがな → 全角カタカナ → 半角カタカナ"),
+        ("nextCandidate", "入力中は変換を始めます"),
+        (
+            "previousCandidate",
+            "入力中は変換を始め、文字種を選択します",
+        ),
+        ("nextUncertainSegment", "誤変換の多い文節に移動します"),
+        ("previousUncertainSegment", "誤変換の多い文節に移動します"),
+        (
+            "extendSegmentToWord",
+            "文節の終わりを単語の切れ目まで動かします",
+        ),
+        (
+            "shrinkSegmentToWord",
+            "文節の終わりを単語の切れ目まで動かします",
+        ),
+        ("splitSegment", "切れ目の番号を数字キーで選んで区切ります"),
+        ("editSegment", "選択中の文節の読みを打ち直します"),
+        ("commitFirstSegment", "先頭の文節だけを確定します"),
+        ("cancel", "変換中は読みに戻し、入力中は読みを削除します"),
+        ("backToReading", "全文を読みに戻します"),
+        ("resumeEditing", "読みに戻り、末尾から入力を続けます"),
+        ("undoConversionEdit", "直前の候補と区切りの変更を戻します"),
+        (
+            "undoPrediction",
+            "確定した予測を取り消し、補う前の読みに戻します",
+        ),
+        ("undoCommit", "確定を取り消し、確定前の変換に戻します"),
+        ("segmentToHiragana", "選択中の文節だけを変換します"),
+        ("segmentToKatakana", "選択中の文節だけを変換します"),
+        ("segmentToHalfwidthKatakana", "選択中の文節だけを変換します"),
         ("forgetCandidate", "選択中の候補を学習から削除します"),
-        ("forgetLastCommit", "最後に確定した語句の学習を取り消します。入力した文字は削除しません"),
-        ("hidePrediction", "入力中の予測の窓に表示している語句を「予測に表示しない語句」に追加し、次から予測に表示しません。設定の「予測に表示しない語句」から削除すると、また表示します"),
-        ("handwriting", "「手書き入力」の設定がオンのときに使えます"),
-        ("emojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
-        ("symbolPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
-        ("kaomojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
-        ("reconvert", "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します。確定した直後に押すと、確定を取り消して確定する前の変換に戻します"),
-        ("associate", "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"),
-        ("registerWord", "ユーザー辞書の画面を開き、入力中の語句か、選択中の文字を単語の欄に入れます"),
-        ("openMenu", "入力メニューの項目を入力位置に表示します"),
-        ("expandCandidates", "候補を何列かの表に広げ、一度に多くの候補を表示します。表では文節の移動のキーで列を移り、数字キーは選択中の列から選びます。もう一度押すか Esc で元に戻します"),
+        ("forgetLastCommit", "最後に確定した語句の学習を取り消します"),
+        (
+            "hidePrediction",
+            "表示中の予測を「予測に表示しない語句」に追加します",
+        ),
+        ("handwriting", "「手書き入力」がオンのときに使えます"),
+        (
+            "emojiPalette",
+            "「絵文字と記号のパレット」がオンのときに使えます",
+        ),
+        (
+            "symbolPalette",
+            "「絵文字と記号のパレット」がオンのときに使えます",
+        ),
+        (
+            "kaomojiPalette",
+            "「絵文字と記号のパレット」がオンのときに使えます",
+        ),
+        ("reconvert", "確定した文字を変換し直します"),
+        ("associate", "選択中の文節を似た意味の単語の一覧にします"),
+        ("registerWord", "選択中の文字でユーザー辞書の登録を開きます"),
+        ("openMenu", "入力メニューを入力位置に表示します"),
+        ("expandCandidates", "候補を表に広げます"),
     ];
 }
 
@@ -1016,10 +1047,8 @@ pub mod palette {
     pub const SYMBOL_KEY: &str = "記号のパレットを開くキー";
     pub const KAOMOJI_KEY: &str = "顔文字のパレットを開くキー";
     pub const NO_KEY: &str = "なし";
-    pub const CLEAR_HISTORY_NOTE: &str =
-        "よく使う文字と、探した語ごとに選んだ文字の記録を消去します。ピン留めと肌の色はそのまま残します。";
-    pub const THEME_NOTE: &str =
-        "色と書体は「外観」のテーマに従います。開くキーは「キー設定」で変更できます。";
+    pub const CLEAR_HISTORY_NOTE: &str = "ピン留めと肌の色は残ります";
+    pub const OPEN_KEYS: &str = "キー設定を開く";
 
     /// UIStrings.Palette.cellSizeValue(スライダーの名前に今の値を付ける)
     pub fn cell_size_value(size: f64) -> String {
@@ -1039,6 +1068,8 @@ pub mod association {
     pub const IMPORT_FAILED: &str =
         "連想の辞書を取り込めませんでした。大きすぎるか、対応していない形式です";
     pub const NOTE: &str = "上の辞書ほど優先";
+    /// 読み込めるファイルの例の行(同じ意味の単語を「,」で区切った 1 行)
+    pub const FILE_EXAMPLE: &str = "美しい,綺麗,麗しい";
 
     pub fn too_many(limit: usize) -> String {
         format!("取り込める連想の辞書は {limit} 個までです")
@@ -1155,7 +1186,7 @@ pub mod sync {
         ("numberFormRoman", "ローマ数字"),
         ("learning", "学習"),
         ("zenzaiModel", "Zenzai のモデル"),
-        ("candidateReranking", "Zenzai による候補の並べ替え"),
+        ("candidateReranking", "2 番目以降の候補を Zenzai で並べ替え"),
         ("theme", "テーマ"),
         ("candidateFontSize", "候補の文字サイズ"),
         ("showsModeIndicator", "入力モードの切り替えを表示"),
@@ -1260,9 +1291,8 @@ pub mod windows {
     pub fn version(version: &str) -> String {
         format!("v{version} (Windows)")
     }
-    /// キーの欄の使い方(macOS は押して記録するだけなので無い．Windows は打って書くこともできる)
-    pub const KEY_NOTE: &str =
-        "キーの欄を押してから割り当てるキーを押すと記録します。「Ctrl+Shift+Space」のように入力することもできます。";
+    /// キーの欄の例の値(macOS は押して記録するだけなので無い．Windows は打って書くこともできる)
+    pub const KEY_EXAMPLE: &str = "Ctrl+Shift+Space";
     /// 読めないキーの書き方
     pub const INVALID_KEY: &str = "キーの書き方が正しくありません";
     /// 除外設定の一覧の並びの意味を示す 1 行(macOS の UIStrings.More.exclusionsOrder)
@@ -1577,5 +1607,14 @@ mod numbers {
         assert_eq!(thousands(999), "999");
         assert_eq!(thousands(1_000), "1,000");
         assert_eq!(thousands(1_234_567), "1,234,567");
+    }
+
+    #[test]
+    fn 取り込む前の表の行は_行の番号と値を読点でつなぐ() {
+        assert_eq!(
+            super::import_preview::row(4, &["かぶしきがいしゃ", "株式会社", "名詞"]),
+            "4 行目、かぶしきがいしゃ、株式会社、名詞"
+        );
+        assert_eq!(super::import_preview::row(1_200, &[]), "1,200 行目");
     }
 }

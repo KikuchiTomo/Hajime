@@ -124,19 +124,22 @@ struct KeymapPage: View {
         }
     }
 
-    /// 確定・取り消しのキーが無い状態を知らせる
+    /// 確定・取り消しのキーが無い状態を知らせ，標準の表のキーを足すボタンを置く
     @ViewBuilder
     private var missingWarning: some View {
         let missing = keymap.missingEssentials
         if !missing.isEmpty {
             GroupBox {
-                VStack(alignment: .leading, spacing: DesignTokens.Size.Space.stack) {
-                    ForEach(Array(missing.enumerated()), id: \.offset) { _, item in
-                        Label(Keys.missing(state: Keys.label(for: item.state), command: Keys.label(for: item.command)),
-                              systemImage: "exclamationmark.triangle.fill")
-                            .symbolRenderingMode(.multicolor)
+                HStack(alignment: .top, spacing: DesignTokens.Size.Space.group) {
+                    VStack(alignment: .leading, spacing: DesignTokens.Size.Space.stack) {
+                        ForEach(Array(missing.enumerated()), id: \.offset) { _, item in
+                            Label(Keys.missing(state: Keys.label(for: item.state), command: Keys.label(for: item.command)),
+                                  systemImage: "exclamationmark.triangle.fill")
+                                .symbolRenderingMode(.multicolor)
+                        }
                     }
-                    Text(Keys.missingNote).font(.caption).foregroundStyle(.secondary)
+                    Spacer()
+                    Button(Keys.addStandardKeys) { model.update { $0.keymap.addMissingEssentials() } }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }

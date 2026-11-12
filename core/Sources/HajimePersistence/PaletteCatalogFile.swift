@@ -86,7 +86,7 @@ public final class PaletteCatalogFile: PaletteCatalogProviding {
     }
 
     /// OS が描ける最も新しい絵文字のバージョン．新しいものから見本を確かめる．どれも描けなければ nil(絵文字を除かない．書体を確かめられない作りでも動くように)
-    nonisolated static func newestRenderableVersion(of catalog: PaletteCatalog, canRender: (String) -> Bool) -> EmojiVersion? {
+    nonisolated public static func newestRenderableVersion(of catalog: PaletteCatalog, canRender: (String) -> Bool) -> EmojiVersion? {
         catalog.versionSamples.reversed().first { canRender($0.text) }?.version
     }
 }

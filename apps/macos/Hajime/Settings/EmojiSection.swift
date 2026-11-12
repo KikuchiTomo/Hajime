@@ -7,6 +7,8 @@ import SwiftUI
 /// 位置・数・名前は変えるとその場で下の候補の窓の見本が変わる(説明の文は置かない)
 struct EmojiSection: View {
     @ObservedObject var model: SettingsModel
+    /// タグの左の端をそろえる名前の幅(ページの中でいちばん長い見本付きの名前の幅．渡さなければ 2 つの切り替えの長いほう)
+    var titleWidth = ExampleToggle.titleWidth([UIStrings.Settings.emojiConversion, UIStrings.Settings.emojiWordConversion])
 
     var body: some View {
         Section(UIStrings.Settings.emojiSection) {
@@ -30,11 +32,6 @@ struct EmojiSection: View {
             }
             .disabled(model.settings.emojiPlacement == nil)
         }
-    }
-
-    /// 2 つの切り替えの名前のうち長いほうの幅．タグの左の端をそろえる
-    private var titleWidth: CGFloat {
-        ExampleToggle.titleWidth([UIStrings.Settings.emojiConversion, UIStrings.Settings.emojiWordConversion])
     }
 }
 

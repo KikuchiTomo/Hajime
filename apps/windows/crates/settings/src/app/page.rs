@@ -479,6 +479,8 @@ struct RowState {
     /// 部品を置いたカード(出さない行は None)
     card: Option<layout::CardLayout>,
     visible: bool,
+    /// 名前の横の見本を出す(条件付きの見本は条件を満たすときだけ)
+    shows_example: bool,
     enabled: bool,
     readable: bool,
     /// 既定に戻すボタンを出す
@@ -700,6 +702,7 @@ impl RowState {
             section,
             card: None,
             visible: true,
+            shows_example: true,
             enabled: true,
             readable: true,
             resettable: false,
@@ -789,6 +792,10 @@ impl RowState {
             Control::Stepper(RangeKind::SuggestionSkipCount) => more::skip_count(value),
             Control::Stepper(RangeKind::EmojiCandidatePosition) => {
                 settings::emoji_candidate_position(value)
+            }
+            // 表に広げたときの大きさ(一覧の候補数の行 × 列数．行の数は値を映すときに text に入れておく)
+            Control::Stepper(RangeKind::CandidateGridColumns) => {
+                more::grid_size(self.text.parse().unwrap_or(0.0), value)
             }
             Control::Seconds(_) => more::seconds(value),
             _ => format!("{value}"),
@@ -1903,6 +1910,7 @@ impl PageView {
             };
             row.visible = row.row.visible.is_none_or(condition)
                 && (row.row.control != Control::KeymapReport || !extras.keymap_report.is_empty());
+            row.shows_example = row.row.example_visible.is_none_or(condition);
             row.readable = row.row.path.is_empty() || values.is_readable(row.row.path);
             row.enabled = row.readable && row.row.enabled.is_none_or(condition);
             row.resettable =
@@ -1947,6 +1955,13 @@ impl PageView {
                         .and_then(Value::as_f64)
                         .unwrap_or(0.0);
                     row.choice = Some(options::nearest(&row.numbers, value));
+                    if row.row.control == Control::Stepper(RangeKind::CandidateGridColumns) {
+                        let rows = values
+                            .value("listCandidatesPerPage")
+                            .and_then(Value::as_f64)
+                            .unwrap_or(0.0);
+                        row.text = format!("{rows}");
+                    }
                 }
                 Control::ThemeOption(value) => {
                     // カスタムテーマを使っているときは，既成のテーマのどれも選ばない(macOS と同じ)
@@ -2058,6 +2073,7 @@ impl PageView {
     pub fn arrange(&mut self, width: f32, measure: &dyn paint::Measure) -> f32 {
         self.width = width;
         let visible: Vec<bool> = self.rows.iter().map(|row| row.visible).collect();
+        let examples: Vec<bool> = self.rows.iter().map(|row| row.shows_example).collect();
         let all: Vec<&Row> = self
             .sections
             .iter()
@@ -2097,6 +2113,7 @@ impl PageView {
             &self.sections,
             width,
             |row| metrics.position(row).is_none_or(|index| visible[index]),
+            |row| metrics.position(row).is_none_or(|index| examples[index]),
             &metrics,
         );
         for row in &mut self.rows {
@@ -3885,7 +3902,7 @@ impl PageView {
                 layout,
             );
         }
-        if let Some(example) = row.row.example {
+        if let Some(example) = row.row.example.filter(|_| row.shows_example) {
             example_chip(canvas, theme, card.icon, example, row.enabled);
         }
         for (position, rect) in &card.descriptions {

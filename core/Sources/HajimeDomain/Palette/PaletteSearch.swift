@@ -172,11 +172,13 @@ public struct PaletteSearch: Sendable {
     }
 
     /// 読みと同じ読み(名前の読みか読み)を持つ絵文字．かな漢字変換の候補に足すのに使う．前方一致では出さない(関係の薄い絵文字を出さないため)．
+    /// word を渡すと，その語が絵文字の名前の語と合うものに限る(EmojiRelevance．翼の「空」のような連想の読みで出さないため)．
     /// 並びは，この読みで何度も選んだもの(ranking.learned)を先にし，そのあとは search と同じく，名前の読みで当たったか・
     /// よく使う度合い・ピン留めの点の順．点が同じなら表の順
-    public func emoji(reading: String, ranking: Ranking = Ranking(), limit: Int) -> [PaletteItem] {
+    public func emoji(reading: String, word: EmojiWord? = nil, ranking: Ranking = Ranking(), limit: Int) -> [PaletteItem] {
         guard limit > 0, let hits = emojiByReading[String(String.UnicodeScalarView(FuzzyMatch.normalized(reading)))] else { return [] }
-        let ranked = hits.map { hit -> (index: Int, learned: Bool, points: Double) in
+        let relevant = word.map { word in hits.filter { EmojiRelevance.matches(entries[$0.index].item, reading: reading, word: word) } } ?? hits
+        let ranked = relevant.map { hit -> (index: Int, learned: Bool, points: Double) in
             let text = entries[hit.index].item.text
             let points = (hit.isName ? Double(DefaultSettings.paletteNameMatchBonus) : 0) + Self.usageBonus(ranking.usage[text] ?? 0)
                 + (ranking.pinned.contains(text) ? DefaultSettings.palettePinnedBonus : 0)

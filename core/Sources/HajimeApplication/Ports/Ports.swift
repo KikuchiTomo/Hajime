@@ -72,6 +72,9 @@ public protocol KanaKanjiConverting: AnyObject {
     func sourceName(of text: String, reading: String) -> String?
     /// 絵文字の候補(origin が .emoji)の日本語の名前(語の意味のカードに出す)．絵文字でなければ nil
     func emojiName(of text: String) -> String?
+    /// 前後の文脈や検証木で並べ替えたあとの文節の候補から，新しい第 1 候補の語と名前が合わなくなった読みの絵文字を除く(R-26．
+    /// 「かえる」だけなら第 1 候補は「カエル」で 🐸 を出すが，「家に帰る」の文節では第 1 候補が「帰る」になるので出さない)
+    func keepingRelevantEmoji(_ candidates: [Candidate], reading: String) -> [Candidate]
     /// 打鍵が止まる前の入力中の表示(ライブ変換)を求めているあいだは true．文脈を見る変換(Zenzai)が 1 キーの時間に
     /// 収まらない環境(GPU の無い Windows など)では，そのあいだ Zenzai を使わずに求め，打鍵が止まったときや Space では使う
     func setTyping(_ typing: Bool)
@@ -93,6 +96,7 @@ extension KanaKanjiConverting {
     public func setApplication(_ identifier: String?) {}
     public func sourceName(of text: String, reading: String) -> String? { nil }
     public func emojiName(of text: String) -> String? { nil }
+    public func keepingRelevantEmoji(_ candidates: [Candidate], reading: String) -> [Candidate] { candidates }
     public func forget(_ candidate: Candidate, readingRange range: Range<Int>) { forget(candidate) }
 }
 
@@ -241,9 +245,9 @@ public protocol EnglishTermProviding: AnyObject {
 /// 読みから絵文字を引くポート(「なく」→ 😢)．表は端末の中にあり，通信しない
 @MainActor
 public protocol EmojiLooking: AnyObject {
-    /// 読みと同じ読みの絵文字(前方一致では引かない)．よさそうな順に limit 個まで．OS が描けない絵文字は除き，
-    /// 肌の色を変えられる絵文字は選んである肌の色にする．無ければ空
-    func emoji(for reading: String, limit: Int) -> [String]
+    /// 読みと同じ読みの絵文字(前方一致では引かない)のうち，文節の語(word．第 1 候補の表記と名詞か)と名前の語が合うもの(EmojiRelevance)．
+    /// よさそうな順に limit 個まで．OS が描けない絵文字は除き，肌の色を変えられる絵文字は選んである肌の色にする．無ければ空
+    func emoji(for reading: String, word: EmojiWord, limit: Int) -> [String]
     /// 絵文字の日本語の名前(CLDR の短い名前．😄 なら「笑顔」)．知らない絵文字なら nil
     func name(of emoji: String) -> String?
     /// 変換で絵文字を確定した．この読みで選んだことを覚えて，次から先に出す

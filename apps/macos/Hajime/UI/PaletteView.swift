@@ -1,6 +1,7 @@
 import AppKit
 import HajimeApplication
 import HajimeDomain
+import HajimePersistence
 
 /// 絵文字と記号のパレットの中身を描く(R-26)．上から，探す欄と種類の切り替え・まとまりのタブ・見出し・マス目・文字の説明・キーの案内．
 ///
@@ -649,7 +650,7 @@ final class PaletteView: NSView {
 /// パレットのタブのアイコンと絵文字の書体．絵文字のまとまりは SF Symbols のアイコンで描き(テーマの文字の色に合わせる)，
 /// 記号のまとまりは代表の文字で描く
 enum PaletteIcons {
-    static let emojiFontName = "AppleColorEmoji"
+    static let emojiFontName = EmojiGlyphProbe.fontName
 
     static func symbolName(for section: PaletteSection.Kind) -> String? {
         switch section {

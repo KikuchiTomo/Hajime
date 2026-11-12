@@ -98,6 +98,8 @@ pub struct ImportSheet {
     pub pressed: Option<ImportPart>,
     /// 表の送り
     pub scroll: Scroller,
+    /// 表で選んでいる行(rows の番号)．表にフォーカスがあるとき印を付け，↑↓ で移る
+    pub cursor: usize,
 }
 
 impl ImportSheet {
@@ -115,6 +117,7 @@ impl ImportSheet {
             hover: None,
             pressed: None,
             scroll: Scroller::default(),
+            cursor: 0,
         }
     }
 
@@ -162,7 +165,77 @@ impl ImportSheet {
         if let Some((filter, _)) = self.filters().get(index) {
             self.filter = *filter;
             self.scroll.jump_to(0.0);
+            self.cursor = 0;
         }
+    }
+
+    /// 選んでいる切り替えの番号
+    pub fn filter_index(&self) -> usize {
+        self.filters()
+            .iter()
+            .position(|(filter, _)| *filter == self.filter)
+            .unwrap_or(0)
+    }
+
+    /// Tab で巡る部品．切り替えはまとまりで 1 回だけ止まり(選んでいるところ)，中は ←→ で動く(WinUI の RadioButtons)
+    pub fn tab_order(&self, layout: &ImportLayout) -> Vec<ImportPart> {
+        let selected = self.filter_index();
+        layout
+            .order()
+            .into_iter()
+            .filter(|part| !matches!(part, ImportPart::Filter(index) if *index != selected))
+            .collect()
+    }
+
+    /// 表で選ぶ行を delta だけ動かし(端で止める)，見えるところまで送る
+    pub fn move_cursor(&mut self, delta: isize, viewport: f32, now: f64) {
+        let count = self.rows().len();
+        if count == 0 {
+            return;
+        }
+        self.cursor = self.cursor.saturating_add_signed(delta).min(count - 1);
+        let top = self.cursor as f32 * size::TABLE_ROW_HEIGHT;
+        let offset = self.scroll.target();
+        if top < offset {
+            self.scroll.scroll_to(top, now);
+        } else if top + size::TABLE_ROW_HEIGHT > offset + viewport {
+            self.scroll
+                .scroll_to(top + size::TABLE_ROW_HEIGHT - viewport, now);
+        }
+    }
+
+    /// 行の読み上げの名前(行の番号・列の値・名詞にする・取り込まない意味)
+    pub fn row_name(&self, row: &ImportPreviewRow) -> String {
+        let mut values: Vec<&str> = Vec::new();
+        for (index, column) in self.pending.preview.columns.iter().enumerate() {
+            let value = row.cells.get(index).map_or("", String::as_str);
+            if value.is_empty() {
+                continue;
+            }
+            values.push(
+                if *column == ImportColumn::WordClass && row.status != ImportRowStatus::Unreadable {
+                    crate::options::label_of(crate::options::WORD_CLASSES, value)
+                } else {
+                    value
+                },
+            );
+        }
+        match row.status {
+            ImportRowStatus::DefaultedWordClass => values.push(text::DEFAULTED_HELP),
+            ImportRowStatus::Unreadable => values.push(text::UNREADABLE_HELP),
+            ImportRowStatus::Ok => {}
+        }
+        text::row(row.line, &values)
+    }
+
+    /// 表の (y)(窓の中の座標)にある行(rows の番号)
+    pub fn row_at(&self, layout: &ImportLayout, y: f32, now: f64) -> Option<usize> {
+        if y < layout.body.y || y >= layout.body.max_y() {
+            return None;
+        }
+        let index =
+            ((y - layout.body.y + self.scroll.offset(now)) / size::TABLE_ROW_HEIGHT) as usize;
+        (index < self.rows().len()).then_some(index)
     }
 
     /// 部品を使えるか(取り込めるものが無ければ取り込めない)
@@ -569,12 +642,39 @@ fn paint_table(
     let body = layout.body;
     let offset = sheet.scroll.offset(now);
     canvas.push_clip(body);
+    // 表にフォーカスがあるときだけ，選んでいる行に印を付ける
+    let table_focused = sheet.focus == ImportPart::Table;
     for (index, row) in sheet.rows().iter().enumerate() {
         let top = body.y + index as f32 * size::TABLE_ROW_HEIGHT - offset;
         if top + size::TABLE_ROW_HEIGHT < body.y || top > body.max_y() {
             continue;
         }
-        if index % 2 == 1 {
+        if table_focused && index == sheet.cursor {
+            // 選んでいる行(ページの表と同じ背景と左の印)
+            let line = Rect::new(
+                table.x + size::TABLE_ROW_INSET,
+                top + part::STROKE,
+                table.width - size::TABLE_ROW_INSET * 2.0,
+                size::TABLE_ROW_HEIGHT - part::STROKE * 2.0,
+            );
+            canvas.fill_round(
+                line,
+                size::CONTROL_RADIUS,
+                Color::from(palette.nav_selected),
+            );
+            let indicator = size::NAV_INDICATOR_HEIGHT
+                .min(size::TABLE_ROW_HEIGHT - size::TABLE_INDICATOR_INSET);
+            canvas.fill_round(
+                Rect::new(
+                    line.x,
+                    line.y + (line.height - indicator) / 2.0,
+                    size::NAV_INDICATOR_WIDTH,
+                    indicator,
+                ),
+                size::NAV_INDICATOR_WIDTH / 2.0,
+                Color::from(palette.accent),
+            );
+        } else if index % 2 == 1 {
             canvas.fill_rect(
                 Rect::new(
                     table.x + part::STROKE,
@@ -710,6 +810,8 @@ mod tests {
         let dialog = layout.dialog;
         assert_eq!(dialog.width, IMPORT_PREVIEW_WIDTH);
         assert!((dialog.x + dialog.width / 2.0 - 500.0).abs() <= 1.0);
+        // 上下も真ん中(窓の大きさはタイトルバーの下の部分)
+        assert!((dialog.y - (800.0 - dialog.max_y())).abs() <= 1.0);
         for (_, rect) in &layout.parts {
             assert!(rect.x >= dialog.x && rect.max_x() <= dialog.max_x() + 0.01);
             assert!(rect.y >= dialog.y && rect.max_y() <= dialog.max_y() + 0.01);
@@ -741,6 +843,44 @@ mod tests {
             .order()
             .iter()
             .any(|part| matches!(part, ImportPart::Filter(_))));
+    }
+
+    #[test]
+    fn 切り替えは_tab_で_1_回だけ止まり_表の行を読み上げの名前にする() {
+        let mut problems = sheet(1, 1, 2);
+        let layout = ImportLayout::new((1000.0, 800.0), &problems, &Fixed);
+        let order = problems.tab_order(&layout);
+        assert_eq!(
+            order,
+            vec![
+                ImportPart::Filter(0),
+                ImportPart::Table,
+                ImportPart::Cancel,
+                ImportPart::Import
+            ]
+        );
+        problems.set_filter(2);
+        assert_eq!(problems.tab_order(&layout)[0], ImportPart::Filter(2));
+        let rows = problems.pending.preview.rows.clone();
+        assert_eq!(
+            problems.row_name(&rows[1]),
+            "2 行目、かいしゃ、会社、名詞、品詞が無いため名詞として登録します"
+        );
+        assert!(problems
+            .row_name(&rows[2])
+            .ends_with("読めないため取り込みません"));
+    }
+
+    #[test]
+    fn 表の行は_上下で移り_はみ出すときは送る() {
+        let mut sheet = sheet(0, 0, 3);
+        sheet.move_cursor(1, size::TABLE_ROW_HEIGHT, 0.0);
+        assert_eq!(sheet.cursor, 1);
+        sheet.move_cursor(5, size::TABLE_ROW_HEIGHT, 0.0);
+        assert_eq!(sheet.cursor, 2);
+        assert!(sheet.scroll.target() > 0.0 || sheet.scroll.max() == 0.0);
+        sheet.move_cursor(-9, size::TABLE_ROW_HEIGHT, 0.0);
+        assert_eq!(sheet.cursor, 0);
     }
 
     #[test]

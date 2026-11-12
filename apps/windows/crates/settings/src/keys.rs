@@ -5,7 +5,8 @@
 //! 画面では Option を Windows の名前の Alt で出す
 
 use crate::strings::keys::{COMMANDS, STATES};
-use ipc::KeymapReport;
+use ipc::{KeymapMissing, KeymapReport};
+use serde_json::{json, Value};
 
 /// 名前で書くキー(KeyStroke.names)
 const NAMES: &[&str] = &[
@@ -287,17 +288,52 @@ fn describe(entries: &[(String, String, String)], row: u32) -> String {
         })
 }
 
+/// キーの無い確定・取り消し(missing)に，standard の表でそのコマンド(か代わりのコマンド)に使うキーを 1 つずつ足した表．
+/// その状態の行を先に，無ければ いつでも の行から選ぶ．変換中の取り消しは，直前の変更の取り消しでも足りる
+/// (core の Keymap.addMissingEssentials)．足すものが無ければ None
+pub fn with_missing(keymap: &Value, missing: &[KeymapMissing], standard: &Value) -> Option<Value> {
+    let rows = standard.as_array()?;
+    let text = |row: &Value, name: &str| row.get(name).and_then(Value::as_str).map(str::to_string);
+    let found = |state: &str, command: &str| {
+        let substitutes: &[&str] = if state == "converting" && command == "cancel" {
+            &["cancel", "undoConversionEdit"]
+        } else {
+            &[command]
+        };
+        [state, "anywhere"].iter().find_map(|wanted| {
+            substitutes.iter().find_map(|substitute| {
+                rows.iter()
+                    .find(|row| {
+                        text(row, "state").as_deref() == Some(*wanted)
+                            && text(row, "command").as_deref() == Some(*substitute)
+                    })
+                    .and_then(|row| Some((text(row, "key")?, substitute.to_string())))
+            })
+        })
+    };
+    let added: Vec<Value> = missing
+        .iter()
+        .filter_map(|item| {
+            let (key, command) = found(&item.state, &item.command)?;
+            Some(json!({"state": item.state, "key": key, "command": command}))
+        })
+        .collect();
+    if added.is_empty() {
+        return None;
+    }
+    let mut entries = keymap.as_array().cloned().unwrap_or_default();
+    entries.extend(added);
+    Some(Value::Array(entries))
+}
+
 /// 表の問題を 1 行ずつの文にする．entries は表の行(状態・キー・コマンド)
 pub fn report_lines(report: &KeymapReport, entries: &[(String, String, String)]) -> Vec<String> {
-    use crate::strings::keys::{missing, MISSING_NOTE, PLAIN_CHARACTER};
+    use crate::strings::keys::{missing, PLAIN_CHARACTER};
     let mut lines: Vec<String> = report
         .missing
         .iter()
         .map(|item| missing(&label(STATES, &item.state), &label(COMMANDS, &item.command)))
         .collect();
-    if !lines.is_empty() {
-        lines.push(MISSING_NOTE.to_string());
-    }
     for issue in &report.rows {
         let row = describe(entries, issue.row);
         let winners = issue
@@ -472,8 +508,48 @@ mod tests {
         let lines = report_lines(&report, &entries);
         assert_eq!(lines[0], "変換中に「確定」のキーがありません");
         assert_eq!(
-            lines[2],
+            lines[1],
             "入力中・Enter・確定: 同じキーの行があるため使われません: 入力中・Enter・取り消し"
+        );
+    }
+
+    #[test]
+    fn キーの無い確定と取り消しに標準の表のキーを足す() {
+        let standard = serde_json::json!([
+            {"state": "anywhere", "key": "Enter", "command": "commit"},
+            {"state": "anywhere", "key": "Escape", "command": "cancel"},
+            {"state": "converting", "key": "Ctrl Enter", "command": "commit"},
+            {"state": "converting", "key": "Escape", "command": "undoConversionEdit"},
+        ]);
+        let keymap =
+            serde_json::json!([{"state": "idle", "key": "F12", "command": "emojiPalette"}]);
+        let missing = |state: &str, command: &str| KeymapMissing {
+            state: state.into(),
+            command: command.into(),
+        };
+        let added = with_missing(
+            &keymap,
+            &[
+                missing("composing", "commit"),
+                missing("converting", "commit"),
+                missing("converting", "cancel"),
+            ],
+            &standard,
+        )
+        .unwrap();
+        assert_eq!(
+            added,
+            serde_json::json!([
+                {"state": "idle", "key": "F12", "command": "emojiPalette"},
+                {"state": "composing", "key": "Enter", "command": "commit"},
+                {"state": "converting", "key": "Ctrl Enter", "command": "commit"},
+                {"state": "converting", "key": "Escape", "command": "undoConversionEdit"},
+            ])
+        );
+        assert_eq!(with_missing(&keymap, &[], &standard), None);
+        assert_eq!(
+            with_missing(&keymap, &[missing("composing", "openMenu")], &standard),
+            None
         );
     }
 }

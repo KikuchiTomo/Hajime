@@ -24,6 +24,8 @@ struct SettingsView: View {
                 .navigationTitle((page ?? .input).title)
         }
         .frame(width: Self.size.width, height: Self.size.height)
+        // ページの中のボタンからほかのページへ移れるようにする(パレットの「キー設定を開く」)
+        .environment(navigation)
         .alert(model.message ?? "", isPresented: Binding(get: { model.message != nil }, set: { if !$0 { model.message = nil } })) {
             Button(UIStrings.Settings.ok) { model.message = nil }
         }
@@ -92,16 +94,28 @@ final class SettingsNavigation {
     }
 }
 
-/// 列挙の値を選ぶ項目．values を渡さなければすべての値を並べる
+/// 列挙の値を選ぶ項目．values を渡さなければすべての値を並べる．
+/// example を渡すと，名前のすぐ後ろにその値で出る見本をタグの形で添える(titleWidth はタグの左の端をそろえる名前の幅．ExampleToggle と同じ)
 struct ChoicePicker<Value: Hashable & CaseIterable>: View where Value.AllCases: RandomAccessCollection {
     let title: String
     let selection: Binding<Value>
     var values: [Value] = Array(Value.allCases)
+    var example: (reading: String, candidate: String)?
+    var titleWidth: CGFloat?
     let label: (Value) -> String
 
     var body: some View {
-        Picker(title, selection: selection) {
+        Picker(selection: selection) {
             ForEach(values, id: \.self) { Text(label($0)).tag($0) }
+        } label: {
+            if let example {
+                HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Size.Space.group) {
+                    Text(title).frame(minWidth: titleWidth, alignment: .leading)
+                    CandidateExample(reading: example.reading, candidate: example.candidate)
+                }
+            } else {
+                Text(title)
+            }
         }
     }
 }
@@ -112,17 +126,15 @@ private struct InputTab: View {
     var body: some View {
         Form {
             Section(UIStrings.Settings.inputStyleSection) {
-                ResettablePicker(model: model, title: UIStrings.Choice.inputStyle, keyPath: \.inputStyle, label: UIStrings.Choice.label(for:))
-                if model.settings.inputStyle == .englishAuto {
-                    Text(UIStrings.Choice.englishAutoNote).font(.caption).foregroundStyle(.secondary)
-                }
-                ResettableToggle(model: model, title: UIStrings.Choice.englishInputLiveConversion, keyPath: \.englishInputLiveConversion)
+                // 英字入力(自動)を選んだときだけ，名前のすぐ後ろに打った英文が日本語になる見本を出す
+                let titleWidth = ExampleToggle.titleWidth([UIStrings.Choice.inputStyle, UIStrings.Choice.englishInputLiveConversion])
+                ResettablePicker(model: model, title: UIStrings.Choice.inputStyle, keyPath: \.inputStyle,
+                                 example: model.settings.inputStyle == .englishAuto ? UIStrings.Choice.englishAutoExample : nil, titleWidth: titleWidth,
+                                 label: UIStrings.Choice.label(for:))
+                ExampleToggle(model: model, title: UIStrings.Choice.englishInputLiveConversion, keyPath: \.englishInputLiveConversion,
+                              example: UIStrings.Choice.englishInputLiveConversionExample, titleWidth: titleWidth)
                     .disabled(model.settings.inputStyle != .english)
-                if model.settings.inputStyle == .english {
-                    Text(UIStrings.Choice.englishInputLiveConversionNote).font(.caption).foregroundStyle(.secondary)
-                }
                 ResettablePicker(model: model, title: UIStrings.Choice.keyboardLayout, keyPath: \.keyboardLayout, label: UIStrings.Choice.label(for:))
-                Text(UIStrings.Choice.keyboardLayoutNote).font(.caption).foregroundStyle(.secondary)
             }
             Section(UIStrings.Settings.characters) {
                 ResettablePicker(model: model, title: UIStrings.Settings.punctuation, keyPath: \.punctuation, label: UIStrings.Settings.label(for:))
@@ -157,6 +169,11 @@ private struct InputTab: View {
 
 private struct ConversionTab: View {
     @ObservedObject var model: SettingsModel
+
+    /// 見本のタグの左の端．ページの中でいちばん長い見本付きの名前のあとにそろえる(Windows の layout と同じく，まとまりをまたいでも)
+    private var exampleTitleWidth: CGFloat {
+        ExampleToggle.titleWidth([UIStrings.More.listSegmentAlternatives, UIStrings.Settings.emojiConversion, UIStrings.Settings.emojiWordConversion])
+    }
 
     var body: some View {
         Form {
@@ -194,14 +211,13 @@ private struct ConversionTab: View {
                                   value: "\(model.settings.branchCandidatesPerPage)")
                 ResettableStepper(model: model, title: UIStrings.More.listCandidates, keyPath: \.listCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange,
                                   value: "\(model.settings.listCandidatesPerPage)")
+                // 表に広げたときの大きさ(一覧の候補数の行 × 列数)を値に出す
                 ResettableStepper(model: model, title: UIStrings.More.gridColumns, keyPath: \.candidateGridColumns, range: DefaultSettings.candidateGridColumnsRange,
-                                  value: "\(model.settings.candidateGridColumns)")
-                Text(UIStrings.More.gridColumnsNote).font(.caption).foregroundStyle(.secondary)
+                                  value: UIStrings.More.gridSize(rows: model.settings.listCandidatesPerPage, columns: model.settings.candidateGridColumns))
                 ResettableToggle(model: model, title: UIStrings.More.expandsGridOnPaging, keyPath: \.expandsGridOnPaging)
                 ResettableToggle(model: model, title: UIStrings.More.contextualSegmentCandidates, keyPath: \.contextualSegmentCandidates)
-                Text(UIStrings.More.contextualSegmentCandidatesNote).font(.caption).foregroundStyle(.secondary)
-                ResettableToggle(model: model, title: UIStrings.More.listSegmentAlternatives, keyPath: \.listSegmentAlternatives)
-                Text(UIStrings.More.listSegmentAlternativesNote).font(.caption).foregroundStyle(.secondary)
+                ExampleToggle(model: model, title: UIStrings.More.listSegmentAlternatives, keyPath: \.listSegmentAlternatives,
+                              example: UIStrings.More.listSegmentAlternativesExample, titleWidth: exampleTitleWidth)
             }
             Section(UIStrings.More.typo) {
                 ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))
@@ -240,7 +256,7 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Settings.symbolConversion, keyPath: \.symbolConversion)
                 ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
             }
-            EmojiSection(model: model)
+            EmojiSection(model: model, titleWidth: exampleTitleWidth)
             Section(UIStrings.Settings.numberForms) {
                 ResettableToggle(model: model, title: UIStrings.Settings.numberFormConversion, keyPath: \.numberFormConversion)
                 Group {
@@ -263,17 +279,14 @@ private struct ConversionTab: View {
                 }
                 .disabled(!model.settings.homophoneNotes)
             }
-            Section {
+            Section(UIStrings.Settings.zenzaiModel) {
                 ResettablePicker(model: model, title: UIStrings.Settings.zenzaiModel, keyPath: \.zenzaiModel, label: UIStrings.Settings.label(for:))
-            } header: {
-                Text(UIStrings.Settings.zenzaiModel)
-            } footer: {
-                Text(UIStrings.Settings.zenzaiModelNote)
+                if model.settings.zenzaiModel == .combined {
+                    Text(UIStrings.Settings.zenzaiCombinedNote).font(.caption).foregroundStyle(.secondary)
+                }
             }
             Section {
                 ResettableToggle(model: model, title: UIStrings.Settings.candidateReranking, keyPath: \.candidateReranking)
-            } footer: {
-                Text(UIStrings.Settings.candidateRerankingNote)
             }
             Section(UIStrings.Settings.learning) {
                 ResettablePicker(model: model, title: UIStrings.Settings.learning, keyPath: \.learning, label: UIStrings.Settings.label(for:))

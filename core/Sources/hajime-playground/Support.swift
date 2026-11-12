@@ -107,7 +107,16 @@ enum PlaygroundEmoji {
     static func lookup(engine: AzooKeyConverterEngine, arguments: Arguments) -> any EmojiLooking {
         if arguments.value(of: "--emoji-source") == "azookey" { return engine }
         let text = (try? String(contentsOf: paletteURL, encoding: .utf8)) ?? ""
-        return PaletteEmojiLookup(catalog: LoadedPalette(PaletteIndex(catalog: PaletteCatalog(text: text))), usage: MemoryPaletteUsage(),
+        var catalog = PaletteCatalog(text: text)
+        // アプリと同じく，この Mac の書体で描けない新しい絵文字を除く
+        #if canImport(CoreText)
+        if let version = PaletteCatalogFile.newestRenderableVersion(of: catalog, canRender: {
+            EmojiGlyphProbe.canRender($0, size: LayoutTokens.Palette.probeFontSize)
+        }) {
+            catalog = catalog.limited(to: version)
+        }
+        #endif
+        return PaletteEmojiLookup(catalog: LoadedPalette(PaletteIndex(catalog: catalog)), usage: MemoryPaletteUsage(),
                                   settings: StaticSettings(DefaultSettings.settings), now: { Date() })
     }
 

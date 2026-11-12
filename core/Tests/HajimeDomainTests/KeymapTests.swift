@@ -93,6 +93,25 @@ struct KeymapTests {
         #expect(keymap.missingEssentials.isEmpty)
     }
 
+    @Test("R-17: キーの無い確定と取り消しに，標準の表のキーを足す．変換中の取り消しは標準の表と同じく直前の変更の取り消しにする")
+    func addMissingEssentials() {
+        var keymap = standard
+        keymap.entries.removeAll { $0.command == .commit || $0.command == .cancel || $0.command == .undoConversionEdit }
+        keymap.entries.append(KeymapEntry(.composing, KeyStroke(.enter), .insertBoundary))
+        let count = keymap.entries.count
+        keymap.addMissingEssentials()
+        #expect(keymap.missingEssentials.isEmpty)
+        #expect(Array(keymap.entries.dropFirst(count)) == [
+            KeymapEntry(.composing, KeyStroke(.enter), .commit), KeymapEntry(.composing, KeyStroke(.escape), .cancel),
+            KeymapEntry(.converting, KeyStroke(.enter), .commit), KeymapEntry(.converting, KeyStroke(.escape), .undoConversionEdit),
+        ])
+        // 足した行は，同じキーで先にあった行より優先する
+        #expect(keymap.strokes(for: .commit, in: .composing) == [KeyStroke(.enter)])
+        let unchanged = keymap
+        keymap.addMissingEssentials()
+        #expect(keymap == unchanged)
+    }
+
     @Test("R-17: キーは「Ctrl Shift Space」の形で書き，読み戻せる")
     func notation() {
         let keys: [KeyStroke.Key] = [

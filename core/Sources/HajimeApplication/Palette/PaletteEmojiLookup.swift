@@ -23,13 +23,13 @@ public final class PaletteEmojiLookup: EmojiLooking {
         self.now = now
     }
 
-    public func emoji(for reading: String, limit: Int) -> [String] {
+    public func emoji(for reading: String, word: EmojiWord, limit: Int) -> [String] {
         guard let index = catalog.index else { return [] }
         let current = usage.usage
         let ranking = usesHistory
             ? PaletteSearch.Ranking(usage: current.scores(at: now()), learned: current.learnedChoices(for: Self.query(reading)), pinned: Set(current.pinned))
             : PaletteSearch.Ranking()
-        return index.search.emoji(reading: reading, ranking: ranking, limit: limit).map { $0.text(skinTone: current.effectiveSkinTone(for: $0.text)) }
+        return index.search.emoji(reading: reading, word: word, ranking: ranking, limit: limit).map { $0.text(skinTone: current.effectiveSkinTone(for: $0.text)) }
     }
 
     public func name(of emoji: String) -> String? {

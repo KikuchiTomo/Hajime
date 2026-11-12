@@ -482,6 +482,10 @@ pub enum Action {
     CreateTheme,
     /// 今のテーマを複製してカスタムテーマにし，それを使う
     DuplicateCurrentTheme,
+    /// キーの無い確定・取り消しに，標準の表のキーを足す(macOS の KeymapPage の「既定のキーを追加」)
+    AddMissingKeys,
+    /// キー設定のページを開く(パレットを開くキーを変えるとき)
+    OpenKeys,
 }
 
 impl Action {
@@ -1218,6 +1222,8 @@ pub struct Row {
     pub clears: Option<&'static str>,
     /// 名前の横にタグの形で添える，その設定で出る候補の見本(読みと候補．「びーる → 🍺」)
     pub example: Option<(&'static str, &'static str)>,
+    /// 満たすときだけ見本を出す(入力方式の見本は英字入力(自動)を選んだときだけ)．None ならいつも出す
+    pub example_visible: Option<Condition>,
 }
 
 impl Row {
@@ -1279,6 +1285,7 @@ impl Row {
             visible: None,
             clears: None,
             example: None,
+            example_visible: None,
             danger: false,
         }
     }
@@ -1291,6 +1298,12 @@ impl Row {
 
     pub fn with_example(mut self, example: (&'static str, &'static str)) -> Self {
         self.example = Some(example);
+        self
+    }
+
+    /// condition を満たすときだけ見本を出す
+    pub fn example_when(mut self, condition: Condition) -> Self {
+        self.example_visible = Some(condition);
         self
     }
 
@@ -1373,21 +1386,21 @@ fn input() -> Vec<Section> {
         Section::new(
             settings::INPUT_STYLE_SECTION,
             vec![
-                Row::choice(choice::INPUT_STYLE, "inputStyle", options::INPUT_STYLES),
-                Row::note(choice::ENGLISH_AUTO_NOTE).visible_when(Is("inputStyle", "englishAuto")),
+                // 英字入力(自動)を選んだときだけ，名前のすぐ後ろに打った英文が日本語になる見本を出す
+                Row::choice(choice::INPUT_STYLE, "inputStyle", options::INPUT_STYLES)
+                    .with_example(choice::ENGLISH_AUTO_EXAMPLE)
+                    .example_when(Is("inputStyle", "englishAuto")),
                 Row::toggle(
                     choice::ENGLISH_INPUT_LIVE_CONVERSION,
                     "englishInputLiveConversion",
                 )
+                .with_example(choice::ENGLISH_INPUT_LIVE_CONVERSION_EXAMPLE)
                 .enabled_when(Is("inputStyle", "english")),
-                Row::note(choice::ENGLISH_INPUT_LIVE_CONVERSION_NOTE)
-                    .visible_when(Is("inputStyle", "english")),
                 Row::choice(
                     choice::KEYBOARD_LAYOUT,
                     "keyboardLayout",
                     options::KEYBOARD_LAYOUTS,
                 ),
-                Row::note(choice::KEYBOARD_LAYOUT_NOTE),
             ],
         ),
         Section::new(
@@ -1523,15 +1536,13 @@ fn conversion() -> Vec<Section> {
                     "candidateGridColumns",
                     RangeKind::CandidateGridColumns,
                 ),
-                Row::note(more::GRID_COLUMNS_NOTE),
                 Row::toggle(more::EXPANDS_GRID_ON_PAGING, "expandsGridOnPaging"),
                 Row::toggle(
                     more::CONTEXTUAL_SEGMENT_CANDIDATES,
                     "contextualSegmentCandidates",
                 ),
-                Row::note(more::CONTEXTUAL_SEGMENT_CANDIDATES_NOTE),
-                Row::toggle(more::LIST_SEGMENT_ALTERNATIVES, "listSegmentAlternatives"),
-                Row::note(more::LIST_SEGMENT_ALTERNATIVES_NOTE),
+                Row::toggle(more::LIST_SEGMENT_ALTERNATIVES, "listSegmentAlternatives")
+                    .with_example(more::LIST_SEGMENT_ALTERNATIVES_EXAMPLE),
             ],
         ),
         Section::new(
@@ -1603,12 +1614,12 @@ fn conversion() -> Vec<Section> {
         ),
         Section {
             title: Some(association::DICTIONARIES),
-            rows: vec![Row::new(
-                "",
-                "",
-                Control::Dictionaries(DictionaryList::Association),
-            )],
-            footer: Some(association::NOTE),
+            // 一覧についての 1 行は一覧のすぐ下に，読み込めるファイルの見本は取り込むボタンの下に置く
+            rows: vec![
+                Row::new("", "", Control::Dictionaries(DictionaryList::Association)),
+                Row::note(association::NOTE),
+            ],
+            footer: Some(association::FILE_EXAMPLE),
             footer_variants: &[],
         },
         Section::new(
@@ -1688,25 +1699,22 @@ fn conversion() -> Vec<Section> {
                     .enabled_when(On("homophoneNotes")),
             ],
         ),
-        Section {
-            title: Some(settings::ZENZAI_MODEL),
-            rows: vec![Row::choice(
-                settings::ZENZAI_MODEL,
-                "zenzaiModel",
-                options::ZENZAI_MODELS,
-            )],
-            footer: Some(settings::ZENZAI_MODEL_NOTE),
-            footer_variants: &[],
-        },
-        Section {
-            title: None,
-            rows: vec![Row::toggle(
-                settings::CANDIDATE_RERANKING,
-                "candidateReranking",
-            )],
-            footer: Some(settings::CANDIDATE_RERANKING_NOTE),
-            footer_variants: &[],
-        },
+        Section::new(
+            settings::ZENZAI_MODEL,
+            vec![
+                Row::choice(
+                    settings::ZENZAI_MODEL,
+                    "zenzaiModel",
+                    options::ZENZAI_MODELS,
+                ),
+                Row::note(settings::ZENZAI_COMBINED_NOTE)
+                    .visible_when(Is("zenzaiModel", "combined")),
+            ],
+        ),
+        Section::untitled(vec![Row::toggle(
+            settings::CANDIDATE_RERANKING,
+            "candidateReranking",
+        )]),
         Section::new(
             settings::LEARNING,
             vec![
@@ -1933,7 +1941,7 @@ fn language() -> Vec<Section> {
 
 const KEYMAP_FIELDS: &[Field] = &[
     Field::choice("state", keys::STATE, keys::STATES, false),
-    Field::key_notation("key", keys::KEY, false),
+    Field::key_notation("key", keys::KEY, false).prompt(crate::strings::windows::KEY_EXAMPLE),
     Field::choice("command", keys::COMMAND, keys::COMMANDS, false),
 ];
 
@@ -1942,7 +1950,12 @@ fn keymap() -> Vec<Section> {
     vec![
         // 既定に戻すボタンは表の下の帯に置く(macOS の KeymapPage の下の右)
         Section::untitled(vec![Row::new(keys::PRESET_MENU, "", Control::Preset)]),
-        Section::untitled(vec![Row::new("", "", Control::KeymapReport)]),
+        // キーの無い確定・取り消しがあれば，知らせの下に標準の表のキーを足すボタンを出す
+        Section::untitled(vec![
+            Row::new("", "", Control::KeymapReport),
+            Row::action(keys::ADD_STANDARD_KEYS, Action::AddMissingKeys)
+                .visible_when(Condition::On(KEYMAP_MISSING)),
+        ]),
         Section {
             title: None,
             rows: vec![Row::list(
@@ -1956,7 +1969,8 @@ fn keymap() -> Vec<Section> {
                 },
                 LimitKind::KeymapEntries,
             )],
-            footer: Some(crate::strings::windows::KEY_NOTE),
+            // 選んだコマンドの説明だけを出す(キーの欄は例の値で書き方を見せる)
+            footer: Some(""),
             footer_variants: keys::COMMAND_HELP,
         },
     ]
@@ -2204,6 +2218,9 @@ const TERM_FIELD_PATHS: &[&str] = &[
     "termFields.history",
 ];
 
+/// キーの無い確定・取り消しがあるか(画面の中だけの値．キー設定の表の問題をエンジンに確かめたときに入れる)
+pub const KEYMAP_MISSING: &str = "page.keymapMissing";
+
 /// ユーザー辞書のページで出している一覧(画面の中だけの値．設定のファイルには書かない)
 pub const DICTIONARY_TAB: &str = "page.dictionaryTab";
 pub const DICTIONARY_TAB_IMPORTED: &str = "imported";
@@ -2248,6 +2265,7 @@ fn palette_page() -> Vec<Section> {
                     Control::Info(Info::PaletteKeys("kaomojiPalette")),
                 )
                 .enabled_when(On("palette")),
+                Row::action(palette::OPEN_KEYS, Action::OpenKeys).enabled_when(On("palette")),
                 Row::toggle(palette::CLOSES_AFTER_INSERT, "paletteClosesAfterInsert")
                     .enabled_when(On("palette")),
                 Row::toggle(palette::RECORDS_HISTORY, "paletteRecordsHistory")
@@ -2286,7 +2304,7 @@ fn palette_page() -> Vec<Section> {
                 Row::toggle(palette::SHOWS_CODE_POINTS, "paletteShowsCodePoints")
                     .enabled_when(On("paletteShowsPreview")),
             ],
-            footer: Some(palette::THEME_NOTE),
+            footer: None,
             footer_variants: &[],
         },
     ]
