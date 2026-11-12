@@ -13,7 +13,7 @@ use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
 use crate::pages::{
-    self, Action, Control, DictionaryList, FontPart, Info, LimitKind, Page, RangeKind, Row,
+    self, Action, Cell, Control, DictionaryList, FontPart, Info, LimitKind, Page, RangeKind, Row,
     Section, TryKind, MACROS_PATH,
 };
 use crate::store::SettingsStore;
@@ -179,10 +179,9 @@ impl DictionaryAction {
 /// 表の下のボタンのうち，行を選ばなくても使えるもの(キーの記録・アプリの追加)
 fn bottom_always_enabled(control: &Control, index: usize) -> bool {
     match control {
-        // 行き先を選ぶのはいつでも，有効・無効の切り替えは行を選んでから使う
-        Control::List(spec, _) if spec.path == "commands" => index == 0,
-        Control::List(spec, _) if spec.has_enabled_flag() => false,
-        Control::List(spec, _) => !(spec.path == "keymap" && index == 1),
+        // 削除(0 番目)は行を選んでから．行き先を選ぶ・キーを記録する・アプリを追加するはいつでも，複製は行を選んでから
+        Control::List(spec, _) if spec.path == "keymap" => index == 1,
+        Control::List(..) => index >= 1,
         _ => false,
     }
 }
@@ -745,15 +744,17 @@ impl RowState {
         )
     }
 
-    /// 選んだ行を切り替えるボタン(記号の有効と無効，項目ごとの同期の範囲)
+    /// 選んだ行を切り替えるボタン(項目ごとの同期の範囲)．記号・コマンド・変換マクロの有効と無効は表の「有効」の列で切り替える
     fn toggle_part(&self) -> Option<Part> {
         match self.row.control {
-            Control::Symbols(..) => Some(Part::Bottom(0)),
-            Control::List(spec, _) if spec.path == "commands" => Some(Part::Bottom(1)),
-            Control::List(spec, _) if spec.has_enabled_flag() => Some(Part::Bottom(0)),
             Control::SyncFields(_) => Some(Part::Top(0)),
             _ => None,
         }
+    }
+
+    /// 選んだ行を消すボタン(足す一覧は表の下の左)
+    pub fn remove_part(&self) -> Option<Part> {
+        self.has_add_remove().then_some(Part::Bottom(0))
     }
 
     /// 入力欄の値(選ぶ欄は設定のファイルに書く値)
@@ -962,7 +963,13 @@ impl RowState {
             control => {
                 if let (Some(spec), Some(buttons)) = (control.list_spec(), control.list_buttons()) {
                     parts.extend((0..spec.fields.len()).map(Part::Field));
-                    parts.extend((0..buttons.top.len()).map(Part::Top));
+                    // キャンセル(上の 2 つ目)は書き換えているあいだだけ出す
+                    let editing = self.editing.is_some();
+                    parts.extend(
+                        (0..buttons.top.len())
+                            .filter(|index| !(*index == 1 && self.has_add_remove() && !editing))
+                            .map(Part::Top),
+                    );
                     parts.push(Part::Table);
                     if buttons.search {
                         parts.push(Part::Search);
@@ -1007,8 +1014,9 @@ impl RowState {
                         .list_spec()
                         .is_some_and(|(spec, _)| spec.is_filled(&self.input_values()))
             }
-            // 書き換えているあいだは「キャンセル」
-            Part::Top(1) if self.has_add_remove() => selected || self.editing.is_some(),
+            // キャンセルは書き換えているあいだ，削除は行を選んでいるとき
+            Part::Top(1) if self.has_add_remove() => self.editing.is_some(),
+            Part::Bottom(0) if self.has_add_remove() => selected,
             Part::Top(index) if self.toggle_part() == Some(Part::Top(index)) => selected,
             // 辞書・カスタムテーマの一覧の更新
             Part::Top(0) if self.is_dictionary_list() => selected,
@@ -1026,9 +1034,6 @@ impl RowState {
         let buttons = self.row.control.list_buttons();
         match part {
             Part::Top(0) if self.has_add_remove() && self.editing.is_some() => rule_list::UPDATE,
-            Part::Top(1) if self.has_add_remove() && self.editing.is_some() => {
-                crate::strings::settings::CANCEL
-            }
             Part::Top(index) => buttons
                 .and_then(|buttons| buttons.top.get(index).copied())
                 .unwrap_or(""),
@@ -1871,24 +1876,24 @@ impl PageView {
         }
         if let Control::List(spec, _) = &row.row.control {
             match (spec.path, part) {
-                ("keymap", Part::Bottom(0)) => {
+                ("keymap", Part::Bottom(1)) => {
                     // キーの欄(状態・キー・コマンドの 2 つ目)で，次に押したキーを書く
                     if let Some(window) = row.edit(Part::Field(1)) {
                         edit::record_key(window, keys::PRESS);
                     }
                     return None;
                 }
-                ("keymap", Part::Bottom(1)) => {
+                ("keymap", Part::Bottom(2)) => {
                     // 選んだ行を入力欄に写し，追加のボタンで新しい行として足す
                     let index = *row.table.selected_rows().first()?;
                     row.fill_inputs(index);
                     row.editing = None;
                     return None;
                 }
-                ("profileRules", Part::Bottom(0)) => {
+                ("profileRules", Part::Bottom(1)) => {
                     return Some(Event::ChooseApp { path: spec.path })
                 }
-                ("commands", Part::Bottom(0)) => return Some(Event::ChooseCommandTarget),
+                ("commands", Part::Bottom(1)) => return Some(Event::ChooseCommandTarget),
                 _ => {}
             }
         }
@@ -1910,11 +1915,7 @@ impl PageView {
                     item: spec.make(&values),
                     replacing: row.editing,
                 }),
-                Part::Top(1) => (!selected.is_empty()).then_some(Event::SymbolRemove {
-                    kind,
-                    indices: selected,
-                }),
-                Part::Bottom(0) => (!selected.is_empty()).then_some(Event::SymbolToggle {
+                Part::Bottom(0) => (!selected.is_empty()).then_some(Event::SymbolRemove {
                     kind,
                     indices: selected,
                 }),
@@ -1932,21 +1933,13 @@ impl PageView {
                 item: spec.make(&values),
                 replacing: row.editing,
             }),
-            Part::Top(1) if dictionary => {
+            Part::Bottom(0) if dictionary => {
                 (!selected.is_empty()).then_some(Event::DictionaryRemove(selected))
             }
-            Part::Top(1) => (!selected.is_empty()).then_some(Event::ListRemove {
+            Part::Bottom(0) => (!selected.is_empty()).then_some(Event::ListRemove {
                 spec,
                 indices: selected,
             }),
-            Part::Bottom(index)
-                if spec.has_enabled_flag() && row.toggle_part() == Some(Part::Bottom(index)) =>
-            {
-                (!selected.is_empty()).then_some(Event::ListToggle {
-                    spec,
-                    indices: selected,
-                })
-            }
             _ => None,
         }
     }
@@ -2134,6 +2127,74 @@ impl PageView {
     }
 
     /// 表の行の数(1 ページ分．PageUp・PageDown で動かす数)
+    /// 行の一覧で，選んだ行を消すボタン(足す一覧でなければ None)
+    pub fn remove_part(&self, row_index: usize) -> Option<Part> {
+        self.rows.get(row_index)?.remove_part()
+    }
+
+    /// 表の (x, y)(ページの中の座標)が見出しの上なら，その列で並べ替える．並べ替えたら true
+    pub fn table_header_click(&mut self, row_index: usize, x: f32, y: f32) -> bool {
+        let Some(row) = self.rows.get_mut(row_index) else {
+            return false;
+        };
+        let Some(rect) = row.part_rect(Part::Table) else {
+            return false;
+        };
+        if y >= rect.y + size::TABLE_HEADER_HEIGHT {
+            return false;
+        }
+        let layout = row.row.control.table_layout();
+        let spans = layout.spans(rect.width, size::FIELD_PADDING_X);
+        let hit = layout
+            .columns
+            .iter()
+            .zip(&spans)
+            .find(|(_, (left, width))| x >= rect.x + left && x < rect.x + left + width);
+        match hit {
+            Some((column, _)) if column.cell != Cell::Check => {
+                let editing = row.editing.is_some();
+                row.table.toggle_sort(column.source);
+                if editing {
+                    row.cancel_edit();
+                }
+                true
+            }
+            _ => false,
+        }
+    }
+
+    /// 表の (x, y) が「有効」の列の印の上なら，その行の有効・無効を切り替える頼みを返す
+    pub fn table_check_click(&self, row_index: usize, x: f32, position: usize) -> Option<Event> {
+        let row = self.rows.get(row_index)?;
+        if !row.enabled {
+            return None;
+        }
+        let rect = row.part_rect(Part::Table)?;
+        let layout = row.row.control.table_layout();
+        let spans = layout.spans(rect.width, size::FIELD_PADDING_X);
+        let (_, (left, _)) = layout
+            .columns
+            .iter()
+            .zip(&spans)
+            .find(|(column, _)| column.cell == Cell::Check)?;
+        let start = rect.x + left;
+        if x < start || x > start + size::RADIO_SIZE {
+            return None;
+        }
+        let index = row.table.row_index(position)?;
+        match &row.row.control {
+            Control::Symbols(kind, _) => Some(Event::SymbolToggle {
+                kind: *kind,
+                indices: vec![index],
+            }),
+            Control::List(spec, _) if spec.has_enabled_flag() => Some(Event::ListToggle {
+                spec: *spec,
+                indices: vec![index],
+            }),
+            _ => None,
+        }
+    }
+
     pub fn table_page(&self, row_index: usize) -> usize {
         self.rows
             .get(row_index)
@@ -3199,6 +3260,35 @@ impl PageView {
 
     fn paint_list(&self, canvas: &mut dyn Canvas, frame: &Frame, index: usize, row: &RowState) {
         let theme = frame.theme;
+        // 打つもの → 置き換えるものの矢印(macOS の RuleListEditor の arrow.right)
+        let arrow = row
+            .row
+            .control
+            .list_buttons()
+            .is_some_and(|buttons| buttons.arrow);
+        if let (true, Some(first), Some(second)) = (
+            arrow,
+            row.part_rect(Part::Field(0)),
+            row.part_rect(Part::Field(1)),
+        ) {
+            let color = if row.enabled {
+                theme.palette.text_secondary
+            } else {
+                theme.palette.text_disabled
+            };
+            canvas.text(
+                Rect::new(
+                    first.max_x(),
+                    first.y,
+                    second.x - first.max_x(),
+                    first.height,
+                ),
+                theme.glyphs.arrow_right,
+                TextStyle::IconSmall,
+                Color::from(color),
+                TextLayout::CENTER,
+            );
+        }
         for part in row.parts() {
             let element = Element { row: index, part };
             let Some(rect) = row.part_rect(part) else {
@@ -3271,24 +3361,46 @@ impl PageView {
         let theme = frame.theme;
         let palette = &theme.palette;
         canvas.fill_round(rect, size::CONTROL_RADIUS, Color::from(palette.control));
-        let columns = row.row.control.table_columns();
-        let count = columns.len().max(1) as f32;
+        let layout = row.row.control.table_layout();
         let padding = size::FIELD_PADDING_X;
-        let column_width = (rect.width - padding) / count;
+        let spans = layout.spans(rect.width, padding);
         let header = Rect::new(rect.x, rect.y, rect.width, size::TABLE_HEADER_HEIGHT);
-        for (column, title) in columns.iter().enumerate() {
+        let sort = row.table.sort();
+        for (column, (left, width)) in layout.columns.iter().zip(&spans) {
+            let cell = Rect::new(
+                header.x + left,
+                header.y,
+                (width - padding).max(0.0),
+                header.height,
+            );
             canvas.text(
-                Rect::new(
-                    header.x + padding + column_width * column as f32,
-                    header.y,
-                    column_width - padding,
-                    header.height,
-                ),
-                title,
+                cell,
+                column.title,
                 TextStyle::Caption,
                 Color::from(palette.text_secondary),
                 TextLayout::LINE,
             );
+            // 並べ替えている列には向きの印を付ける(macOS の表の見出しの山形)
+            if let Some((_, ascending)) = sort.filter(|(sorted, _)| *sorted == column.source) {
+                let title = canvas.width(column.title, TextStyle::Caption);
+                let glyph = if ascending {
+                    theme.glyphs.chevron_up
+                } else {
+                    theme.glyphs.chevron_down
+                };
+                canvas.text(
+                    Rect::new(
+                        cell.x + title + size::CONTROL_GAP / 2.0,
+                        cell.y,
+                        size::CHEVRON_SIZE,
+                        cell.height,
+                    ),
+                    glyph,
+                    TextStyle::IconSmall,
+                    Color::from(palette.text_secondary),
+                    TextLayout::LINE,
+                );
+            }
         }
         canvas.fill_rect(
             Rect::new(rect.x, header.max_y() - 1.0, rect.width, 1.0),
@@ -3359,24 +3471,66 @@ impl PageView {
             } else if self.table_hover == Some((index, position)) {
                 canvas.fill_round(line, size::CONTROL_RADIUS, Color::from(palette.nav_hover));
             }
+            // 1 行おきに薄く敷く(macOS の表の縞)．選んだ行とポインターを載せた行は上の地のまま
+            if position % 2 == 1 && !selected && self.table_hover != Some((index, position)) {
+                canvas.fill_rect(
+                    Rect::new(rect.x + 1.0, top, rect.width - 2.0, row_height),
+                    Color::from(palette.text).with_alpha(opacity::TABLE_STRIPE),
+                );
+            }
+            // 使えない一覧と，無効にした行は薄く出す(macOS と同じ)
+            let enabled = row.enabled && layout.row_enabled(cells);
             let text = if row.enabled {
                 palette.text
             } else {
                 palette.text_disabled
             };
-            for (column, cell) in cells.iter().enumerate() {
+            let secondary = if row.enabled {
+                palette.text_secondary
+            } else {
+                palette.text_disabled
+            };
+            for (column, (left, width)) in layout.columns.iter().zip(&spans) {
+                let cell_rect =
+                    Rect::new(rect.x + left, top, (width - padding).max(0.0), row_height);
+                let value = cells.get(column.source).map_or("", String::as_str);
+                let (style, color) = match column.cell {
+                    Cell::Check => {
+                        paint_check(canvas, theme, cell_rect, !value.is_empty(), row.enabled);
+                        continue;
+                    }
+                    Cell::Mono => (TextStyle::Code, if enabled { text } else { secondary }),
+                    Cell::Text => (TextStyle::Body, if enabled { text } else { secondary }),
+                    Cell::Secondary => (TextStyle::Body, secondary),
+                };
+                let badge = column
+                    .badge
+                    .and_then(|source| cells.get(source))
+                    .filter(|badge| !badge.is_empty());
+                let badge_width = badge.map_or(0.0, |badge| {
+                    canvas.width(badge, TextStyle::Caption) + size::CONTROL_GAP
+                });
                 canvas.text(
                     Rect::new(
-                        rect.x + padding + column_width * column as f32,
-                        top,
-                        column_width - padding,
-                        row_height,
+                        cell_rect.x,
+                        cell_rect.y,
+                        (cell_rect.width - badge_width).max(0.0),
+                        cell_rect.height,
                     ),
-                    cell,
-                    TextStyle::Body,
-                    Color::from(text),
+                    value,
+                    style,
+                    Color::from(color),
                     TextLayout::LINE,
                 );
+                if let Some(badge) = badge {
+                    canvas.text(
+                        cell_rect,
+                        badge,
+                        TextStyle::Caption,
+                        Color::from(secondary),
+                        TextLayout::TRAILING,
+                    );
+                }
             }
         }
         canvas.pop_clip();
@@ -3619,6 +3773,36 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
 }
 
 /// 一覧の表の行(列ごとの文字)．一覧でなければ None
+/// 表の有効の印(WinUI 3 の CheckBox．入れたら色を塗ってチェックを描く)．cell の左に置き，上下は真ん中にする
+fn paint_check(canvas: &mut dyn Canvas, theme: &Theme, cell: Rect, checked: bool, enabled: bool) {
+    let palette = &theme.palette;
+    let side = size::RADIO_SIZE;
+    let rect = Rect::new(cell.x, cell.y + (cell.height - side) / 2.0, side, side);
+    if checked {
+        let fill = if enabled {
+            Color::from(palette.accent)
+        } else {
+            Color::from(palette.control_strong_stroke).with_alpha(opacity::ACCENT_DISABLED)
+        };
+        canvas.fill_round(rect, size::CONTROL_RADIUS, fill);
+        canvas.text(
+            rect,
+            theme.glyphs.check,
+            TextStyle::IconSmall,
+            Color::from(palette.accent_text),
+            TextLayout::CENTER,
+        );
+    } else {
+        canvas.fill_round(rect, size::CONTROL_RADIUS, Color::from(palette.control));
+        let stroke = if enabled {
+            palette.control_strong_stroke
+        } else {
+            palette.text_disabled
+        };
+        canvas.stroke_round(rect, size::CONTROL_RADIUS, 1.0, Color::from(stroke));
+    }
+}
+
 fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec<String>>> {
     Some(match &row.control {
         Control::Dictionary(_) => extras.dictionary.clone(),
@@ -3634,11 +3818,12 @@ fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec
                 .into_iter()
                 .zip(spec.enabled_flags(list))
                 .map(|(item, enabled)| {
+                    // 有効の印は表の先頭の列に印として出す(macOS の「有効」の列)
                     let mut columns = spec.display(&item);
                     columns.push(if enabled {
-                        String::new()
+                        pages::ENABLED_CELL.to_string()
                     } else {
-                        text::DISABLED.to_string()
+                        String::new()
                     });
                     columns
                 })

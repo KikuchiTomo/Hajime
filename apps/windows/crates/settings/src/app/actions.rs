@@ -1185,12 +1185,18 @@ fn symbol_row(item: &SymbolItem) -> Vec<String> {
         SymbolOrigin::Changed => Some(features::CHANGED),
         SymbolOrigin::Added => Some(features::ADDED),
     };
-    let state: Vec<&str> = (!item.is_enabled)
-        .then_some(text::DISABLED)
-        .into_iter()
-        .chain(origin)
-        .collect();
-    vec![item.input.clone(), item.output.clone(), state.join("・")]
+    // 入力・記号・有効の印・札(変更あり・追加)．有効は表の「有効」の列，札は記号の右に小さく出す(macOS と同じ)
+    let enabled = if item.is_enabled {
+        crate::pages::ENABLED_CELL
+    } else {
+        ""
+    };
+    vec![
+        item.input.clone(),
+        item.output.clone(),
+        enabled.to_string(),
+        origin.unwrap_or_default().to_string(),
+    ]
 }
 
 fn symbol_invalid(kind: SymbolKind, limits: &crate::catalog::Limits) -> String {

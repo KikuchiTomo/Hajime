@@ -193,6 +193,7 @@ impl Graphics {
                 size::CAPTION_FONT_SIZE,
                 DWRITE_FONT_WEIGHT_NORMAL,
             ),
+            TextStyle::Code => (MONO_FAMILY, size::BODY_FONT_SIZE, DWRITE_FONT_WEIGHT_NORMAL),
             TextStyle::Subtitle => (
                 self.display_family,
                 size::ABOUT_TITLE_FONT_SIZE,
