@@ -55,7 +55,7 @@ fn list(step: usize) -> CandidateList {
         association_key: None,
         homophone: None,
         shows_numbers: None,
-        variants: ["そのまま", "カタカナ", "ｶﾀｶﾅ", "全角英数", "半角英数"]
+        variants: ["ひらがな", "カタカナ", "ｶﾀｶﾅ", "全角英数", "半角英数"]
             .into_iter()
             .map(|label| CandidateVariant {
                 label: label.into(),

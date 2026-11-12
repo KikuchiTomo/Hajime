@@ -53,7 +53,7 @@ const EMOJI_SECTIONS: [(&str, &str, &str); 9] = [
     ("nature", "動物と自然", "🐻"),
     ("food", "食べ物と飲み物", "🍔"),
     ("travel", "旅行と場所", "🚗"),
-    ("activities", "活動", "⚽"),
+    ("activities", "アクティビティ", "⚽"),
     ("objects", "物", "💡"),
     ("symbols", "記号と標識", "🔣"),
     ("flags", "旗", "🏁"),
@@ -92,7 +92,7 @@ fn hints() -> Vec<KeyHint> {
         ("Enter", "入力"),
         ("Tab", "分類"),
         ("Ctrl+Tab", "種類"),
-        ("Shift+Enter", "続けて入力"),
+        ("Shift+Enter", "連続入力"),
         ("Alt+Enter", "肌の色"),
         ("Ctrl+D", "ピン留め"),
         ("Esc", "閉じる"),
@@ -191,7 +191,7 @@ fn preview(
 /// 絵文字のパレットを開いたところ．よく使う文字の行の下に表のまとまりが続く
 pub fn emoji() -> PalettePanel {
     let titles = [
-        "よく使う",
+        "よく使う項目",
         "顔と感情",
         "顔と感情",
         "顔と感情",
@@ -203,11 +203,11 @@ pub fn emoji() -> PalettePanel {
         query: String::new(),
         placeholder: "絵文字を検索".into(),
         tabs: tabs(
-            tab("frequent", "よく使う", "🕘", false),
+            tab("frequent", "よく使う項目", "🕘", false),
             &EMOJI_SECTIONS,
             "smileys",
         ),
-        heading: "よく使う".into(),
+        heading: "よく使う項目".into(),
         rows: rows(&EMOJI_ROWS, &titles, &[0, 1]),
         row_count: 210,
         first_row: 0,
@@ -261,7 +261,7 @@ pub fn settings(
     let mut panel_rows = Vec::new();
     for index in 0..rows {
         let (source, offset, title) = if index < frequent_rows {
-            (&frequent, index * columns, "よく使う")
+            (&frequent, index * columns, "よく使う項目")
         } else {
             (&smileys, (index - frequent_rows) * columns, "顔と感情")
         };
@@ -276,7 +276,7 @@ pub fn settings(
     }
     let mut panel = emoji();
     let first = if frequent_rows > 0 {
-        tab("frequent", "よく使う", "🕘", false)
+        tab("frequent", "よく使う項目", "🕘", false)
     } else {
         tab("smileys", "顔と感情", "😀", true)
     };
@@ -287,7 +287,7 @@ pub fn settings(
     };
     panel.tabs = tabs(first, sections, "smileys");
     panel.heading = if frequent_rows > 0 {
-        "よく使う"
+        "よく使う項目"
     } else {
         "顔と感情"
     }
@@ -504,7 +504,7 @@ pub fn symbol() -> PalettePanel {
 /// 顔文字のパレット．よく使う行の下に笑顔のまとまりが広いマスで続く
 pub fn kaomoji() -> PalettePanel {
     let titles = [
-        "よく使う",
+        "よく使う項目",
         "笑顔",
         "笑顔",
         "笑顔",
@@ -526,11 +526,11 @@ pub fn kaomoji() -> PalettePanel {
         query: String::new(),
         placeholder: "顔文字を検索".into(),
         tabs: tabs(
-            tab("frequent", "よく使う", "🕘", false),
+            tab("frequent", "よく使う項目", "🕘", false),
             &KAOMOJI_SECTIONS,
             "joy",
         ),
-        heading: "よく使う".into(),
+        heading: "よく使う項目".into(),
         rows: rows(&KAOMOJI_ROWS[..visible_rows as usize], &titles, &[0, 1]),
         row_count: 48,
         first_row: 0,

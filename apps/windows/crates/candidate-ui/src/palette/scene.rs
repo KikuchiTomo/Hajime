@@ -1240,7 +1240,7 @@ mod tests {
         let texts = preview_texts(&scene, &layout, &measure);
         let shown: Vec<&str> = texts.iter().map(|(text, ..)| text.as_str()).collect();
         assert_eq!(shown.iter().filter(|text| **text == "CLDR").count(), 1);
-        let english = texts.iter().find(|(text, ..)| text == "英語").unwrap();
+        let english = texts.iter().find(|(text, ..)| text == "英語名").unwrap();
         let value = texts
             .iter()
             .find(|(text, ..)| text == "flag: Japan")

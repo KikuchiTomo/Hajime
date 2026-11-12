@@ -145,7 +145,7 @@ enum DemoScripts {
             frames.append(converted([("よろしくおながいします", .converted)], panel: .note(note)))
             frames.append(converted([("よろしくお願いします", .converted)]))
         } else {
-            let note = Note(tone: .correction, title: "修正", subject: typed, key: "Esc", keyAction: "戻す")
+            let note = Note(tone: .correction, title: "修正", subject: typed, key: "Esc", keyAction: "元に戻す")
             frames.append(converted([("よろしく", .converted), ("お願い", .correction), ("します", .converted)], panel: .note(note)))
         }
         return frames
@@ -290,7 +290,7 @@ enum DemoScripts {
             let keys = "lpmmovjojs"
             var frames = typing(keys)
             frames += pause(frames.last, seconds: hold / 2)
-            let note = Note(tone: .correction, title: "修正", subject: keys, key: "Esc", keyAction: "戻す")
+            let note = Note(tone: .correction, title: "修正", subject: keys, key: "Esc", keyAction: "元に戻す")
             frames.append(converted([("こんにちは", .correction)], panel: .note(note)))
             frames.append(DemoFrame(committed: "こんにちは", duration: hold))
             return frames

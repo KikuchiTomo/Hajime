@@ -162,8 +162,8 @@ mod tests {
             title: "修正".into(),
             subject: Some("ようですね".into()),
             key: Some("Esc".into()),
-            key_action: Some("戻す".into()),
-            text: "修正「ようですね」　Esc 戻す".into(),
+            key_action: Some("元に戻す".into()),
+            text: "修正「ようですね」　Esc 元に戻す".into(),
         }
     }
 
@@ -182,7 +182,7 @@ mod tests {
         );
         assert!(texts(&scene).contains(&("修正".into(), theme.correction)));
         assert!(texts(&scene).contains(&("ようですね".into(), theme.text_muted)));
-        assert!(texts(&scene).contains(&("戻す".into(), theme.text_muted)));
+        assert!(texts(&scene).contains(&("元に戻す".into(), theme.text_muted)));
         // 直す前の字には取り消し線を引く
         let subject = text_frame(&scene, "ようですね").expect("直す前の字");
         assert!(scene.draws.iter().any(|draw| matches!(draw,

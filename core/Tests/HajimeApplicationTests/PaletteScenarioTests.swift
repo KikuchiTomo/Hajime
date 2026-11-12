@@ -364,7 +364,7 @@ struct PaletteScenarioTests {
         openEmoji(harness)
         #expect(texts(harness.palette).first == ["👍"])
         harness.click(.mode(.kaomoji))
-        #expect(harness.palette?.tabs.first?.title == "よく使う")
+        #expect(harness.palette?.tabs.first?.title == "よく使う項目")
         #expect(texts(harness.palette).first == ["(T_T)"])
         // 顔文字をピン留めしても，絵文字のパレットには出さない
         harness.press(.down)
@@ -491,9 +491,9 @@ struct PaletteScenarioTests {
         harness.type("thumbsup")
         harness.press(.enter)
         openEmoji(harness)
-        #expect(harness.palette?.tabs.first?.title == "よく使う")
+        #expect(harness.palette?.tabs.first?.title == "よく使う項目")
         #expect(texts(harness.palette).first == ["👍"])
-        #expect(harness.palette?.heading == "よく使う")
+        #expect(harness.palette?.heading == "よく使う項目")
         // 履歴を残さない設定なら出さない
         let off = self.harness(settings: { $0.paletteRecordsHistory = false }, usage: usage)
         openEmoji(off)

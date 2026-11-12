@@ -873,7 +873,7 @@ enum UIStrings {
         static let liveConversion = "ライブ変換"
         static let handwriting = "手書き入力"
         static let palette = "絵文字と記号"
-        static let checkForUpdates = "更新を確認"
+        static let checkForUpdates = "更新を確認…"
         static let registerWord = "単語の登録…"
         static let userDictionary = "ユーザー辞書…"
     }
@@ -997,7 +997,7 @@ enum UIStrings {
         static let showsCodePoints = "説明にコードポイントを表示"
         /// 説明の欄の項目名．englishNameLabel は UCD の名前の無い並び(国旗など)で代わりに出す英語の名前
         static let unicodeNameLabel = "Unicode"
-        static let englishNameLabel = "英語"
+        static let englishNameLabel = "英語名"
         static let readingsLabel = "読み"
         static let shortcodesLabel = "ショートコード"
         static let codePointsLabel = "コードポイント"

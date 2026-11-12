@@ -57,18 +57,18 @@ public enum IndicatorLabels {
         Hint(.nextCandidate, "候補"),
         Hint(.previousCandidate, "文字種"),
         Hint(.previousSegment, .nextSegment, "文節"),
-        Hint(.nextUncertainSegment, "誤りやすい文節"),
+        Hint(.nextUncertainSegment, "要確認の文節"),
         Hint(.shrinkSegment, .extendSegment, "区切り調整"),
-        Hint(.shrinkSegmentToWord, .extendSegmentToWord, "単語ごと"),
-        Hint(.splitSegment, "区切り"),
-        Hint(.editSegment, "打ち直し"),
-        Hint(.expandCandidates, "候補を表に"),
+        Hint(.shrinkSegmentToWord, .extendSegmentToWord, "単語単位"),
+        Hint(.splitSegment, "分割"),
+        Hint(.editSegment, "再入力"),
+        Hint(.expandCandidates, "表形式"),
     ]
 
     /// 連想の一覧の足元の案内
     public static let associationHints: [Hint] = [
         Hint(.nextCandidate, "選択"),
-        Hint(.previousSegment, .nextSegment, "意味"),
+        Hint(.previousSegment, .nextSegment, "意味の切り替え"),
         // 変換中の Esc を直前の変更の取り消しにした表では，そのキーで戻る
         Hint(.cancel, "戻る", fallback: .undoConversionEdit),
     ]
@@ -76,13 +76,13 @@ public enum IndicatorLabels {
     /// 一覧で候補を選んでいるときの足元の案内．先頭から前の候補へ進むと文字種の行に移る(R-03)
     public static let candidateHints: [Hint] = [
         Hint(.previousCandidate, "文字種"),
-        Hint(.expandCandidates, "表に広げる"),
+        Hint(.expandCandidates, "表形式"),
     ]
 
     /// 候補を表に広げているときの足元の案内．文節を移るキーで列を移り，広げるキー(か取り消しのキー)で元に戻す
     public static let gridHints: [Hint] = [
         Hint(.previousSegment, .nextSegment, "列"),
-        Hint(.expandCandidates, "戻す", fallback: .cancel),
+        Hint(.expandCandidates, "戻る", fallback: .cancel),
     ]
 
     /// 一覧で文字種の行を選んでいるときの足元の案内．左右で字種を選び，次の候補で候補に戻る
@@ -103,6 +103,6 @@ public enum IndicatorLabels {
 
     /// 文節を区切っているときの案内(数字で区切る位置を選び，Esc でやめる)．count は区切れる位置の数
     public static func splitHints(count: Int) -> [(key: String, label: String)] {
-        [(count > 1 ? "1–\(count)" : "1", "区切り"), ("Esc", "取り消し")]
+        [(count > 1 ? "1–\(count)" : "1", "分割"), ("Esc", "キャンセル")]
     }
 }

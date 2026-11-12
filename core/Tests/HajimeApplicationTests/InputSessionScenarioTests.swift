@@ -1356,7 +1356,7 @@ struct ReadingCorrectionScenarioTests {
         let remembered = harness.settings.current.correction.exceptions
         #expect(remembered.count == 1)
         #expect(remembered.allSatisfy { "ようですね".contains($0) && $0.count >= DefaultSettings.minimumRememberedPhraseLength })
-        #expect(harness.note == "「\(remembered.first ?? "")」は次から直しません")
+        #expect(harness.note == "「\(remembered.first ?? "")」は今後修正しません")
         harness.press(.enter)
         // 同じ語句を打っても，もう直さない
         harness.type("youdesune")

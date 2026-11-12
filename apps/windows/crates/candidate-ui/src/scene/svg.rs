@@ -856,8 +856,8 @@ mod tests {
                 title: "修正".into(),
                 subject: Some("オン外します".into()),
                 key: Some("Esc".into()),
-                key_action: Some("戻す".into()),
-                text: "修正「オン外します」　Esc 戻す".into(),
+                key_action: Some("元に戻す".into()),
+                text: "修正「オン外します」　Esc 元に戻す".into(),
             };
             // 文字種の行が先頭の一覧(候補の窓の上の余白と足元の並びを見る)
             let variants = CandidateList {

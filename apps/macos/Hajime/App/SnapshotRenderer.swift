@@ -44,7 +44,7 @@ enum SnapshotRenderer {
                 render(correctionView(theme: look.theme, appearance: appearance), name: "correction-\(look.name)", to: output, appearance: appearance)
                 render(readingCorrectionView(theme: look.theme, appearance: appearance), name: "correction-reading-\(look.name)", to: output, appearance: appearance)
                 render(correctedLatticeView(theme: look.theme, appearance: appearance), name: "branch-correction-\(look.name)", to: output, appearance: appearance)
-                render(noteView(Note(tone: .correction, title: "修正", subject: "オン外します", key: "Esc", keyAction: "戻す"), theme: look.theme, appearance: appearance),
+                render(noteView(Note(tone: .correction, title: "修正", subject: "オン外します", key: "Esc", keyAction: "元に戻す"), theme: look.theme, appearance: appearance),
                        name: "note-correction-\(look.name)", to: output, appearance: appearance)
                 render(noteView(Note(tone: .suggestion, title: "もしかして", subject: "お願いします", key: "Tab", keyAction: "修正"), theme: look.theme, appearance: appearance),
                        name: "note-suggestion-\(look.name)", to: output, appearance: appearance)
@@ -613,7 +613,7 @@ enum SnapshotRenderer {
             variants: ScriptVariant.allCases.map { .init(label: $0.label, isAvailable: true) },
             selectedVariant: nil,
             entries: [.init(text: "python", annotation: nil), .init(text: "pyてょn", annotation: "入力のまま"), .init(text: "Python", annotation: nil)],
-            selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: Note(tone: .correction, title: "修正", key: "Space", keyAction: "入力のままに戻す")
+            selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: Note(tone: .correction, title: "修正", key: "Space", keyAction: "元に戻す")
         )
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
@@ -630,7 +630,7 @@ enum SnapshotRenderer {
             selectedVariant: nil,
             entries: [.init(text: "今日の天気は良いですね", annotation: nil, corrected: 6..<8), .init(text: "今日の天気はいいですね", annotation: nil, corrected: 6..<8),
                       .init(text: "今日の天気は好いですね", annotation: nil, corrected: 6..<8)],
-            selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: Note(tone: .correction, title: "修正", key: "Esc", keyAction: "入力のままに戻す")
+            selectedEntry: 0, focus: .candidate, position: 1, total: 3, note: Note(tone: .correction, title: "修正", key: "Esc", keyAction: "元に戻す")
         )
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
@@ -681,7 +681,7 @@ enum SnapshotRenderer {
             .init(text: "今日の", isFocused: false, isUncertain: false),
             .init(text: "天気は", alternatives: ["天気は", "転記は"], selectedAlternative: 0, isFocused: true, isUncertain: true),
             corrected,
-        ], position: 1, total: 2, note: Note(tone: .correction, title: "修正", subject: "今日の天気は様ですね", key: "Esc", keyAction: "戻す"))
+        ], position: 1, total: 2, note: Note(tone: .correction, title: "修正", subject: "今日の天気は様ですね", key: "Esc", keyAction: "元に戻す"))
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)
