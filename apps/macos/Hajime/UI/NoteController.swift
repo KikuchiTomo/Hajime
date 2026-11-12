@@ -44,7 +44,7 @@ final class NoteView: NSView {
     var note = Note.info("") { didSet { needsDisplay = true } }
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
 
-    /// 縁の線(角丸)，外枠と立体の縁(platinum と desk)の太さ．余白はこの内側から測る
+    /// 枠線(角丸)，外枠とベベル(platinum と desk)の太さ．余白はこの内側から測る
     private var inset: CGFloat { theme.isRounded ? Size.frameWidth : Size.frameWidth + Size.bevelWidth }
 
     /// 1 行だけの小さな窓の余白(予測の窓・モード表示と同じ)．中身の高さは足元の行と同じ決め方

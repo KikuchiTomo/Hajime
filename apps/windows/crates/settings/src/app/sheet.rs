@@ -294,7 +294,7 @@ pub fn paint(
     let radius = size::DIALOG_RADIUS;
     let dialog = layout.dialog;
     canvas.fill_round(dialog, radius, Color::from(palette.card));
-    // 下の帯は窓の地の色(WinUI の ContentDialog の CommandSpace)．角の丸みは帯の外を切って残す
+    // 下の帯は窓の背景の色(WinUI の ContentDialog の CommandSpace)．角の丸みは帯の外を切って残す
     canvas.push_clip(layout.footer);
     canvas.fill_round(dialog, radius, Color::from(palette.background));
     canvas.pop_clip();

@@ -67,7 +67,7 @@ public struct VisionHandwritingRecognizer: HandwritingRecognizing {
         return Array(result.prefix(maximumCandidates))
     }
 
-    /// 線を書く場所の大きさのまま，白地に黒で描いた画像にする．横に長い線(一)はこの描き方でしか読めない
+    /// 線を書く場所の大きさのまま，白背景に黒で描いた画像にする．横に長い線(一)はこの描き方でしか読めない
     static func render(strokes: [[Point]], canvasSize: Size, scale: Double = 2) -> CGImage? {
         let width = Int(canvasSize.width * scale), height = Int(canvasSize.height * scale)
         guard width > 0, height > 0, strokes.contains(where: { !$0.isEmpty }) else { return nil }
@@ -89,7 +89,7 @@ public struct VisionHandwritingRecognizer: HandwritingRecognizing {
         }
     }
 
-    /// 白地に黒で線を描く．place は線の点(左上が原点)を画像の座標(左上が原点)に移す
+    /// 白背景に黒で線を描く．place は線の点(左上が原点)を画像の座標(左上が原点)に移す
     private static func draw(strokes: [[Point]], width: Int, height: Int, lineWidth: Double, place: (Point) -> CGPoint) -> CGImage? {
         guard width > 0, height > 0,
             let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,

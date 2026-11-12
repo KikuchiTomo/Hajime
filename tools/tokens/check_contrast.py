@@ -58,7 +58,7 @@ def main(argv: list[str]) -> int:
         colors = themes[rule["theme"]]["color"]
         bg = colors[rule["bg"]]["$value"]
         name = rule["bg"]
-        # tint があれば，その色をその濃さで bg の上に重ねた地と比べる(例: 文字の色を薄く敷いたタグ)
+        # tint があれば，その色をその濃さで bg の上に重ねた背景と比べる(例: 文字の色を薄く敷いたタグ)
         if tint := rule.get("tint"):
             opacity = lookup(tokens, tint["opacity"])
             bg = blend(colors[tint["color"]]["$value"], opacity, bg)

@@ -38,7 +38,7 @@ const BASE_DPI: f32 = 96.0;
 const SHOW_HANDWRITING: &str = "--show-handwriting";
 
 /// 引数が --show-handwriting <x> <y> <秒> <light|dark> なら，エンジンにつながずに手書きの窓を (x, y)(画面のピクセル)の
-/// 下に出し，秒だけ動かして終わる(本物の窓の縁・影・DPI・フォーカスを奪わないことを確かめる．書いた線は認識するが，選んだ文字はどこにも入らない)
+/// 下に出し，秒だけ動かして終わる(本物の窓の枠線・影・DPI・フォーカスを奪わないことを確かめる．書いた線は認識するが，選んだ文字はどこにも入らない)
 fn show_handwriting(arguments: &[String]) -> bool {
     let Some(index) = arguments
         .iter()
@@ -147,7 +147,7 @@ fn render_all(output: &Path) -> Result<()> {
     let renderer = Renderer::new()?;
     let custom = sample_theme();
     for (name, theme_name, dark) in LOOKS {
-        // 見本はすりガラスの地を写せないので，地を塗る(macOS の fillsSurface と同じ)
+        // 見本はすりガラスの背景を写せないので，背景を塗る(macOS の fillsSurface と同じ)
         let system = SystemLook {
             dark,
             ..SystemLook::default()

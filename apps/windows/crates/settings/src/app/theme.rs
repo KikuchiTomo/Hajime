@@ -201,7 +201,7 @@ fn system_palette() -> SettingsPalette {
         nav_pressed: window,
         nav_selected: highlight,
         scrollbar: text,
-        // シートの後ろは窓の地の色で薄める(高コントラストでは黒を重ねない)
+        // シートの後ろは窓の背景の色で薄める(高コントラストでは黒を重ねない)
         smoke: window,
         switch_off: gray,
         text,

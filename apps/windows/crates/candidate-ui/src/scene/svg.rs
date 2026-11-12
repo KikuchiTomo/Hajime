@@ -62,7 +62,7 @@ fn escape(text: &str) -> String {
         .replace('>', "&gt;")
 }
 
-/// 窓の見た目を SVG にする．地のすりガラスは写せないので，角丸のテーマは窓の地と縁も描く．margin は窓のまわりの空き
+/// 窓の見た目を SVG にする．背景のすりガラスは写せないので，角丸のテーマは窓の背景と枠線も描く．margin は窓のまわりの空き
 pub fn scene(
     scene: &Scene,
     theme: &ResolvedTheme,
@@ -458,7 +458,7 @@ mod tests {
             "contrast",
         ] {
             let theme = theme(name);
-            // 文字が明るいテーマは暗い地に置く
+            // 文字が明るいテーマは暗い背景に置く
             let dark = theme.text.red + theme.text.green + theme.text.blue > 1.5;
             let font_size = tokens::size::candidate::FONT_SIZE;
             let measure = Approximate {

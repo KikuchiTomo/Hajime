@@ -7,7 +7,7 @@ use super::{Frame, Look, Measure, Scene};
 use crate::theme::Font;
 use tokens::size::{candidate, glass, mode_indicator, prediction as spacing};
 
-/// 縁の線(角丸)，外枠と立体の縁(platinum と desk)の太さ．小さな窓の余白はこの内側から測る
+/// 枠線(角丸)，外枠とベベル(platinum と desk)の太さ．小さな窓の余白はこの内側から測る
 fn edge(look: &Look) -> f32 {
     if look.theme.is_rounded() {
         candidate::FRAME_WIDTH

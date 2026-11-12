@@ -12,7 +12,7 @@ pub fn minimum_size() -> (f32, f32) {
     (size::WIDTH, size::TITLE_HEIGHT + size::HEIGHT)
 }
 
-/// 窓の縁のうち，押して大きさを変える辺
+/// 窓の枠線のうち，押して大きさを変える辺
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Edge {
     Left,
@@ -36,7 +36,7 @@ pub enum Control {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Hit {
-    /// 縁．押したまま動かすと窓の大きさを変える
+    /// 枠線．押したまま動かすと窓の大きさを変える
     Edge(Edge),
     /// 見出しの帯．押したまま動かすと窓を動かす
     Title,
@@ -151,7 +151,7 @@ impl Layout {
         }
     }
 
-    /// 窓の中の点(DIP)にある部品．縁は見出しの帯や部品より先に見る(Windows 11 の窓と同じく，縁は窓のどこでもつかめる)
+    /// 窓の中の点(DIP)にある部品．枠線は見出しの帯や部品より先に見る(Windows 11 の窓と同じく，枠線は窓のどこでもつかめる)
     pub fn hit(&self, x: f32, y: f32) -> Hit {
         if let Some(edge) = self.edge(x, y) {
             return Hit::Edge(edge);

@@ -193,7 +193,7 @@ pub struct Picker {
     pub choices: &'static [Choice],
     /// 推奨の値(メニューの名前に「(推奨)」を添える)
     pub recommended: Option<&'static str>,
-    /// カードの地に載せる(入力する文字の行)
+    /// カードの背景に載せる(入力する文字の行)
     pub framed: bool,
 }
 

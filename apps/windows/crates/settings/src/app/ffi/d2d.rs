@@ -402,7 +402,7 @@ impl Surface {
             }
             return Ok(target.clone());
         }
-        // 地を透明で描いたところに Mica が見えるよう，アルファを持つ描き先にする
+        // 背景を透明で描いたところに Mica が見えるよう，アルファを持つ描き先にする
         let properties = D2D1_RENDER_TARGET_PROPERTIES {
             pixelFormat: D2D1_PIXEL_FORMAT {
                 format: DXGI_FORMAT_B8G8R8A8_UNORM,
@@ -832,7 +832,7 @@ pub struct PreviewRequest<'a> {
     pub dark: bool,
     /// 画面の DPI の倍率
     pub scale: f32,
-    /// 見本の外の地
+    /// 見本の外の背景
     pub background: tokens::Rgb,
     /// 描く候補の窓と置き方
     pub shown: candidate_ui::app::preview::Shown<'a>,
@@ -914,7 +914,7 @@ pub fn render_preview(
     }
 }
 
-/// 透明な地に重ねる候補の窓の部品(初期設定の実演)．rect はデバイスのピクセル(左・上・幅・高さ)
+/// 透明な背景に重ねる候補の窓の部品(初期設定の実演)．rect はデバイスのピクセル(左・上・幅・高さ)
 pub struct Layer<'a> {
     pub shown: candidate_ui::app::preview::Shown<'a>,
     pub rect: (i32, i32, i32, i32),
@@ -929,8 +929,8 @@ pub struct LayerLook<'a> {
     pub scale: f32,
 }
 
-/// layers を透明な地に描いた画像(アルファを掛けた BGRA)．黒い地と白い地に描いて比べ，地の透け具合を求める
-/// (候補の窓の描き方は不透明な描き先に描くので，角の丸みや縁のなめらかさを残したまま舞台の地に重ねるため)
+/// layers を透明な背景に描いた画像(アルファを掛けた BGRA)．黒い背景と白い背景に描いて比べ，背景の透け具合を求める
+/// (候補の窓の描き方は不透明な描き先に描くので，角の丸みや枠線のなめらかさを残したまま舞台の背景に重ねるため)
 pub fn render_layers(
     preview: &candidate_ui::app::preview::Preview,
     width: u32,
@@ -974,7 +974,7 @@ pub fn render_layers(
         blue: 0xFF,
     })?;
     for (pixel, light) in pixels.chunks_exact_mut(4).zip(light.chunks_exact(4)) {
-        // 白い地と黒い地の差が透けている分．黒い地の色はアルファを掛けた色になる
+        // 白い背景と黒い背景の差が透けている分．黒い背景の色はアルファを掛けた色になる
         let through = (0..3)
             .map(|channel| u32::from(light[channel].saturating_sub(pixel[channel])))
             .sum::<u32>()
@@ -1045,7 +1045,7 @@ pub fn render_icon(width: u32, height: u32, background: Option<tokens::Rgb>) -> 
     if let Some(background) = background {
         return icon_on(width, height, background);
     }
-    // GDI はアルファを正しく残さないので，黒と白の地に描いた差からアルファを求める．黒の地の色はアルファを掛けた色
+    // GDI はアルファを正しく残さないので，黒と白の背景に描いた差からアルファを求める．黒の背景の色はアルファを掛けた色
     let black = icon_on(
         width,
         height,
@@ -1079,7 +1079,7 @@ pub fn render_icon(width: u32, height: u32, background: Option<tokens::Rgb>) -> 
     Some(pixels)
 }
 
-/// アイコンを background の地に描いた不透明な画像
+/// アイコンを background の背景に描いた不透明な画像
 fn icon_on(width: u32, height: u32, background: tokens::Rgb) -> Option<Vec<u8>> {
     use windows::Win32::Graphics::Gdi::{
         CreateCompatibleDC, CreateDIBSection, DeleteDC, DeleteObject, SelectObject, BITMAPINFO,

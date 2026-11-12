@@ -32,12 +32,12 @@ struct Metrics {
     /// 候補の文字の前に置く番号の幅
     lead: f32,
     footer_height: f32,
-    /// 候補の行の地の上下を縮める量(角丸のテーマ)．行の地の見える上の端は行の上の端からこの分だけ下
+    /// 候補の行の背景の上下を縮める量(角丸のテーマ)．行の背景の見える上の端は行の上の端からこの分だけ下
     row_inset: f32,
     shadow: f32,
     line_width: f32,
     line_width_selected: f32,
-    /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の地が上下に細いので，その端から伸ばす)
+    /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の背景が上下に細いので，その端から伸ばす)
     root_inset: f32,
     /// 枝の曲がり角の半径．直線の枝は 0(直角)
     turn_radius: f32,
@@ -49,7 +49,7 @@ struct Metrics {
 const GAP: f32 = glass::SEPARATOR_GAP;
 
 impl Metrics {
-    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の地の左から PADDING_X)にそろえる
+    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の背景の左から PADDING_X)にそろえる
     fn text_inset(&self) -> f32 {
         self.inset + candidate::PADDING_X
     }
@@ -289,13 +289,13 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
         .max(footer + metrics.inset * 2.0)
         .max(note + metrics.inset * 2.0)
         .max(heading + (metrics.inset + candidate::PADDING_X) * 2.0);
-    // いちばん上の行の地(角丸のテーマは行の上下を縮めて描く)の上の端を，縁の内側の余白の端にそろえる
+    // いちばん上の行の背景(角丸のテーマは行の上下を縮めて描く)の上の端を，枠線の内側の余白の端にそろえる
     let trunk_y = metrics.inset - metrics.row_inset
         + heading_height(map, metrics)
         + upper_rows as f32 * metrics.row_height;
     let width = width.ceil();
     let content_right = width - metrics.inset;
-    // 下の枝の見える下の端(候補の行の地の下の端)
+    // 下の枝の見える下の端(候補の行の背景の下の端)
     let lower_top = trunk_y + metrics.row_height;
     let mut bottom = lower_top + metrics.row_height * lower_rows as f32
         - if lower_rows > 0 {
@@ -1328,8 +1328,8 @@ mod tests {
         assert_eq!(arcs(&paths[0].0), vec![(glass::BRANCH_TURN_RADIUS, false)]);
         assert_eq!(arcs(&paths[1].0), vec![(glass::BRANCH_TURN_RADIUS, false)]);
         assert_eq!(arcs(&paths[2].0), vec![(glass::BRANCH_TURN_RADIUS, true)]);
-        // 選んだ道は文節の地の下の端から始まり，どの枝も行の左の手前の同じ x で終わる．
-        // いちばん上の行の地の上の端が縁の内側の余白の端にそろうよう，行は地を縮めた分だけ上から始まる
+        // 選んだ道は文節の背景の下の端から始まり，どの枝も行の左の手前の同じ x で終わる．
+        // いちばん上の行の背景の上の端が枠線の内側の余白の端にそろうよう，行は背景を縮めた分だけ上から始まる
         let inset = candidate::FRAME_WIDTH + glass::WINDOW_PADDING;
         let node_bottom = inset - glass::SELECTION_INSET_Y + glass::ROW_HEIGHT * 2.0;
         assert_eq!(
@@ -1366,7 +1366,7 @@ mod tests {
         let scene = branch_map(&map(), &look, &Fixed);
         for (figures, _, width) in paths(&scene) {
             for figure in &figures {
-                // 幹の線の縁と水平の線の縁が，デバイスのピクセルの境に来る
+                // 幹の線の端と水平の線の端が，デバイスのピクセルの境に来る
                 let edge = figure.start.x * 2.0 - width;
                 let end = tip(figure);
                 assert_eq!(end.x * 2.0, (end.x * 2.0).round());

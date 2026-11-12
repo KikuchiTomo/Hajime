@@ -22,7 +22,7 @@ struct OnboardingView: View {
                 header
                 ScrollView {
                     content
-                        // カードの縁の線がスクロールの端で切れないように空ける
+                        // カードの枠線がスクロールの端で切れないように空ける
                         .padding(.vertical, Space.inset)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -251,7 +251,7 @@ struct OnboardingView: View {
     }
 }
 
-/// 選択肢のカード．選んだカードはアクセントカラーの縁と地，推奨の選択肢にはタグを付ける
+/// 選択肢のカード．選んだカードはアクセントカラーの枠線と背景，推奨の選択肢にはタグを付ける
 private struct OptionCard: View {
     private typealias Size = DesignTokens.Size.Onboarding
     private typealias Opacity = DesignTokens.Opacity.Onboarding
@@ -308,7 +308,7 @@ private struct RecommendedBadge: View {
     }
 }
 
-/// テーマのカード．そのテーマの地・選択・補正の色を小さく並べた見本と名前
+/// テーマのカード．そのテーマの背景・選択・補正の色を小さく並べた見本と名前
 private struct ThemeTile: View {
     private typealias Size = DesignTokens.Size.Onboarding
     private typealias Opacity = DesignTokens.Opacity.Onboarding

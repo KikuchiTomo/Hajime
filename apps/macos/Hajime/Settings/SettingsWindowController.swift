@@ -83,7 +83,7 @@ final class SettingsWindowController {
         )
         window.title = UIStrings.Settings.windowTitle
         // タイトルバーを透明にすると，スクロールした中身が見出しの下に透けて重なる．
-        // 窓にツールバーを持たせ，SwiftUI の見出しと検索欄をそこに出して，OS にタイトルバーの地を塗らせる
+        // 窓にツールバーを持たせ，SwiftUI の見出しと検索欄をそこに出して，OS にタイトルバーの背景を塗らせる
         window.toolbar = NSToolbar(identifier: "settings")
         window.toolbarStyle = .unified
         let hosting = NSHostingView(rootView: SettingsView(model: model, sync: sync, navigation: navigation))

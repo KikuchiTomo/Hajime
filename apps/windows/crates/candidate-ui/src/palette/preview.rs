@@ -527,7 +527,7 @@ impl Planner<'_> {
             let baselines: Vec<f32> = (0..lines.len())
                 .map(|index| top + self.rows.table.ascent + pitch * (line + index) as f32)
                 .collect();
-            // タグは文字の上下に chip-padding-y を足した高さで，行の中の縦の真ん中に置く(行の高さに収め，縁はドットにそろえる)
+            // タグは文字の上下に chip-padding-y を足した高さで，行の中の縦の真ん中に置く(行の高さに収め，枠線はドットにそろえる)
             let (ascent, descent) = self.metrics.font_extent(role);
             let height = (ascent + descent + palette::CHIP_PADDING_Y * 2.0)
                 .round()

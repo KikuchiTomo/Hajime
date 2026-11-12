@@ -20,7 +20,7 @@ final class CandidatePanelController {
     private var side: PanelPlacement.Side?
     /// 候補を選んでいるときに置いた窓．続けて選んでいるあいだは，候補が並び始める辺をこの窓から動かさない
     private var held: PanelPlacement.Placement?
-    /// 窓の縁を動かしている途中か
+    /// 窓の枠線を動かしている途中か
     private var isAnimatingFrame = false
 
     /// 候補をマウスで押したときに知らせる先．押した対象(PointerTarget)を渡す
@@ -48,7 +48,7 @@ final class CandidatePanelController {
         shownList = panel
         shownLattice = nil
         view.panel = panel
-        // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，縁を動かさずにすぐ変える．
+        // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，枠線を動かさずにすぐ変える．
         // 窓は入力位置に寄せて置き直す
         let choosing = panel.selectedEntry != nil
         let frame = present(view, size: view.fittingSize(for: panel), caret: caret, theme: view.theme, crossfades: arrived, animatesFrame: choosing, holdsEdges: choosing)
@@ -116,8 +116,8 @@ final class CandidatePanelController {
         return min(grid ? DesignTokens.Size.Candidate.gridMaxWidth : DesignTokens.Size.Candidate.maxWidth, screen)
     }
 
-    /// glass はすりガラスの地(GlassBackdrop)の上に中身を重ね，ウィンドウの影を付ける．
-    /// 出ている窓の大きさが変わるときは縁を滑らかに動かし(候補が増えた・文節を移った)，crossfades ならあとから届いた中身を重ねて変える．
+    /// glass はすりガラスの背景(GlassBackdrop)の上に中身を重ね，ウィンドウの影を付ける．
+    /// 出ている窓の大きさが変わるときは枠線を滑らかに動かし(候補が増えた・文節を移った)，crossfades ならあとから届いた中身を重ねて変える．
     /// 「視差効果を減らす」が有効なら，大きさはすぐ変え，重ね変わりだけにする(Apple のヒューマンインターフェイスガイドラインの動きの決まり)．
     /// holdsEdges なら，前も選んでいたときに置いた窓から候補が並び始める辺(上と左)を動かさない(PanelPlacement.place)
     /// 返すのは窓の新しい枠(動かしている途中でも，動き終えたときの枠)
@@ -141,7 +141,7 @@ final class CandidatePanelController {
             root.layer?.add(transition, forKey: "arrived")
         }
         // 動かすのは，左右と上下のそれぞれで片方の辺がそのままで，大きさだけが変わるときに限る(上の辺を保って下の辺が動く，など)．
-        // 窓ごと動くとき(入力位置が移った)は滑らせずにすぐ移す．動いている途中に次の大きさが届くと縁が揺れて見えるため，
+        // 窓ごと動くとき(入力位置が移った)は滑らせずにすぐ移す．動いている途中に次の大きさが届くと枠線が揺れて見えるため，
         // 動いている途中なら今の動きを止めてすぐ移す
         let current = window.frame
         let verticalEdgeStays = abs(frame.maxY - current.maxY) < 1 || abs(frame.minY - current.minY) < 1

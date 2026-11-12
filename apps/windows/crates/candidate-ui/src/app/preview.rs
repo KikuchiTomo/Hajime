@@ -144,7 +144,7 @@ impl Preview {
     ) -> Result<()> {
         let measure = self.measure_for(shown, theme, font_size)?;
         let scene = Self::scene(shown, theme, font_size, &measure);
-        // 外観の見本は下地の上に置き，実演はウィザードの地にそのまま置く(画像は不透明なので影は付けない)
+        // 外観の見本は下地の上に置き，実演はウィザードの背景にそのまま置く(画像は不透明なので影は付けない)
         let surround = match placement {
             Placement::Center { .. } => Surround::Snapshot { dark },
             Placement::TopLeft { .. } | Placement::Fit { .. } => Surround::Bare,
@@ -152,7 +152,7 @@ impl Preview {
         let mut scene = scene::surround(scene, theme, surround);
         match placement {
             Placement::TopLeft { ground } | Placement::Fit { ground } => {
-                // 角の丸みの外を地の色で塗る(画像は不透明)
+                // 角の丸みの外を背景の色で塗る(画像は不透明)
                 scene.draws.insert(
                     0,
                     Draw::Rect {

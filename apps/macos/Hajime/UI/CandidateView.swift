@@ -21,7 +21,7 @@ final class CandidateView: NSView {
     /// 第 1 候補と選んでいる候補以外の濃さ．出した直後は薄くし，すぐに濃くする(ephemeral adaptation)．
     /// 位置は動かさない．docs/dev/research/candidate-presentation.md の提案による
     var restOpacity: CGFloat = 1 { didSet { needsDisplay = true } }
-    /// glass の面を自分で塗るか．ぼかしの地(GlassBackdrop)の無いところ(画像への書き出し)で使う
+    /// glass の面を自分で塗るか．ぼかしの背景(GlassBackdrop)の無いところ(画像への書き出し)で使う
     var fillsSurface = false { didSet { needsDisplay = true } }
     /// 窓の幅の上限．長い文の候補は末尾を「…」で省いてこの幅に収める(CandidatePanelController が画面の幅から決める)
     var maximumWidth = DesignTokens.Size.Candidate.maxWidth { didSet { needsDisplay = true } }
@@ -44,7 +44,7 @@ final class CandidateView: NSView {
                       hasShadow: theme.hasDropShadow)
     }
 
-    /// 行の地の内側の左右の余白．番号の丸(番号)の左と注釈のタグの右，足元の案内と位置の左右の端をここにそろえる
+    /// 行の背景の内側の左右の余白．番号の丸(番号)の左と注釈のタグの右，足元の案内と位置の左右の端をここにそろえる
     private var rowPaddingX: CGFloat { theme.isRounded ? Glass.rowPaddingX : Size.paddingX }
     /// 番号の幅(番号から候補の文字まで)
     private var lead: CGFloat { theme.isRounded ? Glass.badgeSize + Size.paddingX : Size.indexWidth }
@@ -78,7 +78,7 @@ final class CandidateView: NSView {
 
     // MARK: - 大きさと区画
 
-    /// 候補の列(行の地)の幅．足元とカードを除く．表に広げていれば，すべての列と列のあいだの線を合わせた幅
+    /// 候補の列(行の背景)の幅．足元とカードを除く．表に広げていれば，すべての列と列のあいだの線を合わせた幅
     private func listWidth(for panel: CandidatePanel) -> CGFloat {
         let labelAttributes: [NSAttributedString.Key: Any] = [.font: labelFont]
         let variantsWidth = panel.variants.reduce(CGFloat(0)) { width, variant in
@@ -90,7 +90,7 @@ final class CandidateView: NSView {
         return max(Size.minWidth, entriesWidth, variantsWidth, headingWidth).rounded(.up)
     }
 
-    /// 候補 1 つの行の地の幅．左の余白・番号・文字・添え書き・右の余白(文字の右は番号の左より広く空ける)．
+    /// 候補 1 つの行の背景の幅．左の余白・番号・文字・添え書き・右の余白(文字の右は番号の左より広く空ける)．
     /// 表ではすべての列を同じ幅にそろえ，窓が幅の上限に収まらなければ列を狭めて，収まらない候補は末尾を省く
     private func cellWidth(for panel: CandidatePanel) -> CGFloat {
         let textAttributes: [NSAttributedString.Key: Any] = [.font: candidateFont]
@@ -152,7 +152,7 @@ final class CandidateView: NSView {
     /// 押した対象を知らせる先(候補の窓をマウスで押したとき)
     var onChoose: ((PointerTarget) -> Void)?
 
-    /// 候補ごとの行の地と押せる範囲，表の列のあいだの縦の線
+    /// 候補ごとの行の背景と押せる範囲，表の列のあいだの縦の線
     private struct Cells {
         var rows: [NSRect]
         var hitRows: [NSRect]
@@ -193,7 +193,7 @@ final class CandidateView: NSView {
         }
     }
 
-    /// 候補の行のタグの右端(行の地の内側の余白の内側．足元の位置の右の端と同じ x)
+    /// 候補の行のタグの右端(行の背景の内側の余白の内側．足元の位置の右の端と同じ x)
     private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - rowPaddingX }
 
     /// ユーザー辞書の語のコメントのタグを押せる範囲．コメントのタグの無い行は nil
@@ -227,7 +227,7 @@ final class CandidateView: NSView {
         let layout = placement(for: panel, size: bounds.size).layout
         let hitRows = cells(for: panel, layout: layout).hitRows
         if let row = hitRows.firstIndex(where: { $0.contains(point) }) {
-            // タグを押せる範囲は，候補の行と同じく行と行のあいだまで(タグの右の端は行の地の内側)
+            // タグを押せる範囲は，候補の行と同じく行と行のあいだまで(タグの右の端は行の背景の内側)
             if let comment = commentRect(panel.entries[row], in: hitRows[row]), comment.contains(point) { return .comment(row) }
             return .entry(row)
         }

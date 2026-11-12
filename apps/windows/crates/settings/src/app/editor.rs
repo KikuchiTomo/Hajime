@@ -151,7 +151,7 @@ pub fn paint_sheet(
     state: &SheetState,
 ) {
     let palette = &theme.palette;
-    // 見本の帯はカードの地にし(macOS の background.secondary)，下に区切り線を引く
+    // 見本の帯はカードの背景にし(macOS の background.secondary)，下に区切り線を引く
     canvas.fill_rect(layout.band, Color::from(palette.card));
     canvas.preview(layout.preview);
     let line = |y: f32| Rect::new(layout.band.x, y, layout.band.width, 1.0);

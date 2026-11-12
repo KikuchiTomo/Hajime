@@ -1,7 +1,7 @@
 #!/bin/bash
 # 公式サイトのトップページの画像(apps/docs-site/static/images/hero.webp と features/ の一部)を，
 # Debug でビルドした Hajime Debug が書き出した画面(SnapshotRenderer)から作る．
-# 窓の外の地を消して影を付け，サイトのほかの写真と同じ茶色の地に並べる．
+# 窓の外の背景を消して影を付け，サイトのほかの写真と同じ茶色の背景に並べる．
 # トップの画像は，既存の写真(features/candidate-tree.webp)のテキストエディットの窓の中身を描き直して作る．
 # 候補ウィンドウや設定の見た目を変えたら作り直してコミットする．ImageMagick が要る
 # 使い方:
@@ -13,11 +13,11 @@ snapshots=${1:-$HOME/Library/Containers/men.haji.inputmethod.debug/Data/tmp/haji
 images="$root/apps/docs-site/static/images"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-# 地の色は，既存の写真の壁紙の上と下からとった
+# 背景の色は，既存の写真の壁紙の上と下からとった
 top='rgb(149,100,55)'
 bottom='rgb(112,68,32)'
 
-# 窓の外の地(四隅とつながった同じ色)を透明にし，縮めて影を付ける．$3 は縮める率(%)
+# 窓の外の背景(四隅とつながった同じ色)を透明にし，縮めて影を付ける．$3 は縮める率(%)
 window() {
   local source="$snapshots/$1.png" output="$work/$2.png" scale=${3:-100} w h
   w=$(magick identify -format %w "$source")
@@ -29,7 +29,7 @@ window() {
     \( +clone -background black -shadow 50x16+0+12 \) +swap -background none -layers merge +repage "$output"
 }
 
-# 窓の地と窓の色が同じもの(手書きの画面)は，切り抜かずに角を丸めて影を付ける
+# 窓の背景と窓の色が同じもの(手書きの画面)は，切り抜かずに角を丸めて影を付ける
 panel() {
   local source="$snapshots/$1.png" output="$work/$2.png" scale=${3:-100} w h
   magick "$source" -resize "${scale}%" "$work/resized.png"
@@ -40,7 +40,7 @@ panel() {
     \( +clone -background black -shadow 50x16+0+12 \) +swap -background none -layers merge +repage "$output"
 }
 
-# 幅 1400 の茶色の地に窓を置く．$1 出力の名前，$2 高さ，残りは「窓:x:y」(c なら真ん中)
+# 幅 1400 の茶色の背景に窓を置く．$1 出力の名前，$2 高さ，残りは「窓:x:y」(c なら真ん中)
 scene() {
   local name=$1 height=$2 spec file x y w h
   shift 2

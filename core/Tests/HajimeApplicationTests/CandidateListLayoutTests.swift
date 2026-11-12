@@ -1,7 +1,7 @@
 import HajimeApplication
 import Testing
 
-/// 候補の一覧の窓の区画の配置．縁の内側の余白，区切りの線の上と下の間隔，語の意味のカードの揃いを確かめる
+/// 候補の一覧の窓の区画の配置．枠線の内側の余白，区切りの線の上と下の間隔，語の意味のカードの揃いを確かめる
 @Suite("候補の一覧の窓の配置")
 struct CandidateListLayoutTests {
     typealias Layout = CandidateListLayout

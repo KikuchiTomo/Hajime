@@ -3,7 +3,7 @@ import HajimeApplication
 
 /// 案内(Note)と候補の横のタグを描く．分岐図・一覧の足元と，入力位置の下の案内の窓で同じものを使う．
 ///
-/// 案内は部品ごとに描き分ける: 頭のアイコン(補正の色の地の丸)，主な語(「修正」「もしかして」)，
+/// 案内は部品ごとに描き分ける: 頭のアイコン(補正の色の背景の丸)，主な語(「修正」「もしかして」)，
 /// 対象の字(直す前の字は取り消し線，直した字は文字の色)，キーキャップとそのキーでできること
 @MainActor
 enum NoteDrawing {
@@ -93,8 +93,8 @@ enum NoteDrawing {
         return NSRect(x: tag.minX, y: row.minY, width: tag.width, height: row.height)
     }
 
-    /// 候補の横のタグ(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前，ユーザー辞書の語のコメント)．「修正」は補正の色の地，
-    /// コマンドの候補(command)はアクセントの色の地，ほかは控えめな地．selected は選んでいる行の上(アクセント色の地)に描くとき
+    /// 候補の横のタグ(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前，ユーザー辞書の語のコメント)．「修正」は補正の色の背景，
+    /// コマンドの候補(command)はアクセントの色の背景，ほかは控えめな背景．selected は選んでいる行の上(アクセント色の背景)に描くとき
     static func drawTag(_ text: String, maxX: CGFloat, midY: CGFloat, theme: ResolvedTheme, selected: Bool, command: Bool = false) {
         let rect = tagRect(text, maxX: maxX, midY: midY, theme: theme)
         let corrected = text == CandidatePanel.correctedAnnotation

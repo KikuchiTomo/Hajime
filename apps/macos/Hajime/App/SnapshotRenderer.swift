@@ -246,7 +246,7 @@ enum SnapshotRenderer {
             render(frame, name: "settings-dictionary-words", to: output, appearance: NSAppearance(named: .aqua))
         }
         dictionaryWindow.close()
-        // 左の一覧は窓の中では写らない(地のぼかしの層を写せない)ので，一覧だけを別に描く
+        // 左の一覧は窓の中では写らない(背景のぼかしの層を写せない)ので，一覧だけを別に描く
         let sidebar = NSHostingView(rootView: SettingsSidebar(query: "", selection: .constant(.correction)).listStyle(.inset))
         let sidebarWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: DesignTokens.Size.Settings.sidebarWidth, height: SettingsView.size.height),
                                      styleMask: [.borderless], backing: .buffered, defer: false)
@@ -395,7 +395,7 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// glass の地のぼかしは画像に写らないので，書き出すときだけ面を塗り，影の代わりに余白を付けて地の上に置く
+    /// glass の背景のぼかしは画像に写らないので，書き出すときだけ面を塗り，影の代わりに余白を付けて背景の上に置く
     /// 候補の窓と，その横に出す語の意味の吹き出しを並べる(吹き出しは MeaningBubbleController と同じ置き方．画面は十分に広いとみなす)．
     /// row は選んでいる候補の行(候補の窓の座標．上が y の小さい側)
     /// nearRightEdge なら，候補の窓が画面の右の端にあるとみなす(吹き出しは左に出る)
@@ -878,7 +878,7 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// ユーザー辞書の語のコメント(R-21)をタグに出した一覧．選んでいる行のタグは選択の地の上に描く
+    /// ユーザー辞書の語のコメント(R-21)をタグに出した一覧．選んでいる行のタグは選択の背景の上に描く
     private static func commentListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = CandidateView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
@@ -900,7 +900,7 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// 書き出した画像の地．入力先のアプリの画面の代わりに，薄い色の面を敷く
+    /// 書き出した画像の背景．入力先のアプリの画面の代わりに，薄い色の面を敷く
     private final class SnapshotDesk: NSView {
         override func draw(_ dirtyRect: NSRect) {
             NSColor.underPageBackgroundColor.setFill()
@@ -926,9 +926,9 @@ enum SnapshotRenderer {
     }
 
     /// Form の中の表(FormTableHost)は別の NSHostingView で描くので，外のビューの cacheDisplay では写らない(白く抜ける)．
-    /// 表のすぐ左(Form の行の地)の色で塗り，表の入れ物と見えている行を 1 つずつ写して乗算で重ねる．
-    /// cacheDisplay は透明なところを白で埋めるので，乗算で白を地の色に戻す．
-    /// ダークの外観では白い文字が乗算で消えるので，表の中は写らない(地の色だけになる)
+    /// 表のすぐ左(Form の行の背景)の色で塗り，表の入れ物と見えている行を 1 つずつ写して乗算で重ねる．
+    /// cacheDisplay は透明なところを白で埋めるので，乗算で白を背景の色に戻す．
+    /// ダークの外観では白い文字が乗算で消えるので，表の中は写らない(背景の色だけになる)
     static func drawNestedTables(of root: NSView, into rep: NSBitmapImageRep) {
         guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return }
         let scale = CGFloat(rep.pixelsWide) / root.bounds.width

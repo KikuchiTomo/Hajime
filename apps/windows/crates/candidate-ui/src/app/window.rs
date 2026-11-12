@@ -88,7 +88,7 @@ pub struct Window {
     side: std::cell::Cell<Option<Side>>,
     /// 候補を選んでいるときに置いた窓．続けて選んでいるあいだは，候補が並び始める辺をこの窓から動かさない
     held: std::cell::Cell<Option<Placed>>,
-    /// 最後に DWM に書いた地と角と縁(backdrop・dark・縁の色)と，書いたときの OS の設定の世代．
+    /// 最後に DWM に書いた背景と角と枠線(backdrop・dark・枠線の色)と，書いたときの OS の設定の世代．
     /// どれも同じなら書き直さない(OS の設定が変わったら書き直す)
     chrome: std::cell::Cell<Option<(bool, bool, COLORREF, u64)>>,
     /// 最後に置いた本体の枠(画面のピクセル)．隠したら None．語の意味の吹き出しを候補の窓の横に置くのに使う
@@ -184,7 +184,7 @@ fn colorref(color: Color) -> COLORREF {
 }
 
 impl Window {
-    /// class は窓の種類の名前．shadow なら OS が窓の影を付ける(すりガラスの地の窓)
+    /// class は窓の種類の名前．shadow なら OS が窓の影を付ける(すりガラスの背景の窓)
     pub fn create(class: PCWSTR, shadow: bool) -> Result<Self> {
         // SAFETY: 自分のプロセスのモジュール
         let instance = unsafe { GetModuleHandleW(None)? };
@@ -257,7 +257,7 @@ impl Window {
         }
     }
 
-    /// 地をすりガラス(Windows 11 の DWM の背景)にできるか確かめる
+    /// 背景をすりガラス(Windows 11 の DWM の背景)にできるか確かめる
     pub fn supports_backdrop(&self) -> bool {
         let supported = set_attribute(
             self.hwnd,
@@ -268,7 +268,7 @@ impl Window {
         supported
     }
 
-    /// 窓の地と角と縁．backdrop なら地をすりガラスにして角を OS の丸みで丸め，縁を border の色で OS に描かせる．
+    /// 窓の背景と角と枠線．backdrop なら背景をすりガラスにして角を OS の丸みで丸め，枠線を border の色で OS に描かせる．
     /// そうでなければ OS は何も描かず，角丸の形も影も中身の側(scene)が描く
     pub fn set_chrome(&self, backdrop: bool, dark: bool, border: Color) {
         // 打つたびやアニメーションのコマごとに同じ値を DWM に書き直さない

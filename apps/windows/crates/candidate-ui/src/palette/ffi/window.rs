@@ -123,7 +123,7 @@ impl Window {
         };
         // SAFETY: hwnd は作ったばかりの窓
         let _ = unsafe { DwmExtendFrameIntoClientArea(hwnd, &margins) };
-        // 角の丸みと縁は中身の側(scene)が描く
+        // 角の丸みと枠線は中身の側(scene)が描く
         set_attribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &DWMWCP_DONOTROUND);
         set_attribute(hwnd, DWMWA_BORDER_COLOR, &COLORREF(DWMWA_COLOR_NONE));
         Ok(Self { hwnd, target: None })

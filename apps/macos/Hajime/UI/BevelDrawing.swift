@@ -2,7 +2,7 @@ import AppKit
 
 /// プラチナ外観(platinum と desk)の縁取りを線で描く．glass は GlassDrawing が描く．画像は貼らない(docs/dev/DESIGN-SYSTEM.md の「レトロな表現は描画で出す」)．
 enum BevelDrawing {
-    /// rect の外側に 1 ドットの外枠，その内側に光の縁(左と上)と影の縁(右と下)を描き，面を塗る
+    /// rect の外側に 1 ドットの外枠，その内側に明るい線(左と上)と暗い線(右と下)を描き，面を塗る
     static func drawPanel(in rect: NSRect, theme: ResolvedTheme) {
         let line = DesignTokens.Size.Candidate.frameWidth
         theme.frame.setFill()
@@ -12,7 +12,7 @@ enum BevelDrawing {
         inner.fill()
         let bevel = DesignTokens.Size.Candidate.bevelWidth
         theme.bevelLight.setFill()
-        // AppKit の座標は下が原点なので，上の縁は maxY の側
+        // AppKit の座標は下が原点なので，上の枠線は maxY の側
         NSRect(x: inner.minX, y: inner.maxY - bevel, width: inner.width, height: bevel).fill()
         NSRect(x: inner.minX, y: inner.minY, width: bevel, height: inner.height).fill()
         theme.bevelShadow.setFill()

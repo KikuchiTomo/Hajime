@@ -1,13 +1,13 @@
 import AppKit
 import HajimeApplication
 
-/// すりガラスの見た目(glass)の部品を描く．地のぼかしは GlassBackdrop が受け持ち，ここでは縁と中身だけを描く
+/// すりガラスの見た目(glass)の部品を描く．背景のぼかしは GlassBackdrop が受け持ち，ここでは枠線と中身だけを描く
 @MainActor
 enum GlassDrawing {
     private typealias Glass = DesignTokens.Size.Glass
 
-    /// 角丸の縁．fillsSurface が true なら面も塗る(ぼかしの無い画像に書き出すとき)．
-    /// glass のほかの角丸のテーマは，ぼかしの地(GlassBackdrop)の上を色で塗りつぶす(角丸の形と窓の影は地の側が受け持つ)
+    /// 角丸の枠線．fillsSurface が true なら面も塗る(ぼかしの無い画像に書き出すとき)．
+    /// glass のほかの角丸のテーマは，ぼかしの背景(GlassBackdrop)の上を色で塗りつぶす(角丸の形と窓の影は背景の側が受け持つ)
     static func drawFrame(in rect: NSRect, theme: ResolvedTheme, fillsSurface: Bool) {
         let path = NSBezierPath(roundedRect: rect.insetBy(dx: 0.5, dy: 0.5), xRadius: theme.cornerRadius, yRadius: theme.cornerRadius)
         if fillsSurface || !theme.usesBackdrop {
@@ -19,7 +19,7 @@ enum GlassDrawing {
         path.stroke()
     }
 
-    /// 選んでいるものの角丸の地
+    /// 選んでいるものの角丸の背景
     static func fillCapsule(_ rect: NSRect, color: NSColor) {
         color.setFill()
         NSBezierPath(roundedRect: rect, xRadius: Glass.selectionRadius, yRadius: Glass.selectionRadius).fill()
@@ -54,7 +54,7 @@ enum GlassDrawing {
         }
     }
 
-    /// 番号などを入れる小さな丸．selected は選んでいる行の上(アクセント色の地)に描くとき．
+    /// 番号などを入れる小さな丸．selected は選んでいる行の上(アクセント色の背景)に描くとき．
     /// 大きさを変えるときは size と fontSize を渡す(文節を区切る位置の番号は候補の番号より小さい)
     static func drawBadge(_ label: String, center: NSPoint, theme: ResolvedTheme, selected: Bool, opacity: CGFloat,
                           size: CGFloat = Glass.badgeSize, fontSize: CGFloat = Glass.keyFontSize) {
@@ -99,7 +99,7 @@ enum GlassDrawing {
 
     /// キーキャップとその説明を左から並べる．キーは文字ではなく SF Symbols のアイコンで描く(KeyHint.Part)．
     /// 1 つの案内に複数のキーがあれば(「↓ Tab」)，キーごとにキーキャップを並べてから説明を書く．
-    /// タグの形はテーマに合わせる: 角丸のテーマは角丸，platinum は立体の縁，desk は文字の色の縁取り
+    /// タグの形はテーマに合わせる: 角丸のテーマは角丸，platinum はベベル，desk は文字の色の縁取り
     static func drawHints(_ hints: [KeyHint], x: CGFloat, midY: CGFloat, theme: ResolvedTheme) {
         var x = x
         let labelAttributes: [NSAttributedString.Key: Any] = [.font: theme.labelFont(size: Glass.labelFontSize), .foregroundColor: theme.textMuted]
@@ -131,16 +131,16 @@ enum GlassDrawing {
         drawHints([KeyHint(key: key, label: "")], x: x, midY: midY, theme: theme)
     }
 
-    /// キーキャップの縁の太さ．platinum は外枠と立体の縁，ほかは縁の線
+    /// キーキャップの枠線の太さ．platinum は外枠とベベル，ほかは枠線
     static func keycapBorder(theme: ResolvedTheme) -> CGFloat {
         theme.kind == .platinum ? DesignTokens.Size.Candidate.frameWidth + DesignTokens.Size.Candidate.bevelWidth : DesignTokens.Size.Candidate.frameWidth
     }
 
-    /// キーキャップの地と縁(パレットの肌の色のボタンも同じ形にする)
+    /// キーキャップの背景と枠線(パレットの肌の色のボタンも同じ形にする)
     static func drawKeycap(_ cap: NSRect, theme: ResolvedTheme) {
         switch theme.kind {
         case .platinum:
-            // 角の立った立体のキーキャップ．外枠の内側に光の縁(左と上)と影の縁(右と下)
+            // 角の立った立体のキーキャップ．外枠の内側に明るい線(左と上)と暗い線(右と下)
             theme.frame.setFill()
             cap.fill()
             let inner = cap.insetBy(dx: 1, dy: 1)
@@ -282,7 +282,7 @@ struct KeyHint: Equatable {
     }
 }
 
-/// glass の地．ウィンドウの後ろをぼかし，角を丸める．中身のビューを上に重ねる
+/// glass の背景．ウィンドウの後ろをぼかし，角を丸める．中身のビューを上に重ねる
 final class GlassBackdrop: NSVisualEffectView {
     init() {
         super.init(frame: .zero)

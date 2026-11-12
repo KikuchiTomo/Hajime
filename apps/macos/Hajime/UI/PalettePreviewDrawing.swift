@@ -51,7 +51,7 @@ enum PalettePreviewDrawing {
         (text as NSString).draw(with: NSRect(x: x, y: baseline, width: drawingWidth, height: 0), options: [], attributes: attributes)
     }
 
-    /// 等幅の文字のタグ．角丸のテーマは控えめな地，platinum と desk は光の縁の色の地に 1 ドットの枠(入力欄の形)
+    /// 等幅の文字のタグ．角丸のテーマは控えめな背景，platinum と desk は明るい線の色の背景に 1 ドットの枠(入力欄の形)
     private static func drawChip(_ chip: PalettePreviewLayout.Chip, measuring: Measuring, theme: ResolvedTheme) {
         let rect = NSRect(x: chip.frame.x, y: chip.frame.y, width: chip.frame.width, height: chip.frame.height)
         if theme.isRounded {

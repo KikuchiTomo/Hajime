@@ -6,7 +6,7 @@
 /// - 幹はいちばん遠い候補の曲がり角の始まりで終わる(先を飛び出させない)
 /// - 曲がり角と水平の線は，隣の候補のものと重ならない．幹は 1 本だけで，候補ごとに描くのは曲がり角と水平の線だけ
 ///
-/// 線の縁をデバイスのピクセルの境にそろえる．太さが奇数のピクセルの線は，中心を半ピクセルずらす．
+/// 線の端をデバイスのピクセルの境にそろえる．太さが奇数のピクセルの線は，中心を半ピクセルずらす．
 /// 座標は上が y の小さい側．macOS の BranchView がこの配置を描き，Windows の候補ウィンドウ(scene::branch_lines)は同じ決め方を Rust で持つ
 public struct BranchLines: Sendable, Equatable {
     /// 1 つの候補への曲がり角と水平の線
@@ -66,7 +66,7 @@ public struct BranchLines: Sendable, Equatable {
         return from == stemEnd ? nil : (from, stemEnd)
     }
 
-    /// 線の縁がデバイスのピクセルの境に来る，線の中心の座標
+    /// 線の端がデバイスのピクセルの境に来る，線の中心の座標
     public static func alignCenter(_ value: Double, lineWidth: Double, scale: Double) -> Double {
         let pixels = lineWidth * scale
         return ((value * scale - pixels / 2).rounded() + pixels / 2) / scale

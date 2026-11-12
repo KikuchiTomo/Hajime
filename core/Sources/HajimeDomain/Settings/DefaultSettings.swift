@@ -304,9 +304,9 @@ public enum DefaultSettings {
     public static let maximumThemeNameLength = 40
     public static let customThemeCornerRadius = 12.0
     public static let customThemeCornerRadiusRange = 0.0...24.0
-    /// カスタムテーマで文字と地に求めるコントラスト比(WCAG 2.2 AA)．下回れば設定の画面で知らせる
+    /// カスタムテーマで文字と背景に求めるコントラスト比(WCAG 2.2 AA)．下回れば設定の画面で知らせる
     public static let minimumTextContrast = 4.5
-    /// カスタムテーマで印(修正の下線)と地に求めるコントラスト比
+    /// カスタムテーマで印(修正の下線)と背景に求めるコントラスト比
     public static let minimumMarkContrast = 3.0
     /// 1 ページに出す候補の数を選べる範囲(番号キー 1〜9 で選べる数まで)
     public static let candidatesPerPageRange = 3...9

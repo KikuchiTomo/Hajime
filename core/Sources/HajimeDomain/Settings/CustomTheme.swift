@@ -113,7 +113,7 @@ extension HexColor {
 }
 
 extension CustomTheme {
-    /// 文字と地のコントラストを確かめる組み合わせ．基準は design/tokens/tokens.json の既成のテーマと同じ
+    /// 文字と背景のコントラストを確かめる組み合わせ．基準は design/tokens/tokens.json の既成のテーマと同じ
     public enum ContrastPair: Sendable, Equatable, CaseIterable {
         /// 文字と背景
         case text
