@@ -32,7 +32,7 @@ struct SegmentContextRanker {
                 moved.append(Candidate(text: text, readingCount: length, origin: .sentencePart))
             }
         }
-        // 文脈の変換から持ち込んだ字にも促音の切れ端をつないだもの(じゅっ分)があるので，下げ直す
+        // 文脈の変換から持ち込んだ字にも促音の切れ端をつないだもの(じゅっ分)があるので，除き直す
         return SokuonFragments.cleaned(head + moved + rest)
     }
 

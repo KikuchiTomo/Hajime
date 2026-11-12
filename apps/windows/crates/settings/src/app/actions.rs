@@ -1218,6 +1218,19 @@ pub fn keymap_report(model: &SettingsModel<Store>) -> (String, Vec<ipc::KeymapRo
         .unwrap_or_default()
 }
 
+/// 今のキー設定の表と同じひな形(keys::PRESETS の番号)．どれとも違えば None(macOS の KeymapPreset.matching)
+pub fn matching_preset(model: &SettingsModel<Store>) -> Option<usize> {
+    let current = model.value("keymap")?;
+    keys::PRESETS.iter().position(|(preset, _)| {
+        model
+            .store()
+            .read_keymap_preset(preset)
+            .ok()
+            .and_then(|fields| fields.get("keymap").cloned())
+            .is_some_and(|keymap| &keymap == current)
+    })
+}
+
 /// 確かめてから行う操作の題と文
 pub fn confirmation(event: &Event) -> Option<(String, String)> {
     let name = |preset: &str| {

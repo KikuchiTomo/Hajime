@@ -446,6 +446,10 @@ pub mod keys {
     pub const SEARCH_PROMPT: &str = "コマンドやキーで検索";
     pub const TAB: &str = "キー設定";
     pub const PRESET_MENU: &str = "ひな形を読み込む";
+    pub const CUSTOM_PRESET: &str = "カスタム";
+    pub fn current_preset(name: &str) -> String {
+        format!("ひな形: {name}")
+    }
     pub const STATE: &str = "状態";
     pub const KEY: &str = "キー";
     pub const COMMAND: &str = "コマンド";
