@@ -777,19 +777,23 @@
     "userDictionary": [
       {
         "reading": "はじめ",
-        "word": "Hajime IME"
+        "word": "Hajime IME",
+        "wordClass": "properNoun"
       },
       {
         "reading": "しぶや",
-        "word": "渋谷"
+        "word": "渋谷",
+        "wordClass": "place"
       },
       {
         "reading": "かぶしきがいしゃ",
-        "word": "株式会社"
+        "word": "株式会社",
+        "wordClass": "noun"
       },
       {
         "reading": "めーる",
-        "word": "hajime@example.com"
+        "word": "hajime@example.com",
+        "wordClass": "abbreviation"
       }
     ],
     "symbols": {

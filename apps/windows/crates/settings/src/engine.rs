@@ -602,6 +602,7 @@ mod tests {
                     .map(|index| DictionaryEntry {
                         reading: format!("よみ{index}"),
                         word: format!("語{index}"),
+                        word_class: None,
                     })
                     .collect(),
                 total: self.total as u32,

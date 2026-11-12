@@ -205,6 +205,18 @@ extension WireCandidateList {
     }
 }
 
+extension WireDictionaryEntry {
+    public init(_ entry: UserDictionaryEntry) {
+        self.init(reading: entry.reading, word: entry.word, wordClass: WireWordClass(rawValue: entry.wordClass.rawValue))
+    }
+
+    /// 品詞を送らない設定の画面(品詞を選べるようになる前のもの)から来た語は，登録するときの既定の品詞にする
+    public var entry: UserDictionaryEntry {
+        UserDictionaryEntry(reading: reading, word: word,
+                            wordClass: wordClass.flatMap { WordClass(rawValue: $0.rawValue) } ?? DefaultSettings.userWordClass)
+    }
+}
+
 extension WireCommandKind {
     public init(_ kind: LauncherCommand.Kind) {
         switch kind {

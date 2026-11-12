@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import HajimeDomain
 
@@ -103,6 +104,30 @@ struct UserDictionaryEditingTests {
         let imported = [UserDictionaryEntry(reading: "あ", word: "亜"), UserDictionaryEntry(reading: "い", word: "井"), UserDictionaryEntry(reading: "X/", word: "x")]
         #expect(UserDictionaryEditing.merge(imported, into: &entries) == 1)
         #expect(entries.count == 2)
+    }
+
+    @Test("同じ読みと語を別の品詞で足すと，品詞だけを書き換える．消すときと取り込むときは品詞を問わない")
+    func wordClass() {
+        var entries = [UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .noun), UserDictionaryEntry(reading: "あ", word: "亜")]
+        #expect(UserDictionaryEditing.add(reading: "やまだ", word: "山田", wordClass: .surname, to: &entries) == .added)
+        #expect(entries.map(\.wordClass) == [.surname, .noun])
+        #expect(UserDictionaryEditing.add(reading: "やまだ", word: "山田", wordClass: .surname, to: &entries) == .alreadyRegistered)
+        #expect(UserDictionaryEditing.merge([UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .place)], into: &entries) == 0)
+        #expect(entries.first?.wordClass == .surname)
+        UserDictionaryEditing.remove([UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .place)], from: &entries)
+        #expect(entries == [UserDictionaryEntry(reading: "あ", word: "亜")])
+    }
+
+    @Test("品詞を書いていない語(品詞を選べるようになる前に登録した語)は固有名詞，知らない品詞は名詞として読み，品詞を書き戻す")
+    func wordClassCoding() throws {
+        let decoder = JSONDecoder()
+        let legacy = try decoder.decode(UserDictionaryEntry.self, from: Data(#"{"reading":"あ","word":"亜"}"#.utf8))
+        #expect(legacy.wordClass == .properNoun)
+        let unknown = try decoder.decode(UserDictionaryEntry.self, from: Data(#"{"reading":"あ","word":"亜","wordClass":"verb"}"#.utf8))
+        #expect(unknown.wordClass == .noun)
+        let entry = UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .surname)
+        #expect(try decoder.decode(UserDictionaryEntry.self, from: JSONEncoder().encode(entry)) == entry)
+        #expect(UserDictionaryEntry(reading: "あ", word: "亜").wordClass == DefaultSettings.userWordClass)
     }
 
     @Test("ログに出す表示は中身を伏せる")

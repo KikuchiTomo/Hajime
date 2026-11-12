@@ -224,14 +224,17 @@ final class SettingsModel: ObservableObject {
 
     // MARK: ユーザー辞書
 
-    /// 語を登録する．replacing を渡すとその語を書き換える(同じ位置に置く)．保存できなければ false を返し，打った語を入力欄に残す
-    func saveEntry(replacing old: UserDictionaryEntry?, reading: String, word: String) -> Bool {
+    /// 語を登録する．replacing を渡すとその語を書き換える(同じ位置に置く)．保存できなければ false を返し，打った語を入力欄に残す．
+    /// 同じ読みと語がもうあれば，その語の品詞を書き換える
+    func saveEntry(replacing old: UserDictionaryEntry?, reading: String, word: String, wordClass: WordClass) -> Bool {
         var entries = settings.userDictionary
-        let index = old.flatMap { entries.firstIndex(of: $0) }
+        let index = old.flatMap { old in entries.firstIndex { $0.isSameWord(as: old) } }
         if let index { entries.remove(at: index) }
-        switch UserDictionaryEditing.add(reading: reading, word: word, to: &entries) {
+        let count = entries.count
+        switch UserDictionaryEditing.add(reading: reading, word: word, wordClass: wordClass, to: &entries) {
         case .added:
-            if let index { entries.insert(entries.removeLast(), at: index) }
+            // 足した語(末尾)を元の位置に戻す．ほかの語の品詞を書き換えただけなら動かさない
+            if let index, entries.count > count { entries.insert(entries.removeLast(), at: index) }
             return update { $0.userDictionary = entries }
         case .alreadyRegistered:
             return true
@@ -243,11 +246,12 @@ final class SettingsModel: ObservableObject {
         return false
     }
 
-    func removeEntries(_ entries: Set<UserDictionaryEntry>) {
-        update { $0.userDictionary.removeAll { entries.contains($0) } }
+    /// 読みと語が同じ語を消す(品詞は問わない)
+    func removeEntries(_ entries: [UserDictionaryEntry]) {
+        update { UserDictionaryEditing.remove(entries, from: &$0.userDictionary) }
     }
 
-    /// 「読み<タブ>語」の行が並んだテキストのファイルから取り込む
+    /// 「読み<タブ>語<タブ>品詞」の行が並んだテキストのファイルから取り込む
     func importDictionary() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.plainText, .tabSeparatedText, .commaSeparatedText]

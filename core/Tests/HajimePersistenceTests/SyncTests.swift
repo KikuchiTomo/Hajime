@@ -16,7 +16,8 @@ struct SettingsSchemaTests {
         #expect(settings.inputStyle == .kana)
         #expect(settings.liveConversion == false)
         #expect(settings.punctuation == .commaPeriod)
-        #expect(settings.userDictionary == [UserDictionaryEntry(reading: "えすきゅー", word: "hajime")])
+        // 品詞を書いていない語は，それまでと同じに変換するよう固有名詞として読む
+        #expect(settings.userDictionary == [UserDictionaryEntry(reading: "えすきゅー", word: "hajime", wordClass: .properNoun)])
         #expect(settings.customRomaji.first?.keys == "wyi")
         #expect(settings.profileRules.first?.applicationPrefix == "com.example.editor")
         #expect(settings.candidateFontSize == 18)
@@ -155,6 +156,42 @@ struct SyncMergeTests {
         let words = try SettingsCoding.settings(from: result.settings).userDictionary.map(\.word)
         #expect(Set(words) == ["E", "A", "U"])
         #expect(result.document.tombstones[SyncMerge.key(reading: "い", word: "I")] == t1)
+    }
+
+    @Test("ユーザー辞書の品詞も届け，あとで品詞を変えた方を採る．品詞の無い古い語は品詞を足さずに渡す")
+    func dictionaryWordClass() throws {
+        var remote = SyncDocument()
+        remote.dictionary = [
+            .init(reading: "やまだ", word: "山田", wordClass: "surname", addedAt: t2),
+            .init(reading: "あ", word: "亜", wordClass: "noun", addedAt: t0),
+            .init(reading: "い", word: "井", addedAt: t0),
+        ]
+        var ledger = SyncLedger()
+        ledger.dictionaryAddedAt[SyncMerge.key(reading: "やまだ", word: "山田")] = t1
+        ledger.dictionaryAddedAt[SyncMerge.key(reading: "あ", word: "亜")] = t1
+        let local = try object {
+            $0.userDictionary = [UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .place), UserDictionaryEntry(reading: "あ", word: "亜", wordClass: .adverb)]
+        }
+        let result = SyncMerge.merge(local: local, ledger: ledger, remote: remote, scopes: [:], now: t2)
+        let entries = try SettingsCoding.settings(from: result.settings).userDictionary
+        #expect(entries == [
+            UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .surname),
+            UserDictionaryEntry(reading: "あ", word: "亜", wordClass: .adverb),
+            UserDictionaryEntry(reading: "い", word: "井", wordClass: .properNoun),
+        ])
+        #expect(result.document.dictionary.map(\.wordClass) == ["surname", "adverb", nil])
+    }
+
+    @Test("品詞を変えた語は登録し直したものとして時刻を記す．品詞の無い古い語を保存し直しただけでは記さない")
+    func noteWordClassChange() throws {
+        var ledger = SyncLedger()
+        let legacy: [String: JSONValue] = ["userDictionary": .array([.object(["reading": .string("あ"), "word": .string("亜")])])]
+        let saved = try object { $0.userDictionary = [UserDictionaryEntry(reading: "あ", word: "亜", wordClass: .properNoun)] }
+        SyncMerge.noteChange(from: legacy, to: saved, ledger: &ledger, now: t1)
+        #expect(ledger.dictionaryAddedAt.isEmpty)
+        let changed = try object { $0.userDictionary = [UserDictionaryEntry(reading: "あ", word: "亜", wordClass: .noun)] }
+        SyncMerge.noteChange(from: saved, to: changed, ledger: &ledger, now: t2)
+        #expect(ledger.dictionaryAddedAt[SyncMerge.key(reading: "あ", word: "亜")] == t2)
     }
 
     @Test("古い墓標は捨てる")

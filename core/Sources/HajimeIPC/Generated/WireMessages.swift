@@ -801,13 +801,36 @@ extension WirePreviewWord: CustomStringConvertible, CustomDebugStringConvertible
     public var debugDescription: String { description }
 }
 
+public enum WireWordClass: String, Sendable, Equatable, Codable, CaseIterable {
+    case noun
+    case properNoun
+    case personName
+    case surname
+    case givenName
+    case organization
+    case place
+    case symbol
+    case suruNoun
+    case adjectivalNoun
+    case adverb
+    case interjection
+    case abbreviation
+}
+
+extension WireWordClass: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireWordClass.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
 public struct WireDictionaryEntry: Sendable, Equatable, Codable {
     public var reading: String
     public var word: String
+    public var wordClass: WireWordClass?
 
-    public init(reading: String, word: String) {
+    public init(reading: String, word: String, wordClass: WireWordClass? = nil) {
         self.reading = reading
         self.word = word
+        self.wordClass = wordClass
     }
 }
 
