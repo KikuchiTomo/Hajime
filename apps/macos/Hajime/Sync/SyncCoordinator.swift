@@ -54,14 +54,15 @@ final class SyncCoordinator: ObservableObject {
         panel.allowsMultipleSelection = false
         // 同期に使うフォルダの例として，iCloud Drive があればそこから開く
         if FileManager.default.fileExists(atPath: Self.iCloudDrive.path) { panel.directoryURL = Self.iCloudDrive }
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let bookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
-            try synchronizer.setEnabled(true, folderBookmark: bookmark, folderName: url.lastPathComponent)
-            refresh()
-            syncNow()
-        } catch {
-            fail(error)
+        FilePanel.chooseOne(panel) { [self] url in
+            do {
+                let bookmark = try url.bookmarkData(options: .withSecurityScope, includingResourceValuesForKeys: nil, relativeTo: nil)
+                try synchronizer.setEnabled(true, folderBookmark: bookmark, folderName: url.lastPathComponent)
+                refresh()
+                syncNow()
+            } catch {
+                fail(error)
+            }
         }
     }
 
