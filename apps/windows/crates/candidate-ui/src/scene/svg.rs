@@ -438,12 +438,49 @@ mod tests {
                 reserved_card: reservation.list(&empty, &look, &measure),
                 ..look
             };
+            // 分岐図でも，意味のある枝から意味の無い枝に移ったところ
+            let mut branch_reservation = CardReservation::default();
+            branch_reservation.branch(&branch(), &look, &measure);
+            let mut empty_branch = branch();
+            empty_branch.columns[1].homophone = None;
+            empty_branch.columns[1].selected_alternative = Some(2);
+            empty_branch.meaning_placement = None;
+            let empty_branch_look = Look {
+                reserved_card: branch_reservation.branch(&empty_branch, &look, &measure),
+                ..look
+            };
+            // 候補を表に広げた一覧(1 列 9 個．2 列目を選んでいる)
+            let grid = CandidateList {
+                entries: (1..=20)
+                    .map(|number| CandidateEntry {
+                        text: format!("缶{number}"),
+                        annotation: None,
+                        corrected_start: None,
+                        corrected_length: None,
+                        command: None,
+                        has_comment: None,
+                        detail: None,
+                    })
+                    .collect(),
+                column_length: Some(9),
+                selected_entry: Some(10),
+                homophone: None,
+                meaning_placement: None,
+                position: 11,
+                total: 20,
+                ..list()
+            };
             let scenes = [
                 ("list", candidate_list(&list(), &look, &measure)),
                 ("list-below", candidate_list(&below_list, &look, &measure)),
                 ("list-empty", candidate_list(&empty, &empty_look, &measure)),
+                ("list-grid", candidate_list(&grid, &look, &measure)),
                 ("branch", branch_map(&branch(), &look, &measure)),
                 ("branch-below", branch_map(&below_branch, &look, &measure)),
+                (
+                    "branch-empty",
+                    branch_map(&empty_branch, &empty_branch_look, &measure),
+                ),
             ];
             for (kind, drawn) in scenes {
                 let svg = scene(&drawn, &theme, font_size, background, 16.0);
