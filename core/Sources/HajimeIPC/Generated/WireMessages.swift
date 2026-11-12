@@ -535,6 +535,7 @@ public enum WireRuleList: String, Sendable, Equatable, Codable, CaseIterable {
     case symbolSequences
     case symbolReadings
     case englishTerms
+    case hiddenPredictions
 }
 
 extension WireRuleList: CustomStringConvertible, CustomDebugStringConvertible {
@@ -1790,6 +1791,7 @@ extension WireBranchMap: CustomStringConvertible, CustomDebugStringConvertible {
 public enum WirePaletteKind: String, Sendable, Equatable, Codable, CaseIterable {
     case emoji
     case symbol
+    case kaomoji
 }
 
 extension WirePaletteKind: CustomStringConvertible, CustomDebugStringConvertible {
@@ -1957,8 +1959,9 @@ public struct WirePalettePanel: Sendable, Equatable, Codable {
     public var message: String?
     public var hints: [WireKeyHint]
     public var cellSize: Double
+    public var cellsPerRow: UInt32?
 
-    public init(modes: [WirePaletteMode], query: String, placeholder: String, tabs: [WirePaletteTab], heading: String, rows: [WirePaletteRow], rowCount: UInt32, firstRow: UInt32, columns: UInt32, visibleRows: UInt32, selection: WirePalettePosition? = nil, preview: WirePalettePreview? = nil, showsPreview: Bool, skinTone: WireSkinTone, skinTonePicker: WirePaletteSkinTonePicker? = nil, message: String? = nil, hints: [WireKeyHint], cellSize: Double) {
+    public init(modes: [WirePaletteMode], query: String, placeholder: String, tabs: [WirePaletteTab], heading: String, rows: [WirePaletteRow], rowCount: UInt32, firstRow: UInt32, columns: UInt32, visibleRows: UInt32, selection: WirePalettePosition? = nil, preview: WirePalettePreview? = nil, showsPreview: Bool, skinTone: WireSkinTone, skinTonePicker: WirePaletteSkinTonePicker? = nil, message: String? = nil, hints: [WireKeyHint], cellSize: Double, cellsPerRow: UInt32? = nil) {
         self.modes = modes
         self.query = query
         self.placeholder = placeholder
@@ -1977,6 +1980,7 @@ public struct WirePalettePanel: Sendable, Equatable, Codable {
         self.message = message
         self.hints = hints
         self.cellSize = cellSize
+        self.cellsPerRow = cellsPerRow
     }
 }
 

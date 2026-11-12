@@ -32,6 +32,7 @@ extension WirePaletteKind {
         switch kind {
         case .emoji: self = .emoji
         case .symbol: self = .symbol
+        case .kaomoji: self = .kaomoji
         }
     }
 }
@@ -41,6 +42,7 @@ extension PaletteItem.Kind {
         switch wire {
         case .emoji: self = .emoji
         case .symbol: self = .symbol
+        case .kaomoji: self = .kaomoji
         }
     }
 }
@@ -99,7 +101,9 @@ extension WirePalettePanel {
             skinTonePicker: panel.skinTonePicker.map { WirePaletteSkinTonePicker(options: $0.options, selected: UInt32(clamping: $0.selected)) },
             message: panel.message,
             hints: panel.hints.map { WireKeyHint(keys: $0.key, label: $0.action) },
-            cellSize: cellSize
+            cellSize: cellSize,
+            // 四角いマスだけなら省く(顔文字を知らない候補ウィンドウにも同じ形で送る)
+            cellsPerRow: panel.cellsPerRow == panel.columns ? nil : UInt32(clamping: panel.cellsPerRow)
         )
     }
 }

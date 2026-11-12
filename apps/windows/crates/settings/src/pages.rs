@@ -159,6 +159,8 @@ impl Page {
                 menu::LIVE_CONVERSION,
                 choice::PRESENTATION,
                 choice::INITIAL_FOCUS,
+                choice::PREDICTION_DISPLAY,
+                choice::HIDDEN_PREDICTIONS,
                 features::OKURIGANA,
                 features::PREFERS_KATAKANA,
                 features::CALCULATION,
@@ -335,6 +337,7 @@ pub enum LimitKind {
     Commands,
     Macros,
     EnglishTerms,
+    HiddenPredictions,
 }
 
 impl LimitKind {
@@ -349,6 +352,7 @@ impl LimitKind {
             LimitKind::Commands => catalog.limits.commands,
             LimitKind::Macros => catalog.limits.macros,
             LimitKind::EnglishTerms => catalog.limits.english_terms,
+            LimitKind::HiddenPredictions => catalog.limits.hidden_predictions,
         }
     }
 }
@@ -895,6 +899,16 @@ fn conversion() -> Vec<Section> {
                     "predictionDisplay",
                     options::SUGGESTION_DISPLAY,
                 ),
+                Row::toggle(
+                    choice::PREDICTION_PREFERS_HISTORY,
+                    "predictionPrefersHistory",
+                )
+                .enabled_when(IsNot("predictionDisplay", "off")),
+                Row::toggle(
+                    choice::PREDICTION_FROM_CORRECTION,
+                    "predictionFromCorrection",
+                )
+                .enabled_when(IsNot("predictionDisplay", "off")),
                 Row::toggle(choice::VARIANT_ROW, "showsVariantRow"),
                 Row::toggle(choice::KEY_HINTS, "showsKeyHints"),
                 Row::seconds(
@@ -910,6 +924,25 @@ fn conversion() -> Vec<Section> {
                 )
                 .enabled_when(On("liveConversion")),
             ],
+        ),
+        Section::new(
+            choice::HIDDEN_PREDICTIONS,
+            with_files(
+                Row::list(
+                    ListSpec {
+                        path: "hiddenPredictions",
+                        fields: HIDDEN_PREDICTION_FIELDS,
+                        empty: choice::HIDDEN_PREDICTIONS_EMPTY,
+                        invalid: crate::strings::Text::Limited(
+                            crate::strings::LimitedText::HiddenPrediction,
+                        ),
+                        lowercase: false,
+                        exclusive_with: None,
+                    },
+                    LimitKind::HiddenPredictions,
+                ),
+                RuleList::HiddenPredictions,
+            ),
         ),
         Section::new(
             more::CANDIDATES,
@@ -1091,6 +1124,7 @@ const CORRECTION_RULE_FIELDS: &[Field] = &[
     Field::named("word", features::REPLACEMENT, false),
 ];
 const EXCEPTION_FIELDS: &[Field] = &[Field::text(features::EXCEPTION_PLACEHOLDER)];
+const HIDDEN_PREDICTION_FIELDS: &[Field] = &[Field::text(choice::HIDDEN_PREDICTION_PLACEHOLDER)];
 const ROMAJI_FIELDS: &[Field] = &[
     Field::named("keys", settings::ROMAJI_KEYS, true),
     Field::named("kana", settings::ROMAJI_KANA, false),
@@ -1427,8 +1461,20 @@ fn dictionary() -> Vec<Section> {
     vec![
         Section {
             title: None,
-            rows: vec![Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary")],
-            footer: Some(extras::DYNAMIC_DICTIONARY_NOTE),
+            // 書き方を 1 つずつ注記の行にして並べ，最後に登録の例を置く(macOS の書き方の表と同じ中身)
+            rows: std::iter::once(Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"))
+                .chain(std::iter::once(Row::note(extras::DYNAMIC_DICTIONARY_NOTE)))
+                .chain(
+                    crate::strings::windows::TEMPLATE_ROWS
+                        .iter()
+                        .map(|text| Row::note(text)),
+                )
+                .chain(std::iter::once(Row::note(extras::TEMPLATE_FILTERS)))
+                .chain(std::iter::once(Row::note(
+                    crate::strings::windows::TEMPLATE_EXAMPLE,
+                )))
+                .collect(),
+            footer: Some(extras::DATE_FORMAT_SYMBOLS),
             footer_variants: &[],
         },
         Section::new(

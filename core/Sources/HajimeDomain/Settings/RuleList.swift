@@ -28,6 +28,8 @@ public enum RuleList: String, Sendable, Equatable, CaseIterable {
     case symbolReadings
     /// 利用者が足した英語の語(R-24)．1 行に 1 語で，同梱の辞書(data/english/english-terms.txt)と同じ形
     case englishTerms
+    /// 予測に表示しない語句
+    case hiddenPredictions
 
     /// 書き出すファイルの既定の名前
     public var exportFileName: String {
@@ -40,6 +42,7 @@ public enum RuleList: String, Sendable, Equatable, CaseIterable {
         case .symbolSequences: "symbol-sequences.tsv"
         case .symbolReadings: "symbol-readings.tsv"
         case .englishTerms: "english-terms.txt"
+        case .hiddenPredictions: "hidden-predictions.txt"
         }
     }
 
@@ -54,6 +57,7 @@ public enum RuleList: String, Sendable, Equatable, CaseIterable {
         case .symbolSequences, .symbolReadings:
             SymbolRuleEditing.items(symbolKind, rules: settings.symbolRules).filter(\.isEnabled).map { RuleListRow(key: $0.input, value: $0.output) }
         case .englishTerms: settings.englishTerms.map { RuleListRow(key: $0, value: "") }
+        case .hiddenPredictions: settings.hiddenPredictions.map { RuleListRow(key: $0, value: "") }
         }
     }
 
@@ -83,6 +87,9 @@ public enum RuleList: String, Sendable, Equatable, CaseIterable {
             // 書き方そのものが語なので，大文字小文字はそのまま比べる
             RuleListEditing.merge(rows.map(\.key.trimmed), key: { $0 }, isValid: EnglishTermDictionary.isValidTerm,
                                   limit: DefaultSettings.maximumEnglishTerms, into: &settings.englishTerms)
+        case .hiddenPredictions:
+            RuleListEditing.merge(rows.map(\.key.trimmed), key: { $0 }, isValid: RuleListEditing.isValidHiddenPrediction,
+                                  limit: DefaultSettings.maximumHiddenPredictions, into: &settings.hiddenPredictions)
         }
     }
 

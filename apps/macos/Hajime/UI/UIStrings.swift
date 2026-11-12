@@ -62,8 +62,29 @@ enum UIStrings {
         static let englishTermsEmpty = "足した語はありません"
         static let englishTermsNote = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。"
         static let invalidEnglishTerm = "語は \(DefaultSettings.englishTermLengthRange.lowerBound)〜\(DefaultSettings.englishTermLengthRange.upperBound) 文字の英字にしてください"
-        static let dynamicDictionary = "単語の {datetime:…} などを入力時の値にする"
-        static let dynamicDictionaryNote = "例: 読み「にちじ」、単語「{datetime:YYYY/MM/DD hh:mm:ss}」。ほかに {date}、{time}、{datetime+1d:MM/DD}、{uuid}、{random:1-6} を使えます。読みはローマ字（gh など）でも登録できます。"
+        static let dynamicDictionary = "単語に書いた日付や時刻などを入力時の値にする"
+        static let dynamicDictionaryNote = "登録する単語に次の書き方を入れておくと、変換したときにその時点の値に置き換えて入れます。単語のほかの文字はそのまま入ります。読みはローマ字（gh など）でも登録できます。"
+        static let templateSyntax = "書き方"
+        static let templateMeaning = "入るもの"
+        static let templateNow = "今入れると"
+        /// 単語に書ける書き方(TextTemplate)と，入るもの．「今入れると」の列は書き方を今の値に置き換えて出す
+        static let templateRows: [(syntax: String, meaning: String)] = [
+            ("{date}", "今日の日付"),
+            ("{time}", "今の時刻"),
+            ("{datetime:YYYY/MM/DD hh:mm:ss}", "書式を決めた日時"),
+            ("{datetime+1d:MM/DD}", "日をずらした日付（-7d なら 7 日前）"),
+            ("{uuid}", "UUID（入れるたびに変わる）"),
+            ("{random:1-6}", "範囲の中の整数（入れるたびに変わる）"),
+            ("{date|fullwidth}", "| のあとの名前で変えた値"),
+            ("{{ }}", "「{」と「}」の文字そのもの"),
+        ]
+        static let templateFilters = "| のあとに付けられる名前: upper（大文字）、lower（小文字）、capitalize（先頭を大文字）、katakana（カタカナ）、hiragana（ひらがな）、halfwidth（半角カタカナ）、fullwidth（全角英数）。"
+        static let dateFormatSymbols = "日時の書式の記号: YYYY 年、MM 月、DD 日、hh 時（24 時間制）、KK 時（12 時間制）、A 午前・午後、mm 分、ss 秒、ddd 曜日（月）、dddd 曜日（月曜日）、GG 元号（令和）、E 元号の年。M・D・h・m・s のように 1 文字にすると、1 桁の数に 0 を付けません。' で囲んだ文字（'年' など）は記号として読まず、そのまま入れます。"
+        /// 登録の例に使う単語
+        static let templateExampleWord = "{datetime:YYYY-MM-DD hh:mm}"
+        static func templateExample(_ value: String) -> String {
+            "例: 読み「dt」に単語「\(templateExampleWord)」を登録すると、「dt」を変換したときに「\(value)」を入れます。"
+        }
         static let commandsPage = "コマンド"
         static let commandsSection = "コマンド"
         static let launcherCommands = "読みでコマンドを呼び出す"
@@ -250,11 +271,13 @@ enum UIStrings {
             case .undoConversionEdit: "直前の変更を取り消し"
             case .forgetCandidate: "候補を学習から削除"
             case .forgetLastCommit: "最後の学習を取り消し"
+            case .hidePrediction: "予測に表示しない"
             case .openSettings: "設定を開く"
             case .toggleLiveConversion: "ライブ変換の切り替え"
             case .handwriting: "手書き入力"
             case .emojiPalette: "絵文字のパレット"
             case .symbolPalette: "記号のパレット"
+            case .kaomojiPalette: "顔文字のパレット"
             }
         }
 
@@ -284,8 +307,9 @@ enum UIStrings {
             case .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"
             case .forgetCandidate: "選択中の候補を学習から削除します"
             case .forgetLastCommit: "最後に確定した語句の学習を取り消します。入力した文字は削除しません"
+            case .hidePrediction: "入力中の予測の窓に表示している語句を「予測に表示しない語句」に追加し、次から予測に表示しません。設定の「予測に表示しない語句」から削除すると、また表示します"
             case .handwriting: "「手書き入力」の設定がオンのときに使えます"
-            case .emojiPalette, .symbolPalette: "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"
+            case .emojiPalette, .symbolPalette, .kaomojiPalette: "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"
             case .associate: "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"
             case .englishAutoStyle: "英語で入力しながら、日本語にできる語句を自動で日本語に変換します"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
@@ -677,6 +701,12 @@ enum UIStrings {
         static let initialFocus = "最初に選択する文節"
         static let suggestionDisplay = "入力中の候補"
         static let predictionDisplay = "入力中の予測"
+        static let predictionPrefersHistory = "入力履歴にある予測を優先"
+        static let predictionFromCorrection = "打ち間違いを直した読みからも予測"
+        static let hiddenPredictions = "予測に表示しない語句"
+        static let hiddenPredictionPlaceholder = "語句"
+        static let hiddenPredictionsEmpty = "予測に表示しない語句はありません"
+        static let invalidHiddenPrediction = "予測に表示しない語句は \(DefaultSettings.maximumHiddenPredictionLength) 文字までにしてください"
 
         static func label(for display: SuggestionDisplay) -> String {
             switch display {
@@ -752,6 +782,7 @@ enum UIStrings {
         static let look = "パレットの見た目"
         static let emojiKey = "絵文字のパレットを開くキー"
         static let symbolKey = "記号のパレットを開くキー"
+        static let kaomojiKey = "顔文字のパレットを開くキー"
         static let noKey = "なし"
         static let clearHistory = "使った文字の記録を消去"
         static let clearHistoryQuestion = "使った文字の記録を消去しますか？"
@@ -1012,7 +1043,8 @@ extension UIStrings {
             "keypadDirect": Features.keypadDirect, "questionExclamationCommits": UIStrings.Settings.questionExclamationCommits,
             "keypadCalculation": UIStrings.Settings.keypadCalculation, "cyclesLetterCase": UIStrings.Settings.cyclesLetterCase,
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
-            "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "suggestionSkipCount": More.suggestionSkipCount,
+            "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "predictionPrefersHistory": Choice.predictionPrefersHistory,
+            "predictionFromCorrection": Choice.predictionFromCorrection, "hiddenPredictions": Choice.hiddenPredictions, "suggestionSkipCount": More.suggestionSkipCount,
             "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates,
             "contextualSegmentCandidates": More.contextualSegmentCandidates, "listSegmentAlternatives": More.listSegmentAlternatives,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,

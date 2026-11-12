@@ -133,6 +133,129 @@ struct PredictionWindowScenarioTests {
     }
 }
 
+/// 予測の窓に出す予測の選び方(履歴にある語句を先にするか，打ち間違いを直した読みからも予測するか)
+@Suite("予測の出どころ")
+@MainActor
+struct PredictionSourceScenarioTests {
+    private static func settings(_ change: (inout Settings) -> Void = { _ in }) -> Settings {
+        var settings = DefaultSettings.settings
+        settings.predictionDisplay = .always
+        change(&settings)
+        return settings
+    }
+
+    @Test("確定した履歴にある予測を先に出す設定(既定)では，エンジンの並びより先に履歴の語句を出す．オフならエンジンの並びのまま")
+    func prefersHistory() {
+        let converter = FakeConverter(["えぴ": [("エピ", nil)]])
+        converter.predictionTexts["えぴ"] = ["エピ", "エピソード", "エピローグ"]
+        converter.learnedPredictions = ["エピローグ"]
+        let harness = Harness(converter: converter, settings: Self.settings())
+        harness.type("epi")
+        #expect(harness.prediction?.completion == "ローグ")
+        let off = Harness(converter: converter, settings: Self.settings { $0.predictionPrefersHistory = false })
+        off.type("epi")
+        #expect(off.prediction?.completion == "ソード")
+    }
+
+    /// 「arigatoi」を打って止まると「ありがとう」と「もしかして」で示す
+    private static func typoConverter() -> FakeConverter {
+        let converter = FakeConverter(["ありがとう": [("ありがとう", nil)]])
+        converter.corrections["arigatoi"] = [
+            ReadingCorrection(keys: "arigatou", reading: "アリガトウ", score: 0.5, cost: 2.5),
+            ReadingCorrection(keys: "arigatoi", reading: "アリガトイ", score: -9, cost: 0),
+        ]
+        converter.predictionTexts["ありがとう"] = ["ありがとうございます"]
+        return converter
+    }
+
+    @Test("打ち間違いを直した読みからも予測する設定(既定)では，「もしかして」と示した読みから予測してキーを添えずに出し，Tab で読みを直すとキーを添え，もう一度 Tab で確定する")
+    func predictsFromSuggestedReading() {
+        let harness = Harness(converter: Self.typoConverter(), settings: Self.settings())
+        harness.type("arigatoi")
+        #expect(harness.prediction == nil)
+        harness.settle()
+        // 示した読みの予測は，打鍵の合間に求める
+        harness.followUp()
+        #expect(harness.note?.contains("ありがとう") == true)
+        #expect(harness.prediction == Prediction(typed: "ありがとう", completion: "ございます", key: nil))
+        harness.press(.tab)
+        #expect(harness.marked.text == "ありがとう")
+        #expect(harness.committed.isEmpty)
+        #expect(harness.prediction == Prediction(typed: "ありがとう", completion: "ございます", key: "Tab"))
+        harness.press(.tab)
+        #expect(harness.committed == "ありがとうございます")
+    }
+
+    @Test("打ち間違いを直した読みから予測しない設定では，示しているあいだも直したあとも予測を出さない")
+    func skipsCorrectedReading() {
+        let harness = Harness(converter: Self.typoConverter(), settings: Self.settings { $0.predictionFromCorrection = false })
+        harness.type("arigatoi")
+        harness.settle()
+        harness.followUp()
+        #expect(harness.prediction == nil)
+        harness.press(.tab)
+        #expect(harness.marked.text == "ありがとう")
+        #expect(harness.prediction == nil)
+    }
+}
+
+/// 予測に表示しない語句(キーで足し，設定の画面で消す)
+@Suite("予測に表示しない語句")
+@MainActor
+struct HiddenPredictionScenarioTests {
+    private static func settings(_ change: (inout Settings) -> Void = { _ in }) -> Settings {
+        var settings = DefaultSettings.settings
+        settings.predictionDisplay = .always
+        change(&settings)
+        return settings
+    }
+
+    private static func converter() -> FakeConverter {
+        let converter = FakeConverter(["えぴ": [("エピ", nil)]])
+        converter.predictionTexts["えぴ"] = ["エピ", "エピソード", "エピローグ"]
+        return converter
+    }
+
+    @Test("入力中の ⌃⌫ で予測の窓の語句を設定の「予測に表示しない語句」に入れ，次の予測に替えて案内を出す")
+    func hidesShownPrediction() {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings())
+        harness.type("epi")
+        #expect(harness.prediction?.completion == "ソード")
+        harness.press(.backspace, .control)
+        #expect(harness.settings.current.hiddenPredictions == ["エピソード"])
+        #expect(harness.prediction?.completion == "ローグ")
+        #expect(harness.note?.contains("エピソード") == true)
+        // 読みは消さない
+        #expect(harness.marked.text == "えぴ")
+    }
+
+    @Test("「予測に表示しない語句」にある語句は予測に出さず，一覧から消すとまた出す")
+    func respectsList() {
+        let hidden = Harness(converter: Self.converter(), settings: Self.settings { $0.hiddenPredictions = ["エピソード"] })
+        hidden.type("epi")
+        #expect(hidden.prediction?.completion == "ローグ")
+        let restored = Harness(converter: Self.converter(), settings: Self.settings())
+        restored.type("epi")
+        #expect(restored.prediction?.completion == "ソード")
+    }
+
+    @Test("予測の窓を出していないときは何もしない．キーはキー設定の表で変えられる")
+    func keyAndNoPrediction() {
+        let none = Harness(converter: FakeConverter(["えぴ": [("エピ", nil)]]), settings: Self.settings())
+        none.type("epi")
+        none.press(.backspace, .control)
+        #expect(none.settings.current.hiddenPredictions.isEmpty)
+        #expect(none.marked.text == "えぴ")
+        let custom = Harness(converter: Self.converter(), settings: Self.settings {
+            $0.keymap.entries.removeAll { $0.command == .hidePrediction }
+            $0.keymap.entries.append(KeymapEntry(.composing, KeyStroke(.character("x"), control: true), .hidePrediction))
+        })
+        custom.type("epi")
+        custom.press(.character("x"), .control)
+        #expect(custom.settings.current.hiddenPredictions == ["エピソード"])
+    }
+}
+
 /// 入力中の候補(変換の候補の窓)を出す件数
 @Suite("入力中の候補の件数")
 @MainActor
@@ -178,5 +301,7 @@ struct PredictionSettingTests {
         #expect(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(new)) == new)
         #expect(DefaultSettings.settings.predictionDisplay == .whenLiveConversionOff)
         #expect(DefaultSettings.settings.suggestionSkipCount == 0)
+        #expect(DefaultSettings.settings.predictionPrefersHistory)
+        #expect(DefaultSettings.settings.predictionFromCorrection)
     }
 }

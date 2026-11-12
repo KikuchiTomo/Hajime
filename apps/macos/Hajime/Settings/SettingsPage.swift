@@ -87,6 +87,7 @@ extension SettingsView {
                           UIStrings.Settings.numberSeparators, UIStrings.Settings.alphanumericHyphen, UIStrings.Settings.questionExclamationCommits,
                           UIStrings.Settings.keypadCalculation, UIStrings.Settings.cyclesLetterCase]
             case .conversion: [UIStrings.Menu.liveConversion, UIStrings.Choice.presentation, UIStrings.Choice.initialFocus, UIStrings.Features.okurigana, UIStrings.Features.prefersKatakana,
+                               UIStrings.Choice.predictionDisplay, UIStrings.Choice.hiddenPredictions,
                                UIStrings.Features.calculation, UIStrings.Features.postalCode, UIStrings.Features.handwriting,
                                UIStrings.Settings.dateConversion, UIStrings.Settings.emojiConversion, UIStrings.Settings.latexConversion,
                                UIStrings.Settings.numberFormConversion, UIStrings.Association.enabled,
@@ -97,7 +98,7 @@ extension SettingsView {
                              UIStrings.Features.tryLanguage, UIStrings.Choice.label(for: .englishAuto), UIStrings.Extras.englishTermsSection,
                              UIStrings.Extras.englishTerms]
             case .symbols: [UIStrings.Features.sequences, UIStrings.Features.readings]
-            case .palette: [UIStrings.Palette.enabled, UIStrings.Palette.emojiKey, UIStrings.Palette.symbolKey, UIStrings.Palette.closesAfterInsert,
+            case .palette: [UIStrings.Palette.enabled, UIStrings.Palette.emojiKey, UIStrings.Palette.symbolKey, UIStrings.Palette.kaomojiKey, UIStrings.Palette.closesAfterInsert,
                             UIStrings.Palette.recordsHistory, UIStrings.Palette.clearHistory, UIStrings.Palette.columns, UIStrings.Palette.rows,
                             UIStrings.Palette.cellSize, UIStrings.Palette.frequentRows, UIStrings.Palette.showsPreview]
             // コマンドと状態の名前でも見つける(「全角空白」「英数」「切り替え」で キー設定 を出す)

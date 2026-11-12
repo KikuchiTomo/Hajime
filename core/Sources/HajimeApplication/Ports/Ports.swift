@@ -153,6 +153,13 @@ public protocol CorrectionRejectionRecording: AnyObject {
     func recordRejected(phrase: String) -> Bool
 }
 
+/// 入力中の予測の窓に出した語句を，次から予測に出さないようにするポート(設定の「予測に表示しない語句」に入れる)
+@MainActor
+public protocol PredictionHiding: AnyObject {
+    /// 入れたら true(すでに入っている・入れられないときは false)
+    func hide(_ text: String) -> Bool
+}
+
 /// 設定が変わったことを知らせるポート．エンジンや設定の画面を新しい設定に合わせるのに使う
 @MainActor
 public protocol SettingsObserving: AnyObject {

@@ -1,40 +1,41 @@
-import Carbon
+import AppKit
 import HajimeDomain
 import os
 
-/// 入れた Hajime IME が OS の入力ソースから外れていたら，登録し直す．
-/// 同じバンドル ID のアプリが別の場所に登録される(開発でビルドしたものなど)と，OS が入れたほうを入力ソースから外すことがある．
-/// 外れると入力メニューで切り替えられず，入力ソースを消して足し直すまで使えない．外れても OS はこのプロセスに入力先を渡し続けるので，
-/// 起動したときと入力先が変わったときに確かめる．有効にしていたかどうかは OS が覚えているので，登録し直すだけでよい
+/// 入れた Hajime IME が OS の入力ソースから外れていたら，Contents/Helpers の補助のアプリに登録し直してもらう．
+///
+/// OS は入れた入力メソッドを入力ソースの一覧から外すことがある(同じバンドル ID のアプリが別の場所に登録されたときなど)．
+/// 外れると OS は英字の配列(ABC)で入力させ，キーがこの IME に届かず，英数・かなのキーでも戻せない．
+/// 入力ソースの一覧はサンドボックスの外のプロセスが共有していて，この IME(サンドボックスの中)は自分用の写しを読むので
+/// 外れたことが見えず，ここから登録し直しても共有の一覧には届かない(2026-11-12 に確かめた)．
+/// そのため確かめるのも登録し直すのも，サンドボックスの外で動く補助のアプリ(HajimeInputSourceHelper)に任せる．
+/// 外れているあいだも，OS はほかの入力先でこの IME を有効にするので，起動したときと入力先が変わったときに，間を空けて起動する
 @MainActor
 final class InputSourceRegistration {
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "app")
     private let bundle: Bundle
-    private var lastChecked: ContinuousClock.Instant?
+    private var lastRequested: ContinuousClock.Instant?
 
     init(bundle: Bundle = .main) {
         self.bundle = bundle
     }
 
-    /// 入力ソースから外れていれば登録し直す．間を空けずに呼ばれたときは確かめない
+    /// 補助のアプリを起動して，外れていれば登録し直してもらう．間を空けずに呼ばれたときは起動しない
     func repairIfNeeded() {
         let now = ContinuousClock.now
-        if let lastChecked, now - lastChecked < .seconds(DefaultSettings.inputSourceCheckInterval) { return }
-        lastChecked = now
-        // 入力メソッドの置き場所(Input Methods)から動いているときだけ登録する．ビルドしたフォルダから動かしたものは登録しない
-        guard bundle.bundleURL.deletingLastPathComponent().lastPathComponent == "Input Methods",
-              let identifier = bundle.bundleIdentifier, !isRegistered(identifier) else { return }
-        let status = TISRegisterInputSource(bundle.bundleURL as CFURL)
-        if status == noErr {
-            logger.notice("入力ソースから外れていたので，登録し直しました")
-        } else {
-            logger.error("入力ソースから外れていたので登録し直そうとしましたが，失敗しました(\(status, privacy: .public))")
+        if let lastRequested, now - lastRequested < .seconds(DefaultSettings.inputSourceCheckInterval) { return }
+        lastRequested = now
+        // 入力メソッドの置き場所(Input Methods)から動いているときだけ．ビルドしたフォルダから動かしたものは登録しない
+        guard bundle.bundleURL.deletingLastPathComponent().lastPathComponent == "Input Methods" else { return }
+        let helper = bundle.bundleURL.appendingPathComponent("Contents/Helpers/\(AppIdentity.inputSourceHelperName).app", isDirectory: true)
+        guard FileManager.default.fileExists(atPath: helper.path) else { return }
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = false
+        configuration.addsToRecentItems = false
+        configuration.promptsUserIfNeeded = false
+        NSWorkspace.shared.openApplication(at: helper, configuration: configuration) { [logger] _, error in
+            guard let error else { return }
+            logger.error("入力ソースを確かめる補助のアプリを起動できませんでした: \(String(describing: error), privacy: .public)")
         }
-    }
-
-    private func isRegistered(_ identifier: String) -> Bool {
-        let filter = [kTISPropertyBundleID as String: identifier] as CFDictionary
-        guard let sources = TISCreateInputSourceList(filter, true)?.takeRetainedValue() else { return false }
-        return CFArrayGetCount(sources) > 0
     }
 }
