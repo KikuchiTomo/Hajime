@@ -86,7 +86,16 @@ final class PaletteSession {
 
     private var index: PaletteIndex? { services.catalog.index }
     private var columns: Int { settings.current.paletteColumns }
-    private var visibleRows: Int { settings.current.paletteRows }
+    /// 今の種類で見せるマス目の行の数．設定の行の数に，説明の欄がいちばん高い種類(絵文字)より低い分を回した行を足す(PaletteWindowLayout)
+    private var visibleRows: Int {
+        let rows = settings.current.paletteRows
+        guard settings.current.paletteShowsPreview else { return rows }
+        let height = { (kind: PaletteItem.Kind) in
+            PalettePreviewLayout.height(fields: self.previewFields, kind: kind, tileHeight: LayoutTokens.Palette.tileSize, metrics: .tokens)
+        }
+        return rows + PaletteWindowLayout.extraRows(previewHeight: height(kind), windowPreviewHeight: height(.emoji),
+                                                          cellSize: settings.current.paletteCellSize)
+    }
     private var shape: PaletteCellShape { kind.cellShape }
     private var cellsPerRow: Int { cellsPerRow(for: shape) }
 

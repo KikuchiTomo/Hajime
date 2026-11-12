@@ -64,6 +64,8 @@ enum SnapshotRenderer {
                 render(paletteView(SamplePalettes.emoji, theme: look.theme, appearance: appearance), name: "palette-emoji-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.search, theme: look.theme, appearance: appearance), name: "palette-search-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.flag, theme: look.theme, appearance: appearance), name: "palette-flag-\(look.name)", to: output, appearance: appearance)
+                render(paletteView(SamplePalettes.longName, theme: look.theme, appearance: appearance), name: "palette-long-\(look.name)", to: output, appearance: appearance)
+                render(paletteView(SamplePalettes.reduced, theme: look.theme, appearance: appearance), name: "palette-reduced-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.symbol, theme: look.theme, appearance: appearance), name: "palette-symbol-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.kaomoji, theme: look.theme, appearance: appearance), name: "palette-kaomoji-\(look.name)", to: output, appearance: appearance)
                 // 動きの途中のコマ(選択の枠とタブの印が滑る・種類を切り替えて中身を送る・肌の色の帯が浮かび上がる)
