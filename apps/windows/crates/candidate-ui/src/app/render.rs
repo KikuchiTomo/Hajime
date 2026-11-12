@@ -33,6 +33,8 @@ const LOCALE: &str = "ja-JP";
 
 /// 書式ごと・文字ごとの行の高さとベースライン
 type LineCache = HashMap<Font, HashMap<String, (f32, f32)>>;
+/// 書式ごと・文字ごとの字の外形(測れなければ None)
+type InkCache = HashMap<Font, HashMap<String, Option<Frame>>>;
 /// 角丸のテーマの影をぼかすときに重ねる層の数(1 ドットに 1 層)
 const SHADOW_LAYERS_PER_DOT: f32 = 1.0;
 /// 作った書体の組を覚えておく数．候補の窓・予測の窓・パレットなどが別の書体の組を使っても作り直さないように
@@ -59,6 +61,11 @@ fn families(face: &Face) -> &'static [&'static str] {
         Face::Emoji => &["Segoe UI Emoji"],
         // Windows 11 は Segoe Fluent Icons，Windows 10 は Segoe MDL2 Assets(同じ字の番号でアイコンを持つ)
         Face::Icon => &["Segoe Fluent Icons", "Segoe MDL2 Assets"],
+        // 小さくても字の線が細くならない等幅の書体(Windows 11 は Cascadia Mono)
+        Face::Code => &["Cascadia Mono", "Consolas"],
+        // かなを詰めない書体(Yu Gothic UI はかなを詰めるので，カタカナが英字より小さく見える)
+        Face::Readable => &["BIZ UDPGothic", "Yu Gothic", "Meiryo"],
+        Face::SystemReadable => &["Kiwi Maru", "BIZ UDPGothic", "Yu Gothic"],
     }
 }
 
@@ -110,6 +117,9 @@ pub struct TextMeasure {
     /// 文字ごとの行の高さとベースライン(書体の代わりの字で変わる)
     lines: RefCell<LineCache>,
     line_count: std::cell::Cell<usize>,
+    /// 文字ごとの字の外形(絵文字を箱の真ん中に置く)
+    inks: RefCell<InkCache>,
+    ink_count: std::cell::Cell<usize>,
     glyphs: RefCell<HashMap<(Font, char), bool>>,
     /// 描いた文字の配置(書式・描く枠の幅と高さ・文字ごと)．アニメーションのコマごとや打つたびに同じ文字を並べ直さない
     layouts: RefCell<HashMap<LayoutKey, HashMap<String, IDWriteTextLayout>>>,
@@ -131,6 +141,8 @@ impl TextMeasure {
             heights: RefCell::default(),
             lines: RefCell::default(),
             line_count: std::cell::Cell::new(0),
+            inks: RefCell::default(),
+            ink_count: std::cell::Cell::new(0),
             glyphs: RefCell::default(),
             layouts: RefCell::default(),
             layout_count: std::cell::Cell::new(0),
@@ -188,6 +200,23 @@ impl TextMeasure {
         // SAFETY: lines と count は書き込める領域．折り返さない書式なので 1 行に収まる
         unsafe { layout.GetLineMetrics(Some(&mut lines), &mut count).ok()? };
         (count >= 1).then(|| (lines[0].height, lines[0].baseline))
+    }
+
+    /// 字の外形．幅 width・高さ height の枠に並べた配置がその枠からはみ出す量(GetOverhangMetrics．はみ出せば正)から求める．
+    /// 書式は左寄せで縦は中央なので，枠の高さを行の高さにすると，枠の左上は Draw::Text の枠の左上と同じになる
+    fn ink_metrics(&self, text: &str, font: Font) -> Option<Frame> {
+        let (height, _) = self.line(text, font);
+        let width = self.width(text, font).ceil();
+        let layout = self.layout(text, font, width + height, height)?;
+        // SAFETY: layout は生きている COM の参照
+        let overhang = unsafe { layout.GetOverhangMetrics().ok()? };
+        let ink = Frame::new(
+            -overhang.left,
+            -overhang.top,
+            width + height + overhang.left + overhang.right,
+            height + overhang.top + overhang.bottom,
+        );
+        (ink.width > 0.0 && ink.height > 0.0).then_some(ink)
     }
 
     fn metrics(&self, text: &str, font: Font) -> Option<DWRITE_TEXT_METRICS> {
@@ -276,6 +305,26 @@ impl Measure for TextMeasure {
         let has = self.find_glyph(font, glyph);
         self.glyphs.borrow_mut().insert((font, glyph), has);
         has
+    }
+
+    fn ink(&self, text: &str, font: Font) -> Option<Frame> {
+        if let Some(ink) = self
+            .inks
+            .borrow()
+            .get(&font)
+            .and_then(|inks| inks.get(text))
+        {
+            return *ink;
+        }
+        let ink = self.ink_metrics(text, font);
+        let mut inks = self.inks.borrow_mut();
+        if self.ink_count.get() >= WIDTH_CACHE {
+            inks.clear();
+            self.ink_count.set(0);
+        }
+        inks.entry(font).or_default().insert(text.to_string(), ink);
+        self.ink_count.set(self.ink_count.get() + 1);
+        ink
     }
 }
 

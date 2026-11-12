@@ -72,7 +72,17 @@ final class PaletteSession {
 
     private var index: PaletteIndex? { services.catalog.index }
     private var columns: Int { settings.current.paletteColumns }
-    private var visibleRows: Int { settings.current.paletteRows }
+    /// 窓の高さを決めるマス目の行の数(設定)
+    private var windowRows: Int { settings.current.paletteRows }
+    /// 今の種類で見せるマス目の行の数．説明の欄がいちばん高い種類(絵文字)より低い分を，マス目の行に回す(PaletteWindowLayout)
+    private var visibleRows: Int {
+        guard settings.current.paletteShowsPreview else { return windowRows }
+        let height = { (kind: PaletteItem.Kind) in
+            PalettePreviewLayout.height(fields: self.previewFields, kind: kind, tileHeight: LayoutTokens.Palette.tileSize, metrics: .tokens)
+        }
+        return windowRows + PaletteWindowLayout.extraRows(previewHeight: height(kind), windowPreviewHeight: height(.emoji),
+                                                          cellSize: settings.current.paletteCellSize)
+    }
     private var shape: PaletteCellShape { kind.cellShape }
     private var cellsPerRow: Int { cellsPerRow(for: shape) }
 
@@ -459,7 +469,7 @@ final class PaletteSession {
             query: display,
             placeholder: PaletteStrings.placeholder(of: kind),
             tabs: tabs, heading: heading, rows: panelRows, rowCount: rows.count, firstRow: firstRow,
-            columns: columns, visibleRows: visibleRows, cellsPerRow: cellsPerRow, selection: selection,
+            columns: columns, visibleRows: visibleRows, windowRows: windowRows, cellsPerRow: cellsPerRow, selection: selection,
             preview: settings.current.paletteShowsPreview ? selected.map { preview(of: $0, text: cellText($0), pinned: pinned.contains($0.text)) } : nil,
             showsPreview: settings.current.paletteShowsPreview,
             previewFields: previewFields,

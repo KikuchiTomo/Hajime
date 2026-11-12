@@ -108,7 +108,9 @@ extension WirePalettePanel {
             // 四角いマスだけなら省く(顔文字を知らない候補ウィンドウにも同じ形で送る)
             cellsPerRow: panel.cellsPerRow == panel.columns ? nil : UInt32(clamping: panel.cellsPerRow),
             previewFields: WirePalettePreviewFields(unicodeName: panel.previewFields.unicodeName, readings: panel.previewFields.readings,
-                                                    shortcodes: panel.previewFields.shortcodes, codePoints: panel.previewFields.codePoints)
+                                                    shortcodes: panel.previewFields.shortcodes, codePoints: panel.previewFields.codePoints),
+            // 種類で行を足していなければ省く(候補ウィンドウは visibleRows を窓の行の数にする)
+            windowRows: panel.windowRows == panel.visibleRows ? nil : UInt32(clamping: panel.windowRows)
         )
     }
 }

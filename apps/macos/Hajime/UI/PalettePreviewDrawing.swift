@@ -8,33 +8,21 @@ import HajimeDomain
 enum PalettePreviewDrawing {
     private typealias Size = DesignTokens.Size.Palette
 
-    /// 見本の四角の一辺(顔文字は横に広げる)
-    static var tileSide: CGFloat { Size.previewGlyphSize + Size.previewTilePadding * 2 }
-
-    static let metrics = PalettePreviewLayout.Metrics(
-        tileGap: Size.previewGap, labelGap: Size.previewLabelGap, sourceGap: Size.previewSourceGap, rowGap: Size.previewRowGap,
-        chipPaddingX: Size.previewChipPaddingX, chipPaddingY: Size.previewChipPaddingY, chipGap: Size.previewChipGap,
-        unicodeNameLines: Int(Size.previewNameLines))
+    static let metrics = PalettePreviewLayout.Metrics.tokens
 
     static let labels = PalettePreviewLayout.Labels(
         unicode: UIStrings.Palette.unicodeNameLabel, english: UIStrings.Palette.englishNameLabel, readings: UIStrings.Palette.readingsLabel,
         shortcodes: UIStrings.Palette.shortcodesLabel, codePoints: UIStrings.Palette.codePointsLabel, more: { UIStrings.Candidate.more($0) })
 
-    /// 欄の高さ(上下の余白を含む)．出す項目の設定だけで決め，選んでいる文字では変えない
-    static func height(for fields: PalettePanel.PreviewFields, theme: ResolvedTheme) -> CGFloat {
-        let content = PalettePreviewLayout.height(fields: fields, tileHeight: tileSide, measuring: Measuring(theme), metrics: metrics)
-        return (content + Size.previewPaddingY * 2).rounded(.up)
+    /// 欄の高さ．その種類で出る行の分だけで決め，選んでいる文字では変えない
+    nonisolated static func height(for fields: PalettePanel.PreviewFields, kind: PaletteItem.Kind) -> Double {
+        PalettePreviewLayout.height(fields: fields, kind: kind, tileHeight: Size.tileSize, metrics: .tokens)
     }
 
-    /// 欄(rect)から上下の余白を除いた，見本と情報の列を置く場所
-    static func contentArea(of rect: NSRect) -> NSRect {
-        rect.insetBy(dx: 0, dy: Size.previewPaddingY)
-    }
-
-    /// ピン留めのボタン．欄の右の端で，見出しの行の縦の中心に置く
-    static func pinRect(in rect: NSRect, theme: ResolvedTheme) -> NSRect {
-        let midY = PalettePreviewLayout.headingMidY(top: contentArea(of: rect).minY, measuring: Measuring(theme), metrics: metrics)
-        let side = Size.footerHeight
+    /// ピン留めのボタン．欄の右の端で，見出しの行の縦の中心に置く(押せる範囲は探す欄と同じ高さの正方形)
+    static func pinRect(in rect: NSRect) -> NSRect {
+        let midY = PalettePreviewLayout.headingMidY(top: rect.minY, metrics: metrics)
+        let side = Size.controlHeight
         return NSRect(x: rect.maxX - side, y: (midY - side / 2).rounded(), width: side, height: side)
     }
 
@@ -42,7 +30,7 @@ enum PalettePreviewDrawing {
     static func draw(_ preview: PalettePanel.Preview, fields: PalettePanel.PreviewFields, kind: PaletteItem.Kind, area: NSRect, tile: NSRect,
                      theme: ResolvedTheme) {
         let measuring = Measuring(theme)
-        let layout = PalettePreviewLayout(preview: preview, fields: fields, kind: kind, area: box(area), tile: box(tile), pinWidth: Size.footerHeight,
+        let layout = PalettePreviewLayout(preview: preview, fields: fields, kind: kind, area: box(area), tile: box(tile), pinWidth: Size.controlHeight,
                                           labels: labels, measuring: measuring, metrics: metrics)
         for chip in layout.chips {
             drawChip(chip, measuring: measuring, theme: theme)
@@ -68,7 +56,7 @@ enum PalettePreviewDrawing {
         let rect = NSRect(x: chip.frame.x, y: chip.frame.y, width: chip.frame.width, height: chip.frame.height)
         if theme.isRounded {
             theme.badge.setFill()
-            NSBezierPath(roundedRect: rect, xRadius: Size.previewChipRadius, yRadius: Size.previewChipRadius).fill()
+            NSBezierPath(roundedRect: rect, xRadius: Size.chipRadius, yRadius: Size.chipRadius).fill()
         } else {
             let line = DesignTokens.Size.Candidate.frameWidth
             theme.line.setFill()
@@ -117,7 +105,8 @@ enum PalettePreviewDrawing {
             text.isEmpty ? 0 : (text as NSString).size(withAttributes: [.font: font(role)]).width.rounded(.up)
         }
 
-        func ascent(_ role: PalettePreviewLayout.Role) -> Double { font(role).ascender.rounded(.up) }
-        func descent(_ role: PalettePreviewLayout.Role) -> Double { (-font(role).descender + font(role).leading).rounded(.up) }
+        func ascent(_ role: PalettePreviewLayout.Role) -> Double { font(role).ascender }
+        // 行送りの余り(leading)は字面ではないので含めない(ヒラギノは leading が大きく，含めると行の高さを超える)
+        func descent(_ role: PalettePreviewLayout.Role) -> Double { -font(role).descender }
     }
 }

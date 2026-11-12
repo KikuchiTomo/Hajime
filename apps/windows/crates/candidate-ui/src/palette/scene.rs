@@ -4,7 +4,7 @@
 //! 位置は layout と同じものを使い，押した位置を調べる側とずれないようにする
 
 use super::emoji::{is_emoji, skin_tone_sample};
-use super::layout::{skin_tone_button_inset, Layout};
+use super::layout::{EmojiSizes, Layout, EMOJI_FIT_STEPS};
 use super::preview::{self, Part, Role};
 use crate::geometry::Frame;
 use crate::scene::paint::Painter;
@@ -85,21 +85,14 @@ impl Drawing<'_> {
         self.tabs();
         self.heading();
         self.grid();
-        if let Some(preview) = layout.preview {
-            self.painter.separator(
-                (preview.y - palette::GAP / 2.0).round(),
-                layout.grid.x,
-                layout.footer.max_x(),
-            );
-            if let Some(shown) = &self.panel.preview {
-                self.preview(shown, preview);
-            }
+        // 区切りの線は中身の左の端から右の端まで
+        for y in &layout.separators {
+            self.painter
+                .separator(y.round(), layout.content.x, layout.content.max_x());
         }
-        self.painter.separator(
-            layout.footer.y.round(),
-            layout.footer.x,
-            layout.footer.max_x(),
-        );
+        if let (Some(preview), Some(shown)) = (layout.preview, &self.panel.preview) {
+            self.preview(shown, preview);
+        }
         self.footer();
         if let Some(picker) = &self.panel.skin_tone_picker {
             self.picker(picker);
@@ -174,6 +167,44 @@ impl Drawing<'_> {
         }
     }
 
+    /// 文字を，実際の外形(ink)の中心が frame の中心に来るように描く．外形を測れなければ行の箱の中心に合わせる
+    fn centered_by_ink(&mut self, text: &str, font: Font, color: Color, frame: Frame) {
+        let (height, _) = self.measure.line(text, font);
+        let width = self.painter.width(text, font);
+        let ink = self
+            .measure
+            .ink(text, font)
+            .unwrap_or(Frame::new(0.0, 0.0, width, height));
+        let (x, y) = centered_origin(ink, frame);
+        self.painter.draws.push(Draw::Text {
+            frame: Frame::new(x, y, width, height),
+            text: text.to_string(),
+            font,
+            color,
+        });
+    }
+
+    /// 絵文字を，外形が frame の上下左右に余白を空けた中(sizes.target の一辺)に収まる大きさの書体で，外形の中心を frame の中心に合わせて描く
+    fn emoji(&mut self, text: &str, sizes: EmojiSizes, frame: Frame) {
+        let target = f32::from(sizes.target) + 0.5;
+        let fits = |font: &Font| {
+            self.measure
+                .ink(text, *font)
+                .is_some_and(|ink| ink.width.max(ink.height) <= target)
+        };
+        let font = if self.measure.ink(text, sizes.fonts[0]).is_none() {
+            sizes.fonts[0]
+        } else {
+            sizes
+                .fonts
+                .iter()
+                .copied()
+                .find(fits)
+                .unwrap_or(sizes.fonts[EMOJI_FIT_STEPS - 1])
+        };
+        self.centered_by_ink(text, font, self.theme.text, frame);
+    }
+
     // MARK: - 部品
 
     /// 探す欄．虫めがね・探す語(空なら案内を薄く)・打った文字が入る位置の縦の線
@@ -200,7 +231,7 @@ impl Drawing<'_> {
             (SEARCH_FALLBACK, fonts.tab_symbol),
             theme.text_muted,
             Frame::new(
-                rect.x + palette::MODE_PADDING_X,
+                rect.x + palette::CONTROL_PADDING_X,
                 rect.y,
                 palette::SEARCH_ICON_SIZE,
                 rect.height,
@@ -208,14 +239,14 @@ impl Drawing<'_> {
         );
         let caret_width = palette::SELECTION_STROKE;
         let text_x =
-            rect.x + palette::MODE_PADDING_X * 2.0 + palette::SEARCH_ICON_SIZE + caret_width;
+            rect.x + palette::CONTROL_PADDING_X * 2.0 + palette::SEARCH_ICON_SIZE + caret_width;
         let empty = self.panel.query.is_empty();
         let (text, color) = if empty {
             (&self.panel.placeholder, theme.text_muted)
         } else {
             (&self.panel.query, theme.text)
         };
-        let available = rect.max_x() - text_x - palette::MODE_PADDING_X;
+        let available = rect.max_x() - text_x - palette::CONTROL_PADDING_X;
         let shown = self.painter.truncated(text, fonts.search, available);
         let width = self.painter.width(&shown, fonts.search);
         self.painter.text(&shown, fonts.search, color, text_x, rect);
@@ -224,7 +255,7 @@ impl Drawing<'_> {
         let caret_x = if empty {
             text_x - caret_width * 2.0
         } else {
-            (text_x + width + line).min(rect.max_x() - palette::MODE_PADDING_X)
+            (text_x + width + line).min(rect.max_x() - palette::CONTROL_PADDING_X)
         };
         self.painter.rect(
             Frame::new(
@@ -246,7 +277,7 @@ impl Drawing<'_> {
         };
         let whole = Frame::new(first.x, first.y, last.max_x() - first.x, first.height);
         self.fill(whole, theme.badge, palette::SEARCH_RADIUS);
-        let inner = palette::SELECTION_STROKE;
+        let inner = palette::INSET;
         for (mode, frame) in self.panel.modes.iter().zip(frames) {
             let color = if mode.is_selected {
                 self.fill(
@@ -267,7 +298,7 @@ impl Drawing<'_> {
     fn tabs(&mut self) {
         let theme = self.theme;
         let fonts = self.layout.fonts;
-        let inner = palette::SELECTION_STROKE;
+        let inner = palette::INSET;
         for (tab, frame) in self.panel.tabs.iter().zip(&self.layout.tabs) {
             let mut color = if tab.is_selected {
                 theme.text
@@ -282,9 +313,9 @@ impl Drawing<'_> {
                 );
                 self.painter.rect(
                     Frame::new(
-                        frame.x + inner * 2.0,
+                        frame.x + palette::ITEM_GAP,
                         frame.max_y() - palette::SELECTION_STROKE,
-                        frame.width - inner * 4.0,
+                        frame.width - palette::ITEM_GAP * 2.0,
                         palette::SELECTION_STROKE,
                     ),
                     theme.selection,
@@ -307,7 +338,7 @@ impl Drawing<'_> {
                     &tab.symbol,
                     fonts.tab_symbol,
                     color,
-                    frame.inset(palette::SELECTION_STROKE, 0.0),
+                    frame.inset(palette::INSET, 0.0),
                 ),
             }
         }
@@ -316,7 +347,7 @@ impl Drawing<'_> {
     fn heading(&mut self) {
         let rect = self.layout.heading;
         let font = self.layout.fonts.heading;
-        let x = rect.x + palette::CELL_RADIUS;
+        let x = rect.x;
         let shown = self
             .painter
             .truncated(&self.panel.heading, font, rect.max_x() - x);
@@ -385,7 +416,7 @@ impl Drawing<'_> {
         if let Some(message) = &panel.message {
             let shown = self
                 .painter
-                .truncated(message, fonts.detail, layout.footer.width);
+                .truncated(message, fonts.detail, layout.grid.width);
             self.painter
                 .centered(&shown, fonts.detail, theme.text_muted, layout.grid);
         }
@@ -424,9 +455,8 @@ impl Drawing<'_> {
     fn preview(&mut self, shown: &PalettePreview, rect: Frame) {
         let theme = self.theme;
         let fonts = self.layout.fonts;
-        let content = preview::content_area(rect);
-        let side = preview::tile_side();
-        let mut tile = Frame::new(content.x, content.y, side, side);
+        let side = palette::TILE_SIZE;
+        let mut tile = Frame::new(rect.x, rect.y, side, side);
         if self.layout.wide {
             // 顔文字は横に長いので，文字の幅に合わせて四角を広げる(説明の欄の幅の一定の割合まで)
             let width = self.painter.width(&shown.text, fonts.preview_kaomoji)
@@ -444,23 +474,23 @@ impl Drawing<'_> {
             );
         } else {
             self.fill(tile, theme.badge, palette::CELL_RADIUS);
-            let font = if is_emoji(&shown.text) {
-                fonts.preview_emoji
+            if is_emoji(&shown.text) {
+                // 絵文字は外形が四角の余白の内側に収まる大きさにし，外形の中心を四角の中心に合わせる
+                self.emoji(&shown.text, fonts.preview_emoji, tile);
             } else {
-                fonts.preview_symbol
-            };
-            self.painter.centered(&shown.text, font, theme.text, tile);
+                self.centered_by_ink(&shown.text, fonts.preview_symbol, theme.text, tile);
+            }
         }
         let area = preview::Area {
-            content,
+            content: rect,
             tile,
-            pin_width: palette::FOOTER_HEIGHT,
+            pin_width: palette::CONTROL_HEIGHT,
         };
         let fields = preview::fields(self.panel.preview_fields.as_ref());
         let placed = preview::place(
             shown,
             &fields,
-            self.layout.wide,
+            self.layout.kind,
             &area,
             &fonts,
             self.measure,
@@ -518,7 +548,7 @@ impl Drawing<'_> {
             } => {
                 // 角丸のテーマは控えめな地．platinum と desk は光の縁の色の地に 1 ドットの枠(入力欄の形)
                 if self.theme.is_rounded() {
-                    self.fill(frame, theme.badge, palette::PREVIEW_CHIP_RADIUS);
+                    self.fill(frame, theme.badge, palette::CHIP_RADIUS);
                 } else {
                     self.painter.rect(frame, theme.line);
                     self.painter.rect(
@@ -533,22 +563,19 @@ impl Drawing<'_> {
         }
     }
 
-    /// 足元．キーの案内(収まらないものは後ろから出さない)と，右に既定の肌の色のボタン
+    /// 足元．キーの案内(収まらないものは後ろから出さない)と，右の端に既定の肌の色のボタン(キーの札と同じ形・高さ・縦の中心)
     fn footer(&mut self) {
-        let theme = self.theme;
         let footer = self.layout.footer;
+        let button = self.layout.skin_tone_button;
         let hints = self.painter.hints_fitting(
             &self.panel.hints,
-            footer.width - palette::FOOTER_HEIGHT - palette::GAP,
+            footer.width - button.width - palette::GROUP_GAP,
         );
         self.painter.hints(&hints, footer.x, footer.mid_y());
-        let inset = skin_tone_button_inset();
-        let button = self.layout.skin_tone_button.inset(inset, inset);
-        self.fill(button, theme.badge, palette::CELL_RADIUS);
-        self.painter.centered(
+        self.painter.keycap(button);
+        self.emoji(
             &skin_tone_sample(self.panel.skin_tone),
             self.layout.fonts.button_emoji,
-            theme.text,
             button,
         );
     }
@@ -560,12 +587,12 @@ impl Drawing<'_> {
         let (Some(first), Some(last)) = (cells.first(), cells.last()) else {
             return;
         };
-        let margin = palette::SELECTION_STROKE * 2.0;
+        let margin = palette::ITEM_GAP;
         let strip = Frame::new(first.x, first.y, last.max_x() - first.x, first.height)
             .inset(-margin, -margin);
         let surface = theme.surface.with_alpha(1.0);
-        if let Some(preview) = self.layout.preview {
-            self.painter.rect(cover(preview), surface);
+        if let (Some(preview), Some(line)) = (self.layout.preview, self.layout.separators.first()) {
+            self.painter.rect(cover(preview, *line), surface);
         }
         self.fill(strip, surface, palette::SEARCH_RADIUS);
         self.outline(
@@ -578,15 +605,23 @@ impl Drawing<'_> {
             if index == picker.selected as usize {
                 self.selection(*frame);
             }
-            self.painter
-                .centered(option, self.layout.fonts.picker_emoji, theme.text, *frame);
+            self.emoji(option, self.layout.fonts.picker_emoji, *frame);
         }
     }
 }
 
+/// 文字の外形(描く枠の左上からの位置)の中心が frame の中心に来る，描く枠の左上(core の PaletteWindowLayout.centeredOrigin)．
+/// 字の輪郭をぼかさないよう整数に丸める(上下左右の余白の差は 1 以内)
+fn centered_origin(ink: Frame, frame: Frame) -> (f32, f32) {
+    (
+        (frame.mid_x() - (ink.x + ink.width / 2.0)).round(),
+        (frame.mid_y() - (ink.y + ink.height / 2.0)).round(),
+    )
+}
+
 /// 肌の色の帯の下に敷く面．説明の欄を，上の区切りの線の下から覆う(見出しの名前の字の上の端も隠す)
-fn cover(preview: Frame) -> Frame {
-    let top = (preview.y - palette::GAP / 2.0).round() + candidate::FRAME_WIDTH;
+fn cover(preview: Frame, line: f32) -> Frame {
+    let top = line.round() + candidate::FRAME_WIDTH;
     Frame::new(preview.x, top, preview.width, preview.max_y() - top)
 }
 
@@ -680,7 +715,7 @@ mod tests {
         assert!(long.0.ends_with('…'));
         // 説明の大きな顔文字と，タブの短い顔
         assert!(fonts.contains(&("(´・ω・｀)".into(), layout.fonts.preview_kaomoji)));
-        assert!(fonts.contains(&("T_T".into(), layout.fonts.tab_symbol)));
+        assert!(fonts.contains(&("^^".into(), layout.fonts.tab_symbol)));
     }
 
     #[test]
@@ -694,7 +729,7 @@ mod tests {
         assert!(fonts.contains(&("⇐".into(), layout.fonts.cell_symbol)));
         assert!(fonts.contains(&("⇒".into(), layout.fonts.preview_symbol)));
         // 肌の色のボタンは絵文字の書体
-        assert!(fonts.contains(&("👋".into(), layout.fonts.button_emoji)));
+        assert!(fonts.contains(&("👋".into(), layout.fonts.button_emoji.fonts[0])));
     }
 
     #[test]
@@ -897,13 +932,12 @@ mod tests {
         assert_eq!(find("えがお、すまいる、はっぴー、わーい").1.x, value_x);
         // 札の文字は札の余白の分だけ内側から書く
         for chip in [":smile:", "U+1F604"] {
-            assert_eq!(find(chip).1.x, value_x + palette::PREVIEW_CHIP_PADDING_X);
+            assert_eq!(find(chip).1.x, value_x + palette::CHIP_PADDING_X);
             assert_eq!(find(chip).2, fonts.code);
         }
         // ピン留めのアイコンの中心は見出しの行の中心
         let pin = layout.pin(layout.preview.unwrap());
-        let heading_mid = layout.preview.unwrap().y
-            + preview::heading_mid_y(palette::PREVIEW_PADDING_Y, &fonts, &measure);
+        let heading_mid = preview::heading_mid_y(layout.preview.unwrap().y);
         assert_eq!(pin.mid_y(), heading_mid.round());
         // 文字どうしが重ならず，説明の欄に収まる(ピン留めのアイコンの字は除く)
         let boxes: Vec<Frame> = texts
@@ -987,7 +1021,7 @@ mod tests {
         let cover = scene.draws.iter().position(|draw| {
             *draw
                 == Draw::Rect {
-                    frame: super::cover(preview),
+                    frame: super::cover(preview, layout.separators[0]),
                     color: theme.surface.with_alpha(1.0),
                 }
         });
@@ -1064,5 +1098,104 @@ mod tests {
         let (layout, platinum) = draw(&sample::emoji(), "platinum", &Fixed);
         assert_eq!(layout.body.width, layout.width);
         assert!(!platinum.draws.iter().any(|draw| matches!(draw, Draw::Rect { frame, .. } if frame.x == candidate::SHADOW_OFFSET && frame.y == candidate::SHADOW_OFFSET)));
+    }
+
+    /// 絵文字の外形を，行の箱より右下に寄せて書体の大きさより大きく返す(小さい大きさの絵文字の書体のように)
+    struct Inked;
+
+    impl Measure for Inked {
+        fn width(&self, text: &str, font: Font) -> f32 {
+            Fixed.width(text, font)
+        }
+
+        fn height(&self, font: Font) -> f32 {
+            Fixed.height(font)
+        }
+
+        fn ink(&self, _text: &str, font: Font) -> Option<Frame> {
+            match font {
+                Font::Sized(Role::Emoji, size) => {
+                    let size = f32::from(size);
+                    Some(Frame::new(size * 0.1, size * 0.3, size * 1.1, size * 1.05))
+                }
+                _ => None,
+            }
+        }
+    }
+
+    #[test]
+    fn 絵文字は外形を余白の内側に収め_外形の中心を箱の中心に合わせる() {
+        let panel = sample::search();
+        let (layout, scene) = draw(&panel, "automatic", &Inked);
+        // 描いた絵文字の外形(窓の座標)と書体
+        let inks: Vec<(Frame, Font)> = scene
+            .draws
+            .iter()
+            .filter_map(|draw| match draw {
+                Draw::Text {
+                    text, frame, font, ..
+                } => Inked.ink(text, *font).map(|ink| {
+                    (
+                        Frame::new(frame.x + ink.x, frame.y + ink.y, ink.width, ink.height),
+                        *font,
+                    )
+                }),
+                _ => None,
+            })
+            .collect();
+        let preview = layout.preview.unwrap();
+        let tile = Frame::new(preview.x, preview.y, palette::TILE_SIZE, palette::TILE_SIZE);
+        let mut boxes = vec![
+            (layout.skin_tone_button, palette::SKIN_BUTTON_PADDING),
+            (tile, palette::TILE_PADDING),
+        ];
+        boxes.extend(
+            layout
+                .picker_cells(6)
+                .into_iter()
+                .map(|cell| (cell, palette::PICKER_CELL_PADDING)),
+        );
+        for (frame, padding) in boxes {
+            let (ink, font) = inks
+                .iter()
+                .find(|(ink, _)| {
+                    frame.x <= ink.mid_x()
+                        && ink.mid_x() < frame.max_x()
+                        && frame.y <= ink.mid_y()
+                        && ink.mid_y() < frame.max_y()
+                })
+                .unwrap_or_else(|| panic!("{frame:?}"));
+            let (left, right) = (ink.x - frame.x, frame.max_x() - ink.max_x());
+            let (top, bottom) = (ink.y - frame.y, frame.max_y() - ink.max_y());
+            // 上下左右の余白の差は 1 以内
+            assert!((left - right).abs() <= 1.0, "{frame:?} {left} {right}");
+            assert!((top - bottom).abs() <= 1.0, "{frame:?} {top} {bottom}");
+            // 外形は余白の内側に収まり，候補のうちいちばん大きい書体にする
+            assert!(
+                left.min(right).min(top).min(bottom) >= padding - 1.0,
+                "{frame:?}"
+            );
+            let Font::Sized(_, size) = font else {
+                panic!("{font:?}")
+            };
+            let larger = Inked.ink("", Font::Sized(Role::Emoji, size + 1)).unwrap();
+            assert!(larger.width.max(larger.height) > frame.width - padding * 2.0 + 0.5);
+        }
+    }
+
+    #[test]
+    fn 肌の色のボタンはキーの札と同じ形で_足元の右の端に置く() {
+        for name in ["automatic", "platinum", "desk"] {
+            let (layout, scene) = draw(&sample::emoji(), name, &Fixed);
+            let resolved = theme(name);
+            let look = Look::new(&resolved, 15.0);
+            let mut painter = Painter::new(&look, &Fixed);
+            painter.keycap(layout.skin_tone_button);
+            let keycap = painter.finish(layout.width, layout.height);
+            for draw in &keycap.draws {
+                assert!(scene.draws.contains(draw), "{name} {draw:?}");
+            }
+            assert_eq!(layout.skin_tone_button.max_x(), layout.content.max_x());
+        }
     }
 }

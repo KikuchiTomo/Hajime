@@ -121,6 +121,13 @@ enum DesignTokens {
         )
     }
     enum Size {
+        enum Space {
+            static let xxs: CGFloat = 2
+            static let xs: CGFloat = 4
+            static let sm: CGFloat = 8
+            static let md: CGFloat = 12
+            static let lg: CGFloat = 16
+        }
         enum Candidate {
             static let rowHeight: CGFloat = 22
             static let fontSize: CGFloat = 15
@@ -284,17 +291,19 @@ enum DesignTokens {
             static let keyGap: CGFloat = 6
         }
         enum Palette {
-            static let padding: CGFloat = 8
-            static let gap: CGFloat = 6
-            static let searchHeight: CGFloat = 30
+            static let padding: CGFloat = 12
+            static let sectionGap: CGFloat = 12
+            static let groupGap: CGFloat = 8
+            static let itemGap: CGFloat = 4
+            static let inset: CGFloat = 2
+            static let controlHeight: CGFloat = 28
+            static let controlPaddingX: CGFloat = 8
             static let searchRadius: CGFloat = 8
             static let searchFontSize: CGFloat = 14
             static let searchIconSize: CGFloat = 13
             static let modeFontSize: CGFloat = 12
-            static let modePaddingX: CGFloat = 10
-            static let tabHeight: CGFloat = 28
             static let tabIconSize: CGFloat = 14
-            static let headingHeight: CGFloat = 20
+            static let textRowHeight: CGFloat = 16
             static let headingFontSize: CGFloat = 11
             static let cellRadius: CGFloat = 6
             static let emojiScale: CGFloat = 0.7
@@ -304,30 +313,26 @@ enum DesignTokens {
             static let kaomojiPaddingX: CGFloat = 4
             static let selectionStroke: CGFloat = 2
             static let scrollbarWidth: CGFloat = 3
-            static let scrollbarGutter: CGFloat = 9
             static let scrollbarMinLength: CGFloat = 16
+            static let tileSize: CGFloat = 48
+            static let tilePadding: CGFloat = 8
             static let previewGlyphSize: CGFloat = 40
-            static let previewTilePadding: CGFloat = 4
-            static let previewPaddingY: CGFloat = 4
             static let previewSymbolBoost: CGFloat = 1.2
             static let previewKaomojiFontSize: CGFloat = 18
             static let previewKaomojiWidth: CGFloat = 0.45
-            static let previewGap: CGFloat = 10
-            static let previewRowGap: CGFloat = 4
+            static let previewHeadingHeight: CGFloat = 20
             static let previewLabelFontSize: CGFloat = 10
-            static let previewLabelGap: CGFloat = 8
-            static let previewSourceGap: CGFloat = 6
             static let previewNameLines: CGFloat = 2
-            static let previewChipPaddingX: CGFloat = 4
-            static let previewChipPaddingY: CGFloat = 1
-            static let previewChipGap: CGFloat = 4
-            static let previewChipRadius: CGFloat = 3
+            static let chipPaddingX: CGFloat = 4
+            static let chipPaddingY: CGFloat = 2
+            static let chipRadius: CGFloat = 3
             static let nameFontSize: CGFloat = 13
             static let detailFontSize: CGFloat = 11
             static let codeFontSize: CGFloat = 10
             static let previewChipSmallFontSize: CGFloat = 8
-            static let footerHeight: CGFloat = 28
+            static let skinButtonPadding: CGFloat = 2
             static let pickerCellSize: CGFloat = 36
+            static let pickerCellPadding: CGFloat = 4
             static let probeFontSize: CGFloat = 20
         }
         enum Snapshot {

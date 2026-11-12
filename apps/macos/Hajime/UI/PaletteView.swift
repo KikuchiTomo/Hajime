@@ -5,7 +5,8 @@ import HajimeDomain
 /// 絵文字と記号のパレットの中身を描く(R-26)．上から，探す欄と種類の切り替え・まとまりのタブ・見出し・マス目・文字の説明・キーの案内．
 ///
 /// 何を出すかは core(PaletteSession)が決めた PalettePanel のとおりにし，ここでは描くことと，押した位置を PaletteTarget にすることだけをする．
-/// 窓の大きさは列数・行数・マスの大きさだけで決め，中身(探した結果の数や種類)では変えない．
+/// 部品の位置と余白は core の PaletteWindowLayout が決める(余白は間隔の段階 size.space だけを使う)．
+/// 窓の大きさは列数・行数・マスの大きさ・説明の項目だけで決め，中身(探した結果の数や種類)では変えない．
 /// 顔文字はマス目の幅を 1 行のマスの数(cellsPerRow)で割った広いマスに，テーマの文字の書体で描く
 final class PaletteView: NSView {
     private typealias Size = DesignTokens.Size.Palette
@@ -23,66 +24,58 @@ final class PaletteView: NSView {
     override var isFlipped: Bool { true }
 
     private var dropShadowOffset: CGFloat { theme.hasDropShadow ? DesignTokens.Size.Candidate.shadowOffset : 0 }
-    private var inset: CGFloat { theme.isRounded ? Size.padding : DesignTokens.Size.Candidate.frameWidth + DesignTokens.Size.Candidate.bevelWidth + Size.padding / 2 }
+    /// 窓の縁の太さ(角丸のテーマは縁の線，platinum と desk は外枠と立体の縁)．内側の余白はこの内側から測る
+    private var border: CGFloat {
+        DesignTokens.Size.Candidate.frameWidth + (theme.isRounded ? 0 : DesignTokens.Size.Candidate.bevelWidth)
+    }
     private var labelFont: NSFont { theme.labelFont(size: Size.headingFontSize) }
+    /// 絵文字を実際の外形で箱の真ん中に置くための測り
+    private let glyphs = GlyphFitting()
 
     // MARK: - 大きさと位置
 
-    /// 窓の大きさ．列数・行数・マスの大きさ・説明を出すかだけで決まる
+    /// 窓の大きさ．列数・行数・マスの大きさ・説明の項目だけで決まる
     func fittingSize(for panel: PalettePanel) -> NSSize {
-        let width = inset * 2 + CGFloat(panel.columns) * cellSize + Size.scrollbarGutter + dropShadowOffset
-        var height = inset * 2 + Size.searchHeight + Size.gap + Size.tabHeight + Size.headingHeight + CGFloat(panel.visibleRows) * cellSize + Size.gap
-        if panel.showsPreview { height += PalettePreviewDrawing.height(for: panel.previewFields, theme: theme) }
-        height += Size.footerHeight + dropShadowOffset
-        return NSSize(width: width.rounded(.up), height: height.rounded(.up))
+        let layout = windowLayout(for: panel)
+        return NSSize(width: CGFloat(layout.width).rounded(.up), height: CGFloat(layout.height).rounded(.up))
+    }
+
+    private func windowLayout(for panel: PalettePanel) -> PaletteWindowLayout {
+        let modeFont = theme.labelFont(size: Size.modeFontSize)
+        let modeWidths = panel.modes.map { Double(($0.title.size(withAttributes: [.font: modeFont]).width + Size.controlPaddingX * 2).rounded(.up)) }
+        let height = { (kind: PaletteItem.Kind) in panel.showsPreview ? PalettePreviewDrawing.height(for: panel.previewFields, kind: kind) : nil }
+        return PaletteWindowLayout(columns: panel.columns, visibleRows: panel.visibleRows, windowRows: panel.windowRows, cellSize: cellSize,
+                                   tabCount: panel.tabs.count, modeWidths: modeWidths, previewHeight: height(Self.kind(of: panel)),
+                                   windowPreviewHeight: height(.emoji), metrics: .tokens(border: border, shadow: dropShadowOffset))
     }
 
     private struct Layout {
         var body: NSRect
+        var content: NSRect
         var search: NSRect
         var modes: [NSRect]
         var tabs: [NSRect]
         var heading: NSRect
         var grid: NSRect
         var scrollbar: NSRect
+        var separators: [CGFloat]
         var preview: NSRect?
         var footer: NSRect
         var skinToneButton: NSRect
     }
 
     private func layout(for panel: PalettePanel) -> Layout {
-        let body = NSRect(x: 0, y: 0, width: bounds.width - dropShadowOffset, height: bounds.height - dropShadowOffset)
-        let content = body.insetBy(dx: inset, dy: inset)
-        var y = content.minY
-        // 探す欄の右に種類の切り替えを置く
-        let modeFont = theme.labelFont(size: Size.modeFontSize)
-        let modeWidths = panel.modes.map { ($0.title.size(withAttributes: [.font: modeFont]).width + Size.modePaddingX * 2).rounded(.up) }
-        let modesWidth = modeWidths.reduce(0, +)
-        var x = content.maxX - modesWidth
-        let modes = modeWidths.map { width in
-            defer { x += width }
-            return NSRect(x: x, y: y, width: width, height: Size.searchHeight)
-        }
-        let search = NSRect(x: content.minX, y: y, width: content.width - modesWidth - Size.gap, height: Size.searchHeight)
-        y += Size.searchHeight + Size.gap
-        let tabWidth = panel.tabs.isEmpty ? 0 : min(Size.tabHeight + Size.gap, content.width / CGFloat(panel.tabs.count)).rounded(.down)
-        let tabs = panel.tabs.indices.map { NSRect(x: content.minX + CGFloat($0) * tabWidth, y: y, width: tabWidth, height: Size.tabHeight) }
-        y += Size.tabHeight
-        let heading = NSRect(x: content.minX, y: y, width: content.width, height: Size.headingHeight)
-        y += Size.headingHeight
-        let grid = NSRect(x: content.minX, y: y, width: CGFloat(panel.columns) * cellSize, height: CGFloat(panel.visibleRows) * cellSize)
-        let scrollbar = NSRect(x: grid.maxX + (Size.scrollbarGutter - Size.scrollbarWidth) / 2, y: grid.minY, width: Size.scrollbarWidth, height: grid.height)
-        y = grid.maxY + Size.gap
-        var preview: NSRect?
-        if panel.showsPreview {
-            let height = PalettePreviewDrawing.height(for: panel.previewFields, theme: theme)
-            preview = NSRect(x: content.minX, y: y, width: content.width, height: height)
-            y += height
-        }
-        let footer = NSRect(x: content.minX, y: y, width: content.width, height: Size.footerHeight)
-        let button = NSRect(x: footer.maxX - Size.footerHeight, y: footer.minY, width: Size.footerHeight, height: Size.footerHeight)
-        return Layout(body: body, search: search, modes: modes, tabs: tabs, heading: heading, grid: grid, scrollbar: scrollbar, preview: preview,
-                      footer: footer, skinToneButton: button)
+        let window = windowLayout(for: panel)
+        func rect(_ box: PaletteWindowLayout.Box) -> NSRect { NSRect(x: box.x, y: box.y, width: box.width, height: box.height) }
+        return Layout(body: rect(window.body), content: rect(window.content), search: rect(window.search), modes: window.modes.map(rect),
+                      tabs: window.tabs.map(rect), heading: rect(window.heading), grid: rect(window.grid), scrollbar: rect(window.scrollbar),
+                      separators: window.separators.map { CGFloat($0) }, preview: window.preview.map(rect), footer: rect(window.footer),
+                      skinToneButton: rect(window.skinToneButton))
+    }
+
+    /// 今の種類
+    private static func kind(of panel: PalettePanel) -> PaletteItem.Kind {
+        panel.modes.first { $0.isSelected }?.kind ?? .emoji
     }
 
     /// マスの幅．四角いマスは一辺．顔文字の広いマスは，マス目の幅を 1 行のマスの数で割ったもの
@@ -129,7 +122,7 @@ final class PaletteView: NSView {
         if let index = layout.tabs.firstIndex(where: { $0.contains(point) }) { return .tab(panel.tabs[index].section) }
         if let index = layout.modes.firstIndex(where: { $0.contains(point) }) { return .mode(panel.modes[index].kind) }
         if layout.skinToneButton.contains(point) { return .skinToneButton }
-        if let preview = layout.preview, panel.preview != nil, PalettePreviewDrawing.pinRect(in: preview, theme: theme).contains(point) { return .pin }
+        if let preview = layout.preview, panel.preview != nil, PalettePreviewDrawing.pinRect(in: preview).contains(point) { return .pin }
         return nil
     }
 
@@ -180,11 +173,9 @@ final class PaletteView: NSView {
         drawTabs(panel, in: layout.tabs)
         drawHeading(panel.heading, in: layout.heading)
         drawGrid(panel, layout: layout)
-        if let preview = layout.preview {
-            separator(y: preview.minY - Size.gap / 2, from: layout.grid.minX, to: layout.footer.maxX)
-            if let shown = panel.preview { drawPreview(shown, panel: panel, in: preview) }
-        }
-        separator(y: layout.footer.minY, from: layout.footer.minX, to: layout.footer.maxX)
+        // 区切りの線は中身の左の端から右の端まで
+        for y in layout.separators { separator(y: y, from: layout.content.minX, to: layout.content.maxX) }
+        if let preview = layout.preview, let shown = panel.preview { drawPreview(shown, panel: panel, in: preview) }
         drawFooter(panel, layout: layout)
         if let picker = panel.skinTonePicker { drawPicker(picker, layout: layout) }
     }
@@ -220,21 +211,21 @@ final class PaletteView: NSView {
         fill(rect, color: theme.badge, radius: Size.searchRadius)
         let iconSize = Size.searchIconSize
         if let icon = SymbolImageCache.image("magnifyingglass", pointSize: iconSize, weight: .medium, color: theme.textMuted) {
-            icon.draw(in: NSRect(x: rect.minX + Size.modePaddingX, y: (rect.midY - icon.size.height / 2).rounded(), width: icon.size.width, height: icon.size.height))
+            icon.draw(in: NSRect(x: rect.minX + Size.controlPaddingX, y: (rect.midY - icon.size.height / 2).rounded(), width: icon.size.width, height: icon.size.height))
         }
         let caretWidth = Size.selectionStroke
-        let textX = rect.minX + Size.modePaddingX * 2 + iconSize + caretWidth
+        let textX = rect.minX + Size.controlPaddingX * 2 + iconSize + caretWidth
         let font = theme.candidateFont(size: Size.searchFontSize)
         let isEmpty = panel.query.isEmpty
         let text = isEmpty ? panel.placeholder : panel.query
         let attributes: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: isEmpty ? theme.textMuted : theme.text]
-        let available = rect.maxX - textX - Size.modePaddingX
+        let available = rect.maxX - textX - Size.controlPaddingX
         let shown = TextFitting.truncated(text, attributes: attributes, width: available)
         let size = shown.size(withAttributes: attributes)
         let y = (rect.midY - size.height / 2).rounded()
         shown.draw(at: NSPoint(x: textX, y: y), withAttributes: attributes)
         // 打った文字が探す欄に入ることを示す縦の線(入力位置)．空なら案内の文の前に置く
-        let caretX = isEmpty ? textX - caretWidth * 2 : min(textX + size.width + 1, rect.maxX - Size.modePaddingX)
+        let caretX = isEmpty ? textX - caretWidth * 2 : min(textX + size.width + 1, rect.maxX - Size.controlPaddingX)
         theme.selection.setFill()
         NSRect(x: caretX.rounded(), y: rect.midY - Size.searchFontSize / 2 - 1, width: caretWidth, height: Size.searchFontSize + 2).fill()
     }
@@ -245,7 +236,7 @@ final class PaletteView: NSView {
         fill(whole, color: theme.badge, radius: Size.searchRadius)
         let font = theme.labelFont(size: Size.modeFontSize)
         for (mode, rect) in zip(panel.modes, rects) {
-            if mode.isSelected { fill(rect.insetBy(dx: 2, dy: 2), color: theme.selection, radius: Size.searchRadius - 2) }
+            if mode.isSelected { fill(rect.insetBy(dx: Size.inset, dy: Size.inset), color: theme.selection, radius: Size.searchRadius - Size.inset) }
             GlassDrawing.drawCentered(mode.title, attributes: [.font: font, .foregroundColor: mode.isSelected ? theme.selectionText : theme.textMuted], in: rect)
         }
     }
@@ -255,15 +246,16 @@ final class PaletteView: NSView {
             let color = tab.isSelected ? theme.text : theme.textMuted
             if tab.isSelected, theme.isRounded {
                 // 角丸のテーマは薄い地と下の線で示す
-                fill(rect.insetBy(dx: 2, dy: 2), color: theme.focusTint, radius: Glass.selectionRadius)
+                fill(rect.insetBy(dx: Size.inset, dy: Size.inset), color: theme.focusTint, radius: Glass.selectionRadius)
                 theme.selection.setFill()
-                NSRect(x: rect.minX + 4, y: rect.maxY - Size.selectionStroke, width: rect.width - 8, height: Size.selectionStroke).fill()
+                NSRect(x: rect.minX + Size.itemGap, y: rect.maxY - Size.selectionStroke, width: rect.width - Size.itemGap * 2, height: Size.selectionStroke).fill()
             } else if tab.isSelected {
                 // platinum と desk は選択の色の枠と下の線で示す．塗ってアイコンを選択の文字の色にすると，
                 // 選択の文字の色が暗いテーマ(desk)では SF Symbols の顔の中まで塗られて見分けられない
-                stroke(rect.insetBy(dx: 2, dy: 2), color: theme.selection, radius: 0, width: 1)
+                stroke(rect.insetBy(dx: Size.inset, dy: Size.inset), color: theme.selection, radius: 0, width: DesignTokens.Size.Candidate.frameWidth)
                 theme.selection.setFill()
-                NSRect(x: rect.minX + 4, y: rect.maxY - Size.selectionStroke - 2, width: rect.width - 8, height: Size.selectionStroke).fill()
+                NSRect(x: rect.minX + Size.itemGap, y: rect.maxY - Size.selectionStroke - Size.inset, width: rect.width - Size.itemGap * 2,
+                       height: Size.selectionStroke).fill()
             }
             if let name = PaletteIcons.symbolName(for: tab.section),
                let image = SymbolImageCache.image(name, pointSize: Size.tabIconSize, weight: tab.isSelected ? .semibold : .regular, color: color) {
@@ -271,7 +263,7 @@ final class PaletteView: NSView {
                                       width: image.size.width, height: image.size.height))
             } else {
                 // 顔文字のまとまりの短い顔はタブの幅に収まるよう縮める
-                drawFitted(tab.symbol, size: Size.tabIconSize + 1, color: color, in: rect.insetBy(dx: 2, dy: 0))
+                drawFitted(tab.symbol, size: Size.tabIconSize + DesignTokens.Size.Candidate.frameWidth, color: color, in: rect.insetBy(dx: Size.inset, dy: 0))
             }
         }
     }
@@ -279,7 +271,7 @@ final class PaletteView: NSView {
     private func drawHeading(_ text: String, in rect: NSRect) {
         let attributes: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: theme.textMuted]
         let size = text.size(withAttributes: attributes)
-        text.draw(at: NSPoint(x: rect.minX + Size.cellRadius, y: (rect.midY - size.height / 2).rounded()), withAttributes: attributes)
+        text.draw(at: NSPoint(x: rect.minX, y: (rect.midY - size.height / 2).rounded()), withAttributes: attributes)
     }
 
     private func drawGrid(_ panel: PalettePanel, layout: Layout) {
@@ -331,10 +323,9 @@ final class PaletteView: NSView {
     /// 説明の欄．左に選んでいる文字の大きな見本，右に名前と「項目名 → 値」の表(PalettePreviewDrawing)．
     /// ピン留めのボタンは見出しの行の縦の中心に置く
     private func drawPreview(_ preview: PalettePanel.Preview, panel: PalettePanel, in rect: NSRect) {
-        let area = PalettePreviewDrawing.contentArea(of: rect)
-        let side = PalettePreviewDrawing.tileSide
-        var tile = NSRect(x: area.minX, y: area.minY, width: side, height: side)
-        let kind = panel.modes.first { $0.isSelected }?.kind ?? .emoji
+        let side = Size.tileSize
+        var tile = NSRect(x: rect.minX, y: rect.minY, width: side, height: side)
+        let kind = Self.kind(of: panel)
         if kind.cellShape == .wide {
             // 顔文字は横に長いので，文字の幅に合わせて四角を広げる(説明の欄の幅の一定の割合まで)
             let width = preview.text.size(withAttributes: [.font: theme.candidateFont(size: Size.previewKaomojiFontSize)]).width + Size.kaomojiPaddingX * 4
@@ -343,52 +334,59 @@ final class PaletteView: NSView {
             drawFitted(preview.text, size: Size.previewKaomojiFontSize, color: theme.text, in: tile.insetBy(dx: Size.kaomojiPaddingX, dy: 0))
         } else {
             fill(tile, color: theme.badge, radius: Size.cellRadius)
-            let glyphFont = Self.isEmoji(preview.text) ? (NSFont(name: PaletteIcons.emojiFontName, size: Size.previewGlyphSize * Size.emojiScale) ?? .systemFont(ofSize: Size.previewGlyphSize))
-                : theme.candidateFont(size: Size.previewGlyphSize * Size.symbolScale * Size.previewSymbolBoost)
-            GlassDrawing.drawCentered(preview.text, attributes: [.font: glyphFont, .foregroundColor: theme.text], in: tile)
+            if Self.isEmoji(preview.text) {
+                // 絵文字は外形が四角の余白の内側に収まる大きさにし，外形の中心を四角の中心に合わせる
+                drawEmoji(preview.text, in: tile, padding: Size.tilePadding)
+            } else {
+                let font = theme.candidateFont(size: Size.previewGlyphSize * Size.symbolScale * Size.previewSymbolBoost)
+                preview.text.draw(at: glyphs.origin(preview.text, font: font, centeredIn: tile), withAttributes: [.font: font, .foregroundColor: theme.text])
+            }
         }
-        PalettePreviewDrawing.draw(preview, fields: panel.previewFields, kind: kind, area: area, tile: tile, theme: theme)
-        let pin = PalettePreviewDrawing.pinRect(in: rect, theme: theme)
+        PalettePreviewDrawing.draw(preview, fields: panel.previewFields, kind: kind, area: rect, tile: tile, theme: theme)
+        let pin = PalettePreviewDrawing.pinRect(in: rect)
         if let image = SymbolImageCache.image(preview.isPinned ? "pin.fill" : "pin", pointSize: Size.tabIconSize, weight: .regular,
                                               color: preview.isPinned ? theme.selection : theme.textMuted) {
             image.draw(in: NSRect(x: (pin.midX - image.size.width / 2).rounded(), y: (pin.midY - image.size.height / 2).rounded(), width: image.size.width, height: image.size.height))
         }
     }
 
+    /// 絵文字を，外形が box から上下左右に padding を除いた中に収まる大きさで，外形の中心を box の中心に合わせて描く
+    private func drawEmoji(_ text: String, in box: NSRect, padding: CGFloat) {
+        let font = glyphs.font(text, named: PaletteIcons.emojiFontName, fitting: box, padding: padding)
+        text.draw(at: glyphs.origin(text, font: font, centeredIn: box), withAttributes: [.font: font])
+    }
+
+    /// 足元．キーの案内と，右の端に既定の肌の色のボタン(キーの札と同じ高さ・縦の中心)
     private func drawFooter(_ panel: PalettePanel, layout: Layout) {
         let footer = layout.footer
         let hints = panel.hints.map { KeyHint(key: $0.key, label: $0.action) }
-        let fitting = GlassDrawing.hints(hints, fitting: footer.width - Size.footerHeight - Size.gap, theme: theme)
+        let fitting = GlassDrawing.hints(hints, fitting: footer.width - layout.skinToneButton.width - Size.groupGap, theme: theme)
         GlassDrawing.drawHints(fitting, x: footer.minX, midY: footer.midY, theme: theme)
-        // 既定の肌の色のボタン
-        let button = layout.skinToneButton.insetBy(dx: 3, dy: 3)
-        fill(button, color: theme.badge, radius: Size.cellRadius)
-        let sample = PaletteStrings.skinToneSample.text(skinTone: panel.skinTone)
-        let font = NSFont(name: PaletteIcons.emojiFontName, size: (button.height * Size.emojiScale).rounded()) ?? .systemFont(ofSize: button.height * Size.emojiScale)
-        GlassDrawing.drawCentered(sample, attributes: [.font: font], in: button)
+        let button = layout.skinToneButton
+        GlassDrawing.drawKeycap(button, theme: theme)
+        drawEmoji(PaletteStrings.skinToneSample.text(skinTone: panel.skinTone), in: button, padding: Size.skinButtonPadding)
     }
 
     private func drawPicker(_ picker: PalettePanel.SkinTonePicker, layout: Layout) {
         let cells = pickerCells(picker, in: layout)
         guard let first = cells.first, let last = cells.last else { return }
-        let margin = Size.selectionStroke * 2
+        let margin = Size.itemGap
         let strip = NSRect(x: first.minX, y: first.minY, width: last.maxX - first.minX, height: first.height).insetBy(dx: -margin, dy: -margin)
         // 下の説明の文字が帯のまわりに見えないよう，説明の欄ごと(上の区切りの線の下から)面の色で覆う
-        if let preview = layout.preview {
+        if let preview = layout.preview, let line = layout.separators.first {
             theme.surface.withAlphaComponent(1).setFill()
-            let top = (preview.minY - Size.gap / 2).rounded() + DesignTokens.Size.Candidate.frameWidth
+            let top = line.rounded() + DesignTokens.Size.Candidate.frameWidth
             NSRect(x: preview.minX, y: top, width: preview.width, height: preview.maxY - top).fill()
         }
         fill(strip, color: theme.surface.withAlphaComponent(1), radius: Size.searchRadius)
-        stroke(strip, color: theme.frame, radius: Size.searchRadius, width: 1)
-        let font = NSFont(name: PaletteIcons.emojiFontName, size: (Size.pickerCellSize * Size.emojiScale).rounded()) ?? .systemFont(ofSize: Size.pickerCellSize * Size.emojiScale)
+        stroke(strip, color: theme.frame, radius: Size.searchRadius, width: DesignTokens.Size.Candidate.frameWidth)
         for (index, (option, rect)) in zip(picker.options, cells).enumerated() {
             if index == picker.selected {
-                let inner = rect.insetBy(dx: 1, dy: 1)
+                let inner = rect.insetBy(dx: DesignTokens.Size.Candidate.frameWidth, dy: DesignTokens.Size.Candidate.frameWidth)
                 fill(inner, color: theme.focusTint, radius: Size.cellRadius)
                 stroke(inner, color: theme.selection, radius: Size.cellRadius, width: Size.selectionStroke)
             }
-            GlassDrawing.drawCentered(option, attributes: [.font: font], in: rect)
+            drawEmoji(option, in: rect, padding: Size.pickerCellPadding)
         }
     }
 

@@ -34,13 +34,15 @@ const SYMBOL_ROWS: [&[&str]; 6] = [
     &["⇄", "⇅", "⇆", "⇇", "⇈", "⇉", "⇊", "⇋", "⇌"],
 ];
 
-const KAOMOJI_ROWS: [&[&str]; 6] = [
+const KAOMOJI_ROWS: [&[&str]; 8] = [
     &["(^o^)", "m(_ _)m", "(´・ω・｀)"],
     &["＼(^o^)／", "(^o^)", "(^^)"],
     &["(*^^*)", "^_^", ":D"],
     &["・ω・", "(*´ω｀*)", "(^O^)"],
     &["(^_^)", "(・∀・)", "(*^_^*)"],
     &["ヾ(｡>﹏<｡)ﾉﾞ✧*。", "(((((((((((っ･ω･)っ ﾌﾞｰﾝ", "(*´∀｀*)"],
+    &["(*´ω`*)", "(o^―^o)", "ヽ(*´∀｀)ノ"],
+    &["(・ω・)", "(｀・ω・´)", "(*ﾟ▽ﾟ*)"],
 ];
 
 /// 絵文字のまとまり: 送るときの名前・見出し・アイコンを描けないときの文字
@@ -227,6 +229,7 @@ pub fn emoji() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: None,
+        window_rows: None,
         preview_fields: None,
     }
 }
@@ -370,6 +373,7 @@ pub fn search() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: None,
+        window_rows: None,
         preview_fields: None,
     }
 }
@@ -404,6 +408,7 @@ pub fn flag() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: None,
+        window_rows: None,
         preview_fields: None,
     }
 }
@@ -490,13 +495,31 @@ pub fn symbol() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: None,
+        window_rows: None,
         preview_fields: None,
     }
 }
 
 /// 顔文字のパレット．よく使う行の下に笑顔のまとまりが広いマスで続く
 pub fn kaomoji() -> PalettePanel {
-    let titles = ["よく使う", "笑顔", "笑顔", "笑顔", "笑顔", "笑顔"];
+    let titles = [
+        "よく使う",
+        "笑顔",
+        "笑顔",
+        "笑顔",
+        "笑顔",
+        "笑顔",
+        "笑顔",
+        "笑顔",
+    ];
+    // 説明の欄が低い分(見出しと読みだけ)をマス目の行に回す(core の PaletteSession と同じ決め方)
+    let fields = super::preview::fields(None);
+    let extra = super::layout::extra_rows(
+        super::preview::height(&fields, PaletteKind::Kaomoji),
+        super::preview::height(&fields, PaletteKind::Emoji),
+        CELL_SIZE as f32,
+    );
+    let visible_rows = VISIBLE_ROWS + extra;
     PalettePanel {
         modes: modes(PaletteKind::Kaomoji),
         query: String::new(),
@@ -507,11 +530,11 @@ pub fn kaomoji() -> PalettePanel {
             "joy",
         ),
         heading: "よく使う".into(),
-        rows: rows(&KAOMOJI_ROWS, &titles, &[0, 1]),
+        rows: rows(&KAOMOJI_ROWS[..visible_rows as usize], &titles, &[0, 1]),
         row_count: 48,
         first_row: 0,
         columns: COLUMNS,
-        visible_rows: VISIBLE_ROWS,
+        visible_rows,
         selection: Some(PalettePosition { row: 0, column: 2 }),
         preview: Some(preview(
             "(´・ω・｀)",
@@ -529,6 +552,7 @@ pub fn kaomoji() -> PalettePanel {
         hints: hints(),
         cell_size: CELL_SIZE,
         cells_per_row: Some(KAOMOJI_CELLS_PER_ROW),
+        window_rows: Some(VISIBLE_ROWS),
         preview_fields: None,
     }
 }

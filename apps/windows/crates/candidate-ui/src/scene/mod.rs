@@ -231,6 +231,12 @@ pub trait Measure {
     fn has_glyph(&self, _font: Font, _glyph: char) -> bool {
         false
     }
+
+    /// text を，幅 width(text)・高さ line(text).0 の枠の左上に描いたときの実際の外形(ink)．枠の左上からの位置．
+    /// 絵文字を箱の真ん中に置くのに使う(行の箱で真ん中に置くと，字面が行の中で寄っている分だけ余白がずれる)．測れなければ None
+    fn ink(&self, _text: &str, _font: Font) -> Option<Frame> {
+        None
+    }
 }
 
 /// 描く層が使い回す書体の組(Rc で共有する)も，そのまま測るのに使う
@@ -243,8 +249,16 @@ impl<T: Measure + ?Sized> Measure for std::rc::Rc<T> {
         (**self).height(font)
     }
 
+    fn line(&self, text: &str, font: Font) -> (f32, f32) {
+        (**self).line(text, font)
+    }
+
     fn has_glyph(&self, font: Font, glyph: char) -> bool {
         (**self).has_glyph(font, glyph)
+    }
+
+    fn ink(&self, text: &str, font: Font) -> Option<Frame> {
+        (**self).ink(text, font)
     }
 }
 

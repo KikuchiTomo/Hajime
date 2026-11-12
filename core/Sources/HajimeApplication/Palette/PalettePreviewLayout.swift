@@ -96,7 +96,7 @@ public struct PalettePreviewLayout: Sendable, Equatable {
         }
     }
 
-    /// 寸法(描く側がデザイントークンから渡す)
+    /// 寸法(デザイントークン)
     public struct Metrics: Sendable {
         /// 見本の四角と情報の列のあいだ
         public var tileGap: Double
@@ -112,9 +112,13 @@ public struct PalettePreviewLayout: Sendable, Equatable {
         public var chipGap: Double
         /// Unicode の名前の行の数の上限(欄の高さもこの数で見込む)
         public var unicodeNameLines: Int
+        /// 見出しの行の高さ
+        public var headingHeight: Double
+        /// 表の 1 行の高さ(文字の値の行も札の行も同じ)
+        public var rowHeight: Double
 
         public init(tileGap: Double, labelGap: Double, sourceGap: Double, rowGap: Double, chipPaddingX: Double, chipPaddingY: Double, chipGap: Double,
-                    unicodeNameLines: Int) {
+                    unicodeNameLines: Int, headingHeight: Double, rowHeight: Double) {
             self.tileGap = tileGap
             self.labelGap = labelGap
             self.sourceGap = sourceGap
@@ -123,7 +127,16 @@ public struct PalettePreviewLayout: Sendable, Equatable {
             self.chipPaddingY = chipPaddingY
             self.chipGap = chipGap
             self.unicodeNameLines = max(unicodeNameLines, 1)
+            self.headingHeight = headingHeight
+            self.rowHeight = rowHeight
         }
+
+        /// デザイントークン(size.palette)の値．macOS と Windows のエンジンのプロセスで同じ値を使う
+        public static let tokens = Metrics(
+            tileGap: LayoutTokens.Palette.groupGap, labelGap: LayoutTokens.Palette.groupGap, sourceGap: LayoutTokens.Palette.groupGap,
+            rowGap: LayoutTokens.Palette.itemGap, chipPaddingX: LayoutTokens.Palette.chipPaddingX, chipPaddingY: LayoutTokens.Palette.chipPaddingY,
+            chipGap: LayoutTokens.Palette.itemGap, unicodeNameLines: Int(LayoutTokens.Palette.previewNameLines),
+            headingHeight: LayoutTokens.Palette.previewHeadingHeight, rowHeight: LayoutTokens.Palette.textRowHeight)
     }
 
     public var texts: [Text]
@@ -135,20 +148,30 @@ public struct PalettePreviewLayout: Sendable, Equatable {
 
     // MARK: - 高さ
 
-    /// 欄の中身の高さ(上下の余白を除く)．見本の高さと，設定で出る行がすべて出たときの高さの大きいほう
-    public static func height(fields: PalettePanel.PreviewFields, tileHeight: Double, measuring: some PalettePreviewMeasuring, metrics: Metrics) -> Double {
-        let rows = Rows(measuring: measuring, metrics: metrics)
-        var height = rows.heading.height
-        if fields.unicodeName { height += metrics.rowGap + rows.text.height(lines: metrics.unicodeNameLines) }
-        if fields.readings { height += metrics.rowGap + rows.text.height(lines: 1) }
-        if fields.shortcodes { height += metrics.rowGap + rows.chip.height(lines: 1) }
-        if fields.codePoints { height += metrics.rowGap + rows.chip.height(lines: 1) }
+    /// 欄の中身の高さ．見本の高さと，その種類で設定により出る行がすべて出たときの高さの大きいほう．
+    /// 行の高さはトークンで決まるので書体を測らずに求まり，core はこの高さでマス目の行の数を決める(PaletteWindowLayout)
+    public static func height(fields: PalettePanel.PreviewFields, kind: PaletteItem.Kind, tileHeight: Double, metrics: Metrics) -> Double {
+        let fields = shownFields(fields, kind: kind)
+        var height = metrics.headingHeight
+        if fields.unicodeName { height += metrics.rowGap + metrics.rowHeight * Double(metrics.unicodeNameLines) }
+        for shown in [fields.readings, fields.shortcodes, fields.codePoints] where shown {
+            height += metrics.rowGap + metrics.rowHeight
+        }
         return max(tileHeight, height)
     }
 
+    /// その種類で出しうる項目．顔文字は読みだけ，記号にはショートコードが無い
+    public static func shownFields(_ fields: PalettePanel.PreviewFields, kind: PaletteItem.Kind) -> PalettePanel.PreviewFields {
+        switch kind {
+        case .emoji: fields
+        case .symbol: PalettePanel.PreviewFields(unicodeName: fields.unicodeName, readings: fields.readings, shortcodes: false, codePoints: fields.codePoints)
+        case .kaomoji: PalettePanel.PreviewFields(unicodeName: false, readings: fields.readings, shortcodes: false, codePoints: false)
+        }
+    }
+
     /// 見出しの行の縦の中心(area の上の端から)．選んでいる文字が無くてもピン留めのボタンの位置を決められる
-    public static func headingMidY(top: Double, measuring: some PalettePreviewMeasuring, metrics: Metrics) -> Double {
-        top + Rows(measuring: measuring, metrics: metrics).heading.height / 2
+    public static func headingMidY(top: Double, metrics: Metrics) -> Double {
+        top + metrics.headingHeight / 2
     }
 
     // MARK: - 配置
@@ -160,28 +183,28 @@ public struct PalettePreviewLayout: Sendable, Equatable {
     ///   - kind: 今の種類．項目名の列の幅は，この種類で出しうる項目名で決める(顔文字は読みだけ)
     public init(preview: PalettePanel.Preview, fields: PalettePanel.PreviewFields, kind: PaletteItem.Kind, area: Box, tile: Box, pinWidth: Double,
                 labels: Labels, measuring: some PalettePreviewMeasuring, metrics: Metrics) {
-        // 顔文字は Unicode の名前・ショートコード・コードポイントを出さない(PalettePanel.Preview(item:))
-        var shown = fields
-        if kind == .kaomoji {
-            shown = PalettePanel.PreviewFields(unicodeName: false, readings: fields.readings, shortcodes: false, codePoints: false)
-        }
-        let plan = Planner(preview: preview, fields: shown, area: area, tile: tile, pinWidth: pinWidth, labels: labels, measuring: measuring, metrics: metrics)
+        let plan = Planner(preview: preview, fields: Self.shownFields(fields, kind: kind), area: area, tile: tile, pinWidth: pinWidth, labels: labels,
+                           measuring: measuring, metrics: metrics)
         var options = PlanOptions(unicodeLines: metrics.unicodeNameLines)
         var layout = plan.layout(options)
         // 入りきらなければ，読みを省き，Unicode の名前を 1 行にし，Unicode の名前を省く(求められた Unicode の名前をなるべく残す)
         let steps: [(inout PlanOptions) -> Void] = [{ $0.readings = false }, { $0.unicodeLines = 1 }, { $0.unicodeName = false }]
-        for step in steps where layout.bottom(measuring) > area.maxY {
+        for step in steps where layout.rowsBottom > area.maxY {
             step(&options)
             layout = plan.layout(options)
         }
         self = plan.limitingChips(layout)
     }
 
-    init(texts: [Text], chips: [Chip], headingMidY: Double, valueX: Double) {
+    /// 最後の行の下の端．入りきるかは行の高さで決める(字の下の高さは書体の行送りの余りを含むことがあり，行の中に収めて置くので使わない)
+    var rowsBottom: Double = 0
+
+    init(texts: [Text], chips: [Chip], headingMidY: Double, valueX: Double, rowsBottom: Double = 0) {
         self.texts = texts
         self.chips = chips
         self.headingMidY = headingMidY
         self.valueX = valueX
+        self.rowsBottom = rowsBottom
     }
 
     /// 説明の欄と同じ決め方で折り返した行(描く側が読み上げや見本で使う．テストでも確かめる)
@@ -195,9 +218,6 @@ public struct PalettePreviewLayout: Sendable, Equatable {
             + chips.map(\.frame)
     }
 
-    func bottom(_ measuring: some PalettePreviewMeasuring) -> Double {
-        frames(measuring).map(\.maxY).max() ?? 0
-    }
 }
 
 /// 文字の幅と書体の高さを測る．描く側が OS の書体で測る
@@ -209,18 +229,25 @@ public protocol PalettePreviewMeasuring {
     func descent(_ role: PalettePreviewLayout.Role) -> Double
 }
 
-/// 行の高さ．1 行目のベースラインは行の上の端から ascent，続く行は pitch ずつ下
+/// 行の高さ．pitch はトークンで決まり，ascent は行の上の端からベースラインまで(行の中で文字の上下の余白が等しくなる位置)．
+/// 続く行のベースラインは pitch ずつ下
 struct PreviewRowMetrics {
     var ascent: Double
-    var descent: Double
-    var pitch: Double { ascent + descent }
-    /// 1 行の高さ
+    var pitch: Double
+
+    /// 書体の上下の高さ(ascent・descent)の文字を，高さ pitch の行の縦の真ん中に置く．ベースラインは整数の位置にする(字をぼかさない)．
+    /// 字が行より高ければ，下の端を行に収める(はみ出す分は上の行の間に出す)
+    init(pitch: Double, fontAscent: Double, fontDescent: Double) {
+        self.pitch = pitch
+        ascent = min(((pitch - fontAscent - fontDescent) / 2 + fontAscent).rounded(), (pitch - fontDescent).rounded(.down))
+    }
+
     var height: Double { pitch }
 
     func height(lines: Int) -> Double { pitch * Double(max(lines, 1)) }
 }
 
-/// 見出しの行と表の行の高さ．表の行は，文字の値の行も札の行も同じ高さにし，縦の間隔をそろえる
+/// 見出しの行と表の行．表の行は，文字の値の行も札の行も同じ高さにし，縦の間隔をそろえる
 private struct Rows {
     var heading: PreviewRowMetrics
     var text: PreviewRowMetrics
@@ -228,12 +255,13 @@ private struct Rows {
     var chip: PreviewRowMetrics { text }
 
     init(measuring: some PalettePreviewMeasuring, metrics: PalettePreviewLayout.Metrics) {
-        heading = PreviewRowMetrics(ascent: max(measuring.ascent(.heading), measuring.ascent(.source)),
-                                    descent: max(measuring.descent(.heading), measuring.descent(.source)))
+        heading = PreviewRowMetrics(pitch: metrics.headingHeight, fontAscent: max(measuring.ascent(.heading), measuring.ascent(.source)),
+                                    fontDescent: max(measuring.descent(.heading), measuring.descent(.source)))
         // 札は中の文字の上下に余白を足しても，行の高さに収める
         text = PreviewRowMetrics(
-            ascent: max(measuring.ascent(.label), measuring.ascent(.value), measuring.ascent(.more), measuring.ascent(.code) + metrics.chipPaddingY),
-            descent: max(measuring.descent(.label), measuring.descent(.value), measuring.descent(.more), measuring.descent(.code) + metrics.chipPaddingY))
+            pitch: metrics.rowHeight,
+            fontAscent: max(measuring.ascent(.label), measuring.ascent(.value), measuring.ascent(.more), measuring.ascent(.code) + metrics.chipPaddingY),
+            fontDescent: max(measuring.descent(.label), measuring.descent(.value), measuring.descent(.more), measuring.descent(.code) + metrics.chipPaddingY))
     }
 }
 
@@ -339,7 +367,7 @@ private struct Planner<Measuring: PalettePreviewMeasuring> {
             chips += placed
             y += rows.chip.height(lines: lines)
         }
-        return PalettePreviewLayout(texts: texts, chips: chips, headingMidY: area.y + rows.heading.height / 2, valueX: valueX)
+        return PalettePreviewLayout(texts: texts, chips: chips, headingMidY: area.y + rows.heading.height / 2, valueX: valueX, rowsBottom: y)
     }
 
     private func labelText(_ text: String, baseline: Double) -> PalettePreviewLayout.Text {
@@ -370,9 +398,12 @@ private struct Planner<Measuring: PalettePreviewMeasuring> {
                 x = left
             }
             let baselines = lines.indices.map { top + rows.chip.ascent + rows.chip.pitch * Double(line + $0) }
-            let first = baselines[0], last = baselines[baselines.count - 1]
-            let frame = PalettePreviewLayout.Box(x: x, y: first - measuring.ascent(role) - metrics.chipPaddingY, width: chipWidth,
-                                                 height: last - first + measuring.ascent(role) + measuring.descent(role) + metrics.chipPaddingY * 2)
+            // 札は文字の上下に chipPaddingY を足した高さで，行の中の縦の真ん中に置く(行の高さに収め，縁はドットにそろえる)
+            let pitch = rows.chip.pitch
+            let height = min((measuring.ascent(role) + measuring.descent(role) + metrics.chipPaddingY * 2).rounded(), pitch)
+            let rowTop = top + pitch * Double(line)
+            let frame = PalettePreviewLayout.Box(x: x, y: rowTop + ((pitch - height) / 2).rounded(.down), width: chipWidth.rounded(.up),
+                                                 height: height + pitch * Double(lines.count - 1))
             chips.append(.init(lines: lines, role: role, frame: frame, textX: x + metrics.chipPaddingX, baselines: baselines))
             if lines.count > 1 {
                 line += lines.count
@@ -386,7 +417,7 @@ private struct Planner<Measuring: PalettePreviewMeasuring> {
 
     /// 欄の下の端を越える札を除き，除いた数を最後に残した札の後ろに「+n」で示す．「+n」が入らなければその札も除く
     func limitingChips(_ layout: PalettePreviewLayout) -> PalettePreviewLayout {
-        guard layout.bottom(measuring) > area.maxY else { return layout }
+        guard layout.rowsBottom > area.maxY else { return layout }
         var result = layout
         let total = layout.chips.count
         result.chips = layout.chips.filter { $0.frame.maxY <= area.maxY }

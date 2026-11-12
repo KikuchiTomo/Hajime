@@ -123,6 +123,14 @@ enum SamplePalettes {
     private static let nextTrack = PaletteItem(kind: .emoji, category: .symbols, text: "⏭️", japaneseName: "次の曲ボタン", nameReading: "つぎのきょくぼたん",
                                                englishName: "next track button", readings: ["ぼたん", "つぎのきょくぼたん", "つぎのしーん", "つぎのとらっく", "やじるし"],
                                                shortcodes: ["black_right_pointing_double_triangle_with_vertical_bar"])
+    /// 種類ごとにマス目に回す行の数(既定のマスの大きさで，説明の項目はすべて出す)
+    private static func extraRows(_ kind: PaletteItem.Kind) -> Int {
+        let fields = PalettePanel.PreviewFields()
+        return PaletteWindowLayout.extraRows(previewHeight: PalettePreviewDrawing.height(for: fields, kind: kind),
+                                             windowPreviewHeight: PalettePreviewDrawing.height(for: fields, kind: .emoji),
+                                             cellSize: DefaultSettings.paletteCellSize)
+    }
+
     /// 説明に出す項目を減らした見本(読みとコードポイントを出さない)
     static let reducedFields = PalettePanel.PreviewFields(unicodeName: true, readings: false, shortcodes: true, codePoints: false)
 
@@ -208,13 +216,17 @@ enum SamplePalettes {
     /// 顔文字のパレット．よく使う行の下に笑顔のまとまりが広いマスで続く
     static let kaomoji: PalettePanel = {
         let texts = [["(^o^)", "m(_ _)m", "(´・ω・｀)"], ["＼(^o^)／", "(^o^)", "(^^)"], ["(*^^*)", "^_^", ":D"], ["・ω・", "(*´ω｀*)", "(^O^)"],
-                     ["(^_^)", "(・∀・)", "(*^_^*)"], ["ヾ(｡>﹏<｡)ﾉﾞ✧*。", "(((((((((((っ･ω･)っ ﾌﾞｰﾝ", "(*´∀｀*)"]]
-        let titles = [PaletteStrings.frequent] + Array(repeating: PaletteCategory.joy.title, count: 5)
+                     ["(^_^)", "(・∀・)", "(*^_^*)"], ["ヾ(｡>﹏<｡)ﾉﾞ✧*。", "(((((((((((っ･ω･)っ ﾌﾞｰﾝ", "(*´∀｀*)"],
+                     ["(*´ω`*)", "(o^―^o)", "ヽ(*´∀｀)ノ"], ["(・ω・)", "(｀・ω・´)", "(*ﾟ▽ﾟ*)"]]
+        // 説明の欄が低い分(見出しと読みだけ)をマス目の行に回す(core の PaletteSession と同じ決め方)
+        let visibleRows = 6 + extraRows(.kaomoji)
+        let titles = [PaletteStrings.frequent] + Array(repeating: PaletteCategory.joy.title, count: texts.count - 1)
         let tabs: [PalettePanel.Tab] = [.init(section: .frequent, title: PaletteStrings.frequent, symbol: PaletteStrings.frequentSymbol, isSelected: false)]
             + PaletteCategory.allCases.filter { $0.kind == .kaomoji }.map { .init(section: .category($0), title: $0.title, symbol: $0.symbol, isSelected: $0 == .joy) }
         return PalettePanel(
             modes: modes(.kaomoji), query: "", placeholder: PaletteStrings.kaomojiPlaceholder, tabs: tabs, heading: PaletteStrings.frequent,
-            rows: rows(texts, titles: titles, starts: [0, 1]), rowCount: 48, firstRow: 0, columns: 9, visibleRows: 6, cellsPerRow: 3,
+            rows: rows(Array(texts.prefix(visibleRows)), titles: titles, starts: [0, 1]), rowCount: 48, firstRow: 0, columns: 9,
+            visibleRows: visibleRows, windowRows: 6, cellsPerRow: 3,
             selection: .init(row: 0, column: 2),
             preview: preview(shobon),
             showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)

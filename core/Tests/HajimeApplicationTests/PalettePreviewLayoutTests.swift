@@ -17,10 +17,11 @@ struct PalettePreviewLayoutTests {
         }
 
         func ascent(_ role: Layout.Role) -> Double { (Self.sizes[role] ?? 10) * (role == .label ? 1.0 : 0.92) }
-        func descent(_ role: Layout.Role) -> Double { (Self.sizes[role] ?? 10) * (role == .code ? 0.3 : 0.24) }
+        func descent(_ role: Layout.Role) -> Double { (Self.sizes[role] ?? 10) * (role == .heading ? 0.3 : 0.24) }
     }
 
-    static let metrics = Layout.Metrics(tileGap: 10, labelGap: 8, sourceGap: 6, rowGap: 4, chipPaddingX: 4, chipPaddingY: 1, chipGap: 4, unicodeNameLines: 2)
+    static let metrics = Layout.Metrics(tileGap: 8, labelGap: 8, sourceGap: 8, rowGap: 4, chipPaddingX: 4, chipPaddingY: 2, chipGap: 4, unicodeNameLines: 2,
+                                        headingHeight: 20, rowHeight: 16)
     static let labels = Layout.Labels(unicode: "Unicode", english: "英語", readings: "読み", shortcodes: "ショートコード", codePoints: "コードポイント",
                                       more: { "+\($0)" })
     static let pinWidth = 28.0
@@ -47,7 +48,7 @@ struct PalettePreviewLayoutTests {
                shortcodes: [String]? = nil) -> Placed {
         var preview = PalettePanel.Preview(item: item, text: text ?? item.text, fields: fields, isPinned: false)
         if let shortcodes { preview.shortcodes = shortcodes }
-        let height = Layout.height(fields: fields, tileHeight: 48, measuring: Measuring(), metrics: Self.metrics)
+        let height = Layout.height(fields: fields, kind: item.kind, tileHeight: 48, metrics: Self.metrics)
         let area = Layout.Box(x: 8, y: 4, width: 333, height: height)
         let tile = Layout.Box(x: area.x, y: area.y, width: tileWidth, height: 48)
         let layout = Layout(preview: preview, fields: fields, kind: item.kind, area: area, tile: tile, pinWidth: Self.pinWidth, labels: Self.labels,
@@ -78,9 +79,14 @@ struct PalettePreviewLayoutTests {
             #expect(value.map { abs($0 - label.baseline) <= 0.5 } == true, "\(label.text)", sourceLocation: sourceLocation)
         }
         // 見出しと添える文字のベースラインが同じ．ピン留めのアイコンの中心は見出しの行の中心
-        let heading = layout.texts.filter { $0.role == .heading || $0.role == .source }
-        #expect(Set(heading.map(\.baseline)).count == 1, sourceLocation: sourceLocation)
-        #expect(layout.headingMidY == Layout.headingMidY(top: placed.area.y, measuring: measuring, metrics: Self.metrics), sourceLocation: sourceLocation)
+        let heading = layout.texts.filter { $0.role == .heading || $0.role == .source }.map(\.baseline)
+        #expect(Set(heading).count == 1, sourceLocation: sourceLocation)
+        #expect(layout.headingMidY == Layout.headingMidY(top: placed.area.y, metrics: Self.metrics), sourceLocation: sourceLocation)
+        // 行の高さはトークンで決まり，文字は行の縦の真ん中に置く(見出しの行)
+        if let name = heading.first {
+            let top = name - measuring.ascent(.heading), bottom = name + measuring.descent(.heading)
+            #expect(abs((top - placed.area.y) - (placed.area.y + Self.metrics.headingHeight - bottom)) <= 1, sourceLocation: sourceLocation)
+        }
         // 部品どうし(見本とピン留めのアイコンを含む)が重ならず，欄の中に収まる
         let pin = Layout.Box(x: placed.area.maxX - Self.pinWidth / 2 - Self.pinIconSize / 2, y: layout.headingMidY - Self.pinIconSize / 2,
                              width: Self.pinIconSize, height: Self.pinIconSize)
@@ -125,6 +131,15 @@ struct PalettePreviewLayoutTests {
         // 何も出さなくても見本の高さは空ける
         let none = place(Self.smile, fields: .init(unicodeName: false, readings: false, shortcodes: false, codePoints: false))
         #expect(none.height == 48)
+        // 種類ごとに，その種類で出る行の分だけの高さにする(顔文字は見出しと読み，記号はショートコードの行を取らない)
+        let all = PalettePanel.PreviewFields()
+        let emoji = Layout.height(fields: all, kind: .emoji, tileHeight: 48, metrics: Self.metrics)
+        let symbol = Layout.height(fields: all, kind: .symbol, tileHeight: 48, metrics: Self.metrics)
+        let kaomoji = Layout.height(fields: all, kind: .kaomoji, tileHeight: 48, metrics: Self.metrics)
+        let expected: Double = 20 + 4 + 32 + 20 * 3
+        #expect(emoji == expected)
+        #expect(symbol == emoji - 20)
+        #expect(kaomoji == 48)
         // 選んでいる文字が変わっても値の x は同じ
         #expect(place(Self.flag).layout.valueX == placed.layout.valueX)
     }

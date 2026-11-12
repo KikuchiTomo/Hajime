@@ -5,6 +5,10 @@ import re
 import sys
 from pathlib import Path
 
+# 同じディレクトリの references.py を読む(python3 -I ではスクリプトのディレクトリが探す先に入らない)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from references import resolve  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 TOKENS = ROOT / "design" / "tokens" / "tokens.json"
 OUTPUT = ROOT / "apps" / "windows" / "crates" / "tokens" / "src" / "generated.rs"
@@ -78,6 +82,8 @@ def render(tokens: dict) -> str:
         for section, entries in sections.items():
             lines.append(f"    pub mod {snake(section)} {{")
             for name, token in entries.items():
+                if name.startswith("$"):
+                    continue
                 if "$value" in token:
                     lines.append(f"        pub const {upper(name)}: f32 = {number(token)!r};")
                 else:
@@ -108,7 +114,7 @@ def render_settings_palettes(palettes: dict) -> list[str]:
 
 
 def main(argv: list[str]) -> int:
-    text = render(json.loads(TOKENS.read_text(encoding="utf-8")))
+    text = render(resolve(json.loads(TOKENS.read_text(encoding="utf-8"))))
     current = OUTPUT.read_text(encoding="utf-8") if OUTPUT.exists() else None
     if "--check" in argv:
         if current != text:

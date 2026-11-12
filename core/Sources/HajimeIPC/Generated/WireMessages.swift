@@ -2013,8 +2013,9 @@ public struct WirePalettePanel: Sendable, Equatable, Codable {
     public var cellSize: Double
     public var cellsPerRow: UInt32?
     public var previewFields: WirePalettePreviewFields?
+    public var windowRows: UInt32?
 
-    public init(modes: [WirePaletteMode], query: String, placeholder: String, tabs: [WirePaletteTab], heading: String, rows: [WirePaletteRow], rowCount: UInt32, firstRow: UInt32, columns: UInt32, visibleRows: UInt32, selection: WirePalettePosition? = nil, preview: WirePalettePreview? = nil, showsPreview: Bool, skinTone: WireSkinTone, skinTonePicker: WirePaletteSkinTonePicker? = nil, message: String? = nil, hints: [WireKeyHint], cellSize: Double, cellsPerRow: UInt32? = nil, previewFields: WirePalettePreviewFields? = nil) {
+    public init(modes: [WirePaletteMode], query: String, placeholder: String, tabs: [WirePaletteTab], heading: String, rows: [WirePaletteRow], rowCount: UInt32, firstRow: UInt32, columns: UInt32, visibleRows: UInt32, selection: WirePalettePosition? = nil, preview: WirePalettePreview? = nil, showsPreview: Bool, skinTone: WireSkinTone, skinTonePicker: WirePaletteSkinTonePicker? = nil, message: String? = nil, hints: [WireKeyHint], cellSize: Double, cellsPerRow: UInt32? = nil, previewFields: WirePalettePreviewFields? = nil, windowRows: UInt32? = nil) {
         self.modes = modes
         self.query = query
         self.placeholder = placeholder
@@ -2035,6 +2036,7 @@ public struct WirePalettePanel: Sendable, Equatable, Codable {
         self.cellSize = cellSize
         self.cellsPerRow = cellsPerRow
         self.previewFields = previewFields
+        self.windowRows = windowRows
     }
 }
 

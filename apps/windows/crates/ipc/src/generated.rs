@@ -1921,6 +1921,9 @@ pub struct PalettePanel {
     #[serde(rename = "previewFields")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview_fields: Option<PalettePreviewFields>,
+    #[serde(rename = "windowRows")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub window_rows: Option<u32>,
 }
 
 impl fmt::Debug for PalettePanel {
@@ -1946,6 +1949,7 @@ impl fmt::Debug for PalettePanel {
             .field("cellSize", &self.cell_size)
             .field("cellsPerRow", &self.cells_per_row)
             .field("previewFields", &self.preview_fields)
+            .field("windowRows", &self.window_rows)
             .finish()
     }
 }

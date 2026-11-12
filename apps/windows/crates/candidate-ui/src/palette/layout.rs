@@ -1,8 +1,19 @@
 #![forbid(unsafe_code)]
 
-//! パレットの窓の部品の位置(DIP)と，押した位置の対象(macOS の PaletteView の layout(for:) と target(at:))．
+//! パレットの窓の部品の位置(DIP)と，押した位置の対象(macOS の PaletteView と core の PaletteWindowLayout と同じ決め方)．
 //! 描く側(palette::scene)と押した位置を調べる側が同じ計算を使う．
-//! 顔文字は，マス目の幅を 1 行のマスの数(cells_per_row)で割った広いマスに並べる
+//! 顔文字は，マス目の幅を 1 行のマスの数(cells_per_row)で割った広いマスに並べる．
+//!
+//! 余白は間隔の段階(design/tokens の size.space)だけで決める．
+//! - 窓の内側の余白は上下左右とも padding(窓の縁の内側から．角丸のテーマは縁の線，platinum と desk は立体の縁)
+//! - 区画(探す欄 → タブ → マス目 → 区切り → 説明 → 区切り → 足元)のあいだは section-gap．区切りの線の上と下も同じ
+//! - まとまりのあいだ(探す欄と種類の切り替え，タブとマスの見出し，マス目とスクロールの位置の線)は group-gap，
+//!   まとまりの中(マスの見出しとマス目)は item-gap
+//! - 中身の右の端は 1 か所(探す欄・種類の切り替え・区切りの線・スクロールの位置の線・肌の色のボタンの右の端)
+//!
+//! 窓の大きさは列数・行数・マスの大きさと説明に出す項目の設定だけで決め，選んでいる文字や種類では変えない．
+//! 説明の欄は種類ごとに出る行の分の高さにし，いちばん高い種類(絵文字)との差は，core がマス目の行に回す(visible_rows と window_rows)．
+//! 回しきれない端の高さは，マス目と説明のあいだの区切りの上と下に等しく分ける
 
 use super::emoji::SKIN_TONES;
 use super::preview;
@@ -10,7 +21,31 @@ use crate::geometry::Frame;
 use crate::scene::Measure;
 use crate::theme::{Font, ResolvedTheme, Role};
 use ipc::{PaletteKind, PalettePanel, PaletteTarget};
-use tokens::size::{candidate, palette};
+use tokens::size::{candidate, glass, palette};
+
+/// 外形に合わせて大きさを決める絵文字の書体の候補の数．目当ての大きさから 1 ポイントずつ小さくする
+pub const EMOJI_FIT_STEPS: usize = 6;
+
+/// 外形に合わせて大きさを決める絵文字の書体の候補(大きい順)と，外形を収める一辺
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EmojiSizes {
+    pub fonts: [Font; EMOJI_FIT_STEPS],
+    /// 外形を収める一辺(箱の一辺から余白を除いたもの)
+    pub target: u16,
+}
+
+impl EmojiSizes {
+    /// 一辺 side の箱の上下左右に padding を空けた中に外形を収める
+    fn new(side: f32, padding: f32) -> Self {
+        let target = (side - padding * 2.0).max(1.0);
+        Self {
+            fonts: std::array::from_fn(|step| {
+                Font::sized(Role::Emoji, (target - step as f32).max(1.0))
+            }),
+            target: target.round() as u16,
+        }
+    }
+}
 
 /// パレットで描く文字の書体と大きさ．マスの文字はマスの大きさで変わる
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,11 +71,12 @@ pub struct Fonts {
     pub code_small: Font,
     /// 説明の項目名と，見出しに添える名前の出どころ
     pub label: Font,
-    pub preview_emoji: Font,
+    /// 説明の見本の四角・足元の肌の色のボタン・肌の色の帯のマスの絵文字．外形が余白の内側に収まる大きさを候補から選ぶ
+    pub preview_emoji: EmojiSizes,
     pub preview_symbol: Font,
     pub preview_kaomoji: Font,
-    pub button_emoji: Font,
-    pub picker_emoji: Font,
+    pub button_emoji: EmojiSizes,
+    pub picker_emoji: EmojiSizes,
 }
 
 impl Fonts {
@@ -59,31 +95,28 @@ impl Fonts {
             cell_symbol: Font::sized(Role::Candidate, cell_size * palette::SYMBOL_SCALE),
             cell_kaomoji: Font::sized(Role::Candidate, cell_size * palette::KAOMOJI_SCALE),
             kaomoji_small: Font::sized(Role::Candidate, palette::KAOMOJI_MIN_FONT_SIZE),
-            detail: Font::sized(Role::Label, palette::DETAIL_FONT_SIZE),
+            detail: Font::sized(Role::Annotation, palette::DETAIL_FONT_SIZE),
             name: Font::sized(Role::Emphasis, palette::NAME_FONT_SIZE),
             code: Font::sized(Role::Code, palette::CODE_FONT_SIZE),
             code_small: Font::sized(Role::Code, palette::PREVIEW_CHIP_SMALL_FONT_SIZE),
-            label: Font::sized(Role::Label, palette::PREVIEW_LABEL_FONT_SIZE),
-            preview_emoji: Font::sized(
-                Role::Emoji,
-                palette::PREVIEW_GLYPH_SIZE * palette::EMOJI_SCALE,
-            ),
+            label: Font::sized(Role::Annotation, palette::PREVIEW_LABEL_FONT_SIZE),
+            preview_emoji: EmojiSizes::new(palette::TILE_SIZE, palette::TILE_PADDING),
             preview_symbol: Font::sized(
                 Role::Candidate,
                 palette::PREVIEW_GLYPH_SIZE * palette::SYMBOL_SCALE * palette::PREVIEW_SYMBOL_BOOST,
             ),
             preview_kaomoji: Font::sized(Role::Candidate, palette::PREVIEW_KAOMOJI_FONT_SIZE),
-            button_emoji: Font::sized(Role::Emoji, skin_tone_button_side() * palette::EMOJI_SCALE),
-            picker_emoji: Font::sized(
-                Role::Emoji,
-                palette::PICKER_CELL_SIZE * palette::EMOJI_SCALE,
-            ),
+            button_emoji: EmojiSizes::new(glass::KEYCAP_HEIGHT, palette::SKIN_BUTTON_PADDING),
+            picker_emoji: EmojiSizes::new(palette::PICKER_CELL_SIZE, palette::PICKER_CELL_PADDING),
         }
     }
 
     /// 使う書体のすべて(重なりを除く)．描く側が前もって書式を作る
     pub fn all(&self) -> Vec<Font> {
         let mut unique = Vec::new();
+        let fitted = [self.preview_emoji, self.button_emoji, self.picker_emoji]
+            .into_iter()
+            .flat_map(|sizes| sizes.fonts);
         for font in [
             self.search,
             self.search_icon,
@@ -100,27 +133,18 @@ impl Fonts {
             self.code,
             self.code_small,
             self.label,
-            self.preview_emoji,
             self.preview_symbol,
             self.preview_kaomoji,
-            self.button_emoji,
-            self.picker_emoji,
-        ] {
+        ]
+        .into_iter()
+        .chain(fitted)
+        {
             if !unique.contains(&font) {
                 unique.push(font);
             }
         }
         unique
     }
-}
-
-/// 足元の肌の色のボタンを足元の行の正方形から内側に寄せる幅(1 ドットの縁と選択の線の太さの分)
-pub fn skin_tone_button_inset() -> f32 {
-    candidate::FRAME_WIDTH + palette::SELECTION_STROKE
-}
-
-fn skin_tone_button_side() -> f32 {
-    palette::FOOTER_HEIGHT - skin_tone_button_inset() * 2.0
 }
 
 /// マスの一辺．設定の値が使えない(0 以下や数でない)ときは 0 にし，マス目を描かない
@@ -133,6 +157,26 @@ pub fn cell_size(panel: &PalettePanel) -> f32 {
     }
 }
 
+/// 今の種類(選んでいる種類の切り替え．無ければ絵文字)
+pub fn kind(panel: &PalettePanel) -> PaletteKind {
+    panel
+        .modes
+        .iter()
+        .find(|mode| mode.is_selected)
+        .map_or(PaletteKind::Emoji, |mode| mode.kind)
+}
+
+/// 今の種類のマス目に回す行の数．説明の欄がいちばん高い種類(絵文字)より低い分を，マスの一辺で割って切り捨てる
+/// (core の PaletteWindowLayout.extraRows．見本を作るときに使う)
+pub fn extra_rows(preview_height: f32, window_preview_height: f32, cell: f32) -> u32 {
+    if cell <= 0.0 {
+        return 0;
+    }
+    ((window_preview_height - preview_height) / cell)
+        .floor()
+        .max(0.0) as u32
+}
+
 /// パレットの窓の部品の位置．上から 探す欄と種類の切り替え・まとまりのタブ・見出し・マス目・説明・足元
 #[derive(Debug, Clone, PartialEq)]
 pub struct Layout {
@@ -141,15 +185,21 @@ pub struct Layout {
     pub height: f32,
     /// 枠の中(desk の影を除く)
     pub body: Frame,
+    /// 窓の内側の余白の内側
+    pub content: Frame,
     pub search: Frame,
     pub modes: Vec<Frame>,
     pub tabs: Vec<Frame>,
     pub heading: Frame,
     pub grid: Frame,
     pub scrollbar: Frame,
+    /// 区切りの線(上の端の y)．説明を出すときは 2 本，出さないときは 1 本
+    pub separators: Vec<f32>,
     /// 説明の欄．出さない設定なら None
     pub preview: Option<Frame>,
+    /// 足元の行(キーの札の高さ)
     pub footer: Frame,
+    /// 既定の肌の色のボタン．キーの札と同じ高さの正方形で，中身の右の端に置く
     pub skin_tone_button: Frame,
     /// マスの高さ(四角いマスの一辺)
     pub cell: f32,
@@ -157,14 +207,13 @@ pub struct Layout {
     pub cell_width: f32,
     /// 今の種類のマスが顔文字の広いマスか．広いマスの文字は，絵文字を含んでいても候補の書体で描く
     pub wide: bool,
+    pub kind: PaletteKind,
     pub fonts: Fonts,
     first_row: u32,
-    /// 説明の欄の上の端から見出しの行の縦の中心まで(ピン留めのボタンを合わせる)
-    preview_heading_mid: f32,
 }
 
 impl Layout {
-    /// 窓の大きさは列数・行数・マスの大きさ・説明を出すかと説明に出す項目だけで決まり，中身(探した結果の数など)では変えない
+    /// 窓の大きさは列数・行数(window_rows)・マスの大きさ・説明を出すかと説明に出す項目だけで決まり，中身や種類では変えない
     pub fn new(panel: &PalettePanel, theme: &ResolvedTheme, measure: &dyn Measure) -> Self {
         let cell = cell_size(panel);
         let fonts = Fonts::new(cell);
@@ -173,39 +222,53 @@ impl Layout {
         } else {
             0.0
         };
-        let inset = if theme.is_rounded() {
-            palette::PADDING
+        // 窓の縁の太さ(角丸のテーマは縁の線，platinum と desk は外枠と立体の縁)．内側の余白はこの内側から測る
+        let border = if theme.is_rounded() {
+            candidate::FRAME_WIDTH
         } else {
-            candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH + palette::PADDING / 2.0
+            candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
         };
-        let columns = panel.columns as f32;
-        let rows = panel.visible_rows as f32;
-        let width = (inset * 2.0 + columns * cell + palette::SCROLLBAR_GUTTER + shadow).ceil();
-        let mut height = inset * 2.0
-            + palette::SEARCH_HEIGHT
-            + palette::GAP
-            + palette::TAB_HEIGHT
-            + palette::HEADING_HEIGHT
-            + rows * cell
-            + palette::GAP;
-        let preview_height = preview::height(
-            &preview::fields(panel.preview_fields.as_ref()),
-            &fonts,
-            measure,
-        );
-        if panel.shows_preview {
-            height += preview_height;
+        let inset = border + palette::PADDING;
+        let line = candidate::FRAME_WIDTH;
+        let control = palette::CONTROL_HEIGHT;
+        let footer_height = glass::KEYCAP_HEIGHT;
+        let kind = kind(panel);
+        let visible_rows = panel.visible_rows;
+        let window_rows = panel.window_rows.unwrap_or(visible_rows);
+        let fields = preview::fields(panel.preview_fields.as_ref());
+        // 今の種類の説明の欄の高さと，窓の高さを決める説明の欄の高さ(いちばん高い種類)
+        let preview_heights = panel.shows_preview.then(|| {
+            (
+                preview::height(&fields, kind),
+                preview::height(&fields, PaletteKind::Emoji),
+            )
+        });
+        let grid_width = panel.columns as f32 * cell;
+        let content_width = grid_width + palette::GROUP_GAP + palette::SCROLLBAR_WIDTH;
+        let mut body_height = inset * 2.0
+            + control
+            + palette::SECTION_GAP
+            + control
+            + palette::GROUP_GAP
+            + palette::TEXT_ROW_HEIGHT
+            + palette::ITEM_GAP
+            + window_rows as f32 * cell
+            + palette::SECTION_GAP
+            + line
+            + palette::SECTION_GAP
+            + footer_height;
+        if let Some((_, window)) = preview_heights {
+            body_height += window + palette::SECTION_GAP + line + palette::SECTION_GAP;
         }
-        let height = (height + palette::FOOTER_HEIGHT + shadow).ceil();
-        let body = Frame::new(0.0, 0.0, width - shadow, height - shadow);
+        let body = Frame::new(0.0, 0.0, inset * 2.0 + content_width, body_height);
         let content = body.inset(inset, inset);
         let mut y = content.y;
-        // 探す欄の右に種類の切り替えを置く
+        // 探す欄の右に種類の切り替えを置き，右の端を中身の右の端にそろえる
         let mode_widths: Vec<f32> = panel
             .modes
             .iter()
             .map(|mode| {
-                (measure.width(&mode.title, fonts.mode) + palette::MODE_PADDING_X * 2.0).ceil()
+                (measure.width(&mode.title, fonts.mode) + palette::CONTROL_PADDING_X * 2.0).ceil()
             })
             .collect();
         let modes_width: f32 = mode_widths.iter().sum();
@@ -213,7 +276,7 @@ impl Layout {
         let modes = mode_widths
             .iter()
             .map(|width| {
-                let frame = Frame::new(x, y, *width, palette::SEARCH_HEIGHT);
+                let frame = Frame::new(x, y, *width, control);
                 x += width;
                 frame
             })
@@ -221,83 +284,80 @@ impl Layout {
         let search = Frame::new(
             content.x,
             y,
-            content.width - modes_width - palette::GAP,
-            palette::SEARCH_HEIGHT,
+            content.width - modes_width - palette::GROUP_GAP,
+            control,
         );
-        y += palette::SEARCH_HEIGHT + palette::GAP;
+        y += control + palette::SECTION_GAP;
         let tab_width = if panel.tabs.is_empty() {
             0.0
         } else {
-            (palette::TAB_HEIGHT + palette::GAP)
+            // 探す欄と同じ高さの正方形にまとまりのあいだの間隔を足した幅で並べ，窓の幅に収まらなければ詰める
+            (control + palette::GROUP_GAP)
                 .min(content.width / panel.tabs.len() as f32)
                 .floor()
         };
         let tabs = (0..panel.tabs.len())
-            .map(|index| {
-                Frame::new(
-                    content.x + index as f32 * tab_width,
-                    y,
-                    tab_width,
-                    palette::TAB_HEIGHT,
-                )
-            })
+            .map(|index| Frame::new(content.x + index as f32 * tab_width, y, tab_width, control))
             .collect();
-        y += palette::TAB_HEIGHT;
-        let heading = Frame::new(content.x, y, content.width, palette::HEADING_HEIGHT);
-        y += palette::HEADING_HEIGHT;
-        let grid = Frame::new(content.x, y, columns * cell, rows * cell);
+        y += control + palette::GROUP_GAP;
+        let heading = Frame::new(content.x, y, content.width, palette::TEXT_ROW_HEIGHT);
+        y += palette::TEXT_ROW_HEIGHT + palette::ITEM_GAP;
+        let grid = Frame::new(content.x, y, grid_width, visible_rows as f32 * cell);
         // 1 行のマスの数．送られてこなければ四角いマス(列の数と同じ)
         let cells_per_row = panel
             .cells_per_row
             .unwrap_or(panel.columns)
             .clamp(1, panel.columns.max(1));
         let cell_width = grid.width / cells_per_row as f32;
-        let wide = panel
-            .modes
-            .iter()
-            .any(|mode| mode.is_selected && mode.kind == PaletteKind::Kaomoji);
         let scrollbar = Frame::new(
-            grid.max_x() + (palette::SCROLLBAR_GUTTER - palette::SCROLLBAR_WIDTH) / 2.0,
+            content.max_x() - palette::SCROLLBAR_WIDTH,
             grid.y,
             palette::SCROLLBAR_WIDTH,
             grid.height,
         );
-        y = grid.max_y() + palette::GAP;
-        let preview = panel.shows_preview.then(|| {
-            let frame = Frame::new(content.x, y, content.width, preview_height);
-            y += preview_height;
+        // 窓の高さに対して余った高さ(回しきれなかった分)を，区切りの上と下に等しく分ける
+        let spare = (window_rows as f32 - visible_rows as f32) * cell
+            + preview_heights.map_or(0.0, |(shown, window)| window - shown);
+        let spare = spare.max(0.0);
+        let above = (spare / 2.0).floor();
+        y = grid.max_y() + palette::SECTION_GAP + above;
+        let mut separators = vec![y];
+        y += line + palette::SECTION_GAP + spare - above;
+        let preview = preview_heights.map(|(height, _)| {
+            let frame = Frame::new(content.x, y, content.width, height);
+            y += height + palette::SECTION_GAP;
+            separators.push(y);
+            y += line + palette::SECTION_GAP;
             frame
         });
-        let footer = Frame::new(content.x, y, content.width, palette::FOOTER_HEIGHT);
+        let footer = Frame::new(content.x, y, content.width, footer_height);
         let skin_tone_button = Frame::new(
-            footer.max_x() - palette::FOOTER_HEIGHT,
-            footer.y,
-            palette::FOOTER_HEIGHT,
-            palette::FOOTER_HEIGHT,
+            content.max_x() - footer_height,
+            y,
+            footer_height,
+            footer_height,
         );
         Self {
-            width,
-            height,
+            width: body.width + shadow,
+            height: body.height + shadow,
             body,
+            content,
             search,
             modes,
             tabs,
             heading,
             grid,
             scrollbar,
+            separators,
             preview,
             footer,
             skin_tone_button,
             cell,
             cell_width,
-            wide,
+            wide: kind == PaletteKind::Kaomoji,
+            kind,
             fonts,
             first_row: panel.first_row,
-            preview_heading_mid: preview::heading_mid_y(
-                palette::PREVIEW_PADDING_Y,
-                &fonts,
-                measure,
-            ),
         }
     }
 
@@ -328,12 +388,12 @@ impl Layout {
             .collect()
     }
 
-    /// 説明の欄のピン留めのボタン．欄の右の端で，見出しの行の縦の中心に置く
+    /// 説明の欄のピン留めのボタン．欄の右の端で，見出しの行の縦の中心に置く(押せる範囲は探す欄と同じ高さの正方形)
     pub fn pin(&self, preview: Frame) -> Frame {
-        let side = palette::FOOTER_HEIGHT;
+        let side = palette::CONTROL_HEIGHT;
         Frame::new(
             preview.max_x() - side,
-            (preview.y + self.preview_heading_mid - side / 2.0).round(),
+            (preview::heading_mid_y(preview.y) - side / 2.0).round(),
             side,
             side,
         )
@@ -481,14 +541,17 @@ mod tests {
         let cell = cell_size(&emoji);
         assert_eq!(
             washi.width,
-            (palette::PADDING * 2.0 + 9.0 * cell + palette::SCROLLBAR_GUTTER).ceil()
+            (candidate::FRAME_WIDTH + palette::PADDING) * 2.0
+                + 9.0 * cell
+                + palette::GROUP_GAP
+                + palette::SCROLLBAR_WIDTH
         );
         assert_eq!(washi.grid.width, 9.0 * cell);
         assert_eq!(washi.grid.height, 6.0 * cell);
         // 探した結果が 3 つでも，窓の大きさは同じ
         let search = layout(&sample::search(), "washi");
         assert_eq!((search.width, search.height), (washi.width, washi.height));
-        // 説明を出さなければ，その分だけ低い
+        // 説明を出さなければ，説明の欄と区切り 1 本と上下の間隔の分だけ低い
         let hidden = layout(
             &PalettePanel {
                 shows_preview: false,
@@ -500,9 +563,11 @@ mod tests {
         let fields = preview::fields(None);
         assert_eq!(
             washi.height - hidden.height,
-            preview::height(&fields, &washi.fonts, &Fixed)
+            preview::height(&fields, PaletteKind::Emoji)
+                + palette::SECTION_GAP * 2.0
+                + candidate::FRAME_WIDTH
         );
-        // 説明に出す項目を減らせば説明の欄は低くなり，選んでいる文字によらず同じ高さ
+        // 説明に出す項目を減らせば説明の欄は低くなる
         let fewer = layout(
             &PalettePanel {
                 preview_fields: Some(ipc::PalettePreviewFields {
@@ -516,11 +581,6 @@ mod tests {
             "washi",
         );
         assert!(fewer.height < washi.height);
-        let symbol = layout(&sample::symbol(), "washi");
-        assert_eq!(
-            symbol.preview.map(|frame| frame.height),
-            washi.preview.map(|frame| frame.height)
-        );
         // desk は影の分だけ大きく，本体は影を除く
         let desk = layout(&emoji, "desk");
         assert_eq!(desk.body.width, desk.width - candidate::SHADOW_OFFSET);
@@ -528,21 +588,142 @@ mod tests {
     }
 
     #[test]
+    fn 窓の大きさは種類で変えず_説明の欄が低い種類はマス目の行を増やす() {
+        for name in ["automatic", "platinum", "desk"] {
+            let emoji = layout(&sample::emoji(), name);
+            let symbol = layout(&sample::symbol(), name);
+            let kaomoji = layout(&sample::kaomoji(), name);
+            for other in [&symbol, &kaomoji] {
+                assert_eq!(
+                    (other.width, other.height),
+                    (emoji.width, emoji.height),
+                    "{name}"
+                );
+            }
+            // 顔文字は説明の欄が低い分をマス目の行に回す
+            assert!(kaomoji.grid.height > emoji.grid.height, "{name}");
+            let fields = preview::fields(None);
+            assert_eq!(
+                kaomoji.preview.map(|frame| frame.height),
+                Some(preview::height(&fields, PaletteKind::Kaomoji))
+            );
+            assert_eq!(
+                symbol.preview.map(|frame| frame.height),
+                Some(preview::height(&fields, PaletteKind::Symbol))
+            );
+        }
+    }
+
+    #[test]
+    fn 窓の内側の余白は上下左右とも同じで_中身の右の端は_1_か所にそろう() {
+        for name in ["automatic", "platinum", "desk"] {
+            for panel in [sample::emoji(), sample::symbol(), sample::kaomoji()] {
+                let layout = layout(&panel, name);
+                let top = layout.search.y - layout.body.y;
+                let left = layout.content.x - layout.body.x;
+                let right = layout.body.max_x() - layout.content.max_x();
+                let bottom = layout.body.max_y() - layout.footer.max_y();
+                assert_eq!([top, left, right], [bottom; 3], "{name}");
+                let right_edges = [
+                    layout.modes.last().unwrap().max_x(),
+                    layout.scrollbar.max_x(),
+                    layout.skin_tone_button.max_x(),
+                    layout.preview.unwrap().max_x(),
+                    layout.footer.max_x(),
+                ];
+                assert_eq!(right_edges, [layout.content.max_x(); 5], "{name}");
+                // 区切りの線も中身の左の端から右の端まで(描く側が content を使う)
+                assert_eq!(layout.grid.x, layout.content.x);
+            }
+        }
+    }
+
+    #[test]
+    fn 区切りの線の上と下の間隔は同じ() {
+        for name in ["automatic", "platinum", "desk"] {
+            for panel in [sample::emoji(), sample::symbol(), sample::kaomoji()] {
+                let layout = layout(&panel, name);
+                let preview = layout.preview.unwrap();
+                let line = candidate::FRAME_WIDTH;
+                assert_eq!(layout.separators.len(), 2);
+                let above = layout.separators[0] - layout.grid.max_y();
+                let below = preview.y - (layout.separators[0] + line);
+                assert!((above - below).abs() <= 1.0, "{name} {above} {below}");
+                assert_eq!(layout.separators[1] - preview.max_y(), palette::SECTION_GAP);
+                assert_eq!(
+                    layout.footer.y - (layout.separators[1] + line),
+                    palette::SECTION_GAP
+                );
+            }
+        }
+        // 説明を出さなければ，マス目と足元のあいだの区切り 1 本だけ
+        let hidden = layout(
+            &PalettePanel {
+                shows_preview: false,
+                ..sample::emoji()
+            },
+            "automatic",
+        );
+        assert_eq!(hidden.separators.len(), 1);
+        assert_eq!(
+            hidden.separators[0] - hidden.grid.max_y(),
+            palette::SECTION_GAP
+        );
+        assert_eq!(
+            hidden.footer.y - (hidden.separators[0] + candidate::FRAME_WIDTH),
+            palette::SECTION_GAP
+        );
+    }
+
+    #[test]
+    fn 足元のキーの札と肌の色のボタンは同じ高さと縦の中心で_上下の余白が等しい() {
+        for name in ["automatic", "platinum", "desk"] {
+            let layout = layout(&sample::emoji(), name);
+            let button = layout.skin_tone_button;
+            assert_eq!(button.height, glass::KEYCAP_HEIGHT);
+            assert_eq!(button.width, button.height);
+            assert_eq!(button.mid_y(), layout.footer.mid_y());
+            // 下の余白は窓の縁(platinum と desk は立体の縁の内側)から測る
+            let border = layout.content.x - layout.body.x - palette::PADDING;
+            let above = layout.footer.y - (layout.separators[1] + candidate::FRAME_WIDTH);
+            let below = layout.body.max_y() - border - layout.footer.max_y();
+            assert_eq!(above, below, "{name}");
+        }
+    }
+
+    #[test]
     fn 部品は上から順に重ならずに並ぶ() {
         for name in ["automatic", "platinum", "desk"] {
             let layout = layout(&sample::emoji(), name);
             let preview = layout.preview.unwrap();
-            assert!(layout.search.max_y() < layout.tabs[0].y, "{name}");
-            assert!(layout.search.max_x() < layout.modes[0].x, "{name}");
-            assert_eq!(layout.modes.last().unwrap().max_x(), layout.footer.max_x());
-            assert_eq!(layout.tabs[0].max_y(), layout.heading.y, "{name}");
-            assert_eq!(layout.heading.max_y(), layout.grid.y, "{name}");
-            assert!(layout.grid.max_y() < preview.y, "{name}");
-            assert_eq!(preview.max_y(), layout.footer.y, "{name}");
-            assert!(layout.footer.max_y() <= layout.body.max_y(), "{name}");
-            assert!(layout.scrollbar.x > layout.grid.max_x(), "{name}");
-            assert!(layout.scrollbar.max_x() <= layout.footer.max_x(), "{name}");
-            assert_eq!(layout.skin_tone_button.max_x(), layout.footer.max_x());
+            assert_eq!(
+                layout.search.max_y() + palette::SECTION_GAP,
+                layout.tabs[0].y,
+                "{name}"
+            );
+            assert_eq!(
+                layout.search.max_x() + palette::GROUP_GAP,
+                layout.modes[0].x,
+                "{name}"
+            );
+            assert_eq!(
+                layout.tabs[0].max_y() + palette::GROUP_GAP,
+                layout.heading.y,
+                "{name}"
+            );
+            assert_eq!(
+                layout.heading.max_y() + palette::ITEM_GAP,
+                layout.grid.y,
+                "{name}"
+            );
+            assert!(layout.grid.max_y() < layout.separators[0], "{name}");
+            assert!(layout.separators[0] < preview.y, "{name}");
+            assert!(preview.max_y() < layout.footer.y, "{name}");
+            assert_eq!(
+                layout.grid.max_x() + palette::GROUP_GAP,
+                layout.scrollbar.x,
+                "{name}"
+            );
         }
     }
 
@@ -552,8 +733,8 @@ mod tests {
         let layout = layout(&panel, "automatic");
         assert_eq!(layout.tabs.len(), panel.tabs.len());
         let last = layout.tabs.last().unwrap();
-        assert!(last.max_x() <= layout.footer.max_x());
-        assert!(layout.tabs[0].width <= palette::TAB_HEIGHT + palette::GAP);
+        assert!(last.max_x() <= layout.content.max_x());
+        assert!(layout.tabs[0].width <= palette::CONTROL_HEIGHT + palette::GROUP_GAP);
     }
 
     #[test]
