@@ -945,6 +945,8 @@ pub mod windows {
         "Dropbox や OneDrive のフォルダを選択すると、ほかの PC と同期できます。";
     /// 項目ごとの同期の表の列(macOS は項目ごとのスイッチ)
     pub const SYNC_FIELD: &str = "項目";
+    /// 項目ごとの同期の表のまとまりの列
+    pub const SYNC_GROUP: &str = "まとまり";
     pub const SYNC_SCOPE: &str = "範囲";
     pub const TOGGLE_SYNC_SCOPE: &str = "範囲の切り替え";
     /// 記号の一覧の状態の列(macOS は行ごとのオン・オフと印で出す)

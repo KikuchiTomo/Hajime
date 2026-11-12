@@ -630,7 +630,8 @@ impl Control {
             Control::List(..) | Control::Dictionary(_) | Control::Symbols(..) => {
                 (ADD_CANCEL, &[settings::REMOVE])
             }
-            Control::SyncFields(_) => (&[windows::TOGGLE_SYNC_SCOPE], &[]),
+            // 項目ごとの同期は表の「同期する」の印で切り替える(macOS の項目ごとのスイッチ)
+            Control::SyncFields(_) => (&[], &[]),
             Control::Dictionaries(DictionaryList::Imported, _) => (
                 &[rule_list::UPDATE],
                 &[
@@ -824,6 +825,31 @@ impl Control {
             },
             Control::List(..) => TableLayout {
                 columns: rules(field_count),
+                enabled: None,
+            },
+            // 項目ごとの同期: 同期するかの印・まとまり・項目(行は まとまり・項目・印)
+            Control::SyncFields(_) => TableLayout {
+                columns: vec![
+                    Column {
+                        title: crate::options::SYNC_SCOPES[0].1,
+                        width: Fixed(mac::RULE_KIND_COLUMN_WIDTH),
+                        ..check(2)
+                    },
+                    Column {
+                        title: windows::SYNC_GROUP,
+                        source: 0,
+                        width: Fixed(mac::RULE_KEY_COLUMN_WIDTH),
+                        cell: Cell::Secondary,
+                        badge: None,
+                    },
+                    Column {
+                        title: windows::SYNC_FIELD,
+                        source: 1,
+                        width: Fill,
+                        cell: Cell::Text,
+                        badge: None,
+                    },
+                ],
                 enabled: None,
             },
             _ => TableLayout {
@@ -1066,6 +1092,8 @@ pub struct Row {
     pub enabled: Option<Condition>,
     /// 満たさないときは出さない
     pub visible: Option<Condition>,
+    /// 注記を危険の色(赤)で出す(同期の失敗．macOS は赤い文字)
+    pub danger: bool,
     /// 値を変えたときに一緒に空(null)にする項目(テーマを選んだらカスタムテーマを外す)
     pub clears: Option<&'static str>,
     /// 名前の横に札の形で添える，その設定で出る候補の見本(読みと候補．「びーる → 🍺」)
@@ -1131,7 +1159,14 @@ impl Row {
             visible: None,
             clears: None,
             example: None,
+            danger: false,
         }
+    }
+
+    /// 注記を危険の色(赤)で出す
+    pub fn danger(mut self) -> Self {
+        self.danger = true;
+        self
     }
 
     pub fn with_example(mut self, example: (&'static str, &'static str)) -> Self {
@@ -2342,9 +2377,12 @@ fn sync_page() -> Vec<Section> {
                     Control::InfoAction(Info::LastSynced, Action::SyncNow, sync::SYNC_NOW),
                 )
                 .enabled_when(On(crate::sync::ENABLED)),
+                // 同期できなかった知らせは赤い文字で出す(macOS の SyncPage)
                 Row::note(sync::FAILED)
+                    .danger()
                     .visible_when(Is(crate::sync::PROBLEM, crate::sync::PROBLEM_FAILED)),
                 Row::note(sync::UNREADABLE)
+                    .danger()
                     .visible_when(Is(crate::sync::PROBLEM, crate::sync::PROBLEM_UNREADABLE)),
             ],
             footer: Some(crate::strings::windows::SYNC_NOTE),
