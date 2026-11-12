@@ -62,6 +62,7 @@ public enum LayoutTokens {
         public static let previewChipGap: Double = 6
         public static let ruleCheckColumnWidth: Double = 40
         public static let ruleKeyColumnWidth: Double = 160
+        public static let ruleValueColumnWidth: Double = 200
         public static let commandReadingColumnWidth: Double = 110
         public static let commandTitleColumnWidth: Double = 120
         public static let commandKindColumnWidth: Double = 130

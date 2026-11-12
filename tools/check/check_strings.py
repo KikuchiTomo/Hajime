@@ -38,6 +38,7 @@ OPTION_TABLES = {
     "SYNC_SCOPES": ("Sync", "SyncScope"),
     "SYNC_GROUPS": ("Sync", "SyncGroup"),
     "BRANCH_STYLES": ("More", "CustomTheme.BranchStyle"),
+    "WORD_CLASSES": ("Settings", "WordClass"),
 }
 # Windows で名前を変える選択肢(macOS の Command のキーを，Windows では Ctrl のキーにする)
 WINDOWS_ONLY_OPTIONS = {("KEYBOARD_LAYOUTS", "dvorakQwertyCommand"), ("SYNC_SCOPES", "local")}

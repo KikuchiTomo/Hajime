@@ -148,15 +148,36 @@ public enum ZenzaiModelChoice: String, Sendable, Equatable, Codable, CaseIterabl
     case combined
 }
 
-/// 利用者が登録した語
+/// 利用者が登録した語．読みと語の組で 1 語とみなし，同じ組を品詞を変えて重ねて登録しない
 public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
     /// 読み．ひらがなか，ローマ字・英字(「gh」「toyota」)．引くときは lookupReading にそろえる
     public var reading: String
     public var word: String
+    public var wordClass: WordClass
 
-    public init(reading: String, word: String) {
+    public init(reading: String, word: String, wordClass: WordClass = DefaultSettings.userWordClass) {
         self.reading = reading
         self.word = word
+        self.wordClass = wordClass
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case reading, word, wordClass
+    }
+
+    /// 品詞を書いていない語(品詞を選べるようになる前に登録した語)は固有名詞として読む．それまで固有名詞として変換エンジンに渡していたため．
+    /// 知らない品詞(新しいバージョンで足した品詞)は名詞として読む
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        reading = try container.decode(String.self, forKey: .reading)
+        word = try container.decode(String.self, forKey: .word)
+        let name = try container.decodeIfPresent(String.self, forKey: .wordClass)
+        wordClass = name.map { WordClass(rawValue: $0) ?? .noun } ?? DefaultSettings.legacyUserWordClass
+    }
+
+    /// 同じ語とみなすか(読みと語が同じ)．品詞は比べない
+    public func isSameWord(as other: UserDictionaryEntry) -> Bool {
+        reading == other.reading && word == other.word
     }
 
     /// 読みはひらがな・長音か，ローマ字・英字・数字．語は空でなく，どちらも上限の長さ以内
@@ -179,7 +200,7 @@ public struct UserDictionaryEntry: Sendable, Equatable, Codable, Hashable {
 
 extension UserDictionaryEntry: CustomStringConvertible, CustomDebugStringConvertible {
     // 登録した語は入力内容と同じに扱うので，ログには長さだけを出す(docs/dev/SECURITY-MODEL.md)
-    public var description: String { "UserDictionaryEntry(readingLength: \(reading.count), wordLength: \(word.count))" }
+    public var description: String { "UserDictionaryEntry(readingLength: \(reading.count), wordLength: \(word.count), class: \(wordClass))" }
     public var debugDescription: String { description }
 }
 
@@ -192,25 +213,45 @@ public enum UserDictionaryEditing {
         case full
     }
 
-    /// 前後の空白を除いて 1 語を足す
-    public static func add(reading: String, word: String, to entries: inout [UserDictionaryEntry]) -> AddResult {
-        let entry = UserDictionaryEntry(reading: reading.trimmed, word: word.trimmed)
+    /// 前後の空白を除いて 1 語を足す．同じ読みと語がもうあれば，品詞だけを書き換える
+    public static func add(reading: String, word: String, wordClass: WordClass = DefaultSettings.userWordClass,
+                           to entries: inout [UserDictionaryEntry]) -> AddResult {
+        let entry = UserDictionaryEntry(reading: reading.trimmed, word: word.trimmed, wordClass: wordClass)
         guard entry.isValid else { return .invalid }
-        guard !entries.contains(entry) else { return .alreadyRegistered }
+        if let index = entries.firstIndex(where: { $0.isSameWord(as: entry) }) {
+            guard entries[index].wordClass != entry.wordClass else { return .alreadyRegistered }
+            entries[index].wordClass = entry.wordClass
+            return .added
+        }
         guard entries.count < DefaultSettings.maximumUserDictionaryEntries else { return .full }
         entries.append(entry)
         return .added
     }
 
-    /// 取り込んだ語を足す．形の誤った語・登録済みの語・上限を超えた語は足さない．足した数を返す
+    /// 読みと語が同じ語を除く(品詞は問わない)
+    public static func remove(_ removed: some Sequence<UserDictionaryEntry>, from entries: inout [UserDictionaryEntry]) {
+        let keys = Set(removed.map { Key($0) })
+        entries.removeAll { keys.contains(Key($0)) }
+    }
+
+    /// 取り込んだ語を足す．形の誤った語・登録済みの語(読みと語が同じもの)・上限を超えた語は足さない．足した数を返す
     public static func merge(_ imported: [UserDictionaryEntry], into entries: inout [UserDictionaryEntry]) -> Int {
-        var seen = Set(entries)
+        var seen = Set(entries.map { Key($0) })
         var added = 0
-        for entry in imported where entry.isValid && entries.count < DefaultSettings.maximumUserDictionaryEntries && seen.insert(entry).inserted {
+        for entry in imported where entry.isValid && entries.count < DefaultSettings.maximumUserDictionaryEntries && seen.insert(Key(entry)).inserted {
             entries.append(entry)
             added += 1
         }
         return added
+    }
+
+    private struct Key: Hashable {
+        let reading: String
+        let word: String
+        init(_ entry: UserDictionaryEntry) {
+            reading = entry.reading
+            word = entry.word
+        }
     }
 }
 

@@ -489,7 +489,7 @@ struct EngineServiceTests {
         }
         #expect(total == 601)
         #expect(page.count == EngineService.maximumDictionaryPage)
-        #expect(page.first == WireDictionaryEntry(reading: "よみ", word: "語句0"))
+        #expect(page.first == WireDictionaryEntry(reading: "よみ", word: "語句0", wordClass: .noun))
         guard case .userDictionary(let tail, _) = service.handle(WireRequest(id: 47, body: .readUserDictionary(offset: 1000, limit: 10)), from: id).body else {
             Issue.record("範囲の外を読めない")
             return
@@ -498,6 +498,31 @@ struct EngineServiceTests {
         #expect(service.handle(WireRequest(id: 48, body: .removeUserDictionaryEntry(entry: WireDictionaryEntry(reading: "えすきゅー", word: "hajime"))), from: id).body == .done)
         #expect(settings.current.userDictionary.count == 600)
         #expect(!settings.current.userDictionary.contains(UserDictionaryEntry(reading: "えすきゅー", word: "hajime")))
+    }
+
+    @Test("ユーザー辞書の語を品詞つきで足し，読み返す．品詞を送らなければ名詞，同じ語を別の品詞で足すと品詞を書き換え，消すときは品詞を問わない")
+    func userDictionaryWordClass() {
+        let id = greeted()
+        func add(_ entry: WireDictionaryEntry) -> WireResponseBody {
+            service.handle(WireRequest(id: 44, body: .addUserDictionaryEntry(entry: entry)), from: id).body
+        }
+        #expect(add(WireDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .surname)) == .dictionaryAdded(result: .added))
+        #expect(add(WireDictionaryEntry(reading: "かいしゃ", word: "会社")) == .dictionaryAdded(result: .added))
+        #expect(settings.current.userDictionary.map(\.wordClass) == [.surname, .noun])
+        #expect(add(WireDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .place)) == .dictionaryAdded(result: .added))
+        guard case .userDictionary(let page, _) = service.handle(WireRequest(id: 45, body: .readUserDictionary(offset: 0, limit: 10)), from: id).body else {
+            Issue.record("ユーザー辞書を読めない")
+            return
+        }
+        #expect(page.map(\.wordClass) == [.place, .noun])
+        let removed = service.handle(WireRequest(id: 46, body: .removeUserDictionaryEntry(entry: WireDictionaryEntry(reading: "やまだ", word: "山田"))), from: id).body
+        #expect(removed == .done)
+        #expect(settings.current.userDictionary.map(\.word) == ["会社"])
+    }
+
+    @Test("通信の品詞は core の品詞と同じ名前を同じ順に持つ")
+    func wordClassCases() {
+        #expect(WireWordClass.allCases.map(\.rawValue) == WordClass.allCases.map(\.rawValue))
     }
 
     @Test("入力方式を切り替えたら，モードの札に入力方式を出す．出さない設定なら出さない")

@@ -1,6 +1,6 @@
 import Foundation
 
-/// 取り込んだ辞書の語の品詞．変換エンジンの品詞に置き換えて渡す．
+/// 辞書の語の品詞．ユーザー辞書と取り込んだ辞書の語に付け，変換エンジンの品詞に置き換えて渡す．
 /// 動詞や形容詞の活用は扱わないので，分からない品詞はすべて名詞として扱う
 public enum WordClass: String, Sendable, Equatable, Codable, CaseIterable {
     case noun
@@ -10,27 +10,73 @@ public enum WordClass: String, Sendable, Equatable, Codable, CaseIterable {
     case givenName
     case organization
     case place
+    /// 顔文字と記号
     case symbol
+    /// サ変名詞(「勉強」→ 勉強する)
+    case suruNoun
+    /// 形容動詞の語幹(「綺麗」→ 綺麗な)
+    case adjectivalNoun
+    case adverb
+    case interjection
+    /// 短縮よみ．文の中の語にはせず，読み全体を変換したときだけ候補に出す
+    case abbreviation
 
-    /// 辞書のファイルに書かれた品詞の名前から決める．分からなければ名詞
+    /// 辞書のファイルに書かれた品詞の名前(Google 日本語入力・Microsoft IME・ATOK の書き出し)から決める．分からなければ名詞
     public init(partOfSpeech name: String) {
         let name = String(name.filter { $0 != " " && $0 != "\u{3000}" })
         if name.contains("人名") || name.contains("名前") {
-            self = name.contains("姓") ? .surname : name.contains("名") && name != "人名" ? .givenName : .personName
+            // 「人名(名のみ)」は名，「人名」「固有人名」は姓と名
+            let rest = ["人名", "名前", "固有", "名詞"].reduce(name) { $0.replacingOccurrences(of: $1, with: "") }
+            self = name.contains("姓") ? .surname : rest.contains("名") ? .givenName : .personName
         } else if name.contains("姓") {
             self = .surname
+        } else if name == "名" {
+            self = .givenName
         } else if name.contains("地名") || name.contains("駅") {
             self = .place
         } else if name.contains("組織") || name.contains("会社") || name.contains("団体") {
             self = .organization
-        } else if name.contains("固有名詞") {
+        } else if name.contains("固有") {
             self = .properNoun
         } else if name.contains("記号") || name.contains("顔文字") || name.contains("絵文字") {
             self = .symbol
+        } else if name.contains("短縮") {
+            self = .abbreviation
+        } else if name.contains("サ変") || name.contains("さ変") {
+            // 「名詞・サ変形動」もサ変名詞にする
+            self = .suruNoun
+        } else if name.contains("形動") || name.contains("形容動詞") {
+            self = .adjectivalNoun
+        } else if name.hasPrefix("副詞") {
+            self = .adverb
+        } else if name.hasPrefix("感動詞") {
+            self = .interjection
         } else {
             self = .noun
         }
     }
+
+    /// 書き出すファイルに書く品詞の名前．Google 日本語入力の品詞の名前で，init(partOfSpeech:) で読み戻せる
+    public var partOfSpeechName: String {
+        switch self {
+        case .noun: "名詞"
+        case .properNoun: "固有名詞"
+        case .personName: "人名"
+        case .surname: "姓"
+        case .givenName: "名"
+        case .organization: "組織"
+        case .place: "地名"
+        case .symbol: "顔文字"
+        case .suruNoun: "名詞サ変"
+        case .adjectivalNoun: "名詞形動"
+        case .adverb: "副詞"
+        case .interjection: "感動詞"
+        case .abbreviation: "短縮よみ"
+        }
+    }
+
+    /// 文の中の語として変換エンジンに渡すか．短縮よみは読み全体が一致したときだけ候補に出す
+    public var joinsSentences: Bool { self != .abbreviation }
 }
 
 /// 取り込んだ辞書の語 1 つ．読みはひらがな

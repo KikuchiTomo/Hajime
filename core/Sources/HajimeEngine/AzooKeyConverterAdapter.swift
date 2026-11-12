@@ -219,23 +219,25 @@ public final class AzooKeyConverterEngine {
         return true
     }
 
-    /// ユーザー辞書と取り込んだ辞書の語を，動的な辞書としてエンジンに渡す
+    /// ユーザー辞書と取り込んだ辞書の語を，動的な辞書としてエンジンに渡す．
+    /// 短縮よみの語は文の中の語にしない(SupplementedConverter が読み全体の一致で候補に出す)
     private func importDynamicUserDictionary() {
-        // ユーザー辞書の語は固有名詞として登録する
-        let user = userDictionary.map {
-            DicdataElement(word: $0.word, ruby: KanaWidth.katakana(from: $0.lookupReading ?? $0.reading), cid: CIDData.固有名詞.cid, mid: MIDData.一般.mid,
-                           value: DefaultSettings.userDictionaryWordCost)
+        let user = userDictionary.filter(\.wordClass.joinsSentences).map {
+            DicdataElement(word: $0.word, ruby: KanaWidth.katakana(from: $0.lookupReading ?? $0.reading), cid: Self.partOfSpeechID(for: $0.wordClass),
+                           mid: MIDData.一般.mid, value: DefaultSettings.userDictionaryWordCost)
         }
-        let imported = auxiliaryWords.map {
-            DicdataElement(word: $0.word.word, ruby: KanaWidth.katakana(from: $0.word.reading), cid: Self.cid(for: $0.word.wordClass),
+        let imported = auxiliaryWords.filter(\.word.wordClass.joinsSentences).map {
+            DicdataElement(word: $0.word.word, ruby: KanaWidth.katakana(from: $0.word.reading), cid: Self.partOfSpeechID(for: $0.word.wordClass),
                            mid: MIDData.一般.mid, value: DefaultSettings.importedWordCost + $0.costOffset)
         }
         converter.importDynamicUserDictionary(user + imported)
     }
 
-    private static func cid(for wordClass: WordClass) -> Int {
+    /// 品詞に当たる変換エンジンの品詞の ID．名前の無い ID は本体の辞書の語の ID(サ変名詞は「勉強」，形容動詞は「綺麗」，
+    /// 副詞は「迚も」，感動詞は「ああ」)に合わせた．短縮よみは文の中の語にしないので使わない
+    public nonisolated static func partOfSpeechID(for wordClass: WordClass) -> Int {
         switch wordClass {
-        case .noun: CIDData.一般名詞.cid
+        case .noun, .abbreviation: CIDData.一般名詞.cid
         case .properNoun: CIDData.固有名詞.cid
         case .personName: CIDData.人名一般.cid
         case .surname: CIDData.人名姓.cid
@@ -243,6 +245,10 @@ public final class AzooKeyConverterEngine {
         case .organization: CIDData.固有名詞組織.cid
         case .place: CIDData.地名一般.cid
         case .symbol: CIDData.記号.cid
+        case .suruNoun: 1283
+        case .adjectivalNoun: 1287
+        case .adverb: 1281
+        case .interjection: 3
         }
     }
 

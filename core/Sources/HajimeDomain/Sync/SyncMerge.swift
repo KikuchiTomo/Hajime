@@ -65,14 +65,15 @@ public enum SyncMerge {
         func add(_ entry: SyncDocument.DictionaryEntry) {
             let key = Self.key(reading: entry.reading, word: entry.word)
             if let existing = entries[key] {
-                entries[key]?.addedAt = max(existing.addedAt, entry.addedAt)
+                // 品詞はあとで登録し直した(品詞を変えた)方を採る
+                if entry.addedAt > existing.addedAt { entries[key] = entry }
             } else {
                 order.append(key)
                 entries[key] = entry
             }
         }
         for entry in localDictionary(settings) {
-            add(.init(reading: entry.reading, word: entry.word,
+            add(.init(reading: entry.reading, word: entry.word, wordClass: entry.wordClass,
                       addedAt: ledger.dictionaryAddedAt[key(reading: entry.reading, word: entry.word)] ?? .distantPast))
         }
         remote?.dictionary.forEach(add)
@@ -81,7 +82,11 @@ public enum SyncMerge {
             if let removed = tombstones[key], removed >= entry.addedAt { return nil }
             return entry
         }
-        settings["userDictionary"] = .array(kept.map { .object(["reading": .string($0.reading), "word": .string($0.word)]) })
+        settings["userDictionary"] = .array(kept.map { entry in
+            var fields: [String: JSONValue] = ["reading": .string(entry.reading), "word": .string(entry.word)]
+            fields["wordClass"] = entry.wordClass.map(JSONValue.string)
+            return .object(fields)
+        })
         ledger.dictionaryAddedAt = Dictionary(kept.map { (key(reading: $0.reading, word: $0.word), $0.addedAt) }, uniquingKeysWith: max)
         ledger.dictionaryTombstones = tombstones
         document.dictionary = kept
@@ -96,11 +101,12 @@ public enum SyncMerge {
     /// ユーザー辞書の語を引く鍵
     public static func key(reading: String, word: String) -> String { "\(reading)\t\(word)" }
 
-    private static func localDictionary(_ object: [String: JSONValue]) -> [(reading: String, word: String)] {
+    private static func localDictionary(_ object: [String: JSONValue]) -> [(reading: String, word: String, wordClass: String?)] {
         guard case .array(let items)? = object["userDictionary"] else { return [] }
         return items.compactMap { item in
             guard case .object(let fields) = item, case .string(let reading)? = fields["reading"], case .string(let word)? = fields["word"] else { return nil }
-            return (reading, word)
+            guard case .string(let wordClass)? = fields["wordClass"] else { return (reading, word, nil) }
+            return (reading, word, wordClass)
         }
     }
 
@@ -113,9 +119,19 @@ public enum SyncMerge {
             let after = values(of: group, in: new).filter { !localFields.contains($0.key) }
             if before != after { ledger.groupModifiedAt[group] = now }
         }
-        let before = Set(localDictionary(old).map { key(reading: $0.reading, word: $0.word) })
-        let after = Set(localDictionary(new).map { key(reading: $0.reading, word: $0.word) })
-        for added in after.subtracting(before) {
+        // 品詞の無い語(古いバージョンが書いた語)は，読むときと同じ品詞とみなして比べる．
+        // 新しいバージョンで保存し直しただけで，すべての語を登録し直したことにしないため
+        func classes(_ object: [String: JSONValue]) -> [String: String] {
+            Dictionary(localDictionary(object).map { (key(reading: $0.reading, word: $0.word), $0.wordClass ?? DefaultSettings.legacyUserWordClass.rawValue) },
+                       uniquingKeysWith: { first, _ in first })
+        }
+        let classesBefore = classes(old)
+        let classesAfter = classes(new)
+        let before = Set(classesBefore.keys)
+        let after = Set(classesAfter.keys)
+        // 品詞を変えた語は登録し直したものとして時刻を記す(ほかの Mac の古い品詞で戻さないように)
+        let reclassified = after.intersection(before).filter { classesBefore[$0] != classesAfter[$0] }
+        for added in after.subtracting(before).union(reclassified) {
             ledger.dictionaryAddedAt[added] = now
             ledger.dictionaryTombstones[added] = nil
         }

@@ -1521,7 +1521,16 @@ fn apps() -> Vec<Section> {
 const DICTIONARY_FIELDS: &[Field] = &[
     Field::named("reading", settings::READING, false),
     Field::named("word", settings::WORD, false),
+    Field::choice(
+        "wordClass",
+        settings::WORD_CLASS,
+        options::WORD_CLASSES,
+        false,
+    ),
 ];
+
+/// ユーザー辞書の注記に入れ替えて出す文(品詞の欄で選んでいる値と文)
+const DICTIONARY_NOTES: &[(&str, &str)] = &[("abbreviation", settings::ABBREVIATION_NOTE)];
 
 const COMMAND_FIELDS: &[Field] = &[
     Field::named("reading", extras::COMMAND_READING, true),
@@ -1632,7 +1641,7 @@ fn dictionary() -> Vec<Section> {
             )
             .visible_when(words())],
             footer: Some(settings::DICTIONARY_NOTE),
-            footer_variants: &[],
+            footer_variants: DICTIONARY_NOTES,
         },
         Section {
             title: None,

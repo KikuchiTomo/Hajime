@@ -366,19 +366,21 @@ public final class EngineService {
             let entries = settings.current.userDictionary
             let start = min(Int(offset), entries.count)
             let end = min(start + min(Int(limit), Self.maximumDictionaryPage), entries.count)
-            return .userDictionary(entries: entries[start..<end].map { WireDictionaryEntry(reading: $0.reading, word: $0.word) },
+            return .userDictionary(entries: entries[start..<end].map { WireDictionaryEntry($0) },
                                    total: UInt32(clamping: entries.count))
         case .addUserDictionaryEntry(let entry):
             var result = UserDictionaryEditing.AddResult.invalid
             do {
-                try settings.update { result = UserDictionaryEditing.add(reading: entry.reading, word: entry.word, to: &$0.userDictionary) }
+                try settings.update {
+                    result = UserDictionaryEditing.add(reading: entry.reading, word: entry.word, wordClass: entry.entry.wordClass, to: &$0.userDictionary)
+                }
             } catch {
                 return .error(code: .malformed)
             }
             return .dictionaryAdded(result: WireDictionaryAddResult(result))
         case .removeUserDictionaryEntry(let entry):
             do {
-                try settings.update { $0.userDictionary.removeAll { $0 == UserDictionaryEntry(reading: entry.reading, word: entry.word) } }
+                try settings.update { UserDictionaryEditing.remove([entry.entry], from: &$0.userDictionary) }
             } catch {
                 return .error(code: .malformed)
             }
@@ -387,7 +389,7 @@ public final class EngineService {
             var added = 0
             do {
                 try settings.update {
-                    added = UserDictionaryEditing.merge(wanted.map { UserDictionaryEntry(reading: $0.reading, word: $0.word) }, into: &$0.userDictionary)
+                    added = UserDictionaryEditing.merge(wanted.map(\.entry), into: &$0.userDictionary)
                 }
             } catch {
                 return .error(code: .malformed)

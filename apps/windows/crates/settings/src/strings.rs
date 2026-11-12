@@ -90,7 +90,10 @@ pub mod settings {
     pub const RESET_USAGE: &str = "統計を消去";
     /// UIStrings.Settings.fontSize から値を除いたもの
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
-    pub const DICTIONARY_NOTE: &str = "読みと単語をタブで区切ったテキストファイルを読み込めます。";
+    pub const DICTIONARY_NOTE: &str = "読み・単語・品詞をタブで区切ったテキストファイルを読み込めます。品詞の無い行は名詞として登録します。";
+    pub const WORD_CLASS: &str = "品詞";
+    pub const ABBREVIATION_NOTE: &str =
+        "短縮よみの単語は、読みだけを変換したときに出ます。文の中では出ません。";
 
     /// UIStrings.Settings.fontSize(スライダーの名前に今の値を付ける)
     pub fn font_size(size: f64) -> String {
