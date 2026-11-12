@@ -305,6 +305,10 @@ pub fn open(
     });
     // 起動した側が決めた見せ方(前に出さないなど)に従う
     ffi::show_default(window);
+    if options.check_for_updates {
+        // 確かめる窓はこの窓を持ち主にして出すので，窓を出してから始める
+        with_app(super::update::start_check);
+    }
     Some(window)
 }
 
@@ -340,6 +344,9 @@ pub struct Options {
     pub offline: bool,
     /// 単語の登録で開いた(--register-word)．ユーザー辞書のページの登録の欄に，エンジンが持っている語と読みを入れる
     pub register_word: bool,
+    /// 入力メニューの「更新を確認」で開いた(--check-for-updates)．窓を出したら，情報のページの「更新を確認」を
+    /// 押したときと同じ確認を始める
+    pub check_for_updates: bool,
 }
 
 /// 状態を借りて f を呼ぶ．借りられない(手続きの中から呼ばれた)ときは None
