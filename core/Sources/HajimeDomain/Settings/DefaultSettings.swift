@@ -219,6 +219,8 @@ public enum DefaultSettings {
     /// 読みで引いた絵文字を差し込む位置と，差し込む数．よく使う語のあとに並べ，候補の一覧の 1 ページに収める
     public static let emojiCandidateOffset = 5
     public static let emojiCandidateCount = 3
+    /// 文節の長さを変えたとき(⇧← ⇧→)に，すぐに分け直す後ろの文節の数．それより後ろは打鍵の合間に分け直す
+    public static let resizeResegmentedSegments = 2
     /// 文節格子の列ごとに見せる候補の数
     public static let latticeCandidatesPerSegment = 5
     /// 「nn」のあとの母音の読みを選び直す数．1 キーごとに変換にかけるので小さく保つ

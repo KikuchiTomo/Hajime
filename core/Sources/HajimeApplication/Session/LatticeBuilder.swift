@@ -31,6 +31,18 @@ struct LatticeBuilder {
         return lattice
     }
 
+    /// 候補をまだ求めていない文節のうち，文節の読みが isReady を満たすものだけ候補を求める
+    func filled(_ lattice: SegmentLattice, reading: String, where isReady: (String) -> Bool) -> SegmentLattice {
+        var result = lattice
+        for index in result.segments.indices where result.segments[index].isPending {
+            let segment = result.segments[index]
+            if isReady(String(reading.dropFirst(segment.readingStart).prefix(segment.readingLength))) {
+                result.segments[index] = filled(segment, reading: reading)
+            }
+        }
+        return result
+    }
+
     /// 候補をまだ求めていない文節の候補を求める．選んでいる字種と，選び直したかは残す
     func filled(_ segment: SegmentLattice.Segment, reading: String) -> SegmentLattice.Segment {
         guard segment.isPending else { return segment }
@@ -118,12 +130,12 @@ struct LatticeBuilder {
         return (clauseSegmentMakers(of: reading, sentence: sentence) ?? []).map { make in { _ = make() } }
     }
 
-    /// 文節ごとに，前後の文脈での並べ替え(rankedByContext)に使う変換を前もって求める手順．1 文節で 1 歩
-    func contextWarmingSteps(reading: String) -> [@MainActor () -> Void] {
-        guard let contextRanker else { return [] }
+    /// warmingSteps と同じく文節ごとに候補を求める手順に，その文節の読みを添えたもの(一覧で，求め終えた文節を覚えるのに使う)
+    func segmentWarmingSteps(reading: String) -> [(slice: String, make: () -> Void)] {
         let sentence = converter.candidates(for: reading).first { $0.readingCount == reading.count }
         return (clausePlan(of: reading, sentence: sentence) ?? []).map { plan in
-            { _ = contextRanker.contextualTexts(start: plan.start, length: plan.length, reading: reading) }
+            (slice: String(reading.dropFirst(plan.start).prefix(plan.length)),
+             make: { [self] in _ = makeSegment(start: plan.start, length: plan.length, reading: reading, preferred: plan.preferred) })
         }
     }
 
@@ -166,14 +178,14 @@ struct LatticeBuilder {
 
     /// 注目している文節の終わりを，前(grow が false)か次(true)の語の切れ目に動かす．
     /// 語の切れ目は Zenzai を使わない変換の語の並び(segmentationWords)から求める．切れ目が無ければ 1 文字動かす
-    func resizeToWord(_ lattice: SegmentLattice, grow: Bool, reading: String) -> SegmentLattice {
+    func resizeToWord(_ lattice: SegmentLattice, grow: Bool, reading: String, nearby: Bool = false) -> SegmentLattice {
         let segment = lattice.focused
         let end = segment.readingStart + segment.readingLength
         let boundaries = wordBoundaries(of: reading)
         let target = grow
             ? boundaries.first { $0 > end } ?? min(end + 1, reading.count)
             : boundaries.last { $0 > segment.readingStart && $0 < end } ?? max(end - 1, segment.readingStart + 1)
-        return resize(lattice, segmentAt: lattice.focusedIndex, to: target - segment.readingStart, reading: reading)
+        return resize(lattice, segmentAt: lattice.focusedIndex, to: target - segment.readingStart, reading: reading, nearby: nearby)
     }
 
     /// 語の切れ目の位置(読みの先頭からの文字数)．語の並びが読み全体を覆わなければ空
@@ -298,28 +310,52 @@ struct LatticeBuilder {
     }
 
     /// index の文節の長さを length に変え，それより後ろを分け直す(Shift+←→)．
-    /// 分け直したあとも読みの範囲が同じ文節は，利用者が選び直したものを残す(人が決めた文節は書き換えない)
-    func resize(_ lattice: SegmentLattice, segmentAt index: Int, to length: Int, reading: String) -> SegmentLattice {
+    /// 分け直したあとも読みの範囲が同じ文節は，利用者が選び直したものを残す(人が決めた文節は書き換えない)．
+    /// nearby なら，新しい区切りより後ろで終わる文節を DefaultSettings.resizeResegmentedSegments 個分までだけ，Zenzai を使わずに分け直し，
+    /// その先の文節は候補と選んだものをそのまま残す(残りの読みを Zenzai で全部変換し直すと，長い文の前のほうで ⇧→ を押すたびに遅くなる．
+    /// CI のマシンで 0.15 秒を超えた)．残りは resegmentingRest で，打鍵の合間にこれまでと同じく読み全体で分け直す
+    func resize(_ lattice: SegmentLattice, segmentAt index: Int, to length: Int, reading: String, nearby: Bool = false) -> SegmentLattice {
         let segment = lattice.segments[index]
         let available = reading.count - segment.readingStart
         let length = min(max(length, 1), available)
         guard length != segment.readingLength else { return lattice }
         var segments = Array(lattice.segments.prefix(index))
         segments.append(makeSegment(start: segment.readingStart, length: length, reading: reading, preferred: nil))
-        // 区切りを変えた後ろは，その読みだけで求め直す
-        let decided = lattice.segments.dropFirst(index + 1).filter(\.isDecided)
-        segments += following(reading, from: segment.readingStart + length).map { rebuilt in
+        let end = segment.readingStart + length
+        let after = lattice.segments.dropFirst(index + 1)
+        let windowEnd = nearby
+            ? after.map { $0.readingStart + $0.readingLength }.filter { $0 > end }.dropFirst(DefaultSettings.resizeResegmentedSegments - 1).first ?? reading.count
+            : reading.count
+        segments += resegmented(String(reading.prefix(windowEnd)), from: end, keeping: after.filter(\.isDecided), usesZenzai: !nearby)
+        segments += after.filter { $0.readingStart >= windowEnd }
+        return SegmentLattice(segments: segments, focusedIndex: index)
+    }
+
+    /// index の文節より後ろを，その読みだけで分け直す(resize で nearby にしたときの残り)．利用者が選び直した文節は，読みの範囲が同じなら残す
+    func resegmentingRest(_ lattice: SegmentLattice, after index: Int, reading: String) -> SegmentLattice {
+        let segment = lattice.segments[index]
+        var result = lattice
+        result.segments = Array(lattice.segments.prefix(index + 1))
+            + resegmented(reading, from: segment.readingStart + segment.readingLength, keeping: lattice.segments.dropFirst(index + 1).filter(\.isDecided))
+        return result
+    }
+
+    /// start より後ろの読みを分け直した文節．読みの範囲が同じ文節が keeping にあれば，それを使う
+    private func resegmented(_ reading: String, from start: Int, keeping decided: [SegmentLattice.Segment],
+                             usesZenzai: Bool = true) -> [SegmentLattice.Segment] {
+        following(reading, from: start, usesZenzai: usesZenzai).map { rebuilt in
             decided.first { $0.readingStart == rebuilt.readingStart && $0.readingLength == rebuilt.readingLength } ?? rebuilt
         }
-        return SegmentLattice(segments: segments, focusedIndex: index)
     }
 
     /// start より後ろの読みを文節に分ける．build と同じく，その読みの第 1 候補の語の並びで区切る(clauseSegments)．
     /// 語の並びで区切れなければ，文節の候補で区切る(segments)
-    private func following(_ reading: String, from start: Int) -> [SegmentLattice.Segment] {
+    /// usesZenzai が false なら，区切りと幹を Zenzai を使わない変換(segmentCandidates)で決める．
+    /// Zenzai の変換は前に変換した読みの続きを引き継ぐので，あとで読みの残り全体を変換するときの結果を変えないようにする
+    private func following(_ reading: String, from start: Int, usesZenzai: Bool = true) -> [SegmentLattice.Segment] {
         let rest = String(reading.dropFirst(start))
         guard !rest.isEmpty else { return [] }
-        let sentence = converter.candidates(for: rest).first { $0.readingCount == rest.count }
+        let sentence = (usesZenzai ? converter.candidates(for: rest) : converter.segmentCandidates(for: rest)).first { $0.readingCount == rest.count }
         guard let clauses = clauseSegments(of: rest, sentence: sentence) else {
             return segments(of: reading, from: start, sentence: sentence?.text)
         }

@@ -54,8 +54,13 @@ public final class InputSession {
     private var latticeUntouched = false
     /// 注目している文節の長さを変えたときの下見(読みと文節の位置ごと)．分岐図を出してから求めて足す
     private var resizePreviews: [ResizePreviewKey: (shorter: String?, longer: String?)] = [:]
-    /// 一覧に入れる文節を入れ替えた文のために，前後の文脈での並べ替えに使う変換を前もって求め終えた読み
-    private var contextWarmedReading: String?
+    /// 文節の長さを変えたあと，打鍵の合間に分け直す残りの文節(長さを変えた文節の位置と読み)．分け直したら nil
+    private var pendingRestResegmentation: RestResegmentation?
+    /// 一覧で，打鍵が止まったあいだに候補を求め終えた文節の読み(変換器は読みごとに候補をためる．確定などで捨てるときに空にする)．
+    /// Space で文節を入れ替えた文を作るときは，ここにある文節だけをすぐに使い，残りは打鍵の合間に求めて足す(listSubstitutionPending)
+    private var listWarmedSegments: Set<String> = []
+    /// 一覧を出したあと，まだ候補を求めていない文節があり，打鍵の合間に求めて文節を入れ替えた文を足す読み．足し終えたら nil
+    private var listSubstitutionPending: String?
     /// 予測の窓に出す，続く語句の予測(読みごと)．打った文字を出してから求めて足す
     private var suggestionPredictions: (reading: String, candidates: [Candidate])?
     /// 予測の窓に出している予測．出していなければ nil
@@ -360,6 +365,17 @@ public final class InputSession {
                     return rerender(context: context)
                 }
             }
+            // 文節の長さを変えたときは，残りの文節を読み全体で分け直す(すぐには後ろの文節だけを分け直して出している)．
+            // 長さを変えた文節から利用者が動いていたら分け直さない(選んでいる文節の外が急に変わらないように)
+            let rest: [@MainActor () -> [ClientAction]] = pendingRestResegmentation.map { pending in
+                [{ [self] in
+                    defer { if pendingRestResegmentation == pending { pendingRestResegmentation = nil } }
+                    guard case .lattice(let current) = phase, composition.conversionReading == reading, pending.matches(current, reading: reading)
+                    else { return [] }
+                    phase = .lattice(latticeBuilder.resegmentingRest(current, after: pending.index, reading: reading))
+                    return rerender(context: context)
+                }]
+            } ?? []
             let preview: @MainActor () -> [ClientAction] = { [self] in
                 guard case .lattice(let current) = phase, composition.conversionReading == reading, inlineEdit == nil else { return [] }
                 let key = resizePreviewKey(current)
@@ -367,7 +383,38 @@ public final class InputSession {
                 resizePreviews[key] = latticeBuilder.resizePreview(current, reading: reading)
                 return rerender(context: context)
             }
-            return fills + [preview]
+            return rest + fills + [preview]
+        case .selecting where listSubstitutionPending == composition.conversionReading:
+            // 一覧を出したときにまだ求めていなかった文節の候補を 1 文節ずつ求め，最後に文節を入れ替えた文を足して出し直す．
+            // 選んでいる候補は，並びが変わっても同じ候補のままにする
+            let reading = composition.conversionReading
+            let unchanged = { [self] in listSubstitutionPending == reading && composition.conversionReading == reading }
+            let fills: [@MainActor () -> [ClientAction]] = latticeBuilder.segmentWarmingSteps(reading: reading)
+                .filter { !listWarmedSegments.contains($0.slice) }
+                .map { item in
+                    { [self] in
+                        guard unchanged() else { return [] }
+                        item.make()
+                        listWarmedSegments.insert(item.slice)
+                        return []
+                    }
+                }
+            let refresh: @MainActor () -> [ClientAction] = { [self] in
+                guard unchanged(), case .selecting(let current) = phase else { return [] }
+                // 字種を選んでいるときは一覧の並びを出していないので，足さずに終える
+                guard case .candidate(let index) = current.focus, current.candidates.indices.contains(index) else {
+                    listSubstitutionPending = nil
+                    return []
+                }
+                var next = makeSelection(focus: .candidate(0))
+                next.focus = .candidate(next.candidates.firstIndex { $0.text == current.candidates[index].text } ?? 0)
+                next.shownPrefix = current.shownPrefix
+                next.letterCase = current.letterCase
+                listSubstitutionPending = nil
+                phase = .selecting(next)
+                return rerender(context: context)
+            }
+            return fills + [refresh]
         case .composing where predictionsShown && suggestionPredictions?.reading != predictionTarget().reading:
             let reading = composition.conversionReading
             let target = predictionTarget().reading
@@ -389,6 +436,26 @@ public final class InputSession {
         return render(context: context).filter { action in
             if case .setMarkedText(let marked) = action { return marked != previous }
             return true
+        }
+    }
+
+    /// 長さを変えた文節(位置と読みの範囲)．打鍵の合間に残りを分け直すとき，利用者がまだその文節にいるかを確かめるのに使う
+    private struct RestResegmentation: Equatable {
+        var index: Int
+        var start: Int
+        var length: Int
+        var reading: String
+
+        init(lattice: SegmentLattice, reading: String) {
+            index = lattice.focusedIndex
+            start = lattice.focused.readingStart
+            length = lattice.focused.readingLength
+            self.reading = reading
+        }
+
+        func matches(_ lattice: SegmentLattice, reading: String) -> Bool {
+            reading == self.reading && lattice.focusedIndex == index && lattice.segments.indices.contains(index)
+                && lattice.focused.readingStart == start && lattice.focused.readingLength == length
         }
     }
 
@@ -426,16 +493,18 @@ public final class InputSession {
     }
 
     /// 打鍵が止まったあいだに，Space で分岐図を出すときに求める候補を前もって求める手順(LatticeBuilder.warmingSteps)．
-    /// 分岐図を使わない設定(一覧)や，入力中でなければ空
+    /// 一覧では，文節を入れ替えた文に使う文節の候補を求める手順．入力中でなければ空
     public var latticeWarmingSteps: [@MainActor () -> Void] {
         guard phase == .composing, !composition.isEmpty else { return [] }
         guard settings.current.candidatePresentation.segmentsReading else {
-            // 一覧では，文節を入れ替えた文(makeSelection)を作るのに使う文節の候補と，その並べ替えに使う変換だけを前もって求める
-            // (長い文で Space を遅くしないため)
+            // 一覧では，文節を入れ替えた文(makeSelection)を作るのに使う文節の候補だけを，1 文節ずつ前もって求める
             guard settings.current.listSegmentAlternatives else { return [] }
-            let builder = latticeBuilder
-            let reading = composition.conversionReading
-            return builder.warmingSteps(reading: reading) + builder.contextWarmingSteps(reading: reading) + [{ [self] in contextWarmedReading = reading }]
+            return latticeBuilder.segmentWarmingSteps(reading: composition.conversionReading).map { item in
+                { [self] in
+                    item.make()
+                    listWarmedSegments.insert(item.slice)
+                }
+            }
         }
         let builder = latticeBuilder
         let reading = composition.conversionReading
@@ -1521,6 +1590,9 @@ public final class InputSession {
         phase = .composing
         corrector.reset()
         converter.endComposition()
+        listWarmedSegments = []
+        listSubstitutionPending = nil
+        pendingRestResegmentation = nil
         return [.setMarkedText(.empty), .hideCandidates] + hidePrediction
     }
 
@@ -1598,10 +1670,14 @@ public final class InputSession {
         // 文節を 1 か所だけ替えた文を，エンジンの文全体の候補と交互に並べる(一覧では文節を選び直せないため)
         if settings.current.listSegmentAlternatives, corrector.active == nil, !readingCorrector.isApplied {
             var builder = latticeBuilder
-            // 前後の語を含めた変換は，打鍵が止まったあいだに前もって求め終えていれば使う．求めていなければ，求めてある文全体の候補だけで
-            // 並べ替える(Space のときに文節ごとに変換すると遅くなるため)
-            builder.contextRanker?.usesNeighborConversion = contextWarmedReading == composition.conversionReading
-            var lattice = builder.build(reading: composition.conversionReading)
+            let reading = composition.conversionReading
+            // 並べ替えには求めてある文全体の候補だけを使い，前後の語を含めた変換は求めない．一覧では入れ替えた文の並びが変わらず
+            // (操作の数の評価で同じ)，前もって求める 1 歩が長くなる(CI のマシンで 0.056 秒)ため
+            builder.contextRanker?.usesNeighborConversion = false
+            // 文節の候補も，打鍵が止まったあいだに求め終えた文節の分だけをすぐに使う．残りの文節は打鍵の合間に求めて足す(followUps)．
+            // Space のときにすべての文節を変換すると，長い文を止まらずに打って Space を押したときに遅くなる(CI のマシンで 0.32 秒)
+            var lattice = builder.filled(builder.quickBuild(reading: reading), reading: reading) { listWarmedSegments.contains($0) }
+            listSubstitutionPending = lattice.segments.contains(where: \.isPending) ? reading : nil
             // 替えた文に使う文節の候補を，迷う文節から順に前後の文脈で並べ替える(一覧の 1 ページに出る分だけ)
             let order = lattice.segments.indices.sorted { (lattice.segments[$0].confidenceGap, $0) < (lattice.segments[$1].confidenceGap, $1) }
             for index in order.prefix(DefaultSettings.listContextRankedSegments) {
@@ -2193,11 +2269,14 @@ public final class InputSession {
             case .nextUncertain: lattice.moveToUncertain(forward: true)
             case .previousUncertain: lattice.moveToUncertain(forward: false)
             case .extend, .shrink:
+                // すぐ後ろの文節だけを分け直して出し，残りは打鍵の合間に分け直す(followUps)
                 let length = lattice.focused.readingLength + (move == .extend ? 1 : -1)
-                lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: length, reading: composition.conversionReading)
+                lattice = builder.resize(lattice, segmentAt: lattice.focusedIndex, to: length, reading: composition.conversionReading, nearby: true)
+                pendingRestResegmentation = RestResegmentation(lattice: lattice, reading: composition.conversionReading)
             case .extendToWord, .shrinkToWord:
                 // 文節の終わりを次・前の語の切れ目まで動かす(1 文字ずつより少ない打鍵で長さを変える)
-                lattice = builder.resizeToWord(lattice, grow: move == .extendToWord, reading: composition.conversionReading)
+                lattice = builder.resizeToWord(lattice, grow: move == .extendToWord, reading: composition.conversionReading, nearby: true)
+                pendingRestResegmentation = RestResegmentation(lattice: lattice, reading: composition.conversionReading)
             case .split:
                 // 区切れる位置が 2 つ以上の文字のときだけ区切る状態にする
                 splitMode = !splitMode && !focusedSplit(lattice).positions.isEmpty

@@ -27,6 +27,7 @@ struct ListAlternativesScenarioTests {
         settings.contextualSegmentCandidates = false
         let harness = Harness(converter: converter(), settings: settings)
         harness.type("tegamiwokakou")
+        warm(harness)
         harness.press(.space)
         let entries = harness.panel?.entries.map(\.text) ?? []
         if enabled {
@@ -41,9 +42,46 @@ struct ListAlternativesScenarioTests {
     func commitsAlternative() {
         let harness = Harness(converter: converter(), settings: .listPresentation)
         harness.type("tegamiwokakou")
+        warm(harness)
         harness.press(.space)
         harness.press(.down)
         harness.press(.enter)
         #expect(harness.committed == "手紙を河口")
+    }
+
+    @Test("打鍵が止まらずに Space を押したときは，すぐには文節の候補を求めずに一覧を出し，打鍵の合間に求めて替えた文を足す．選んでいる候補は変えない")
+    func spaceWithoutWarming() {
+        let harness = Harness(converter: converter(), settings: .listPresentation)
+        harness.type("tegamiwokakou")
+        harness.runsFollowUps = false
+        let before = harness.converter.requests.count
+        harness.press(.space)
+        let requested = harness.converter.requests.dropFirst(before).map(\.reading)
+        #expect(!requested.contains("かこう") && !requested.contains("てがみを"))
+        #expect(harness.panel?.entries.map(\.text).prefix(2) == ["手紙を加工", "手紙お加工"])
+        harness.press(.down)
+        harness.followUp()
+        #expect(harness.panel?.entries.map(\.text).prefix(3) == ["手紙を加工", "手紙を河口", "手紙お加工"])
+        harness.press(.enter)
+        #expect(harness.committed == "手紙お加工")
+    }
+
+    @Test("確定したあとは，前の文で求めた文節の候補を使わない(変換器は確定のときにためた候補を捨てる)")
+    func forgetsWarmedSegmentsAfterCommit() {
+        let harness = Harness(converter: converter(), settings: .listPresentation)
+        harness.type("tegamiwokakou")
+        warm(harness)
+        harness.press(.space)
+        harness.press(.enter)
+        harness.type("tegamiwokakou")
+        harness.runsFollowUps = false
+        let before = harness.converter.requests.count
+        harness.press(.space)
+        #expect(!harness.converter.requests.dropFirst(before).map(\.reading).contains("かこう"))
+    }
+
+    /// アプリで打鍵が止まったときと同じく，前もって求める手順をすべて動かす
+    private func warm(_ harness: Harness) {
+        harness.session.latticeWarmingSteps.forEach { $0() }
     }
 }
