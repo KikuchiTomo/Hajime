@@ -142,11 +142,8 @@ struct LatticeBuilder {
     private func clausePlan(of reading: String, sentence: Candidate?) -> [ClausePlan]? {
         let fromSentence = sentence.map { ClauseSplitter.clauses(of: $0.words) } ?? []
         let clauses: [ClauseSplitter.Clause]
-        // Zenzai が書き換えた文の語の並びは，語の途中で切れていることがある(てんきですね → 天｜気ですね)．
-        // 字だけで語の途中と分かる区切りがあれば使わず，Zenzai を使わない変換の語の並びで分ける
-        let cutsWord = zip(fromSentence, fromSentence.dropFirst()).contains { SegmentSplitter.cutsWord(before: $0.text, after: $1.text) }
-        if fromSentence.count > 1, !cutsWord, fromSentence.reduce(0, { $0 + $1.readingCount }) == reading.count,
-            fromSentence.map(\.text).joined() == sentence?.text {
+        if fromSentence.count > 1, fromSentence.reduce(0, { $0 + $1.readingCount }) == reading.count,
+            fromSentence.map(\.text).joined() == sentence?.text, !cutsWord(fromSentence, reading: reading) {
             clauses = fromSentence
         } else {
             let lengths = ClauseSplitter.clauses(of: converter.segmentationWords(for: reading))
@@ -159,6 +156,22 @@ struct LatticeBuilder {
             position += clause.readingCount
             return ClausePlan(start: start, length: clause.readingCount, preferred: clause.text.isEmpty ? nil : clause.text)
         }
+    }
+
+    /// Zenzai が書き換えた文の語の並びが，語の途中で切れているか(てんきですね → 天｜気ですね)．切れていれば，その区切りは使わず，
+    /// Zenzai を使わない変換の語の並びで分ける．字だけで語の途中と見える区切り(1 字の漢字どうし)でも，
+    /// Zenzai を使わない変換の語の切れ目と同じ読みの位置なら語の境とみる(にはいえでるから → 家｜出るから．
+    /// 捨てると，何も変換しない Zenzai なしの語の並び「はいえ｜でるから」の長さに「家出｜るから」が当たる)
+    private func cutsWord(_ clauses: [ClauseSplitter.Clause], reading: String) -> Bool {
+        var position = 0
+        var suspicious: [Int] = []
+        for (clause, next) in zip(clauses, clauses.dropFirst()) {
+            position += clause.readingCount
+            if SegmentSplitter.cutsWord(before: clause.text, after: next.text) { suspicious.append(position) }
+        }
+        guard !suspicious.isEmpty else { return false }
+        let boundaries = Set(converter.segmentationWords(for: reading).reduce(into: [Int]()) { $0.append(($0.last ?? 0) + $1.readingCount) })
+        return !suspicious.allSatisfy(boundaries.contains)
     }
 
     /// build が文節ごとに求める候補を，1 文節ずつ前もって求める手順．変換器が読みごとに候補をためるので，あとの build が速くなる．

@@ -56,6 +56,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private var emojiFirstCandidates: [String: String] = [:]
     /// 今の入力を終えるまで学ばない(suspendLearningUntilEnd)．選んだ絵文字も覚えない
     private var learningSuspended = false
+    /// 入力位置の前に文字があるか(左の文脈)．無ければ 1 語の名詞の第 1 候補を漢字にする(ContextlessNoun)
+    private var hasLeftContext = false
     /// ユーザー辞書を読みで引く表．設定のユーザー辞書が変わったときだけ作り直す
     private var dictionaryIndex: (source: [UserDictionaryEntry], words: [String: [(word: String, comment: String)]]) = ([], [:])
     /// 取り込んだ辞書を引くもの．無ければ取り込んだ辞書は使わない
@@ -208,7 +210,10 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func dictionaryCandidates(for reading: String) -> [Candidate] { base.dictionaryCandidates(for: reading) }
     public func segmentationWords(for reading: String) -> [Candidate.Word] { base.segmentationWords(for: reading) }
     public func typoCorrections(forKeys keys: String) -> [ReadingCorrection] { base.typoCorrections(forKeys: keys) }
-    public func setLeftContext(_ text: String?) { base.setLeftContext(text) }
+    public func setLeftContext(_ text: String?) {
+        hasLeftContext = text.map { !$0.allSatisfy(\.isWhitespace) } ?? false
+        base.setLeftContext(text)
+    }
     public func setTyping(_ typing: Bool) { base.setTyping(typing) }
     public var hasDeferredConversion: Bool { base.hasDeferredConversion }
     public func performDeferredConversion() { base.performDeferredConversion() }
@@ -244,8 +249,10 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private func supplement(_ candidates: [Candidate], reading: String, forList: Bool = false) -> [Candidate] {
         let current = settings.current
         // エンジンの辞書から来る絵文字を含む候補を除く．ユーザー辞書の語より先に除き，登録した絵文字は消さない．
-        // 字の並びが崩れた候補(はッ制・じゅっ分・出発スる)は除く(BrokenSpellings)
-        var result = BrokenSpellings.cleaned(Okurigana.reorder(candidates.filter { !Self.isEngineEmoji($0) }, style: current.okuriganaStyle))
+        // 字の並びが崩れた候補(はッ制・じゅっ分・出発スる)は除く(BrokenSpellings)．
+        // 左の文脈が無いと Zenzai は 1 語の名詞をかなのまま写しがちなので，Zenzai を使わない変換の名詞を先にする(ContextlessNoun)
+        let ordered = hasLeftContext ? candidates : ContextlessNoun.reordered(candidates, reading: reading) { base.segmentCandidates(for: reading).first }
+        var result = BrokenSpellings.cleaned(Okurigana.reorder(ordered.filter { !Self.isEngineEmoji($0) }, style: current.okuriganaStyle))
         var userWords = userDictionaryWords(for: reading, in: current.userDictionary)
         if current.dynamicDictionary, userWords.contains(where: { TextTemplate.containsPlaceholder($0.word) }) {
             let values = templateValues()

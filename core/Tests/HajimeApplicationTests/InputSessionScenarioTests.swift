@@ -186,6 +186,29 @@ struct InputSessionScenarioTests {
         #expect(harness.lattice?.columns.map(\.text) == ["天気ですね"])
     }
 
+    @Test("1 字の漢字どうしの区切りでも，Zenzai を使わない変換の語の切れ目と同じ位置なら，見えている文の区切りを使う(家｜出るから)")
+    func keepsClauseAtPlainWordBoundary() {
+        let converter = FakeConverter([
+            "にはいえでるから": [("には家出るから", nil)], "には": [("には", nil)], "いえで": [("家出", nil)], "るから": [("るから", nil)],
+            "いえ": [("家", nil)], "でるから": [("出るから", nil)],
+        ])
+        // Zenzai が書き換えた文の語の並びは「に｜は家｜出るから」(辞書の句の語)．Zenzai を使わない変換は何も変換せず，
+        // 「に｜はいえ｜でるから」で「でるから」は助詞の「で」で始まる．その長さで分けると「には｜家出｜るから」になっていた
+        converter.candidateWords["には家出るから"] = [
+            Candidate.Word(text: "に", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Candidate.Word(text: "は家", readingCount: 3, startsWithParticle: true), Candidate.Word(text: "出るから", readingCount: 4, startsWithPredicate: true),
+        ]
+        converter.words["にはいえでるから"] = [
+            Candidate.Word(text: "に", readingCount: 1, startsWithParticle: true, endsWithParticle: true),
+            Candidate.Word(text: "はいえ", readingCount: 3, startsWithParticle: true),
+            Candidate.Word(text: "でるから", readingCount: 4, startsWithParticle: true),
+        ]
+        let harness = Harness(converter: converter)
+        harness.type("nihaiederukara")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.map(\.text) == ["には", "家", "出るから"])
+    }
+
     @Test("区切りを入れたあと Backspace でその位置より前に戻ると，区切りも消える")
     func boundaryRemovedByBackspace() {
         let converter = FakeConverter(["きょうは": [("京は", nil)], "きょう": [("今日", nil)], "きょ": [("巨", nil)]])
