@@ -87,16 +87,19 @@ enum Shot {
     DynamicOff,
     /// 辞書のファイルを取り込む前に中身を見せるシート(名詞にする行と読めない行を含む見本のファイル)
     ImportPreview,
+    /// キー設定の表から確定の行を消した(キーの無い知らせと「既定のキーを追加」)
+    MissingKeys,
 }
 
 impl Shot {
     /// ふつうの 1 枚のほかに写すページと状態
-    const TEMPLATES: [(Page, Shot); 5] = [
+    const TEMPLATES: [(Page, Shot); 6] = [
         (Page::Dictionary, Shot::Open),
         (Page::Dictionary, Shot::Typing),
         (Page::Dictionary, Shot::DynamicOff),
         (Page::Commands, Shot::Open),
         (Page::Dictionary, Shot::ImportPreview),
+        (Page::Keys, Shot::MissingKeys),
     ];
 
     fn suffix(self) -> &'static str {
@@ -106,6 +109,7 @@ impl Shot {
             Shot::Typing => "-templates-typing",
             Shot::DynamicOff => "-templates-off",
             Shot::ImportPreview => "-import-preview",
+            Shot::MissingKeys => "-missing-keys",
         }
     }
 }
@@ -2891,18 +2895,37 @@ impl App {
             return;
         };
         // 書き方のチップ: 開いているか(閉じた状態はふつうの 1 枚)と，「入力時の値にする」のオン・オフ
-        self.templates_open =
-            if matches!(shot, Shot::Plain | Shot::DynamicOff | Shot::ImportPreview) {
-                std::collections::HashSet::new()
-            } else {
-                [pages::TemplateTarget::Word, pages::TemplateTarget::Macro].into()
-            };
+        self.templates_open = if matches!(
+            shot,
+            Shot::Plain | Shot::DynamicOff | Shot::ImportPreview | Shot::MissingKeys
+        ) {
+            std::collections::HashSet::new()
+        } else {
+            [pages::TemplateTarget::Word, pages::TemplateTarget::Macro].into()
+        };
         if page == Page::Dictionary {
             if let Some(model) = &mut self.model {
                 let _ = model.set(
                     "dynamicDictionary",
                     serde_json::Value::Bool(shot != Shot::DynamicOff),
                 );
+            }
+        }
+        // キーの無い知らせ: キー設定の表から確定の行を消して写し，写したら元の表に戻す
+        let mut restored_keymap = None;
+        if shot == Shot::MissingKeys {
+            if let Some(model) = &mut self.model {
+                if let Some(keymap) = model.value("keymap").cloned() {
+                    let without_commit: Vec<serde_json::Value> = keymap
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter(|row| row["command"] != "commit")
+                        .cloned()
+                        .collect();
+                    let _ = model.set("keymap", serde_json::Value::Array(without_commit));
+                    restored_keymap = Some(keymap);
+                }
             }
         }
         self.forced_theme = Some(if dark {
@@ -2998,6 +3021,9 @@ impl App {
         self.import_sheet = None;
         if let Err(error) = written {
             eprintln!("{name} を書き出せませんでした: {error}");
+        }
+        if let (Some(keymap), Some(model)) = (restored_keymap, &mut self.model) {
+            let _ = model.set("keymap", keymap);
         }
         self.snapshots = Some((directory, jobs));
         ffi::post(self.window, WM_SNAPSHOT, 0, 0);
