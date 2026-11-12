@@ -25,8 +25,9 @@ struct PredictionUndoKeyUpgradeTests {
         for preset in [KeymapPreset.standard, .mac, .emacs, .vim] {
             #expect(preset.keymap.command(for: backspace, in: .idle) == .undoPrediction)
         }
+        // Windows 風・ATOK 風の Ctrl+Backspace は，バージョン 16 で確定の取り消しに替えた
         for preset in [KeymapPreset.windows, .atok] {
-            #expect(preset.keymap.command(for: controlBackspace, in: .idle) == .undoPrediction)
+            #expect(UndoCommitKeyUpgrade.previous(preset).command(for: controlBackspace, in: .idle) == .undoPrediction)
         }
     }
 

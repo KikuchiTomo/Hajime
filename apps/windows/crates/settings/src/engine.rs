@@ -603,6 +603,7 @@ mod tests {
                         reading: format!("よみ{index}"),
                         word: format!("語{index}"),
                         word_class: None,
+                        comment: None,
                     })
                     .collect(),
                 total: self.total as u32,

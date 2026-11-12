@@ -205,6 +205,7 @@ impl Engine for SampleEngine {
                     Some(existing) if *existing == entry => DictionaryAddResult::AlreadyRegistered,
                     Some(existing) => {
                         existing.word_class = entry.word_class;
+                        existing.comment = entry.comment;
                         DictionaryAddResult::Added
                     }
                     None => {

@@ -375,6 +375,9 @@ pub enum PointerTarget {
     ListVariant {
         index: u32,
     },
+    Comment {
+        index: u32,
+    },
 }
 
 impl fmt::Debug for PointerTarget {
@@ -398,6 +401,10 @@ impl fmt::Debug for PointerTarget {
                 .finish(),
             Self::ListVariant { index, .. } => f
                 .debug_struct("ListVariant")
+                .field("index", index)
+                .finish(),
+            Self::Comment { index, .. } => f
+                .debug_struct("Comment")
                 .field("index", index)
                 .finish(),
         }
@@ -694,6 +701,8 @@ pub struct DictionaryEntry {
     #[serde(rename = "wordClass")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub word_class: Option<WordClass>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
 }
 
 impl fmt::Debug for DictionaryEntry {
@@ -702,6 +711,7 @@ impl fmt::Debug for DictionaryEntry {
             .field("reading", &REDACTED)
             .field("word", &REDACTED)
             .field("wordClass", &self.word_class)
+            .field("comment", &REDACTED)
             .finish()
     }
 }
@@ -1378,6 +1388,9 @@ pub struct CandidateEntry {
     pub corrected_length: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<CommandKind>,
+    #[serde(rename = "hasComment")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has_comment: Option<bool>,
 }
 
 impl fmt::Debug for CandidateEntry {
@@ -1388,6 +1401,7 @@ impl fmt::Debug for CandidateEntry {
             .field("correctedStart", &self.corrected_start)
             .field("correctedLength", &self.corrected_length)
             .field("command", &self.command)
+            .field("hasComment", &self.has_comment)
             .finish()
     }
 }
@@ -1625,6 +1639,9 @@ pub struct BranchColumn {
     #[serde(rename = "alternativeCommands")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alternative_commands: Option<Vec<Option<CommandKind>>>,
+    #[serde(rename = "alternativeComments")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alternative_comments: Option<Vec<bool>>,
     #[serde(rename = "sourceName")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source_name: Option<String>,
@@ -1651,6 +1668,7 @@ impl fmt::Debug for BranchColumn {
             .field("homophone", &self.homophone)
             .field("alternativeNotes", &REDACTED)
             .field("alternativeCommands", &self.alternative_commands)
+            .field("alternativeComments", &self.alternative_comments)
             .field("sourceName", &REDACTED)
             .field("split", &self.split)
             .finish()

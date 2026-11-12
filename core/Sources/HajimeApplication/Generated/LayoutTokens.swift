@@ -62,7 +62,9 @@ public enum LayoutTokens {
         public static let previewChipGap: Double = 6
         public static let ruleCheckColumnWidth: Double = 40
         public static let ruleKeyColumnWidth: Double = 160
-        public static let ruleValueColumnWidth: Double = 200
+        public static let ruleValueColumnWidth: Double = 150
+        public static let ruleNoteFieldGap: Double = 8
+        public static let ruleKindColumnWidth: Double = 120
         public static let commandReadingColumnWidth: Double = 110
         public static let commandTitleColumnWidth: Double = 120
         public static let commandKindColumnWidth: Double = 130
@@ -72,7 +74,7 @@ public enum LayoutTokens {
         public static let tablePopupTextInset: Double = 21
         public static let themeEditorWidth: Double = 640
         public static let themeEditorHeight: Double = 720
-        public static let userDictionaryTableHeight: Double = 330
+        public static let userDictionaryTableHeight: Double = 280
         public static let previewPadding: Double = 24
         public static let keyFilterRadius: Double = 5
         public static let fontSliderWidth: Double = 220
@@ -244,7 +246,7 @@ public enum LayoutTokens {
         public static let cardGap: Double = 4
         public static let cardRadius: Double = 4
         public static let cardPaddingX: Double = 16
-        public static let rowHeight: Double = 52
+        public static let rowHeight: Double = 68
         public static let controlHeight: Double = 32
         public static let dropdownHeight: Double = 384
         public static let controlWidth: Double = 240
@@ -312,7 +314,7 @@ public enum LayoutTokens {
         public static let sliderThumbSize: Double = 20
         public static let sliderThumbInner: Double = 12
         public static let sliderThumbInnerHover: Double = 14
-        public static let cardPaddingY: Double = 12
+        public static let cardPaddingY: Double = 16
         public static let footerGap: Double = 8
         public static let labelMinWidth: Double = 160
         public static let radioSize: Double = 20
@@ -325,6 +327,9 @@ public enum LayoutTokens {
         public static let themeSwatchRadius: Double = 6
         public static let themeSwatchFontSize: Double = 11
         public static let aboutIcon: Double = 64
+        public static let titleBarHeight: Double = 32
+        public static let titleBarIconSize: Double = 16
+        public static let titleBarPaddingX: Double = 16
         public static let aboutTitleFontSize: Double = 20
         public static let palettePreviewHeight: Double = 300
         public static let switchKnobOff: Double = 12

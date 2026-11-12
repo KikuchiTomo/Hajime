@@ -520,6 +520,21 @@ struct EngineServiceTests {
         #expect(settings.current.userDictionary.map(\.word) == ["会社"])
     }
 
+    @Test("ユーザー辞書の語のコメントを足して読み返す．コメントの無い語は送らない")
+    func userDictionaryComment() {
+        let id = greeted()
+        let added = service.handle(WireRequest(id: 44, body: .addUserDictionaryEntry(entry: WireDictionaryEntry(reading: "かいしゃ", word: "会社", comment: "本社"))),
+                                   from: id).body
+        #expect(added == .dictionaryAdded(result: .added))
+        _ = service.handle(WireRequest(id: 45, body: .addUserDictionaryEntry(entry: WireDictionaryEntry(reading: "あ", word: "亜"))), from: id)
+        #expect(settings.current.userDictionary.map(\.comment) == ["本社", ""])
+        guard case .userDictionary(let page, _) = service.handle(WireRequest(id: 46, body: .readUserDictionary(offset: 0, limit: 10)), from: id).body else {
+            Issue.record("ユーザー辞書を読めない")
+            return
+        }
+        #expect(page.map(\.comment) == ["本社", nil])
+    }
+
     @Test("通信の品詞は core の品詞と同じ名前を同じ順に持つ")
     func wordClassCases() {
         #expect(WireWordClass.allCases.map(\.rawValue) == WordClass.allCases.map(\.rawValue))

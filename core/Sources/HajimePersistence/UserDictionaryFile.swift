@@ -3,7 +3,7 @@ import HajimeDomain
 
 /// ユーザー辞書を「読み<タブ>語<タブ>品詞」の行のテキストで読み書きする．
 /// 品詞は Google 日本語入力の品詞の名前で書き，読むときは他の IME の品詞の名前も対応付ける(WordClass(partOfSpeech:))．
-/// 品詞の列が無い行は名詞として読む．4 列目以降(コメント)は読まない．
+/// 品詞の列が無い行は名詞として読む．4 列目はコメント(Google 日本語入力の書き出しと同じ)．長すぎるコメントは上限の長さで切る
 /// Google 日本語入力・Microsoft IME(UTF-16)・ATOK の書き出し，Shift_JIS・EUC-JP のファイル，macOS のユーザ辞書の plist，SKK の辞書も読む
 public enum UserDictionaryFile {
     public enum FileError: Error, Equatable {
@@ -55,7 +55,8 @@ public enum UserDictionaryFile {
             let columns = line.split(separator: "\t", omittingEmptySubsequences: false)
             guard columns.count >= 2 else { return nil }
             let wordClass = columns.count >= 3 ? WordClass(partOfSpeech: String(columns[2])) : DefaultSettings.userWordClass
-            let entry = UserDictionaryEntry(reading: String(columns[0]), word: String(columns[1]), wordClass: wordClass)
+            let comment = columns.count >= 4 ? String(columns[3].trimmingCharacters(in: .whitespaces).prefix(DefaultSettings.maximumUserDictionaryCommentLength)) : ""
+            let entry = UserDictionaryEntry(reading: String(columns[0]), word: String(columns[1]), wordClass: wordClass, comment: comment)
             return entry.isValid ? entry : nil
         }
     }
@@ -66,7 +67,10 @@ public enum UserDictionaryFile {
     }
 
     public static func write(_ entries: [UserDictionaryEntry], to url: URL) throws {
-        let text = entries.map { "\($0.reading)\t\($0.word)\t\($0.wordClass.partOfSpeechName)" }.joined(separator: "\n") + "\n"
+        let text = entries.map { entry in
+            let line = "\(entry.reading)\t\(entry.word)\t\(entry.wordClass.partOfSpeechName)"
+            return entry.comment.isEmpty ? line : line + "\t" + entry.comment
+        }.joined(separator: "\n") + "\n"
         try Data(text.utf8).write(to: url, options: .atomic)
     }
 }

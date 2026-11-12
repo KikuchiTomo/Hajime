@@ -73,7 +73,10 @@ final class CandidatePanelController {
             let command = focused.selectedAlternative.flatMap { index in
                 focused.alternativeCommands.indices.contains(index) && focused.alternativeCommands[index] != nil ? focused.alternatives[index] : nil
             }
-            let text = command.map(UIStrings.Candidate.commandAnnouncement) ?? focused.text
+            let named = command.map(UIStrings.Candidate.commandAnnouncement) ?? focused.text
+            // ユーザー辞書の語のコメントがあれば続けて読む(札を押すとコメントを入れられる)
+            let comment = focused.selectedAlternative.flatMap(focused.comment(at:))
+            let text = comment.map { UIStrings.Candidate.commentAnnouncement(named, comment: $0) } ?? named
             announce(focused.homophone.map { "\(text)、\($0.text)" } ?? text)
         }
     }
@@ -193,7 +196,9 @@ final class CandidatePanelController {
         case .candidate: panel.selectedEntry.flatMap { index in
             guard panel.entries.indices.contains(index) else { return nil }
             let entry = panel.entries[index]
-            return entry.command == nil ? entry.text : UIStrings.Candidate.commandAnnouncement(entry.text)
+            let text = entry.command == nil ? entry.text : UIStrings.Candidate.commandAnnouncement(entry.text)
+            // ユーザー辞書の語のコメントがあれば続けて読む(札を押すとコメントを入れられる)
+            return entry.comment.map { UIStrings.Candidate.commentAnnouncement(text, comment: $0) } ?? text
         }
         case .variants: panel.selectedVariant.flatMap { panel.variants.indices.contains($0) ? panel.variants[$0].label : nil }
         }

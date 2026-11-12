@@ -439,6 +439,18 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             );
             if pressable {
                 for index in 0..column.alternatives.len() {
+                    // コメントの札は枝の行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
+                    // 札を押すと候補の代わりにコメントを入れる
+                    if let Some(comment) = super::alternative_comment(column, index) {
+                        let row = branch_row(node, layout.branch_width, index, true, &metrics);
+                        let frame = painter.tag_hit_frame(comment, tag_max_x(row), row);
+                        painter.hit(
+                            frame,
+                            ipc::PointerTarget::Comment {
+                                index: index as u32,
+                            },
+                        );
+                    }
                     let y = node.max_y() + index as f32 * metrics.row_height;
                     painter.hit(
                         Frame::new(node.x, y, layout.branch_width, metrics.row_height),
@@ -644,7 +656,7 @@ struct Row {
     badge: String,
     selected: bool,
     opacity: f32,
-    /// 打ったまま・修正・コマンドの添え書き
+    /// 打ったまま・修正・コマンドの添え書きか，ユーザー辞書の語のコメント
     note: Option<String>,
     /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色の札にする)
     command: Option<CommandKind>,
@@ -687,6 +699,27 @@ fn upper_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
         .collect()
 }
 
+/// 枝の index 番目の行(番号・文字・札を描く枠)．描くときと押した位置を調べるときで同じものを使う
+fn branch_row(node: Frame, width: f32, index: usize, downward: bool, metrics: &Metrics) -> Frame {
+    let stem_x = (node.x + metrics.stem_x).round();
+    let y = if downward {
+        node.max_y() + index as f32 * metrics.row_height
+    } else {
+        node.y - (index + 1) as f32 * metrics.row_height
+    };
+    Frame::new(
+        stem_x + metrics.branch_indent,
+        y,
+        width - metrics.stem_x - metrics.branch_indent,
+        metrics.row_height,
+    )
+}
+
+/// 枝の行の札の右端
+fn tag_max_x(row: Frame) -> f32 {
+    row.max_x() - candidate::PADDING_X / 2.0
+}
+
 fn branches(
     painter: &mut Painter,
     rows: &[Row],
@@ -699,19 +732,7 @@ fn branches(
         return;
     }
     let stem_x = (node.x + metrics.stem_x).round();
-    let row_frame = |index: usize| {
-        let y = if downward {
-            node.max_y() + index as f32 * metrics.row_height
-        } else {
-            node.y - (index + 1) as f32 * metrics.row_height
-        };
-        Frame::new(
-            stem_x + metrics.branch_indent,
-            y,
-            width - metrics.stem_x - metrics.branch_indent,
-            metrics.row_height,
-        )
-    };
+    let row_frame = |index: usize| branch_row(node, width, index, downward, metrics);
     if painter.theme.curved_branches() {
         let stem_y = if downward {
             node.max_y() - glass::CURVE_START_OVERLAP
@@ -866,7 +887,7 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
     if let Some(note) = row.note.as_deref() {
         painter.tag(
             note,
-            frame.max_x() - padding / 2.0,
+            tag_max_x(frame),
             frame.mid_y(),
             row.selected,
             TagStyle::of(note, row.command.is_some()),
@@ -986,6 +1007,7 @@ mod tests {
             homophone: None,
             alternative_notes: vec![None, Some("修正".into())],
             alternative_commands: None,
+            alternative_comments: None,
             source_name: None,
             split: None,
         }
@@ -1112,6 +1134,63 @@ mod tests {
     }
 
     #[test]
+    fn コメントの札を押すとコメント_札の外の枝と_コメントでない札は候補() {
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let mut commented = map();
+            commented.columns[0].alternative_notes =
+                vec![Some("千代田区千代田1-1".into()), Some("修正".into())];
+            commented.columns[0].alternative_comments = Some(vec![true, false]);
+            let scene = branch_map(&commented, &Look::new(&theme, 15.0), &Fixed);
+            let hit = |target: ipc::PointerTarget| {
+                scene
+                    .hits
+                    .iter()
+                    .find(|hit| hit.target == target)
+                    .map(|hit| hit.frame)
+            };
+            let comment = ipc::PointerTarget::Comment { index: 0 };
+            let tag = text_frame(&scene, "千代田区千代田1-1").expect("札を描く");
+            assert_eq!(
+                scene.target_at(tag.mid_x(), tag.mid_y()),
+                Some(comment.clone())
+            );
+            // 札の上下の空きも，枝の行の高さいっぱいまで札として押せる
+            let row = hit(ipc::PointerTarget::Alternative { index: 0 }).expect("枝の行");
+            let area = hit(comment.clone()).expect("札を押せる範囲");
+            assert_eq!((area.y, area.height), (row.y, row.height), "{name}");
+            assert!(area.max_x() <= row.max_x(), "{name}");
+            assert_eq!(scene.target_at(tag.mid_x(), row.y + 1.0), Some(comment));
+            // 札の左(候補の文字の側)は候補
+            assert_eq!(
+                scene.target_at(area.x - 1.0, row.mid_y()),
+                Some(ipc::PointerTarget::Alternative { index: 0 })
+            );
+            // コメントでない札(修正)は押しても候補
+            let corrected = scene
+                .draws
+                .iter()
+                .filter_map(|draw| match draw {
+                    Draw::Text { text, frame, .. } if text == "修正" => Some(*frame),
+                    _ => None,
+                })
+                .find(|frame| frame.y > row.y)
+                .expect("枝の札を描く");
+            assert_eq!(
+                scene.target_at(corrected.mid_x(), corrected.mid_y()),
+                Some(ipc::PointerTarget::Alternative { index: 1 })
+            );
+        }
+        // コメントの無い分岐図には札の押せる範囲を足さない
+        let theme = theme("automatic");
+        let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
+        assert!(!scene
+            .hits
+            .iter()
+            .any(|hit| matches!(hit.target, ipc::PointerTarget::Comment { .. })));
+    }
+
+    #[test]
     fn 区切っているあいだは枝を押せない() {
         let theme = theme("automatic");
         let mut splitting = map();
@@ -1121,7 +1200,9 @@ mod tests {
         let scene = branch_map(&splitting, &Look::new(&theme, 15.0), &Fixed);
         assert!(!scene.hits.iter().any(|hit| matches!(
             hit.target,
-            ipc::PointerTarget::Alternative { .. } | ipc::PointerTarget::Variant { .. }
+            ipc::PointerTarget::Alternative { .. }
+                | ipc::PointerTarget::Variant { .. }
+                | ipc::PointerTarget::Comment { .. }
         )));
     }
 

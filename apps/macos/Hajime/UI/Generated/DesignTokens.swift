@@ -181,7 +181,9 @@ enum DesignTokens {
             static let previewChipGap: CGFloat = 6
             static let ruleCheckColumnWidth: CGFloat = 40
             static let ruleKeyColumnWidth: CGFloat = 160
-            static let ruleValueColumnWidth: CGFloat = 200
+            static let ruleValueColumnWidth: CGFloat = 150
+            static let ruleNoteFieldGap: CGFloat = 8
+            static let ruleKindColumnWidth: CGFloat = 120
             static let commandReadingColumnWidth: CGFloat = 110
             static let commandTitleColumnWidth: CGFloat = 120
             static let commandKindColumnWidth: CGFloat = 130
@@ -191,7 +193,7 @@ enum DesignTokens {
             static let tablePopupTextInset: CGFloat = 21
             static let themeEditorWidth: CGFloat = 640
             static let themeEditorHeight: CGFloat = 720
-            static let userDictionaryTableHeight: CGFloat = 330
+            static let userDictionaryTableHeight: CGFloat = 280
             static let previewPadding: CGFloat = 24
             static let keyFilterRadius: CGFloat = 5
             static let fontSliderWidth: CGFloat = 220
@@ -363,7 +365,7 @@ enum DesignTokens {
             static let cardGap: CGFloat = 4
             static let cardRadius: CGFloat = 4
             static let cardPaddingX: CGFloat = 16
-            static let rowHeight: CGFloat = 52
+            static let rowHeight: CGFloat = 68
             static let controlHeight: CGFloat = 32
             static let dropdownHeight: CGFloat = 384
             static let controlWidth: CGFloat = 240
@@ -431,7 +433,7 @@ enum DesignTokens {
             static let sliderThumbSize: CGFloat = 20
             static let sliderThumbInner: CGFloat = 12
             static let sliderThumbInnerHover: CGFloat = 14
-            static let cardPaddingY: CGFloat = 12
+            static let cardPaddingY: CGFloat = 16
             static let footerGap: CGFloat = 8
             static let labelMinWidth: CGFloat = 160
             static let radioSize: CGFloat = 20
@@ -444,6 +446,9 @@ enum DesignTokens {
             static let themeSwatchRadius: CGFloat = 6
             static let themeSwatchFontSize: CGFloat = 11
             static let aboutIcon: CGFloat = 64
+            static let titleBarHeight: CGFloat = 32
+            static let titleBarIconSize: CGFloat = 16
+            static let titleBarPaddingX: CGFloat = 16
             static let aboutTitleFontSize: CGFloat = 20
             static let palettePreviewHeight: CGFloat = 300
             static let switchKnobOff: CGFloat = 12

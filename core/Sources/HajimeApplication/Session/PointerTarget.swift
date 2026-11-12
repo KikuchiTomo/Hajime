@@ -10,4 +10,7 @@ public enum PointerTarget: Sendable, Hashable {
     case entry(Int)
     /// 候補の一覧の上の字種の行(左から 0．ScriptVariant.allCases の順)
     case listVariant(Int)
+    /// 候補に添えたユーザー辞書のコメント．一覧なら見えている行，分岐図なら注目している文節の下の枝の位置(上から 0)．
+    /// 候補の代わりにコメントそのものを入れる
+    case comment(Int)
 }

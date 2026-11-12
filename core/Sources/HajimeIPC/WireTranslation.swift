@@ -128,15 +128,15 @@ extension WireKeyChord {
 }
 
 extension WireSessionState {
-    /// undoablePrediction は予測の確定を取り消せるか．取り消すキー(入力文字なしの Backspace など)は，取り消せるときだけ送ってもらう
-    /// (いつも送ってもらうと，ふだんの Backspace もエンジンを通る)
+    /// undoablePrediction は予測の確定を，undoableCommit は確定(予測も含む)を取り消せるか．取り消すキー(入力文字なしの Backspace・
+    /// Ctrl+Backspace など)は，取り消せるときだけ送ってもらう(いつも送ってもらうと，ふだんの Backspace もエンジンを通る)
     public init(mode: InputMode, isComposing: Bool, keymap: Keymap, wakeAfterMilliseconds: UInt32?, keyboardLayout: String? = nil,
-                undoablePrediction: Bool = false) {
+                undoablePrediction: Bool = false, undoableCommit: Bool = false) {
         let state: KeymapState = mode == .direct ? .direct : .idle
         var chords: [WireKeyChord] = []
         if !isComposing {
             for entry in keymap.entries where (entry.state == state || entry.state == .anywhere) && entry.command.isAvailable(in: state)
-                && (undoablePrediction || entry.command != .undoPrediction) {
+                && (undoablePrediction || entry.command != .undoPrediction) && (undoableCommit || entry.command != .undoCommit) {
                 guard let chord = WireKeyChord(entry.stroke), !chords.contains(chord) else { continue }
                 chords.append(chord)
             }
@@ -185,7 +185,9 @@ extension WireCandidateList {
                 return WireCandidateEntry(text: entry.text, annotation: entry.annotation,
                                           correctedStart: corrected.map { UInt32(clamping: $0.start) },
                                           correctedLength: corrected.map { UInt32(clamping: $0.length) },
-                                          command: entry.command.map(WireCommandKind.init))
+                                          command: entry.command.map(WireCommandKind.init),
+                                          // コメントでなければ送らない
+                                          hasComment: entry.hasComment ? true : nil)
             },
             selectedEntry: panel.selectedEntry.map(UInt32.init(clamping:)),
             focus: panel.focus == .candidate ? .candidate : .variants,
@@ -207,13 +209,14 @@ extension WireCandidateList {
 
 extension WireDictionaryEntry {
     public init(_ entry: UserDictionaryEntry) {
-        self.init(reading: entry.reading, word: entry.word, wordClass: WireWordClass(rawValue: entry.wordClass.rawValue))
+        self.init(reading: entry.reading, word: entry.word, wordClass: WireWordClass(rawValue: entry.wordClass.rawValue),
+                  comment: entry.comment.isEmpty ? nil : entry.comment)
     }
 
     /// 品詞を送らない設定の画面(品詞を選べるようになる前のもの)から来た語は，登録するときの既定の品詞にする
     public var entry: UserDictionaryEntry {
         UserDictionaryEntry(reading: reading, word: word,
-                            wordClass: wordClass.flatMap { WordClass(rawValue: $0.rawValue) } ?? DefaultSettings.userWordClass)
+                            wordClass: wordClass.flatMap { WordClass(rawValue: $0.rawValue) } ?? DefaultSettings.userWordClass, comment: comment ?? "")
     }
 }
 
@@ -296,6 +299,7 @@ extension WireBranchMap {
                     homophone: column.homophone.map(WireHomophoneNote.init),
                     alternativeNotes: column.alternativeNotes,
                     alternativeCommands: column.alternativeCommands.isEmpty ? nil : column.alternativeCommands.map { $0.map(WireCommandKind.init) },
+                    alternativeComments: column.alternativeComments.isEmpty ? nil : column.alternativeComments,
                     sourceName: column.sourceName,
                     split: column.split.map { WireBranchSplit(pieces: $0.pieces) }
                 )

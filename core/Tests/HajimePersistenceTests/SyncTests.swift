@@ -194,6 +194,19 @@ struct SyncMergeTests {
         #expect(ledger.dictionaryAddedAt[SyncMerge.key(reading: "あ", word: "亜")] == t2)
     }
 
+    @Test("ユーザー辞書のコメントも届け，コメントを変えた語は登録し直したものとして時刻を記す")
+    func dictionaryComment() throws {
+        var remote = SyncDocument()
+        remote.dictionary = [.init(reading: "かいしゃ", word: "会社", wordClass: "noun", comment: "本社", addedAt: t2)]
+        let result = SyncMerge.merge(local: try object(), ledger: SyncLedger(), remote: remote, scopes: [:], now: t2)
+        #expect(try SettingsCoding.settings(from: result.settings).userDictionary.map(\.comment) == ["本社"])
+        var ledger = SyncLedger()
+        let before = try object { $0.userDictionary = [UserDictionaryEntry(reading: "かいしゃ", word: "会社", comment: "本社")] }
+        let after = try object { $0.userDictionary = [UserDictionaryEntry(reading: "かいしゃ", word: "会社", comment: "支社")] }
+        SyncMerge.noteChange(from: before, to: after, ledger: &ledger, now: t1)
+        #expect(ledger.dictionaryAddedAt[SyncMerge.key(reading: "かいしゃ", word: "会社")] == t1)
+    }
+
     @Test("古い墓標は捨てる")
     func prunesTombstones() throws {
         var ledger = SyncLedger()
