@@ -410,7 +410,6 @@ enum DesignTokens {
             static let scrollLine: CGFloat = 40
             static let listHeight: CGFloat = 220
             static let buttonWidth: CGFloat = 96
-            static let previewHeight: CGFloat = 240
             static let buttonPaddingX: CGFloat = 12
             static let pagePaddingTop: CGFloat = 20
             static let titleFontSize: CGFloat = 28
@@ -487,6 +486,8 @@ enum DesignTokens {
             static let wizardModeSize: CGFloat = 28
             static let wizardHeroSize: CGFloat = 72
             static let stepperButtonWidth: CGFloat = 32
+            static let iconButtonWidth: CGFloat = 40
+            static let dialogRadius: CGFloat = 8
             static let sliderTrackHeight: CGFloat = 4
             static let sliderThumbSize: CGFloat = 20
             static let sliderThumbInner: CGFloat = 12
@@ -512,8 +513,6 @@ enum DesignTokens {
             static let titleBarIconSize: CGFloat = 16
             static let titleBarPaddingX: CGFloat = 16
             static let aboutTitleFontSize: CGFloat = 20
-            static let emojiPreviewHeight: CGFloat = 260
-            static let palettePreviewHeight: CGFloat = 300
             static let switchKnobOff: CGFloat = 12
             static let switchKnobOn: CGFloat = 14
             static let switchKnobPressed: CGFloat = 2
@@ -666,6 +665,7 @@ enum DesignTokens {
             static let sliderTrackDisabled: CGFloat = 0.5
             static let previewChip: CGFloat = 0.06
             static let tableStripe: CGFloat = 0.035
+            static let smoke: CGFloat = 0.3
         }
     }
 }

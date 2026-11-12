@@ -1,0 +1,27 @@
+{{- /*
+Markdown の表．中身は Hugo の既定と同じ．各セルに列の見出しを data-label として持たせ，
+狭い画面では表を行ごとのカードに組み替えて，見出しをセルの小さな項目名として出す(assets/css/custom.css)．
+セルの中身を 1 つの span に入れ，項目名と中身の 2 つを横に並べられるようにする(中の code などを別々に並べない)
+*/ -}}
+{{- $head := index .THead 0 -}}
+<table
+  {{- range $key, $value := .Attributes }} {{ $key }}="{{ $value }}"{{ end }}>
+  <thead>
+    {{- range .THead }}
+    <tr>
+      {{- range . }}
+      <th{{ with .Alignment }} style="text-align: {{ . }}"{{ end }}>{{ .Text }}</th>
+      {{- end }}
+    </tr>
+    {{- end }}
+  </thead>
+  <tbody>
+    {{- range .TBody }}
+    <tr>
+      {{- range $index, $cell := . }}
+      <td data-label="{{ (index $head $index).Text | plainify }}"{{ with $cell.Alignment }} style="text-align: {{ . }}"{{ end }}>{{ with $cell.Text }}<span>{{ . }}</span>{{ end }}</td>
+      {{- end }}
+    </tr>
+    {{- end }}
+  </tbody>
+</table>

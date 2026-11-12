@@ -172,6 +172,7 @@ pub struct SettingsPalette {
     pub nav_pressed: Rgb,
     pub nav_selected: Rgb,
     pub scrollbar: Rgb,
+    pub smoke: Rgb,
     pub switch_off: Rgb,
     pub text: Rgb,
     pub text_disabled: Rgb,
@@ -203,6 +204,7 @@ pub mod settings_windows {
         nav_pressed: Rgb { red: 0xE5, green: 0xE5, blue: 0xE5 },
         nav_selected: Rgb { red: 0xEA, green: 0xEA, blue: 0xEA },
         scrollbar: Rgb { red: 0x8A, green: 0x8A, blue: 0x8A },
+        smoke: Rgb { red: 0x00, green: 0x00, blue: 0x00 },
         switch_off: Rgb { red: 0x7A, green: 0x7A, blue: 0x7A },
         text: Rgb { red: 0x1B, green: 0x1B, blue: 0x1B },
         text_disabled: Rgb { red: 0xA0, green: 0xA0, blue: 0xA0 },
@@ -230,6 +232,7 @@ pub mod settings_windows {
         nav_pressed: Rgb { red: 0x26, green: 0x26, blue: 0x26 },
         nav_selected: Rgb { red: 0x2D, green: 0x2D, blue: 0x2D },
         scrollbar: Rgb { red: 0x9F, green: 0x9F, blue: 0x9F },
+        smoke: Rgb { red: 0x00, green: 0x00, blue: 0x00 },
         switch_off: Rgb { red: 0x9A, green: 0x9A, blue: 0x9A },
         text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
         text_disabled: Rgb { red: 0x78, green: 0x78, blue: 0x78 },
@@ -545,7 +548,6 @@ pub mod size {
         pub const SCROLL_LINE: f32 = 40.0;
         pub const LIST_HEIGHT: f32 = 220.0;
         pub const BUTTON_WIDTH: f32 = 96.0;
-        pub const PREVIEW_HEIGHT: f32 = 240.0;
         pub const BUTTON_PADDING_X: f32 = 12.0;
         pub const PAGE_PADDING_TOP: f32 = 20.0;
         pub const TITLE_FONT_SIZE: f32 = 28.0;
@@ -622,6 +624,8 @@ pub mod size {
         pub const WIZARD_MODE_SIZE: f32 = 28.0;
         pub const WIZARD_HERO_SIZE: f32 = 72.0;
         pub const STEPPER_BUTTON_WIDTH: f32 = 32.0;
+        pub const ICON_BUTTON_WIDTH: f32 = 40.0;
+        pub const DIALOG_RADIUS: f32 = 8.0;
         pub const SLIDER_TRACK_HEIGHT: f32 = 4.0;
         pub const SLIDER_THUMB_SIZE: f32 = 20.0;
         pub const SLIDER_THUMB_INNER: f32 = 12.0;
@@ -647,8 +651,6 @@ pub mod size {
         pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;
         pub const TITLE_BAR_PADDING_X: f32 = 16.0;
         pub const ABOUT_TITLE_FONT_SIZE: f32 = 20.0;
-        pub const EMOJI_PREVIEW_HEIGHT: f32 = 260.0;
-        pub const PALETTE_PREVIEW_HEIGHT: f32 = 300.0;
         pub const SWITCH_KNOB_OFF: f32 = 12.0;
         pub const SWITCH_KNOB_ON: f32 = 14.0;
         pub const SWITCH_KNOB_PRESSED: f32 = 2.0;
@@ -803,5 +805,6 @@ pub mod opacity {
         pub const SLIDER_TRACK_DISABLED: f32 = 0.5;
         pub const PREVIEW_CHIP: f32 = 0.06;
         pub const TABLE_STRIPE: f32 = 0.035;
+        pub const SMOKE: f32 = 0.3;
     }
 }

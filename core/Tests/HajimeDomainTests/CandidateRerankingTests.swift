@@ -67,14 +67,14 @@ struct CandidateRerankingTests {
         #expect(CandidateReranking.reranked([], adding: [Self.engine("一")], readingCount: 4) { _ in 0 }.isEmpty)
     }
 
-    @Test("促音の切れ端を漢字とつないだ候補は，点数が高くても上げず，同じ読みの数のほかの候補の下に置く")
+    @Test("促音の切れ端を漢字とつないだ候補は，点数が高くても採点せず，並べ替えたあとに除く")
     func keepsSokuonFragmentsDown() {
         let fragment = Candidate(text: "じゅっ分", readingCount: 4, origin: .engine(id: 1),
                                  words: [Candidate.Word(text: "じゅっ", readingCount: 3), Candidate.Word(text: "分", readingCount: 1)])
         let candidates = [Self.engine("10分"), Self.engine("十分"), fragment, Self.engine("ジュップン")]
         let scores = ["十分": -3.0, "じゅっ分": -0.5, "ジュップン": -5.0]
         let result = CandidateReranking.reranked(candidates, adding: [], readingCount: 4) { scores[$0] }
-        #expect(result.map(\.text) == ["10分", "十分", "ジュップン", "じゅっ分"])
+        #expect(result.map(\.text) == ["10分", "十分", "ジュップン"])
         #expect(!CandidateReranking.textsToScore(candidates, adding: [], readingCount: 4).contains("じゅっ分"))
     }
 }

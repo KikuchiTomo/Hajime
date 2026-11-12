@@ -1,9 +1,11 @@
 //! 設定の画面のアプリ．エンジンへの接続と窓をここで組み立てる(composition root)
 
 mod actions;
+mod editor;
 mod ffi;
 mod page;
 mod paint;
+mod sheet;
 mod theme;
 mod update;
 mod window;
