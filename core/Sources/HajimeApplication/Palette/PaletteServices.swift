@@ -1,14 +1,14 @@
 import Foundation
 import HajimeDomain
 
-/// パレットの表と，表から作った検索の仕組み
+/// パレットの表と，表から作った検索の仕組み．synonyms はかな漢字変換の候補に足す絵文字の，同じ意味の語の一覧
 public struct PaletteIndex: Sendable {
     public let catalog: PaletteCatalog
     public let search: PaletteSearch
 
-    public init(catalog: PaletteCatalog) {
+    public init(catalog: PaletteCatalog, synonyms: EmojiSynonyms = EmojiSynonyms()) {
         self.catalog = catalog
-        self.search = PaletteSearch(catalog: catalog)
+        self.search = PaletteSearch(catalog: catalog, synonyms: synonyms)
     }
 }
 

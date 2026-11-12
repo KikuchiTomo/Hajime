@@ -45,9 +45,11 @@ struct EmojiRelevanceTests {
 
     @Test("名前そのもの・名前の語の境・キーワードで名前の中にある語・かなの名前の読みは出す", arguments: [
         ("😄", "えがお", "笑顔"), ("🍣", "すし", "すし"), ("😺", "ねこ", "猫"), ("🚗", "くるま", "車"), ("🐈", "ねこ", "猫"), ("🍺", "びーる", "ビール"),
+        ("💐", "はな", "花"),
     ])
     func related(text: String, reading: String, word: String) throws {
-        let item = try #require([Self.smile, Self.sushi, Self.grinningCat, Self.car, Self.cat, Self.beer].first { $0.text == text })
+        let bouquet = PaletteItem(kind: .emoji, category: .nature, text: "💐", japaneseName: "花束", nameReading: "はなたば", readings: ["はな"], keywords: ["花"])
+        let item = try #require([Self.smile, Self.sushi, Self.grinningCat, Self.car, Self.cat, Self.beer, bouquet].first { $0.text == text })
         #expect(Self.matches(item, reading, word))
     }
 
@@ -78,6 +80,33 @@ struct EmojiRelevanceTests {
                                       readings: ["ぶどう"], keywords: ["武道"])
         #expect(!Self.matches(martialArts, "ぶどう", "ブドウ"))
         #expect(EmojiRelevance.containsKanji("帰る") && !EmojiRelevance.containsKanji("ウマ") && !EmojiRelevance.containsKanji("とり"))
+    }
+
+    @Test("漢字の語が名前にあっても，名前の読みに文節の読みが無ければ出さない(車(くるま) → 🚗 自動車(じどうしゃ)．空(そら) → 🈳 空マーク(くう))")
+    func nameReading() {
+        let car = PaletteItem(kind: .emoji, category: .travel, text: "🚗", japaneseName: "自動車", nameReading: "じどうしゃ",
+                              readings: ["くるま", "じどうしゃ"], keywords: ["自動車", "車"])
+        #expect(!Self.matches(car, "くるま", "車"))
+        #expect(Self.matches(car, "じどうしゃ", "自動車"))
+        let ambulance = PaletteItem(kind: .emoji, category: .travel, text: "🚑", japaneseName: "救急車", nameReading: "きゅうきゅうしゃ",
+                                    readings: ["くるま"], keywords: ["車"])
+        #expect(!Self.matches(ambulance, "くるま", "車"))
+        let catFace = PaletteItem(kind: .emoji, category: .smileys, text: "😺", japaneseName: "にっこり笑う猫", nameReading: "にっこりわらうねこ",
+                                  readings: ["ねこ"], keywords: ["猫"])
+        #expect(Self.matches(catFace, "ねこ", "猫"))
+    }
+
+    @Test("囲み文字の記号は名前そのもののときだけ出す(空 → 🈳 は出さない．空マーク → 🈳 は出す)")
+    func enclosedIdeograph() {
+        let vacancy = PaletteItem(kind: .emoji, category: .symbols, text: "🈳", japaneseName: "空マーク", nameReading: "そらまーく",
+                                  readings: ["そら", "くう", "くうしつ"], keywords: ["空", "空室"])
+        #expect(!Self.matches(vacancy, "そら", "空"))
+        #expect(!Self.matches(vacancy, "くう", "空"))
+        #expect(!Self.matches(vacancy, "くうしつ", "空室"))
+        #expect(Self.matches(vacancy, "そらまーく", "空マーク"))
+        let secret = PaletteItem(kind: .emoji, category: .symbols, text: "㊙️", japaneseName: "マル秘", nameReading: "まるひ",
+                                 readings: ["ひ", "ひみつ"], keywords: ["秘", "秘密"])
+        #expect(!Self.matches(secret, "ひ", "秘"))
     }
 
     @Test("語の境は字の種類の変わり目と記号．漢字の続きの途中では合わせない")

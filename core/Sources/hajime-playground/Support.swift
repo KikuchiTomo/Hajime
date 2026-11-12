@@ -103,6 +103,7 @@ struct Arguments {
 @MainActor
 enum PlaygroundEmoji {
     static let paletteURL = URL(fileURLWithPath: "data/palette").appendingPathComponent(DefaultSettings.bundledPaletteFileName)
+    static let synonymsURL = URL(fileURLWithPath: "data/palette").appendingPathComponent(DefaultSettings.bundledEmojiSynonymsFileName)
 
     static func lookup(engine: AzooKeyConverterEngine, arguments: Arguments) -> any EmojiLooking {
         if arguments.value(of: "--emoji-source") == "azookey" { return engine }
@@ -116,7 +117,8 @@ enum PlaygroundEmoji {
             catalog = catalog.limited(to: version)
         }
         #endif
-        return PaletteEmojiLookup(catalog: LoadedPalette(PaletteIndex(catalog: catalog)), usage: MemoryPaletteUsage(),
+        let synonyms = (try? String(contentsOf: synonymsURL, encoding: .utf8)).map(EmojiSynonyms.init(text:)) ?? EmojiSynonyms()
+        return PaletteEmojiLookup(catalog: LoadedPalette(PaletteIndex(catalog: catalog, synonyms: synonyms)), usage: MemoryPaletteUsage(),
                                   settings: StaticSettings(DefaultSettings.settings), now: { Date() })
     }
 

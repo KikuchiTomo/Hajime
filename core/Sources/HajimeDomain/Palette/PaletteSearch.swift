@@ -96,10 +96,15 @@ public struct PaletteSearch: Sendable {
     private let entries: [Entry]
     /// 絵文字の名前の読みと読み(normalized の形)ごとの，項目の位置と名前の読みで当たったか(emoji(reading:) が引く)
     private let emojiByReading: [String: [(index: Int, isName: Bool)]]
+    /// 絵文字の文字ごとの項目の位置と，同じ意味の語の一覧(emoji(reading:word:) が名前の照らし合わせを通さずに出す)
+    private let emojiByText: [String: Int]
+    private let synonyms: EmojiSynonyms
 
-    public init(catalog: PaletteCatalog) {
+    public init(catalog: PaletteCatalog, synonyms: EmojiSynonyms = EmojiSynonyms()) {
         var emojiByReading: [String: [(index: Int, isName: Bool)]] = [:]
+        var emojiByText: [String: Int] = [:]
         for (index, item) in catalog.items.enumerated() where item.kind == .emoji {
+            if emojiByText[item.text] == nil { emojiByText[item.text] = index }
             var seen = Set<String>()
             for (reading, isName) in [(item.nameReading, true)] + item.readings.map({ ($0, false) }) where !reading.isEmpty {
                 let key = String(String.UnicodeScalarView(FuzzyMatch.normalized(reading)))
@@ -107,6 +112,8 @@ public struct PaletteSearch: Sendable {
             }
         }
         self.emojiByReading = emojiByReading
+        self.emojiByText = emojiByText
+        self.synonyms = synonyms
         entries = catalog.items.map { item in
             func keys(_ texts: [String], _ field: Field) -> [Key] {
                 texts.filter { !$0.isEmpty }.map { Key(scalars: FuzzyMatch.normalized($0), field: field) }
@@ -173,19 +180,29 @@ public struct PaletteSearch: Sendable {
 
     /// 読みと同じ読み(名前の読みか読み)を持つ絵文字．かな漢字変換の候補に足すのに使う．前方一致では出さない(関係の薄い絵文字を出さないため)．
     /// word を渡すと，その語が絵文字の名前の語と合うものに限る(EmojiRelevance．翼の「空」のような連想の読みで出さないため)．
-    /// 並びは，この読みで何度も選んだもの(ranking.learned)を先にし，そのあとは search と同じく，名前の読みで当たったか・
-    /// よく使う度合い・ピン留めの点の順．点が同じなら表の順
+    /// 同じ意味の語の一覧(EmojiSynonyms)にある絵文字は，名前の照らし合わせを通さずに出す(コーヒー → ☕)．
+    /// 並びは，この読みで何度も選んだもの(ranking.learned)を先にし，次に一覧の絵文字を一覧の順に，そのあとは search と同じく，
+    /// 名前の読みで当たったか・よく使う度合い・ピン留めの点の順．点が同じなら表の順
     public func emoji(reading: String, word: EmojiWord? = nil, ranking: Ranking = Ranking(), limit: Int) -> [PaletteItem] {
-        guard limit > 0, let hits = emojiByReading[String(String.UnicodeScalarView(FuzzyMatch.normalized(reading)))] else { return [] }
-        let relevant = word.map { word in hits.filter { EmojiRelevance.matches(entries[$0.index].item, reading: reading, word: word) } } ?? hits
-        let ranked = relevant.map { hit -> (index: Int, learned: Bool, points: Double) in
+        guard limit > 0 else { return [] }
+        let hits = emojiByReading[String(String.UnicodeScalarView(FuzzyMatch.normalized(reading)))] ?? []
+        var listed: [Int] = []
+        for text in word.map({ synonyms.emoji(reading: reading, word: $0) }) ?? [] {
+            if let index = emojiByText[text], !listed.contains(index) { listed.append(index) }
+        }
+        let relevant = word.map { word in
+            hits.filter { !listed.contains($0.index) && EmojiRelevance.matches(entries[$0.index].item, reading: reading, word: word) }
+        } ?? hits
+        let candidates = listed.map { (index: $0, isName: false) } + relevant
+        let ranked = candidates.map { hit -> (index: Int, learned: Bool, order: Int, points: Double) in
             let text = entries[hit.index].item.text
             let points = (hit.isName ? Double(DefaultSettings.paletteNameMatchBonus) : 0) + Self.usageBonus(ranking.usage[text] ?? 0)
                 + (ranking.pinned.contains(text) ? DefaultSettings.palettePinnedBonus : 0)
-            return (hit.index, ranking.learned.contains(text), points)
+            return (hit.index, ranking.learned.contains(text), listed.firstIndex(of: hit.index) ?? listed.count, points)
         }
         return ranked.sorted { lhs, rhs in
             if lhs.learned != rhs.learned { return lhs.learned }
+            if lhs.order != rhs.order { return lhs.order < rhs.order }
             if lhs.points != rhs.points { return lhs.points > rhs.points }
             return lhs.index < rhs.index
         }.prefix(limit).map { entries[$0.index].item }
