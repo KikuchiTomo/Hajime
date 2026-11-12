@@ -80,6 +80,27 @@ struct ListAlternativesScenarioTests {
         #expect(!harness.converter.requests.dropFirst(before).map(\.reading).contains("かこう"))
     }
 
+    @Test("一覧を出したあと，打鍵の合間に前後の語を含めた変換を求め，入れ替えた文を前後の文脈で並べ替えて出し直す．設定を切ると並べ替えない",
+          arguments: [true, false])
+    func contextAfterShowing(contextual: Bool) {
+        let converter = converter()
+        // 前の語を含めた「をかこう」では「を書こう」が「を加工」の次に来る(「かこう」だけでは「加工・河口・書こう」の順)
+        converter.table["をかこう"] = [("を加工", nil), ("を書こう", nil)]
+        let particle = Candidate.Word(text: "を", readingCount: 1, startsWithParticle: true, endsWithParticle: true)
+        converter.candidateWords["を加工"] = [particle, Candidate.Word(text: "加工", readingCount: 3)]
+        converter.candidateWords["を書こう"] = [particle, Candidate.Word(text: "書こう", readingCount: 3)]
+        var settings = Settings.listPresentation
+        settings.contextualSegmentCandidates = contextual
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("tegamiwokakou")
+        warm(harness)
+        harness.runsFollowUps = false
+        harness.press(.space)
+        #expect(harness.panel?.entries.map(\.text).prefix(3) == ["手紙を加工", "手紙を河口", "手紙お加工"])
+        harness.followUp()
+        #expect(harness.panel?.entries.map(\.text).prefix(3) == ["手紙を加工", contextual ? "手紙を書こう" : "手紙を河口", "手紙お加工"])
+    }
+
     /// アプリで打鍵が止まったときと同じく，前もって求める手順をすべて動かす
     private func warm(_ harness: Harness) {
         harness.session.latticeWarmingSteps.forEach { $0() }

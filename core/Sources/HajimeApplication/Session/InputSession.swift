@@ -59,8 +59,10 @@ public final class InputSession {
     /// 一覧で，打鍵が止まったあいだに候補を求め終えた文節の読み(変換器は読みごとに候補をためる．確定などで捨てるときに空にする)．
     /// Space で文節を入れ替えた文を作るときは，ここにある文節だけをすぐに使い，残りは打鍵の合間に求めて足す(listSubstitutionPending)
     private var listWarmedSegments: Set<String> = []
-    /// 一覧を出したあと，まだ候補を求めていない文節があり，打鍵の合間に求めて文節を入れ替えた文を足す読み．足し終えたら nil
+    /// 一覧を出したあと，打鍵の合間に文節の候補と並べ替えに使う変換を求めて，文節を入れ替えた文を出し直す読み．出し直したら nil
     private var listSubstitutionPending: String?
+    /// 一覧で，文節を入れ替えた文の並べ替えに使う前後の語を含めた変換を求め終えた読み(打鍵の合間に求める)
+    private var listContextReading: String?
     /// 予測の窓に出す，続く語句の予測(読みごと)．打った文字を出してから求めて足す
     private var suggestionPredictions: (reading: String, candidates: [Candidate])?
     /// 予測の窓に出している予測．出していなければ nil
@@ -385,8 +387,8 @@ public final class InputSession {
             }
             return rest + fills + [preview]
         case .selecting where listSubstitutionPending == composition.conversionReading:
-            // 一覧を出したときにまだ求めていなかった文節の候補を 1 文節ずつ求め，最後に文節を入れ替えた文を足して出し直す．
-            // 選んでいる候補は，並びが変わっても同じ候補のままにする
+            // 一覧を出したときにまだ求めていなかった文節の候補を 1 文節ずつ求め，迷う文節から順に前後の語を含めた変換を 1 文節ずつ求める．
+            // 最後に，文節を入れ替えた文を足して(並べ替えて)出し直す．選んでいる候補は，並びが変わっても同じ候補のままにする
             let reading = composition.conversionReading
             let unchanged = { [self] in listSubstitutionPending == reading && composition.conversionReading == reading }
             let fills: [@MainActor () -> [ClientAction]] = latticeBuilder.segmentWarmingSteps(reading: reading)
@@ -399,6 +401,22 @@ public final class InputSession {
                         return []
                     }
                 }
+            // 迷う文節の順は，文節の候補を求め終えてから決まるので，求める 1 歩の中で決める(makeSelection と同じ順)
+            let contexts: [@MainActor () -> [ClientAction]] = (0..<DefaultSettings.listContextRankedSegments).map { rank in
+                { [self] in
+                    guard unchanged() else { return [] }
+                    var builder = latticeBuilder
+                    guard builder.contextRanker != nil else { return [] }
+                    builder.contextRanker?.usesNeighborConversion = true
+                    let lattice = builder.filled(builder.quickBuild(reading: reading), reading: reading) { listWarmedSegments.contains($0) }
+                    let order = lattice.segments.indices.filter { !lattice.segments[$0].isPending }
+                        .sorted { (lattice.segments[$0].confidenceGap, $0) < (lattice.segments[$1].confidenceGap, $1) }
+                    guard order.indices.contains(rank) else { return [] }
+                    let segment = lattice.segments[order[rank]]
+                    _ = builder.contextRanker?.contextualTexts(start: segment.readingStart, length: segment.readingLength, reading: reading)
+                    return []
+                }
+            }
             let refresh: @MainActor () -> [ClientAction] = { [self] in
                 guard unchanged(), case .selecting(let current) = phase else { return [] }
                 // 字種を選んでいるときは一覧の並びを出していないので，足さずに終える
@@ -406,6 +424,7 @@ public final class InputSession {
                     listSubstitutionPending = nil
                     return []
                 }
+                listContextReading = reading
                 var next = makeSelection(focus: .candidate(0))
                 next.focus = .candidate(next.candidates.firstIndex { $0.text == current.candidates[index].text } ?? 0)
                 next.shownPrefix = current.shownPrefix
@@ -414,7 +433,7 @@ public final class InputSession {
                 phase = .selecting(next)
                 return rerender(context: context)
             }
-            return fills + [refresh]
+            return fills + contexts + [refresh]
         case .composing where predictionsShown && suggestionPredictions?.reading != predictionTarget().reading:
             let reading = composition.conversionReading
             let target = predictionTarget().reading
@@ -1592,6 +1611,7 @@ public final class InputSession {
         converter.endComposition()
         listWarmedSegments = []
         listSubstitutionPending = nil
+        listContextReading = nil
         pendingRestResegmentation = nil
         return [.setMarkedText(.empty), .hideCandidates] + hidePrediction
     }
@@ -1671,13 +1691,14 @@ public final class InputSession {
         if settings.current.listSegmentAlternatives, corrector.active == nil, !readingCorrector.isApplied {
             var builder = latticeBuilder
             let reading = composition.conversionReading
-            // 並べ替えには求めてある文全体の候補だけを使い，前後の語を含めた変換は求めない．一覧では入れ替えた文の並びが変わらず
-            // (操作の数の評価で同じ)，前もって求める 1 歩が長くなる(CI のマシンで 0.056 秒)ため
-            builder.contextRanker?.usesNeighborConversion = false
+            // 前後の語を含めた変換は，一覧を出したあと打鍵の合間に求め(followUps)，求め終えていれば並べ替えに使う．
+            // 求めていなければ，求めてある文全体の候補だけで並べ替える．打鍵が止まったあいだには求めない(1 歩が長くなる．CI のマシンで 0.056 秒)
+            builder.contextRanker?.usesNeighborConversion = listContextReading == reading
             // 文節の候補も，打鍵が止まったあいだに求め終えた文節の分だけをすぐに使う．残りの文節は打鍵の合間に求めて足す(followUps)．
             // Space のときにすべての文節を変換すると，長い文を止まらずに打って Space を押したときに遅くなる(CI のマシンで 0.32 秒)
             var lattice = builder.filled(builder.quickBuild(reading: reading), reading: reading) { listWarmedSegments.contains($0) }
-            listSubstitutionPending = lattice.segments.contains(where: \.isPending) ? reading : nil
+            let needsContext = builder.contextRanker != nil && listContextReading != reading
+            listSubstitutionPending = lattice.segments.contains(where: \.isPending) || needsContext ? reading : nil
             // 替えた文に使う文節の候補を，迷う文節から順に前後の文脈で並べ替える(一覧の 1 ページに出る分だけ)
             let order = lattice.segments.indices.sorted { (lattice.segments[$0].confidenceGap, $0) < (lattice.segments[$1].confidenceGap, $1) }
             for index in order.prefix(DefaultSettings.listContextRankedSegments) {
