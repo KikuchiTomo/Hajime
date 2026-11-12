@@ -86,6 +86,11 @@ struct BundledDictionaryQualityTests {
         ("はっちゅう", ["8中"]), ("はっこつ", ["8骨"]), ("ろっきん", ["6筋", "6金"]),
     ]
 
+    /// 漢字と促音で終わる活用の形(良っ・行っ)に漢字の語をつないだ書き方．直す前は いっぷん の文節の 3・5 番目に出ていた
+    private nonisolated static let sokuonStemCases: [(reading: String, spellings: [String])] = [
+        ("いっぷん", ["良っ分", "好っ分", "善っ分", "行っ分"]), ("いっしょに", ["良っ所に", "良っ書に"]),
+    ]
+
     /// 数と助数詞の書き方．数のあとの語の決まりで除かず，一覧の上位 5 に出る
     private nonisolated static let counterCases: [(reading: String, text: String)] = [
         ("はっぽん", "8本"), ("いっぷん", "1分"), ("じゅっかい", "10回"), ("ろっぽん", "6本"), ("ろっけん", "6件"), ("はっさい", "8歳"),
@@ -198,23 +203,33 @@ struct BundledDictionaryQualityTests {
 
     @Test("読みが促音で終わる数に助数詞でない語をつないだ書き方(8精子・6権・8中)は，文節と一覧の 2〜5 番目に出ない", arguments: numberCases)
     func noNumberBeforeNonCounter(reading: String, spellings: [String]) throws {
-        try expectNoNumberBeforeNonCounter(reading: reading, spellings: spellings, zenzai: false)
+        try expectNoSpellings(reading: reading, spellings: spellings, zenzai: false)
     }
 
     @Test("Zenzai を使っても，読みが促音で終わる数に助数詞でない語をつないだ書き方は，文節と一覧の 2〜5 番目に出ない",
           .enabled(if: ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"] != nil), arguments: numberCases)
     func noNumberBeforeNonCounterWithZenzai(reading: String, spellings: [String]) throws {
         try #require(Self.zenzaiEngine != nil, "HAJIME_ZENZAI_MODEL のモデルが無い")
-        try expectNoNumberBeforeNonCounter(reading: reading, spellings: spellings, zenzai: true)
+        try expectNoSpellings(reading: reading, spellings: spellings, zenzai: true)
     }
 
-    private func expectNoNumberBeforeNonCounter(reading: String, spellings: [String], zenzai: Bool) throws {
+    private func expectNoSpellings(reading: String, spellings: [String], zenzai: Bool) throws {
         let automatic = try convert(reading, presentation: .automatic, zenzai: zenzai)
         let list = try convert(reading, presentation: .list, zenzai: zenzai)
         for candidates in automatic.alternatives + [list.entries] {
             let found = candidates.dropFirst().prefix(4).filter { text in spellings.contains { text.hasPrefix($0) } }
             #expect(found.isEmpty, "候補: \(candidates.prefix(5))")
         }
+    }
+
+    @Test("促音で終わる活用の形に漢字の語をつないだ書き方(良っ分・良っ所に)は，文節と一覧の 2〜5 番目に出ない", arguments: sokuonStemCases)
+    func noKanjiAfterSokuonStem(reading: String, spellings: [String]) throws {
+        try expectNoSpellings(reading: reading, spellings: spellings, zenzai: false)
+        if Self.zenzaiEngine != nil {
+            try expectNoSpellings(reading: reading, spellings: spellings, zenzai: true)
+        }
+        // 1分 は第 1 候補のまま
+        #expect(try convert(reading, presentation: .list).entries.first == (reading == "いっぷん" ? "1分" : "一緒に"))
     }
 
     @Test("数と助数詞(8本・1分・10回・6本・6件・8歳)は除かず，一覧の上位 5 に出る", arguments: counterCases)

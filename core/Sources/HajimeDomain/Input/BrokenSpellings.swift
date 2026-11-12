@@ -14,7 +14,9 @@
 ///   ヵ・ヶ，数のあとの カ・ケ(3カ月)，漢字に挟まれた ノ・ケ・ツ(湯ノ沢・霞ケ関・一ツ橋)，音の名前(ハ長調)は残す
 /// - 数のあとの助数詞でない語: 読みが促音で終わる数(いっ・はっ・ろっ・じゅっ)のすぐ後の，助数詞でない漢字の語(8精子)．
 ///   助数詞(8本・1分・6匹・10回・1体)は残す．読みが促音で終わらない数(中2・第2子)は当たらない
-/// - 当たらない: 1 つの語(辞書の「うっ血」「フッ素」「三ッ星」「トッ捕まる」)，強めの接頭の語(ぶっ飛ぶ・ブッ飛ばす・カッ飛ぶ・真ッ赤)，
+/// - 促音で終わる活用の形のあとの漢字の語: 漢字と促音で終わる語(良っ・行っ)のすぐ後の，漢字で始まる語(良っ分・行っ分)．
+///   強めの接頭の語(引っ・突っ・取っ・真っ)の後ろは当たらない
+/// - 当たらない: 1 つの語(辞書の「うっ血」「フッ素」「三ッ星」「トッ捕まる」「引っ越し」「取っ手」)，強めの接頭の語(ぶっ飛ぶ・ブッ飛ばす・カッ飛ぶ・真ッ赤)，
 ///   数のあとの「ッ」(三ッ＋星)，動詞の活用の促音(引っ＋越し)，送りがなの促音(開けっ＋放し)，ユーザー辞書の語や記号
 /// - 第 1 候補は変えない．ライブ変換で見えている文字と同じにするため
 public enum BrokenSpellings {
@@ -23,6 +25,9 @@ public enum BrokenSpellings {
     static let emphaticPrefixes: Set<String> = ["ぶっ", "ひっ", "おっ", "かっ", "つっ", "とっ", "すっ", "ふっ"]
     /// 「ッ」の前の漢字のうち，後ろに漢字の語が続いても崩れていないもの(真ッ赤・三ッ星・七ッ森・一ッ橋)
     static let kanjiBeforeSokuon: Set<Character> = Set("真一二三四五六七八九十")
+    /// 漢字と「っ」で強めの接頭の語になる字(引っ越す・突っ込む・取っ組む・打っ倒す・吹っ飛ぶ・追っ払う・掻っ込む・素っ裸)．
+    /// 後ろに漢字の語が続いても崩れていない
+    static let emphaticKanji: Set<Character> = Set("引突取打吹追掻搔素")
 
     /// 1 文字のカタカナのうち，数のすぐ後なら助数詞の一部のもの(3カ月・三ケ所)
     static let counterKatakana: Set<Character> = ["カ", "ケ"]
@@ -54,6 +59,7 @@ public enum BrokenSpellings {
     public static func isBroken(_ candidate: Candidate) -> Bool {
         guard isEngineText(candidate) else { return false }
         return hasScriptBreak(Array(candidate.text)) || hasFragment(candidate) || hasNumberBeforeNonCounter(candidate)
+            || hasKanjiAfterSokuonStem(candidate)
     }
 
     /// 拍の途中の字種の切り替え・小さいかなの位置・1 文字のカタカナ
@@ -132,6 +138,19 @@ public enum BrokenSpellings {
         return zip(words, words.dropFirst()).contains { number, next in
             guard number.endsWithSokuon, !number.text.isEmpty, number.text.allSatisfy(isDigit), let head = next.text.first else { return false }
             return isKanji(head) && !counters.contains(head)
+        }
+    }
+
+    /// 漢字と促音で終わる語(良っ・行っ)のすぐ後に，漢字で始まる語が続くか(良っ分・行っ分)．
+    /// 促音で終わる活用の形(行っ)のあとには「た」「て」のようなかなが続き，漢字の語は続かない．
+    /// 1 つの語(引っ越し・突っ込む・取っ手)と，強めの接頭の語(引っ＋越し・真っ＋白)・数(三っ)の後ろは当たらない
+    private static func hasKanjiAfterSokuonStem(_ candidate: Candidate) -> Bool {
+        guard let words = knownWords(of: candidate) else { return false }
+        return zip(words, words.dropFirst()).contains { word, next in
+            let characters = Array(word.text)
+            guard characters.count >= 2, characters.last == "っ", let head = next.text.first else { return false }
+            let stem = characters[characters.count - 2]
+            return isKanji(stem) && !kanjiBeforeSokuon.contains(stem) && !emphaticKanji.contains(stem) && isKanji(head)
         }
     }
 
