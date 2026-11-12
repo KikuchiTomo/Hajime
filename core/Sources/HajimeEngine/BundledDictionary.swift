@@ -23,9 +23,9 @@ public struct BundledDictionary: Sendable, Equatable {
         case hashMismatch
     }
 
-    /// https://github.com/KikuchiTomo/hajime-dictionary の v0.3.0
-    public static let version = "0.3.0"
-    public static let expectedManifestSHA256 = "547bcbc48b73e9c79cfc917c428d3b62e9fb6ec2828d9f1d69ed1cb9bc931c17"
+    /// https://github.com/KikuchiTomo/hajime-dictionary の v0.4.0
+    public static let version = "0.4.0"
+    public static let expectedManifestSHA256 = "945b7d5efbd0e874d1b1a72aa5cfd1ee3d87c7a529a3e0ccaae793b3652003a5"
     /// アプリの中で辞書を置くディレクトリの名前
     public static let directoryName = "Dictionary"
     static let manifestName = "SHA256SUMS"
