@@ -75,7 +75,7 @@ pub fn parts(keys: &str) -> Vec<Part> {
         .collect()
 }
 
-/// 案内のキーをキーキャップごとの部品に分ける．複数のキー(「↓ Tab」)はキーごとに札を分ける
+/// 案内のキーをキーキャップごとの部品に分ける．複数のキー(「↓ Tab」)はキーごとにキーキャップを分ける
 pub fn keycaps(keys: &str) -> Vec<Vec<Part>> {
     keys.split(KEY_SEPARATOR)
         .filter(|key| !key.is_empty())
@@ -99,7 +99,7 @@ mod tests {
     }
 
     #[test]
-    fn 複数のキーはキーごとに札を分ける() {
+    fn 複数のキーはキーごとにキーキャップを分ける() {
         assert_eq!(
             keycaps("↓ Tab"),
             vec![vec![Part::Icon(Icon::Down)], vec![Part::Icon(Icon::Tab)]]

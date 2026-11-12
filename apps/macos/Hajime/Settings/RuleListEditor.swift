@@ -16,7 +16,7 @@ struct RuleItem: Identifiable, Hashable {
     var key: String
     var value: String
     var isEnabled = true
-    /// 既定から変えた・足したことを示す短い札(「変更あり」「追加」)
+    /// 既定から変えた・足したことを示す短いタグ(「変更あり」「追加」)
     var badge: String?
     var removal = Removal.remove
     /// 左の欄を書き換えられないか(既定の決まりの入力)
@@ -357,7 +357,7 @@ struct RuleListEditor: View {
             HStack {
                 Text(item.value).foregroundStyle(item.isEnabled ? .primary : .secondary)
                 Spacer()
-                // 既定から変えた・足したことを示す札
+                // 既定から変えた・足したことを示すタグ
                 if let badge = item.badge {
                     Text(badge).font(.caption).foregroundStyle(.secondary)
                 }

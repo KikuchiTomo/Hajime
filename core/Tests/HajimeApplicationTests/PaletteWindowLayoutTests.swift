@@ -75,7 +75,7 @@ struct PaletteWindowLayoutTests {
         #expect(emoji.height - symbol.height == 20)
     }
 
-    @Test("R-26: 足元のキーの札と肌の色のボタンは同じ高さと縦の中心で，上下の余白が等しい")
+    @Test("R-26: 足元のキーキャップと肌の色のボタンは同じ高さと縦の中心で，上下の余白が等しい")
     func footer() {
         let layout = layout(kind: .emoji)
         #expect(layout.skinToneButton.height == layout.footer.height)

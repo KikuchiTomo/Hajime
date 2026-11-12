@@ -491,7 +491,7 @@ mod tests {
         }
     }
 
-    /// 候補の窓の見本(分岐図・入力中の候補・予測・モードの札・案内)を，標準のテーマと platinum で SVG に書き出す．
+    /// 候補の窓の見本(分岐図・入力中の候補・予測・モード表示・案内)を，標準のテーマと platinum で SVG に書き出す．
     /// HAJIME_SCENE_SVG=<ディレクトリ> cargo test -p candidate-ui --lib scene::svg -- --ignored
     #[test]
     #[ignore = "見本を書き出すときだけ動かす"]

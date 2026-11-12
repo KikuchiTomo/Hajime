@@ -70,7 +70,7 @@ pub fn candidates(list: &CandidateList) -> Option<String> {
                     Some(_) => command(&entry.text),
                     None => entry.text.clone(),
                 };
-                // ユーザー辞書の語のコメントがあれば続けて読む(札を押すとコメントを入れられる)
+                // ユーザー辞書の語のコメントがあれば続けて読む(タグを押すとコメントを入れられる)
                 let text = with_comment(text, crate::scene::entry_comment(entry));
                 with_homophone(text, list.homophone.as_ref())
             }),
@@ -94,7 +94,7 @@ pub fn branch_map(map: &BranchMap) -> Option<String> {
                 column.alternatives.get(index)
             });
             let text = chosen.map_or_else(|| column.text.clone(), |title| command(title));
-            // ユーザー辞書の語のコメントがあれば続けて読む(札を押すとコメントを入れられる)
+            // ユーザー辞書の語のコメントがあれば続けて読む(タグを押すとコメントを入れられる)
             let comment =
                 selected.and_then(|index| crate::scene::alternative_comment(column, index));
             with_homophone(with_comment(text, comment), column.homophone.as_ref())
@@ -319,7 +319,7 @@ mod tests {
             candidates(&list).as_deref(),
             Some("返還、コメント、千代田区千代田1-1")
         );
-        // コメントでない札は読まない
+        // コメントでないタグは読まない
         list.entries[1].has_comment = None;
         assert_eq!(candidates(&list).as_deref(), Some("返還"));
     }

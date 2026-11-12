@@ -283,7 +283,7 @@ pub mod extras {
     pub const COMMANDS_PAGE: &str = "コマンド";
     pub const COMMANDS_SECTION: &str = "コマンド";
     pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
-    pub const COMMANDS_NOTE: &str = "読みを変換すると、候補の一覧に「コマンド」の札を付けた名前が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。";
+    pub const COMMANDS_NOTE: &str = "読みを変換すると、候補の一覧に「コマンド」のタグを付けた名前が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。";
     pub const COMMAND_READING: &str = "読み";
     pub const COMMAND_TITLE: &str = "名前";
     pub const COMMAND_KIND: &str = "動作";
@@ -946,7 +946,7 @@ pub mod windows {
     pub const APP_NAME: &str = "Hajime IME";
     /// 数を 1 段ずつ変えるボタン(読み上げの名前．macOS の Stepper の矢印)
     pub const DECREASE: &str = "減らす";
-    /// テーマの見本の札の文字(macOS の IndicatorLabels の日本語の札)
+    /// テーマの見本の文字(macOS の IndicatorLabels の日本語の表示)
     pub const JAPANESE_MODE: &str = "あ";
     pub const INCREASE: &str = "増やす";
     /// 同梱の連想の辞書の内容の欄(件数は数えていないので出さない)
@@ -1095,7 +1095,7 @@ pub mod windows_wizard {
     pub const DEMO_NOTES: &str = "メモ帳";
     /// 英数で打つ実演の文字(macOS は「Mac で」)
     pub const DEMO_DIRECT_TEXT: &str = "PC で";
-    /// 実演で押すキーの名前(キーの札に出す．macOS は「かな」「英数」)
+    /// 実演で押すキーの名前(キーキャップに出す．macOS は「かな」「英数」)
     pub const DEMO_KEY_HENKAN: &str = "変換";
     pub const DEMO_KEY_MUHENKAN: &str = "無変換";
     pub const DEMO_KEY_HANKAKU: &str = "半角/全角";

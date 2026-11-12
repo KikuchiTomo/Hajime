@@ -474,7 +474,7 @@ struct RowState {
     text: String,
     /// 色のボタンに出す色(「#RRGGBB」)
     color: String,
-    /// カスタムテーマの行のテーマ(見本の色の札に描く)と，読みにくい組み合わせがあるか
+    /// カスタムテーマの行のテーマ(見本の色のタグに描く)と，読みにくい組み合わせがあるか
     custom: Option<ipc::CustomTheme>,
     warns: bool,
     /// まだカスタムテーマを作れる(複製のボタン)
@@ -4415,7 +4415,7 @@ impl PageView {
     }
 }
 
-/// 名前の横の候補の見本の札(「びーる → 🍺」)．読みと矢印は薄い色，候補はふつうの色で，名前と同じ大きさの文字で書く
+/// 名前の横の候補の見本(「びーる → 🍺」)．読みと矢印は薄い色，候補はふつうの色で，名前と同じ大きさの文字で書く
 fn example_chip(
     canvas: &mut dyn Canvas,
     theme: &Theme,
@@ -4433,7 +4433,7 @@ fn example_chip(
     } else {
         (palette.text_disabled, palette.text_disabled)
     };
-    // 札は試す欄の結果の札と同じ地と枠にする
+    // タグは試す欄の結果のタグと同じ地と枠にする
     canvas.fill_round(rect, PREVIEW_CHIP_RADIUS, Color::from(palette.control));
     canvas.stroke_round(
         rect,
@@ -4466,8 +4466,8 @@ fn example_chip(
 }
 
 /// 表の行を見せる高さ
-/// 試した結果を rect の中に描く．語は札にして左から並べ，幅に収まらなければ次の行に送る(macOS の WrappingStack)．
-/// 札にしない 1 行(書いている途中の形の結果)はそのまま折り返して書く．rect からはみ出す札は描かない
+/// 試した結果を rect の中に描く．語はタグにして左から並べ，幅に収まらなければ次の行に送る(macOS の WrappingStack)．
+/// タグにしない 1 行(書いている途中の形の結果)はそのまま折り返して書く．rect からはみ出すタグは描かない
 fn preview_chips(
     canvas: &mut dyn Canvas,
     theme: &Theme,
@@ -4487,7 +4487,7 @@ fn preview_chips(
             TextLayout::WRAP,
         );
     }
-    // 札は macOS の resultChip と同じく枠の無い薄い地にし，2 行目に英語か日本語かを小さく出す(日本語はアクセントの色)
+    // タグは macOS の resultChip と同じく枠の無い薄い地にし，2 行目に英語か日本語かを小さく出す(日本語はアクセントの色)
     let two_lines = shown.labels.iter().any(Option::is_some);
     let height = size::BODY_LINE_HEIGHT
         + if two_lines {
@@ -5056,7 +5056,7 @@ fn button_kind(action: Action) -> paint::ButtonKind {
     }
 }
 
-/// テーマの見本の札(地・文字・選択の色．macOS の ThemeSwatch)．色は候補ウィンドウと同じ解き方で，今の画面の明暗の色にする．
+/// テーマの見本(地・文字・選択の色．macOS の ThemeSwatch)．色は候補ウィンドウと同じ解き方で，今の画面の明暗の色にする．
 /// value は既成のテーマの値(カスタムテーマは元のテーマ)，custom はカスタムテーマの色
 fn paint_swatch(
     canvas: &mut dyn Canvas,

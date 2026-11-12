@@ -56,7 +56,7 @@ struct PalettePreviewLayoutTests {
         return Placed(layout: layout, area: area, tile: tile, height: height)
     }
 
-    /// 項目名ごとの，値の 1 行目のベースライン(文字の値か札)
+    /// 項目名ごとの，値の 1 行目のベースライン(文字の値かタグ)
     func valueBaseline(after label: Layout.Text, in layout: Layout) -> Double? {
         let values = layout.texts.filter { $0.role == .value }.map(\.baseline) + layout.chips.map(\.baselines[0])
         return values.filter { $0 >= label.baseline - 0.5 }.min()
@@ -65,7 +65,7 @@ struct PalettePreviewLayoutTests {
     func expectAligned(_ placed: Placed, sourceLocation: SourceLocation = #_sourceLocation) {
         let layout = placed.layout
         let measuring = Measuring()
-        // 値は，どの行も同じ x から書き出す(折り返した行と，行の頭の札も)
+        // 値は，どの行も同じ x から書き出す(折り返した行と，行の頭のタグも)
         let lineStarts = layout.texts.filter { $0.role == .value }.map(\.x)
             + layout.chips.filter { chip in !layout.chips.contains { $0.frame.maxX <= chip.frame.x && $0.baselines[0] == chip.baselines[0] } }.map(\.frame.x)
         #expect(Set(lineStarts).count <= 1, sourceLocation: sourceLocation)
@@ -177,7 +177,7 @@ struct PalettePreviewLayoutTests {
         #expect(lines.first?.text.hasPrefix("CLOCKWISE") == true)
     }
 
-    @Test("R-26: 長いショートコードの札で欄が足りなければ，Unicode の名前より先に読みを省く")
+    @Test("R-26: 長いショートコードのチップで欄が足りなければ，Unicode の名前より先に読みを省く")
     func readingsFirst() {
         let item = PaletteItem(kind: .emoji, category: .symbols, text: "⏭️", japaneseName: "次の曲ボタン", nameReading: "つぎのきょくぼたん",
                                englishName: "next track button", readings: ["ぼたん", "つぎのしーん"],
@@ -197,7 +197,7 @@ struct PalettePreviewLayoutTests {
         #expect(placed.layout.chips.isEmpty)
     }
 
-    @Test("R-26: 札が入りきらなければ読みと Unicode の名前を詰め，それでも入らない札は「+n」にまとめる．札の字は切らない")
+    @Test("R-26: タグが入りきらなければ読みと Unicode の名前を詰め，それでも入らないタグは「+n」にまとめる．タグの字は切らない")
     func overflow() {
         let kiss = "👩🏽‍❤️‍💋‍👨🏿"
         let item = PaletteItem(kind: .emoji, category: .people, text: kiss, japaneseName: "キス", englishName: "kiss: woman, man, medium skin tone, dark skin tone",
@@ -206,10 +206,10 @@ struct PalettePreviewLayoutTests {
         let placed = place(item, shortcodes: [":\(long):"])
         expectAligned(placed)
         let layout = placed.layout
-        // 値の幅より広いショートコードは字を縮め，それでも入らなければ札の中で折り返す
+        // 値の幅より広いショートコードは字を縮め，それでも入らなければタグの中で折り返す
         let wide = layout.chips.first { $0.role == .smallCode }
         #expect(wide?.lines.joined() == ":\(long):")
-        // 札の中の行のベースラインも，値の行と同じ間隔で並ぶ
+        // タグの中の行のベースラインも，値の行と同じ間隔で並ぶ
         let pitches = zip(wide?.baselines.dropFirst() ?? [], wide?.baselines ?? []).map { $0 - $1 }
         #expect(Set(pitches).count <= 1)
         #expect(layout.chips.allSatisfy { !$0.lines.joined().contains("…") })
