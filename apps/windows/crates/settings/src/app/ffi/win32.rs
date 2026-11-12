@@ -33,7 +33,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{
 };
 use windows::Win32::UI::Shell::Common::COMDLG_FILTERSPEC;
 use windows::Win32::UI::Shell::{
-    FileOpenDialog, FileSaveDialog, IFileDialog, IFileOpenDialog, IShellItem, ShellExecuteW,
+    FileOpenDialog, FileSaveDialog, IFileDialog, IFileOpenDialog, ShellExecuteW,
     FILEOPENDIALOGOPTIONS, FOS_ALLOWMULTISELECT, FOS_FORCEFILESYSTEM, FOS_PICKFOLDERS,
     SIGDN_FILESYSPATH,
 };
@@ -580,7 +580,8 @@ pub fn choose_file(
     show_dialog(&dialog, owner, FOS_FORCEFILESYSTEM)
 }
 
-/// ファイルを選ぶ窓(開く．いくつでも選べる)を出し，選んだファイルの場所を返す．キャンセルしたら空
+/// 開くファイルをいくつも選べる窓を出し，選んだファイルの場所を返す．キャンセルしたら空
+/// (除外設定のアプリを追加…．macOS の NSOpenPanel の allowsMultipleSelection)
 pub fn choose_files(owner: HWND, filter_name: &str, pattern: &str) -> Vec<String> {
     let filter_name = HSTRING::from(filter_name);
     let pattern = HSTRING::from(pattern);
@@ -595,34 +596,30 @@ pub fn choose_files(owner: HWND, filter_name: &str, pattern: &str) -> Vec<String
         return Vec::new();
     };
     // SAFETY: dialog はこの関数の間生きている COM のオブジェクト．filters の文字列は呼び出しの間生きている．
-    // owner はこのスレッドの窓
+    // owner はこのスレッドの窓．返された場所の文字列は CoTaskMemFree で放す
     unsafe {
         let shown = dialog.SetFileTypes(&filters).and_then(|()| {
             let current = dialog.GetOptions()?;
             dialog.SetOptions(current | FOS_FORCEFILESYSTEM | FOS_ALLOWMULTISELECT)?;
-            // キャンセルは Err で返る
-            dialog.Show(Some(owner))?;
-            dialog.GetResults()
+            dialog.Show(Some(owner))
         });
-        let Ok(items) = shown else {
+        // キャンセルは Err で返る
+        if shown.is_err() {
+            return Vec::new();
+        }
+        let Ok(items) = dialog.GetResults() else {
             return Vec::new();
         };
         let count = items.GetCount().unwrap_or(0);
         (0..count)
-            .filter_map(|index| items.GetItemAt(index).ok())
-            .filter_map(|item| item_path(&item))
+            .filter_map(|index| {
+                let item = items.GetItemAt(index).ok()?;
+                let path = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
+                let text = path.to_string().ok();
+                CoTaskMemFree(Some(path.0 as *const _));
+                text
+            })
             .collect()
-    }
-}
-
-/// 選んだものの場所．返された場所の文字列は CoTaskMemFree で放す
-fn item_path(item: &IShellItem) -> Option<String> {
-    // SAFETY: item は呼ぶ側が生かしている COM のオブジェクト．返された文字列は読んでから放す
-    unsafe {
-        let path = item.GetDisplayName(SIGDN_FILESYSPATH).ok()?;
-        let text = path.to_string().ok();
-        CoTaskMemFree(Some(path.0 as *const _));
-        text
     }
 }
 

@@ -33,12 +33,6 @@ pub(super) const WM_DICTIONARY_IMPORTED: u32 = WM_APP + 40;
 pub(super) type ImportInbox = Arc<Mutex<Option<(DictionaryList, Result<FileOutcome, StoreError>)>>>;
 
 /// 窓の外に出してから行うこと(借りている間にモーダルの窓を出さない)
-/// コマンドの一覧と，その入力欄の番号(pages の COMMAND_FIELDS の並び)
-const COMMANDS: &str = "commands";
-const COMMAND_TITLE: usize = 1;
-const COMMAND_KIND: usize = 2;
-const COMMAND_TARGET: usize = 3;
-
 pub enum After {
     Message {
         text: Cow<'static, str>,
@@ -46,8 +40,10 @@ pub enum After {
     },
     /// 件数などを含む知らせ
     Notice(String),
-    /// コマンドの行き先を選ぶ窓を出す
-    ChooseCommandTarget,
+    /// コマンドのシートの行き先を選ぶ窓を出す(application ならアプリの実行ファイルだけを出す)
+    ChooseCommandTarget {
+        application: bool,
+    },
     OpenSettingsFile,
     /// 初期設定ウィザードを開く(同じ実行ファイルを --setup で起動する)
     OpenSetup,
@@ -62,7 +58,7 @@ pub enum After {
         path: &'static str,
         current: String,
     },
-    /// アプリの実行ファイルを選ぶ窓を出してから，一覧の入力欄に名前を入れる
+    /// アプリの実行ファイルを選ぶ窓を出してから(いくつも選べる)，一覧に足す
     ChooseApp {
         path: &'static str,
     },
@@ -104,56 +100,36 @@ pub fn run_after(window: Window, after: Option<After>) {
         }
         Some(After::ChooseApp { path }) => {
             let filter = crate::files::APP_FILTER;
-            let Some(file) = ffi::choose_file(window, true, "", filter.name, filter.pattern) else {
+            let files = ffi::choose_files(window, filter.name, filter.pattern);
+            if files.is_empty() {
                 return;
-            };
+            }
             // 除外設定はアプリを実行ファイルの名前(小文字)で見分ける
-            let name = std::path::Path::new(&file)
-                .file_name()
+            let names: Vec<String> = files
+                .iter()
+                .filter_map(|file| std::path::Path::new(file).file_name())
                 .map(|name| name.to_string_lossy().to_lowercase())
-                .unwrap_or_default();
-            // 選んだアプリは，入力欄で選んでいる扱いでそのまま足す(macOS の ExclusionsPage と同じ)
+                .collect();
+            // 選んだアプリは，表の下で選んでいる動作でそのまま足す(macOS の ExclusionsPage と同じ)
             let after = with_app(|app| {
-                app.view.set_list_input(path, 0, &name);
-                let after = app
-                    .view
-                    .list_add_event(path)
-                    .and_then(|event| app.handle(event));
+                let after = app.add_apps(path, &names);
                 ffi::invalidate(app.window);
                 after
             })
             .flatten();
             run_after(window, after);
         }
-        Some(After::ChooseCommandTarget) => {
-            let Some(file) = ffi::choose_file(window, true, "", text::ALL_FILES, "*.*") else {
+        Some(After::ChooseCommandTarget { application }) => {
+            let (name, pattern) = if application {
+                let filter = crate::files::APP_FILTER;
+                (filter.name, filter.pattern)
+            } else {
+                (text::ALL_FILES, "*.*")
+            };
+            let Some(file) = ffi::choose_file(window, true, "", name, pattern) else {
                 return;
             };
-            // 実行ファイルならアプリを開く，ほかはファイルを開くコマンドにする．名前が空なら拡張子を除いたファイルの名前にする
-            let path = std::path::Path::new(&file);
-            let is_app = path
-                .extension()
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("exe"));
-            let stem = path
-                .file_stem()
-                .map(|stem| stem.to_string_lossy().to_string())
-                .unwrap_or_default();
-            with_app(|app| {
-                app.view.set_list_input(COMMANDS, COMMAND_TARGET, &file);
-                app.view.set_list_choice(
-                    COMMANDS,
-                    COMMAND_KIND,
-                    if is_app {
-                        "openApplication"
-                    } else {
-                        "openFile"
-                    },
-                );
-                if app.view.list_input(COMMANDS, COMMAND_TITLE).is_empty() {
-                    app.view.set_list_input(COMMANDS, COMMAND_TITLE, &stem);
-                }
-                ffi::invalidate(app.window);
-            });
+            with_app(|app| app.sheet_choose(&file));
         }
         Some(After::ImportDictionary { list, replacing }) => {
             let filter = crate::files::TEXT_FILTER;
@@ -322,8 +298,26 @@ impl App {
         if let Event::OpenUrl(url) = event {
             return Some(After::OpenUrl(url));
         }
-        if event == Event::ChooseCommandTarget {
-            return Some(After::ChooseCommandTarget);
+        if let Event::EditCommand(index) = event {
+            self.open_command_sheet(index);
+            return None;
+        }
+        if let Event::ListMove {
+            spec,
+            index,
+            offset,
+        } = event
+        {
+            return self.move_in_list(&spec, index, offset);
+        }
+        if let Event::ListSet {
+            spec,
+            index,
+            field,
+            value,
+        } = event
+        {
+            return self.set_in_list(&spec, index, field, &value);
         }
         if let Event::Notice(text) = event {
             return Some(After::Message {
@@ -446,7 +440,9 @@ impl App {
             | Event::ChooseApp { .. }
             | Event::OpenUrl(_)
             | Event::Notice(_)
-            | Event::ChooseCommandTarget
+            | Event::EditCommand(_)
+            | Event::ListMove { .. }
+            | Event::ListSet { .. }
             | Event::Relayout
             | Event::Action(
                 Action::SyncNow
@@ -1056,6 +1052,111 @@ impl App {
         }
     }
 
+    /// 表の index 番目の行の field 番目の欄を value にし，その行を選んだままにする(除外設定の動作の Picker)
+    fn set_in_list(
+        &mut self,
+        spec: &ListSpec,
+        index: usize,
+        field: usize,
+        value: &str,
+    ) -> Option<After> {
+        let model = self.model.as_mut()?;
+        let list = spec.set_field_at(model.value(spec.path), index, field, value)?;
+        if let Err(error) = model.set(spec.path, list) {
+            return self.failure(error);
+        }
+        self.refresh();
+        let now = self.now();
+        self.view.select_list_row(spec.path, index, now);
+        None
+    }
+
+    /// 選んだ行を offset だけ動かし，動かした行を選んだままにする(除外設定の優先度．macOS の ExclusionsPage)
+    fn move_in_list(&mut self, spec: &ListSpec, index: usize, offset: isize) -> Option<After> {
+        let model = self.model.as_mut()?;
+        let list = spec.move_by(model.value(spec.path), index, offset)?;
+        if let Err(error) = model.set(spec.path, list) {
+            return self.failure(error);
+        }
+        self.refresh();
+        let now = self.now();
+        if let Some(target) = index.checked_add_signed(offset) {
+            self.view.select_list_row(spec.path, target, now);
+        }
+        None
+    }
+
+    /// 選んだアプリ(実行ファイルの名前)を，表の下で選んでいる動作で除外設定に足す．知らせは最初の 1 つだけ出す
+    pub(super) fn add_apps(&mut self, path: &'static str, names: &[String]) -> Option<After> {
+        let (spec, limit) = self.view.list_spec(path)?;
+        let profile = self.view.list_choice(path, 1).unwrap_or_default();
+        let mut notice = None;
+        for name in names {
+            let item = spec.make(&[name.clone(), profile.to_string()]);
+            let after = self.add_to_list(&spec, limit.limit(&self.catalog), &item, None);
+            if notice.is_none() {
+                notice = after;
+            }
+        }
+        notice
+    }
+
+    /// シートのコマンドを保存する．書き換えるコマンドは id で引き，同じ位置のまま書き換える(同じ読みの
+    /// コマンドがあっても書き換えるのはその 1 つ)．保存できたら true．エンジンが受け付けなければシートに文を出す
+    pub(super) fn save_command(&mut self) -> (bool, Option<After>) {
+        let Some(sheet) = self.sheet.as_ref() else {
+            return (false, None);
+        };
+        let draft = sheet.draft.clone();
+        let index = sheet.index;
+        if !draft.is_valid() {
+            return (false, None);
+        }
+        let Some((spec, limit)) = self.view.list_spec(crate::pages::COMMANDS) else {
+            return (false, None);
+        };
+        let limit = limit.limit(&self.catalog);
+        let Some(model) = self.model.as_mut() else {
+            return (false, None);
+        };
+        let item = draft.item();
+        let current = model.value(spec.path);
+        let list = match (&draft.id, index) {
+            (Some(id), _) => spec.replace_id(current, id, &item),
+            // id の無いコマンド(エンジンが振る前)は行の番号で書き換える
+            (None, Some(index)) => spec.replace_at(current, index, &item),
+            (None, None) if spec.items(current).len() >= limit => {
+                return (
+                    false,
+                    Some(After::Message {
+                        text: rule_list::FULL.into(),
+                        warning: true,
+                    }),
+                );
+            }
+            (None, None) => Some(spec.upsert(current, &item)),
+        };
+        // 書き換えるコマンドが消えていたら(同期で変わったなど)，新しく足す
+        let list = list.unwrap_or_else(|| spec.upsert(current, &item));
+        if let Err(error) = model.set(spec.path, list) {
+            return (false, self.failure(error));
+        }
+        let items = spec.items(model.value(spec.path));
+        let kept = items.contains(&item);
+        self.refresh();
+        if !kept {
+            if let Some(sheet) = self.sheet.as_mut() {
+                sheet.rejected = true;
+            }
+            return (false, None);
+        }
+        // 書き換えた・足したコマンドを選んだままにする(macOS の表は id で選んだ行を残す)
+        let row = index.unwrap_or(items.len().saturating_sub(1));
+        let now = self.now();
+        self.view.select_list_row(spec.path, row, now);
+        (true, None)
+    }
+
     /// 一覧に行を足す．上限を超える・形が誤っていて残らないときは知らせる
     fn add_to_list(
         &mut self,
@@ -1167,9 +1268,10 @@ fn load_preset(model: &mut SettingsModel<Store>, preset: &str) -> Result<(), Sto
 }
 
 /// 今の表の問題を文にする．調べられなければ空
-pub fn keymap_report(model: &SettingsModel<Store>) -> String {
+/// キー設定の表の問題の文と，行ごとの問題(行の印に使う)
+pub fn keymap_report(model: &SettingsModel<Store>) -> (String, Vec<ipc::KeymapRowIssue>) {
     let Some(keymap) = model.value("keymap").cloned() else {
-        return String::new();
+        return (String::new(), Vec::new());
     };
     let entries: Vec<(String, String, String)> = keymap
         .as_array()
@@ -1192,8 +1294,26 @@ pub fn keymap_report(model: &SettingsModel<Store>) -> String {
     model
         .store()
         .check_keymap(&values)
-        .map(|report| crate::keys::report_lines(&report, &entries).join("\n"))
+        .map(|report| {
+            (
+                crate::keys::report_lines(&report, &entries).join("\n"),
+                report.rows,
+            )
+        })
         .unwrap_or_default()
+}
+
+/// 今のキー設定の表と同じひな形(keys::PRESETS の番号)．どれとも違えば None(macOS の KeymapPreset.matching)
+pub fn matching_preset(model: &SettingsModel<Store>) -> Option<usize> {
+    let current = model.value("keymap")?;
+    keys::PRESETS.iter().position(|(preset, _)| {
+        model
+            .store()
+            .read_keymap_preset(preset)
+            .ok()
+            .and_then(|fields| fields.get("keymap").cloned())
+            .is_some_and(|keymap| &keymap == current)
+    })
 }
 
 /// 確かめてから行う操作の題と文

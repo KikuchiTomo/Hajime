@@ -18,7 +18,7 @@ use crate::model::SettingsModel;
 use crate::options;
 use crate::pages::{
     self, Action, Cell, Control, DictionaryList, FontPart, Info, LimitKind, Page, RangeKind, Row,
-    Section, TryKind, DICTIONARY_CONDITIONS, MACROS_PATH,
+    Section, TryKind, DICTIONARY_CONDITIONS, MACROS_PATH, PROFILE_RULES,
 };
 use crate::store::SettingsStore;
 use crate::strings::{extras, features, keys, more, rule_list, settings, windows as text};
@@ -101,7 +101,7 @@ pub enum Event {
     },
     /// カスタムテーマの一覧で行を選んだ(選んでいなければ None)
     ThemeSelected(Option<usize>),
-    /// アプリの実行ファイルを選ぶ窓を出し，path の一覧の入力欄に名前を入れる
+    /// アプリの実行ファイルを選ぶ窓を出し(いくつも選べる)，path の一覧に表の下で選んでいる動作で足す
     ChooseApp {
         path: &'static str,
     },
@@ -129,8 +129,21 @@ pub enum Event {
     OpenUrl(String),
     /// 知らせを出すだけ(操作できない理由)
     Notice(&'static str),
-    /// コマンドの行き先のファイルやアプリを選ぶ窓を出し，入力欄に入れる
-    ChooseCommandTarget,
+    /// コマンドを足す・書き換えるシートを出す(書き換えるコマンドの表の行の番号．足すなら None)
+    EditCommand(Option<usize>),
+    /// 表の中の選ぶ欄で選び直した(index は表の行の番号，field は欄，value は設定のファイルに書く値)．すぐ書く
+    ListSet {
+        spec: ListSpec,
+        index: usize,
+        field: usize,
+        value: String,
+    },
+    /// 選んだ行を offset だけ上(負)か下(正)へ動かす(除外設定の優先度．index は表の行の番号)
+    ListMove {
+        spec: ListSpec,
+        index: usize,
+        offset: isize,
+    },
     /// 部品の大きさが変わったので置き直す(謝辞のライセンスの全文を開いた・閉じた)
     Relayout,
 }
@@ -184,13 +197,34 @@ pub enum DictionaryAction {
     RemoveApp(usize),
 }
 
-/// 表の下のボタンのうち，行を選ばなくても使えるもの(キーの記録・アプリの追加)
-fn bottom_always_enabled(control: &Control, index: usize) -> bool {
-    match control {
-        // 削除(0 番目)は行を選んでから．行き先を選ぶ・アプリを追加するはいつでも，キー設定の複製は行を選んでから
-        Control::List(spec, _) if spec.path == "keymap" => index == 2,
-        Control::List(..) => index >= 1,
-        _ => false,
+/// 一覧の表の下のボタンの役割(ボタンの名前から決める)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ListButton {
+    /// 選んだ行を消す
+    Remove,
+    /// 選んだ 1 行をシートで書き換える(コマンド)
+    Edit,
+    /// シートで足す(コマンド)
+    Add,
+    /// 選んだ 1 行を上・下へ動かす(除外設定)
+    MoveUp,
+    MoveDown,
+    /// 選んだ行を入力欄に写す(キー設定の複製)
+    Duplicate,
+    /// 行を選ばなくても使える(アプリを追加・キー設定を既定に戻す)
+    Always,
+}
+
+fn list_button(label: &str) -> ListButton {
+    match label {
+        // コマンドの「削除」(extras::REMOVE_COMMAND)も同じ文字
+        settings::REMOVE => ListButton::Remove,
+        extras::EDIT_COMMAND => ListButton::Edit,
+        extras::ADD_COMMAND => ListButton::Add,
+        crate::strings::dictionaries::MOVE_UP => ListButton::MoveUp,
+        crate::strings::dictionaries::MOVE_DOWN => ListButton::MoveDown,
+        keys::DUPLICATE => ListButton::Duplicate,
+        _ => ListButton::Always,
     }
 }
 
@@ -292,6 +326,10 @@ pub struct Extras {
     pub sync_fields: Vec<Vec<String>>,
     /// キー設定の表の問題の文(無ければ空)
     pub keymap_report: String,
+    /// キー設定の行ごとの問題(行の印と，使われない行を薄く出すのに使う)
+    pub keymap_issues: Vec<ipc::KeymapRowIssue>,
+    /// キー設定の表に合うひな形(keys::PRESETS の番号．合わなければ None)
+    pub keymap_preset: Option<usize>,
     /// 変換マクロを試した結果(コマンドのページを出すたびに読む)
     pub macro_preview: crate::engine::PreviewShown,
     /// OS に入っている書体(外観のページを初めて開いたときに読む)
@@ -330,8 +368,6 @@ pub enum Part {
     Action,
     /// 色のボタン
     Color,
-    /// ひな形を読み込むボタン
-    PresetLoad,
     /// 一覧の入力欄(打つ欄か選ぶ欄)
     Field(usize),
     /// 入力欄の右のボタン(追加・削除・切り替え・更新)
@@ -364,6 +400,8 @@ pub enum Part {
     Button(usize),
     /// 表の下の状態で絞り込む欄(キー設定)
     Filter,
+    /// 表の行の中の選ぶ欄(表の中の位置．列は表の選ぶ欄の列．除外設定の動作)
+    TableChoice(usize),
     /// 辞書の一覧の辞書の行の部品(辞書の番号と部品)
     Entry(usize, EntryPart),
     /// 辞書の一覧の下の取り込むボタン
@@ -405,6 +443,8 @@ enum Input {
 
 struct RowState {
     row: Row,
+    /// キー設定のコマンドを置ける状態(新しい行のコマンドの欄を，選んだ状態に置けるものだけにする)
+    command_states: std::collections::BTreeMap<String, Vec<String>>,
     section: usize,
     /// 部品を置いたカード(出さない行は None)
     card: Option<layout::CardLayout>,
@@ -455,6 +495,8 @@ struct RowState {
     dragging: Option<f64>,
     /// 表の下の状態で絞り込む欄で選んでいる番号(0 はすべての状態)
     filter: usize,
+    /// 一覧の行の数の上限(足すボタンを使えるか．上限の無い一覧は usize::MAX)
+    limit: usize,
     /// 辞書の一覧の状態(辞書の一覧の行だけ)．入力欄(inputs)は開いた辞書の名前と分野
     dictionaries: Option<dictionary_rows::Rows>,
 }
@@ -579,8 +621,15 @@ impl RowState {
             Control::Version => text::version(env!("CARGO_PKG_VERSION")),
             _ => String::new(),
         };
+        let command_states = match &row.control {
+            Control::List(spec, _) if spec.path == "keymap" => {
+                catalog.keymap_command_states.clone()
+            }
+            _ => Default::default(),
+        };
         Self {
             row: row.clone(),
+            command_states,
             section,
             card: None,
             visible: true,
@@ -589,7 +638,7 @@ impl RowState {
             resettable: false,
             on: false,
             knob: Tween::fixed(0.0),
-            choice: matches!(row.control, Control::Preset).then_some(0),
+            choice: None,
             extra_choice: None,
             font_items: Vec::new(),
             numbers,
@@ -609,6 +658,10 @@ impl RowState {
             acknowledgement: None,
             dragging: None,
             filter: 0,
+            limit: match &row.control {
+                Control::List(_, limit) => limit.limit(catalog),
+                _ => usize::MAX,
+            },
             dictionaries: match row.control {
                 Control::Dictionaries(list) => Some(dictionary_rows::Rows::new(list)),
                 _ => None,
@@ -765,9 +818,84 @@ impl RowState {
         matches!(self.row.control, Control::CustomThemes(_))
     }
 
-    /// 選んだ行を消すボタン(足す一覧は表の下の左)
+    /// 選んだ行を消すボタン(足す一覧の表の下の「削除」)
     pub fn remove_part(&self) -> Option<Part> {
-        self.has_add_remove().then_some(Part::Bottom(0))
+        if !self.has_add_remove() {
+            return None;
+        }
+        let buttons = self.row.control.list_buttons()?;
+        buttons
+            .bottom
+            .iter()
+            .position(|label| list_button(label) == ListButton::Remove)
+            .map(Part::Bottom)
+    }
+
+    /// 表の下の index 番目のボタンの役割(ファイルのボタンは除く)
+    fn list_button(&self, index: usize) -> Option<ListButton> {
+        let buttons = self.row.control.list_buttons()?;
+        buttons.bottom.get(index).map(|label| list_button(label))
+    }
+
+    /// 一覧の上に並べる欄の数と，表の下の帯に置く欄の数
+    fn field_counts(&self) -> (usize, usize) {
+        let fields = self
+            .row
+            .control
+            .list_spec()
+            .map_or(0, |spec| spec.fields.len());
+        match self.row.control.list_buttons() {
+            Some(buttons) => {
+                let top = buttons.top_fields(fields);
+                (top, buttons.input_fields(fields) - top)
+            }
+            None => (fields, 0),
+        }
+    }
+
+    /// 選んだ 1 行を offset だけ動かせるか(除外設定の優先度)
+    fn can_move(&self, offset: isize) -> bool {
+        if !self.row.control.reorderable() {
+            return false;
+        }
+        let selected = self.table.selected_rows();
+        let [index] = selected.as_slice() else {
+            return false;
+        };
+        index
+            .checked_add_signed(offset)
+            .is_some_and(|target| target < self.table.total())
+    }
+
+    /// 表の選ぶ欄の列(表の列の番号と，行の値の何番目か)
+    fn choice_column(&self) -> Option<(usize, usize)> {
+        self.row
+            .control
+            .table_layout()
+            .columns
+            .iter()
+            .enumerate()
+            .find(|(_, column)| column.cell == Cell::Choice)
+            .map(|(index, column)| (index, column.source))
+    }
+
+    /// 表の position 番目の行の選ぶ欄の位置(ページの中の座標．送った位置)
+    fn table_choice_rect(&self, position: usize) -> Option<Rect> {
+        let rect = self.part_rect(Part::Table)?;
+        let (column, _) = self.choice_column()?;
+        let layout = self.row.control.table_layout();
+        let (left, width) = *layout
+            .spans(rect.width, size::FIELD_PADDING_X)
+            .get(column)?;
+        let top = rect.y + size::TABLE_HEADER_HEIGHT + position as f32 * size::TABLE_ROW_HEIGHT
+            - self.table_scroll.target();
+        let inset = size::TABLE_ROW_INSET;
+        Some(Rect::new(
+            rect.x + left - size::FIELD_PADDING_X,
+            top + inset,
+            width,
+            size::TABLE_ROW_HEIGHT - inset * 2.0,
+        ))
     }
 
     /// 入力欄の値(選ぶ欄は設定のファイルに書く値)
@@ -881,11 +1009,7 @@ impl RowState {
     /// 部品の位置(ページの中の座標)
     fn part_rect(&self, part: Part) -> Option<Rect> {
         let card = self.card.as_ref()?;
-        let fields = self
-            .row
-            .control
-            .list_spec()
-            .map_or(0, |spec| spec.fields.len());
+        let (fields, bottom_fields) = self.field_counts();
         let buttons = self.row.control.list_buttons();
         let top = buttons.map_or(0, |buttons| buttons.top.len());
         let search = buttons.is_some_and(|buttons| buttons.search);
@@ -935,15 +1059,27 @@ impl RowState {
             | Part::Color
             | Part::Table
             | Part::Text => Some(card.control),
-            Part::PresetLoad => card.parts.first().copied(),
+            // 表の下の帯に置く欄は，検索欄・絞り込みのあと，下のボタンの前
+            Part::Field(index) if index >= fields => card
+                .parts
+                .get(fields + top + usize::from(search) + usize::from(filter) + index - fields)
+                .copied(),
             Part::Field(index) | Part::PreviewField(index) => card.parts.get(index).copied(),
+            Part::TableChoice(position) => self.table_choice_rect(position),
             Part::Top(index) => card.parts.get(fields + index).copied(),
             Part::Search => search
                 .then(|| card.parts.get(fields + top).copied())
                 .flatten(),
             Part::Bottom(index) => card
                 .parts
-                .get(fields + top + usize::from(search) + usize::from(filter) + index)
+                .get(
+                    fields
+                        + top
+                        + usize::from(search)
+                        + usize::from(filter)
+                        + bottom_fields
+                        + index,
+                )
                 .copied(),
         }
     }
@@ -978,7 +1114,8 @@ impl RowState {
                 }
             }
             Control::Color => parts.push(Part::Color),
-            Control::Preset => parts.extend([Part::Dropdown, Part::PresetLoad]),
+            // ひな形は 1 つのメニューで，選ぶと読み込む(macOS の KeymapPage のひな形のメニュー)
+            Control::Preset => parts.push(Part::Dropdown),
             Control::KeymapReport | Control::ThemeReport => parts.push(Part::Text),
             Control::Dictionaries(_) => {
                 if let Some(rows) = &self.dictionaries {
@@ -998,8 +1135,9 @@ impl RowState {
                 }
             }
             control => {
-                if let (Some(spec), Some(buttons)) = (control.list_spec(), control.list_buttons()) {
-                    parts.extend((0..spec.fields.len()).map(Part::Field));
+                if let (Some(_), Some(buttons)) = (control.list_spec(), control.list_buttons()) {
+                    let (fields, bottom_fields) = self.field_counts();
+                    parts.extend((0..fields).map(Part::Field));
                     // キャンセル(上の 2 つ目)は書き換えているあいだだけ出す
                     let editing = self.editing.is_some();
                     parts.extend(
@@ -1014,6 +1152,7 @@ impl RowState {
                     if buttons.filter {
                         parts.push(Part::Filter);
                     }
+                    parts.extend((fields..fields + bottom_fields).map(Part::Field));
                     parts.extend((0..buttons.bottom_labels().len()).map(Part::Bottom));
                 }
             }
@@ -1031,11 +1170,10 @@ impl RowState {
             return false;
         }
         let selected = !self.table.selected_positions().is_empty();
-        let fields = self
-            .row
-            .control
-            .list_spec()
-            .map_or(0, |spec| spec.fields.len());
+        let fields = {
+            let (top, bottom) = self.field_counts();
+            top + bottom
+        };
         match part {
             Part::Entry(index, part) => self
                 .dictionaries
@@ -1058,13 +1196,21 @@ impl RowState {
             }
             // キャンセルは書き換えているあいだ，削除は行を選んでいるとき
             Part::Top(1) if self.has_add_remove() => self.editing.is_some(),
-            Part::Bottom(0) if self.has_add_remove() => selected,
             // カスタムテーマの一覧の更新
             Part::Top(0) if self.is_dictionary_list() => selected,
             Part::Bottom(index) if self.is_dictionary_list() => {
                 index < always_enabled(&self.row.control) || selected
             }
-            Part::Bottom(index) => bottom_always_enabled(&self.row.control, index) || selected,
+            Part::Bottom(index) => match self.list_button(index) {
+                Some(ListButton::Remove | ListButton::Duplicate) => selected,
+                Some(ListButton::Edit) => self.table.selected_positions().len() == 1,
+                Some(ListButton::Add) => self.table.total() < self.limit,
+                Some(ListButton::MoveUp) => self.can_move(-1),
+                Some(ListButton::MoveDown) => self.can_move(1),
+                Some(ListButton::Always) => true,
+                None => selected,
+            },
+            Part::TableChoice(position) => position < self.table.len(),
             Part::Field(index) => index < fields,
             _ => true,
         }
@@ -1081,7 +1227,6 @@ impl RowState {
             Part::Bottom(index) => buttons
                 .and_then(|buttons| buttons.bottom_labels().get(index).copied())
                 .unwrap_or(""),
-            Part::PresetLoad => keys::LOAD,
             Part::Action => match self.row.control {
                 Control::Version => more::CHECK_FOR_UPDATES,
                 Control::LabeledAction(_, label) | Control::InfoAction(_, _, label) => label,
@@ -1139,6 +1284,18 @@ impl RowState {
                 .and_then(|spec| spec.fields.get(index))
                 .and_then(|field| field.choices)
                 .map(|choices| {
+                    self.choice_positions(index)
+                        .iter()
+                        .filter_map(|position| choices.get(*position))
+                        .map(|(_, name)| (*name).to_string())
+                        .collect()
+                })
+                .unwrap_or_default(),
+            (control, Part::TableChoice(_)) => self
+                .choice_column()
+                .and_then(|(_, source)| control.list_spec()?.fields.get(source))
+                .and_then(|field| field.choices)
+                .map(|choices| {
                     choices
                         .iter()
                         .map(|(_, name)| (*name).to_string())
@@ -1155,20 +1312,76 @@ impl RowState {
             Part::Dropdown => self.choice,
             Part::Filter => Some(self.filter),
             Part::Field(index) => match self.inputs.get(index) {
-                Some(Input::Choice(selected)) => Some(*selected),
+                Some(Input::Choice(selected)) => self
+                    .choice_positions(index)
+                    .iter()
+                    .position(|position| position == selected),
                 _ => None,
             },
             Part::Entry(index, EntryPart::Condition) => {
                 self.dictionaries.as_ref()?.condition_index(index)
             }
+            // 表に出している名前から選んでいるものを引く
+            Part::TableChoice(position) => {
+                let (_, source) = self.choice_column()?;
+                let label = self.table.shown_row(position)?.get(source)?;
+                self.dropdown_items(part)
+                    .iter()
+                    .position(|item| item == label)
+            }
             _ => None,
         }
+    }
+
+    /// 選ぶ欄に出す選択肢(選択肢の番号の並び)．キー設定のコマンドの欄は，選んだ状態に置けるものだけにする
+    /// (macOS の KeymapPage の commandPicker)．ほかの欄はすべて
+    fn choice_positions(&self, index: usize) -> Vec<usize> {
+        let Some(spec) = self.row.control.list_spec() else {
+            return Vec::new();
+        };
+        let Some(choices) = spec.fields.get(index).and_then(|field| field.choices) else {
+            return Vec::new();
+        };
+        if spec.path != "keymap" || index != KEYMAP_COMMAND || self.command_states.is_empty() {
+            return (0..choices.len()).collect();
+        }
+        let state = self.keymap_state();
+        (0..choices.len())
+            .filter(|position| self.command_available(choices[*position].0, state))
+            .collect()
+    }
+
+    /// 新しい行の状態の値(キー設定)
+    fn keymap_state(&self) -> &'static str {
+        let states = self
+            .row
+            .control
+            .list_spec()
+            .and_then(|spec| spec.fields.first())
+            .and_then(|field| field.choices)
+            .unwrap_or(&[]);
+        match self.inputs.first() {
+            Some(Input::Choice(selected)) => states.get(*selected).map_or("", |(value, _)| value),
+            _ => "",
+        }
+    }
+
+    /// command を state の行に置けるか(KeymapCommand.isAvailable(in:))
+    fn command_available(&self, command: &str, state: &str) -> bool {
+        state == KEYMAP_ANYWHERE
+            || self
+                .command_states
+                .get(command)
+                .is_none_or(|states| states.iter().any(|value| value == state))
     }
 
     /// 部品が選ぶ欄か
     fn is_dropdown(&self, part: Part) -> bool {
         match part {
-            Part::Dropdown | Part::Filter | Part::Entry(_, EntryPart::Condition) => true,
+            Part::Dropdown
+            | Part::Filter
+            | Part::TableChoice(_)
+            | Part::Entry(_, EntryPart::Condition) => true,
             Part::Field(index) => matches!(self.inputs.get(index), Some(Input::Choice(_))),
             _ => false,
         }
@@ -1473,6 +1686,7 @@ impl PageView {
                     row.text = crate::keys::assigned(values.value("keymap"), command)
                 }
                 Control::KeymapReport => row.text = extras.keymap_report.clone(),
+                Control::Preset => row.choice = extras.keymap_preset,
                 Control::TemplateReference => row.lines.clone_from(&extras.template_values),
                 Control::Preview(TryKind::Macros) => {
                     row.preview_result = extras.macro_preview.clone();
@@ -1709,6 +1923,15 @@ impl PageView {
                 .dictionaries
                 .as_ref()?
                 .tooltip(index, part),
+            Part::Bottom(_) => {
+                let row = self.rows.get(element.row)?;
+                let label = row.button_label(element.part);
+                row.row
+                    .control
+                    .list_buttons()
+                    .filter(|buttons| buttons.is_icon(label))
+                    .map(|_| label)
+            }
             _ => None,
         }
     }
@@ -1727,7 +1950,6 @@ impl PageView {
             Part::Segment(_) | Part::Button(_) => row.button_label(element.part).to_string(),
             Part::Top(_)
             | Part::Bottom(_)
-            | Part::PresetLoad
             | Part::Action
             | Part::Link(_)
             | Part::PreviewAdd(_)
@@ -1809,7 +2031,6 @@ impl PageView {
             Part::Dropdown => 2,
             Part::Action => 3,
             Part::Color => 4,
-            Part::PresetLoad => 5,
             Part::Decrement => 6,
             Part::Increment => 7,
             Part::Slider => 8,
@@ -1822,6 +2043,7 @@ impl PageView {
             Part::Search => 30,
             Part::Bottom(index) => 40 + index,
             Part::Table => 50,
+            Part::TableChoice(_) => 51,
             Part::PreviewField(index) => 60 + index,
             Part::Text => 70,
             Part::Expand => 79,
@@ -1850,11 +2072,29 @@ impl PageView {
             if !row.visible || row.card.is_none() {
                 return None;
             }
-            row.parts().into_iter().find_map(|part| {
-                let rect = row.part_rect(part)?;
-                let inside = x >= rect.x && x < rect.max_x() && y >= rect.y && y < rect.max_y();
-                (inside && row.part_enabled(part)).then_some(Element { row: index, part })
-            })
+            let inside =
+                |rect: Rect| x >= rect.x && x < rect.max_x() && y >= rect.y && y < rect.max_y();
+            let part = row.parts().into_iter().find(|part| {
+                row.part_rect(*part)
+                    .is_some_and(|rect| inside(rect) && row.part_enabled(*part))
+            })?;
+            // 表の行の中の選ぶ欄(見出しの下の行の中だけ)
+            if part == Part::Table && row.choice_column().is_some() {
+                let table = row.part_rect(Part::Table)?;
+                let top = table.y + size::TABLE_HEADER_HEIGHT;
+                if y >= top {
+                    let position =
+                        ((y - top + row.table_scroll.target()) / size::TABLE_ROW_HEIGHT) as usize;
+                    let choice = Part::TableChoice(position);
+                    if row.part_enabled(choice) && row.part_rect(choice).is_some_and(inside) {
+                        return Some(Element {
+                            row: index,
+                            part: choice,
+                        });
+                    }
+                }
+            }
+            Some(Element { row: index, part })
         })
     }
 
@@ -2042,10 +2282,6 @@ impl PageView {
                     current: row.color.clone(),
                 })
             }
-            (Control::Preset, Part::PresetLoad) => {
-                let (preset, _) = keys::PRESETS.get(row.choice?)?;
-                return Some(Event::LoadPreset(preset));
-            }
             _ => {}
         }
         let positions = row.table.selected_positions();
@@ -2087,11 +2323,37 @@ impl PageView {
                     row.editing = None;
                     return None;
                 }
-                ("profileRules", Part::Bottom(1)) => {
-                    return Some(Event::ChooseApp { path: spec.path })
-                }
-                ("commands", Part::Bottom(1)) => return Some(Event::ChooseCommandTarget),
                 _ => {}
+            }
+            if let Part::Bottom(index) = part {
+                let selected = row.table.selected_rows();
+                match row.list_button(index) {
+                    Some(ListButton::Add) => return Some(Event::EditCommand(None)),
+                    Some(ListButton::Edit) => {
+                        return selected
+                            .first()
+                            .map(|index| Event::EditCommand(Some(*index)))
+                    }
+                    Some(ListButton::MoveUp | ListButton::MoveDown) => {
+                        let offset = if row.list_button(index) == Some(ListButton::MoveUp) {
+                            -1
+                        } else {
+                            1
+                        };
+                        let [index] = selected.as_slice() else {
+                            return None;
+                        };
+                        return Some(Event::ListMove {
+                            spec: *spec,
+                            index: *index,
+                            offset,
+                        });
+                    }
+                    Some(ListButton::Always) if spec.path == PROFILE_RULES => {
+                        return Some(Event::ChooseApp { path: spec.path })
+                    }
+                    _ => {}
+                }
             }
         }
         if !row.has_add_remove() {
@@ -2133,10 +2395,12 @@ impl PageView {
             Part::Bottom(0) if dictionary => {
                 (!selected.is_empty()).then_some(Event::DictionaryRemove(selected))
             }
-            Part::Bottom(0) => (!selected.is_empty()).then_some(Event::ListRemove {
-                spec,
-                indices: selected,
-            }),
+            Part::Bottom(_) if Some(part) == row.remove_part() => {
+                (!selected.is_empty()).then_some(Event::ListRemove {
+                    spec,
+                    indices: selected,
+                })
+            }
             _ => None,
         }
     }
@@ -2173,13 +2437,25 @@ impl PageView {
                 row.table_scroll.jump_to(0.0);
                 None
             }
-            (Control::Preset, Part::Dropdown) => {
-                row.choice = Some(index);
-                None
-            }
+            (Control::Preset, Part::Dropdown) => keys::PRESETS
+                .get(index)
+                .map(|(preset, _)| Event::LoadPreset(preset)),
             (_, Part::Field(field)) => {
-                if let Some(Input::Choice(selected)) = row.inputs.get_mut(field) {
-                    *selected = index;
+                // 出した選択肢の位置を選択肢の番号にする(キー設定のコマンドは置けるものだけを出す)
+                let positions = row.choice_positions(field);
+                if let (Some(Input::Choice(selected)), Some(position)) =
+                    (row.inputs.get_mut(field), positions.get(index))
+                {
+                    *selected = *position;
+                }
+                // キー設定の状態を変えたら，置けないコマンドを置けるものの先頭にする(macOS の setDraftState)
+                if field == 0 {
+                    let allowed = row.choice_positions(KEYMAP_COMMAND);
+                    if let Some(Input::Choice(command)) = row.inputs.get_mut(KEYMAP_COMMAND) {
+                        if !allowed.is_empty() && !allowed.contains(command) {
+                            *command = allowed[0];
+                        }
+                    }
                 }
                 None
             }
@@ -2189,6 +2465,18 @@ impl PageView {
                     list: *list,
                     action: DictionaryAction::SetCondition(value),
                     index: Some(entry),
+                })
+            }
+            // 表の行の中で選び直したら，その行のその欄だけをすぐ書く(macOS の ExclusionsPage の Picker)
+            (Control::List(spec, _), Part::TableChoice(position)) => {
+                let (_, source) = row.choice_column()?;
+                let (value, _) = spec.fields.get(source)?.choices?.get(index)?;
+                let row_index = row.table.row_index(position)?;
+                (row.dropdown_selected(element.part) != Some(index)).then(|| Event::ListSet {
+                    spec: *spec,
+                    index: row_index,
+                    field: source,
+                    value: (*value).to_string(),
                 })
             }
             _ => None,
@@ -2299,6 +2587,22 @@ impl PageView {
     ) -> Option<Event> {
         let row = self.rows.get_mut(row_index)?;
         let changed = row.table.click(position, control, shift);
+        // コマンドは 2 回押すとシートで書き換える(macOS の CommandsPage の primaryAction)．
+        // 除外設定は行の中で動作を選び直すので，2 回押しても書き換えない(macOS と同じ)
+        let sheet = row
+            .row
+            .control
+            .list_buttons()
+            .is_some_and(|buttons| buttons.sheet);
+        if double && !control && !shift && sheet {
+            return row
+                .table
+                .row_index(position)
+                .map(|index| Event::EditCommand(Some(index)));
+        }
+        if double && !control && !shift && row.row.control.reorderable() {
+            return changed.then(|| self.selection_changed(row_index)).flatten();
+        }
         if double && !control && !shift && row.has_add_remove() {
             if let [index] = row.table.selected_rows().as_slice() {
                 let index = *index;
@@ -2349,6 +2653,9 @@ impl PageView {
             return false;
         };
         if y >= rect.y + size::TABLE_HEADER_HEIGHT {
+            return false;
+        }
+        if !row.row.control.sortable() {
             return false;
         }
         let layout = row.row.control.table_layout();
@@ -2521,69 +2828,81 @@ impl PageView {
         }
     }
 
-    /// 一覧の入力欄の値で行を足す(追加のボタンを押したのと同じ)．入力欄が埋まっていなければ None
-    pub fn list_add_event(&self, path: &str) -> Option<Event> {
-        let row = self
-            .rows
-            .iter()
-            .find(|row| matches!(&row.row.control, Control::List(spec, _) if spec.path == path))?;
-        let (spec, limit) = row.list_spec().map(|(spec, limit)| (*spec, limit))?;
-        let values = row.input_values();
-        spec.is_filled(&values).then(|| Event::ListAdd {
-            spec,
-            limit,
-            item: spec.make(&values),
-            replacing: None,
+    /// path の一覧の表で，rows の index 番目の行だけを選ぶ(除外設定の行を動かしたあと．macOS は動かした行を選んだまま)
+    pub fn select_list_row(&mut self, path: &str, index: usize, now: f64) {
+        for row in &mut self.rows {
+            if matches!(&row.row.control, Control::List(spec, _) if spec.path == path) {
+                row.table.select_row(index);
+                if let Some(position) = row.table.cursor() {
+                    let top = position as f32 * size::TABLE_ROW_HEIGHT;
+                    row.table_scroll
+                        .reveal(top, top + size::TABLE_ROW_HEIGHT, now);
+                }
+            }
+        }
+    }
+
+    /// 表で Enter を押した．シートで書き換える一覧(コマンド)なら，選んだ 1 行を書き換えるシートを出す
+    pub fn table_enter(&self, row_index: usize) -> Option<Event> {
+        let row = self.rows.get(row_index)?;
+        if !row.row.control.list_buttons()?.sheet {
+            return None;
+        }
+        match row.table.selected_rows().as_slice() {
+            [index] => Some(Event::EditCommand(Some(*index))),
+            _ => None,
+        }
+    }
+
+    /// 表で選んでいる 1 行の中の選ぶ欄(無ければ None)．キーボードで開く
+    pub fn table_choice(&self, row_index: usize) -> Option<Element> {
+        let row = self.rows.get(row_index)?;
+        row.choice_column()?;
+        let position = row.table.cursor()?;
+        row.table.is_selected(position).then_some(Element {
+            row: row_index,
+            part: Part::TableChoice(position),
         })
     }
 
-    /// path の一覧の field 番目の打つ欄の文字
-    pub fn list_input(&self, path: &str, field: usize) -> String {
+    /// path の一覧の表
+    pub fn list_table(&self, path: &str) -> Option<Element> {
         self.rows
             .iter()
-            .find_map(|row| match (&row.row.control, row.inputs.get(field)) {
-                (Control::List(spec, _), Some(Input::Edit(window))) if spec.path == path => {
-                    Some(ffi::window_text(*window))
-                }
-                _ => None,
+            .position(|row| matches!(&row.row.control, Control::List(spec, _) if spec.path == path))
+            .map(|row| Element {
+                row,
+                part: Part::Table,
             })
-            .unwrap_or_default()
     }
 
-    /// path の一覧の field 番目の選ぶ欄で value を選ぶ
-    pub fn set_list_choice(&mut self, path: &str, field: usize, value: &str) {
-        for row in &mut self.rows {
+    /// path の一覧の決まりと上限
+    pub fn list_spec(&self, path: &str) -> Option<(ListSpec, LimitKind)> {
+        self.rows.iter().find_map(|row| match &row.row.control {
+            Control::List(spec, limit) if spec.path == path => Some((*spec, *limit)),
+            _ => None,
+        })
+    }
+
+    /// path の一覧の field 番目の選ぶ欄で選んでいる値(設定のファイルに書く名前．除外設定の表の下の動作)
+    pub fn list_choice(&self, path: &str, field: usize) -> Option<&'static str> {
+        self.rows.iter().find_map(|row| {
             let Control::List(spec, _) = &row.row.control else {
-                continue;
+                return None;
             };
             if spec.path != path {
-                continue;
+                return None;
             }
-            let position = spec
-                .fields
-                .get(field)
-                .and_then(|field| field.choices)
-                .and_then(|choices| choices.iter().position(|(raw, _)| *raw == value));
-            if let (Some(position), Some(Input::Choice(selected))) =
-                (position, row.inputs.get_mut(field))
-            {
-                *selected = position;
+            match row.inputs.get(field)? {
+                Input::Choice(selected) => spec
+                    .fields
+                    .get(field)?
+                    .choices?
+                    .get(*selected)
+                    .map(|(value, _)| *value),
+                Input::Edit(_) => None,
             }
-        }
-    }
-
-    /// path の一覧の field 番目の入力欄に text を入れる(アプリを選んで足すとき)
-    pub fn set_list_input(&mut self, path: &str, field: usize, text: &str) {
-        for row in &mut self.rows {
-            if let Control::List(spec, _) = &row.row.control {
-                if spec.path != path {
-                    continue;
-                }
-                if let Some(Input::Edit(window)) = row.inputs.get(field) {
-                    ffi::set_text(*window, text);
-                }
-            }
-        }
+        })
     }
 
     /// 足し終えた記号の一覧の入力欄を空にする
@@ -3064,11 +3383,19 @@ impl PageView {
             Control::Choice(_) | Control::ThemeFont(_) | Control::Preset => {
                 let dropdown = element(Part::Dropdown);
                 let items = row.dropdown_items(Part::Dropdown);
-                let label = row
-                    .choice
-                    .and_then(|choice| items.get(choice))
-                    .cloned()
-                    .unwrap_or_default();
+                // ひな形は今の表に合うひな形の名前を出す．合わなければ「カスタム」(macOS の currentPreset)
+                let label = match row.row.control {
+                    Control::Preset => keys::current_preset(
+                        row.choice
+                            .and_then(|choice| items.get(choice))
+                            .map_or(keys::CUSTOM_PRESET, String::as_str),
+                    ),
+                    _ => row
+                        .choice
+                        .and_then(|choice| items.get(choice))
+                        .cloned()
+                        .unwrap_or_default(),
+                };
                 paint::dropdown(
                     canvas,
                     theme,
@@ -3077,19 +3404,6 @@ impl PageView {
                     frame.open == Some(dropdown),
                     self.state(frame, dropdown, row.enabled),
                 );
-                if let (Control::Preset, Some(rect)) =
-                    (&row.row.control, row.part_rect(Part::PresetLoad))
-                {
-                    let load = element(Part::PresetLoad);
-                    paint::button(
-                        canvas,
-                        theme,
-                        rect,
-                        keys::LOAD,
-                        paint::ButtonKind::Standard,
-                        self.state(frame, load, row.enabled),
-                    );
-                }
             }
             Control::Action(kind) => {
                 let action = element(Part::Action);
@@ -3549,16 +3863,30 @@ impl PageView {
                 }
                 Part::Field(_) | Part::Search => self.paint_field(canvas, frame, index, row, part),
                 Part::Top(_) | Part::Bottom(_) => {
+                    let label = row.button_label(part);
+                    let icon = row
+                        .row
+                        .control
+                        .list_buttons()
+                        .is_some_and(|buttons| buttons.is_icon(label));
                     let kind = if part == Part::Top(0) && row.has_add_remove() {
                         paint::ButtonKind::Accent
+                    } else if icon {
+                        paint::ButtonKind::Icon
                     } else {
                         paint::ButtonKind::Standard
+                    };
+                    // 優先度を上げる・下げるは山形の絵で描く(名前は説明の吹き出しと読み上げに出す)
+                    let shown = match label {
+                        _ if !icon => label,
+                        crate::strings::dictionaries::MOVE_UP => theme.glyphs.chevron_up,
+                        _ => theme.glyphs.chevron_down,
                     };
                     paint::button(
                         canvas,
                         theme,
                         rect,
-                        row.button_label(part),
+                        shown,
                         kind,
                         self.state(frame, element, row.part_enabled(part)),
                     );
@@ -3735,6 +4063,59 @@ impl PageView {
                 let (style, color) = match column.cell {
                     Cell::Check => {
                         paint_check(canvas, theme, cell_rect, !value.is_empty(), row.enabled);
+                        continue;
+                    }
+                    Cell::Choice => {
+                        let element = Element {
+                            row: index,
+                            part: Part::TableChoice(position),
+                        };
+                        let state = self.state(frame, element, row.enabled);
+                        paint_table_choice(
+                            canvas,
+                            theme,
+                            row.part_rect(element.part).unwrap_or(cell_rect),
+                            value,
+                            frame.open == Some(element),
+                            state,
+                        );
+                        continue;
+                    }
+                    Cell::Path => {
+                        let shown = paint::truncate_middle(
+                            &*canvas,
+                            value,
+                            TextStyle::Body,
+                            cell_rect.width,
+                        );
+                        canvas.text(
+                            cell_rect,
+                            &shown,
+                            TextStyle::Body,
+                            Color::from(if enabled { text } else { secondary }),
+                            TextLayout::LINE,
+                        );
+                        continue;
+                    }
+                    Cell::Mark => {
+                        // 使われない行は塗った警告，一部の状態で使われない行は情報，文字を打てなくなる行は線の警告
+                        let (glyph, color) = match value {
+                            pages::keymap_mark::HIDDEN => (theme.glyphs.warning, palette.caution),
+                            pages::keymap_mark::PARTLY => {
+                                (theme.glyphs.info, palette.text_secondary)
+                            }
+                            pages::keymap_mark::BLOCKS => {
+                                (theme.glyphs.warning_outline, palette.text_secondary)
+                            }
+                            _ => continue,
+                        };
+                        canvas.text(
+                            cell_rect,
+                            glyph,
+                            TextStyle::IconSmall,
+                            Color::from(color),
+                            TextLayout::LINE,
+                        );
                         continue;
                     }
                     Cell::Mono => (TextStyle::Code, if enabled { text } else { secondary }),
@@ -4038,7 +4419,11 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
             let (Some(spec), Some(buttons)) = (control.list_spec(), control.list_buttons()) else {
                 return;
             };
-            for field in spec.fields {
+            for field in spec
+                .fields
+                .iter()
+                .take(buttons.input_fields(spec.fields.len()))
+            {
                 let input = match field.choices {
                     Some(_) => Input::Choice(field.default_choice),
                     None => match fields.take(field.prompt.unwrap_or(field.label)) {
@@ -4179,6 +4564,75 @@ fn paint_template(canvas: &mut dyn Canvas, theme: &Theme, row: &RowState) {
     }
 }
 
+/// キー設定の入力欄のうちコマンドの欄の番号(状態・キー・コマンド)
+const KEYMAP_COMMAND: usize = 2;
+/// キー設定の「いつでも」の状態(KeymapState.anywhere)．どのコマンドも置ける
+const KEYMAP_ANYWHERE: &str = "anywhere";
+
+/// 表の行の中の選ぶ欄(macOS の表の中の Picker)．ふだんは地を描かずに名前と山形の印だけを出し，
+/// ポインターを載せた・開いているときだけドロップダウンの地を出す(行の縞と選んだ行の地を消さない)
+fn paint_table_choice(
+    canvas: &mut dyn Canvas,
+    theme: &Theme,
+    rect: Rect,
+    label: &str,
+    open: bool,
+    state: State,
+) {
+    if open || state.hover > 0.0 || state.pressed {
+        let fade = if open || state.pressed {
+            1.0
+        } else {
+            state.hover
+        };
+        canvas.set_opacity(fade);
+        paint::dropdown(
+            canvas,
+            theme,
+            rect,
+            "",
+            open,
+            State {
+                focus_visible: false,
+                ..state
+            },
+        );
+        canvas.set_opacity(1.0);
+    }
+    let palette = &theme.palette;
+    let (text, secondary) = if state.enabled {
+        (palette.text, palette.text_secondary)
+    } else {
+        (palette.text_disabled, palette.text_disabled)
+    };
+    let padding = size::FIELD_PADDING_X;
+    let chevron = size::CHEVRON_SIZE;
+    canvas.text(
+        Rect::new(
+            rect.x + padding,
+            rect.y,
+            (rect.width - padding * 3.0 - chevron).max(0.0),
+            rect.height,
+        ),
+        label,
+        TextStyle::Body,
+        Color::from(text),
+        TextLayout::LINE,
+    );
+    canvas.text(
+        Rect::new(
+            rect.max_x() - padding - chevron,
+            rect.y,
+            chevron,
+            rect.height,
+        ),
+        theme.glyphs.chevron_down,
+        TextStyle::IconSmall,
+        Color::from(secondary),
+        TextLayout::CENTER,
+    );
+}
+
 /// 表の有効の印(WinUI 3 の CheckBox．入れたら色を塗ってチェックを描く)．cell の左に置き，上下は真ん中にする
 fn paint_check(canvas: &mut dyn Canvas, theme: &Theme, cell: Rect, checked: bool, enabled: bool) {
     let palette = &theme.palette;
@@ -4232,6 +4686,35 @@ fn list_rows(row: &Row, values: &impl Values, extras: &Extras) -> Option<Vec<Vec
                 })
                 .collect()
         }
+        // キー設定は行の印(重なり・文字を打てなくなる)と，使われるかの印を後ろに足す(macOS の KeymapPage)
+        Control::List(spec, _) if spec.path == "keymap" => spec
+            .items(values.value(spec.path))
+            .into_iter()
+            .enumerate()
+            .map(|(index, item)| {
+                let issue = extras
+                    .keymap_issues
+                    .iter()
+                    .find(|issue| issue.row as usize == index);
+                let hidden = issue.is_some_and(|issue| {
+                    !issue.hidden_by.is_empty() && issue.hidden_states.is_empty()
+                });
+                let mark = match issue {
+                    Some(_) if hidden => pages::keymap_mark::HIDDEN,
+                    Some(issue) if !issue.hidden_by.is_empty() => pages::keymap_mark::PARTLY,
+                    Some(issue) if issue.blocks_typing => pages::keymap_mark::BLOCKS,
+                    _ => "",
+                };
+                let mut columns = spec.display(&item);
+                columns.push(mark.to_string());
+                columns.push(if hidden {
+                    String::new()
+                } else {
+                    pages::ENABLED_CELL.to_string()
+                });
+                columns
+            })
+            .collect(),
         Control::List(spec, _) => spec
             .items(values.value(spec.path))
             .into_iter()

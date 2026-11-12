@@ -172,6 +172,7 @@ pub struct SettingsPalette {
     pub nav_pressed: Rgb,
     pub nav_selected: Rgb,
     pub scrollbar: Rgb,
+    pub smoke: Rgb,
     pub switch_off: Rgb,
     pub text: Rgb,
     pub text_disabled: Rgb,
@@ -203,6 +204,7 @@ pub mod settings_windows {
         nav_pressed: Rgb { red: 0xE5, green: 0xE5, blue: 0xE5 },
         nav_selected: Rgb { red: 0xEA, green: 0xEA, blue: 0xEA },
         scrollbar: Rgb { red: 0x8A, green: 0x8A, blue: 0x8A },
+        smoke: Rgb { red: 0x00, green: 0x00, blue: 0x00 },
         switch_off: Rgb { red: 0x7A, green: 0x7A, blue: 0x7A },
         text: Rgb { red: 0x1B, green: 0x1B, blue: 0x1B },
         text_disabled: Rgb { red: 0xA0, green: 0xA0, blue: 0xA0 },
@@ -230,6 +232,7 @@ pub mod settings_windows {
         nav_pressed: Rgb { red: 0x26, green: 0x26, blue: 0x26 },
         nav_selected: Rgb { red: 0x2D, green: 0x2D, blue: 0x2D },
         scrollbar: Rgb { red: 0x9F, green: 0x9F, blue: 0x9F },
+        smoke: Rgb { red: 0x00, green: 0x00, blue: 0x00 },
         switch_off: Rgb { red: 0x9A, green: 0x9A, blue: 0x9A },
         text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
         text_disabled: Rgb { red: 0x78, green: 0x78, blue: 0x78 },
@@ -622,6 +625,8 @@ pub mod size {
         pub const WIZARD_MODE_SIZE: f32 = 28.0;
         pub const WIZARD_HERO_SIZE: f32 = 72.0;
         pub const STEPPER_BUTTON_WIDTH: f32 = 32.0;
+        pub const ICON_BUTTON_WIDTH: f32 = 40.0;
+        pub const DIALOG_RADIUS: f32 = 8.0;
         pub const SLIDER_TRACK_HEIGHT: f32 = 4.0;
         pub const SLIDER_THUMB_SIZE: f32 = 20.0;
         pub const SLIDER_THUMB_INNER: f32 = 12.0;
@@ -670,19 +675,21 @@ pub mod size {
         pub const WIDTH: f32 = 900.0;
         pub const HEIGHT: f32 = 600.0;
         pub const STAGE_WIDTH: f32 = 440.0;
-        pub const PADDING: f32 = 36.0;
-        pub const STAGE_PADDING: f32 = 28.0;
+        pub const PADDING: f32 = 24.0;
+        pub const STAGE_PADDING: f32 = 24.0;
+        pub const FIELD_TOP: f32 = 96.0;
         pub const CARD_RADIUS: f32 = 12.0;
-        pub const CARD_PADDING: f32 = 14.0;
-        pub const CARD_GAP: f32 = 10.0;
+        pub const CARD_PADDING: f32 = 12.0;
+        pub const CARD_GAP: f32 = 8.0;
+        pub const THEME_SAMPLE_WIDTH: f32 = 48.0;
         pub const DOT_SIZE: f32 = 7.0;
-        pub const DOT_GAP: f32 = 6.0;
+        pub const DOT_GAP: f32 = 4.0;
         pub const FIELD_HEIGHT: f32 = 46.0;
         pub const FIELD_RADIUS: f32 = 10.0;
         pub const FIELD_FONT_SIZE: f32 = 19.0;
         pub const APPLICATION_TAB_FONT_SIZE: f32 = 12.0;
         pub const INFO_SYMBOL_WIDTH: f32 = 28.0;
-        pub const DEMO_GAP: f32 = 14.0;
+        pub const DEMO_GAP: f32 = 8.0;
         pub const BADGE_RADIUS: f32 = 6.0;
         pub const COUNTER_HEIGHT: f32 = 16.0;
         pub const CHECK_SIZE: f32 = 20.0;
@@ -801,5 +808,6 @@ pub mod opacity {
         pub const SLIDER_TRACK_DISABLED: f32 = 0.5;
         pub const PREVIEW_CHIP: f32 = 0.06;
         pub const TABLE_STRIPE: f32 = 0.035;
+        pub const SMOKE: f32 = 0.3;
     }
 }

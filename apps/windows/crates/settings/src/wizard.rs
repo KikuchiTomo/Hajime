@@ -73,17 +73,18 @@ impl Step {
         }
     }
 
-    pub fn detail(self) -> &'static str {
+    /// 見出しの下に添える 1 行(macOS の OnboardingPage.detail)．選択肢と左の実演で分かるページには添えない
+    pub fn detail(self) -> Option<&'static str> {
         match self {
-            Step::ModeSwitch => text::MODE_DETAIL,
-            Step::AppModes => text::APP_MODES_DETAIL,
-            Step::Correction => text::CORRECTION_DETAIL,
-            Step::Theme => text::THEME_DETAIL,
-            Step::LiveConversion => text::LIVE_DETAIL,
-            Step::Presentation => text::PRESENTATION_DETAIL,
-            Step::Characters => text::CHARACTERS_DETAIL,
-            Step::Features => text::FEATURES_DETAIL,
-            Step::Extras => text::EXTRAS_DETAIL,
+            Step::AppModes => Some(text::APP_MODES_DETAIL),
+            Step::Theme => Some(text::THEME_DETAIL),
+            Step::Extras => Some(text::EXTRAS_DETAIL),
+            Step::ModeSwitch
+            | Step::Correction
+            | Step::LiveConversion
+            | Step::Presentation
+            | Step::Characters
+            | Step::Features => None,
         }
     }
 
@@ -177,12 +178,11 @@ pub enum Mark {
     Both,
 }
 
-/// 説明だけのカード(macOS の InfoCard)
+/// 紹介だけのカード(macOS の InfoCard)．どう動くかは左の実演で見せる
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Info {
     pub mark: Mark,
     pub title: &'static str,
-    pub detail: &'static str,
 }
 
 /// 名前とメニューの行(macOS の CharacterRow と，最初に選ぶ文節の LabeledContent)
@@ -233,13 +233,13 @@ const SWITCH_CARDS: &[Card] = &[
     Card {
         value: SWITCH_SEPARATE,
         title: notes::MODE_SEPARATE,
-        detail: Some(notes::MODE_SEPARATE_DETAIL),
+        detail: None,
         recommended: true,
     },
     Card {
         value: SWITCH_SINGLE,
         title: notes::MODE_SINGLE,
-        detail: Some(notes::MODE_SINGLE_DETAIL),
+        detail: None,
         recommended: false,
     },
 ];
@@ -256,17 +256,14 @@ const APP_MODES: &[Info] = &[
     Info {
         mark: Mark::Direct,
         title: "IME をオフ",
-        detail: notes::APP_MODE_OFF_DETAIL,
     },
     Info {
         mark: Mark::Japanese,
         title: "IME をオン",
-        detail: notes::APP_MODE_ON_DETAIL,
     },
     Info {
         mark: Mark::Both,
         title: "IME のオンオフを記憶",
-        detail: notes::APP_MODE_REMEMBERS_DETAIL,
     },
 ];
 
@@ -704,7 +701,7 @@ mod tests {
         assert!(Step::Extras.is_last() && Step::ModeSwitch.is_first());
         assert!(Step::ALL
             .iter()
-            .all(|step| !step.title().is_empty() && !step.detail().is_empty()));
+            .all(|step| !step.title().is_empty() && step.detail() != Some("")));
         assert_eq!(Step::Features.spots().len(), 4);
         assert_eq!(Step::Extras.spots().len(), 6);
     }
