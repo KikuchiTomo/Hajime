@@ -139,7 +139,7 @@ public enum LayoutTokens {
         public static let compactPaddingY: Double = 4
         public static let separatorGap: Double = 12
         public static let rowPaddingX: Double = 4
-        public static let headerHeight: Double = 20
+        public static let headerHeight: Double = 16
         public static let rowHeight: Double = 28
         public static let labelFontSize: Double = 11.5
         public static let keyFontSize: Double = 10.5

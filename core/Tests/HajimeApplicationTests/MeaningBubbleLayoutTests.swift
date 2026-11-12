@@ -99,6 +99,29 @@ struct MeaningBubbleLayoutTests {
         #expect(layout.pointerY <= 160 - Self.metrics.radius - Self.metrics.pointerWidth / 2)
     }
 
+    @Test("候補の窓の上の端より上に出さず，窓の高さに入るなら下の端より下にも出さない")
+    func withinWindow() {
+        // いちばん上の行で，三角を本体の上の端から遠くに置きたいとき
+        let top = Self.list(x: 100, y: 100, selected: 0)
+        let raised = Layout(row: top.row, window: top.window, size: Self.size, preferredPointer: 40, screen: Self.screen,
+                            obstacles: top.obstacles, metrics: Self.metrics)
+        #expect(raised.window.y == top.window.y)
+        #expect(Self.tip(raised).y == top.row.midY)
+        // いちばん下の行
+        let bottom = Self.list(x: 100, y: 100, selected: 3)
+        let lowered = Self.place(bottom)
+        #expect(lowered.window.maxY == bottom.window.maxY)
+        #expect(Self.tip(lowered).y == bottom.row.midY)
+    }
+
+    @Test("候補の窓より高い吹き出しは，窓の上の端にそろえる")
+    func tallerThanWindow() {
+        let setup = Self.list(x: 100, y: 100, selected: 1)
+        let layout = Self.place(setup, size: (288, 260))
+        #expect(layout.window.y == setup.window.y)
+        #expect(Self.tip(layout).y == setup.row.midY)
+    }
+
     @Test("枠線は本体と三角を 1 本でなぞり，始まりに戻る", arguments: [100.0, 880.0])
     func outline(x: Double) throws {
         let layout = Self.place(Self.list(x: x, y: 100, selected: 1))

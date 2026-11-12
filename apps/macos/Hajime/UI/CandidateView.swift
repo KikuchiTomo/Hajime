@@ -45,7 +45,7 @@ final class CandidateView: NSView {
     }
 
     /// 行の背景の内側の左右の余白．番号の丸(番号)の左と注釈のタグの右，足元の案内と位置の左右の端をここにそろえる
-    private var rowPaddingX: CGFloat { theme.isRounded ? Glass.rowPaddingX : Size.paddingX }
+    private var rowPaddingX: CGFloat { DesignTokens.Size.Part.rowPaddingX }
     /// 番号の幅(番号から候補の文字まで)
     private var lead: CGFloat { theme.isRounded ? Glass.badgeSize + Glass.badgeGap : Size.indexWidth }
 
@@ -407,7 +407,7 @@ final class CandidateView: NSView {
         return GlassDrawing.hintsWidth(footer.hints, theme: theme) + extra
     }
 
-    /// glass は案内を左，位置を右．platinum と desk は位置を左，案内を右(漢字Talk 7 の候補ウィンドウにならう)．
+    /// 案内を左，位置を右．どのテーマも同じ並び(テーマで変えるのは形と色だけ)．
     /// 左右の端は候補の行の番号の左と注釈のタグの右にそろえる
     private func drawFooter(_ panel: CandidatePanel, in rect: NSRect) {
         let footer = footerContent(for: panel)
@@ -418,26 +418,13 @@ final class CandidateView: NSView {
             self.drawText(text, attributes: attributes, x: rightEdge - text.size(withAttributes: attributes).width, in: rect)
         }
         let hintsWidth = GlassDrawing.hintsWidth(footer.hints, theme: theme)
-        if theme.isRounded {
-            if let note = footer.note {
-                NoteDrawing.draw(note, x: left, midY: rect.midY, theme: theme)
-            } else {
-                GlassDrawing.drawHints(footer.hints, x: left, midY: rect.midY, theme: theme)
-                if let hint = footer.associationHint { drawText(hint, attributes: muted, x: left + hintsWidth + Glass.hintGap, in: rect) }
-            }
-            right(footer.position, muted)
-            return
-        }
-        drawText(footer.position, attributes: muted, x: left, in: rect)
         if let note = footer.note {
-            NoteDrawing.draw(note, x: rightEdge - NoteDrawing.width(note, theme: theme), midY: rect.midY, theme: theme)
+            NoteDrawing.draw(note, x: left, midY: rect.midY, theme: theme)
         } else {
-            GlassDrawing.drawHints(footer.hints, x: rightEdge - hintsWidth, midY: rect.midY, theme: theme)
-            if let hint = footer.associationHint {
-                let width = hint.size(withAttributes: muted).width
-                drawText(hint, attributes: muted, x: rightEdge - hintsWidth - Glass.hintGap - width, in: rect)
-            }
+            GlassDrawing.drawHints(footer.hints, x: left, midY: rect.midY, theme: theme)
+            if let hint = footer.associationHint { drawText(hint, attributes: muted, x: left + hintsWidth + Glass.hintGap, in: rect) }
         }
+        right(footer.position, muted)
     }
 
     /// 行の縦の真ん中に，文字の行の箱(書体の ascender から descender まで)の真ん中を合わせて描く．
