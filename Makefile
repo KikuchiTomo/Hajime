@@ -8,7 +8,7 @@ BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.4.0/Dictionary
 # 評価用のデータ(AJIMEE-Bench)の置き場所．リポジトリに入れられないライセンスなので，1 つ上の evaluation/ に置く
 EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 
-.PHONY: fetch-models fetch-evaluation evaluate evaluate-operations evaluate-engines setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try english-terms
+.PHONY: fetch-models fetch-evaluation evaluate evaluate-operations release-metrics evaluate-engines setup check test test-debug test-zenzai tokens protocol settings-catalog site site-serve build-macos package-macos install-macos dev-macos uninstall-dev-macos uninstall-macos try english-terms
 
 setup:
 	mise install
@@ -27,6 +27,7 @@ check:
 	$(PYTHON) tools/protocol/generate.py --check
 	$(PYTHON) tools/tokens/generate_rust.py --check
 	$(PYTHON) tools/release/changelog.py check
+	$(PYTHON) -m unittest discover -s tools/evaluation -p 'test_*.py'
 
 # モデルがあれば本物の Zenzai のテストも動かす．無ければ飛ばしたことを最後に出す
 test: test-debug
@@ -105,6 +106,11 @@ evaluate:
 		echo "== $$file"; \
 		"$$bin/hajime-playground" --evaluate "$$file" $$options 2>/dev/null | tail -1; \
 	done
+
+# 前のリリース(BASE=タグ．既定はいちばん新しい v*)と今の作業ツリーの版で，かな漢字変換の指標を測って比べ，build/release-metrics/report.md に書く．
+# リリースの PR に CI(.github/workflows/metrics.yml)がコメントするものと同じ．前の版をはじめから作るので時間がかかる
+release-metrics:
+	EVALUATION_DIR="$(EVALUATION_DIR)" MODELS_DIR="$(MODELS_DIR)" tools/evaluation/release_metrics.sh "$(BASE)" build/release-metrics
 
 # 期待する文に着くまでの操作(↓ ← → ⇧← ⇧→)の数と，着いた割合を，文(conversion-basic と AJIMEE-Bench)で測る(R-25)．
 # 候補の出し方ごとに，同梱の辞書と Zenzai のモデルで測る．PRESENTATION=automatic,segmentList,list で出し方を選べる．
