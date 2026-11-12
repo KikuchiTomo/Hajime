@@ -24,7 +24,7 @@ struct Shown {
     layout: Layout,
     /// 窓の全体(角丸のテーマは影の余白を含む)
     scene: Scene,
-    measure: TextMeasure,
+    measure: std::rc::Rc<TextMeasure>,
 }
 
 /// パレットの窓の状態．候補ウィンドウのプロセスの窓のスレッドだけで触る
