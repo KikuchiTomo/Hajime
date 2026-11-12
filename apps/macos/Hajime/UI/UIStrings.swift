@@ -719,6 +719,8 @@ enum UIStrings {
         static let handwriting = "手書き入力"
         static let palette = "絵文字と記号"
         static let checkForUpdates = "更新を確認"
+        static let registerWord = "単語の登録…"
+        static let userDictionary = "ユーザー辞書…"
     }
 
     /// 設定の画面の選択肢の名前
