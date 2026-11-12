@@ -6,7 +6,7 @@
 use super::emoji::{with_skin_tone, SKIN_TONES};
 use ipc::{
     KeyHint, PaletteCell, PaletteKind, PaletteMode, PalettePanel, PalettePosition, PalettePreview,
-    PaletteRow, PaletteSkinTonePicker, PaletteTab, SkinTone,
+    PalettePreviewFields, PaletteRow, PaletteSkinTonePicker, PaletteTab, SkinTone,
 };
 
 /// 設定のマスの大きさの既定(core の DefaultSettings.paletteCellSize)
@@ -231,13 +231,14 @@ pub fn emoji() -> PalettePanel {
     }
 }
 
-/// 設定の画面の見本(macOS の SamplePalettes.preview)．列数・行数・よく使う文字の行数・説明の有無・マスの大きさは設定のとおりにし，
-/// 絵文字は見本の並びを繰り返して埋める
+/// 設定の画面の見本(macOS の SamplePalettes.preview)．列数・行数・よく使う文字の行数・説明の有無と説明に出す項目・
+/// マスの大きさは設定のとおりにし，絵文字は見本の並びを繰り返して埋める
 pub fn settings(
     columns: u32,
     rows: u32,
     frequent_rows: u32,
     shows_preview: bool,
+    fields: PalettePreviewFields,
     cell_size: f64,
 ) -> PalettePanel {
     let columns = columns.max(1);
@@ -295,9 +296,35 @@ pub fn settings(
         column: 2.min(columns - 1),
     });
     panel.shows_preview = shows_preview;
-    if !shows_preview {
-        panel.preview = None;
-    }
+    // 出さない設定の項目は空にする(core の PalettePanel.Preview と同じ)
+    panel.preview = panel
+        .preview
+        .filter(|_| shows_preview)
+        .map(|preview| PalettePreview {
+            english_name: if fields.unicode_name {
+                preview.english_name
+            } else {
+                String::new()
+            },
+            english_name_source: preview.english_name_source.filter(|_| fields.unicode_name),
+            readings: if fields.readings {
+                preview.readings
+            } else {
+                Vec::new()
+            },
+            shortcodes: if fields.shortcodes {
+                preview.shortcodes
+            } else {
+                Vec::new()
+            },
+            code_points: if fields.code_points {
+                preview.code_points
+            } else {
+                String::new()
+            },
+            ..preview
+        });
+    panel.preview_fields = Some(fields);
     panel.cell_size = cell_size;
     panel
 }
