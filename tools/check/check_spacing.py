@@ -76,18 +76,11 @@ SKIPPED_DIRS = {"Generated"}
 MOTION_FILES = {"motion.rs", "anim.rs", "PaletteMotion.swift"}
 
 # 決まりを入れる前からの画面で，あとの PR で直すもの(トークンの節とファイル)．直したら外す
-FOLLOW_UP_CANDIDATE = "#430 の次の PR で直す(候補の窓・分岐図・語の意味・案内と，予測・モード表示)"
 FOLLOW_UP_SETTINGS = "設定の画面の PR で直す(template-ui が作り直し中)"
 PENDING_SECTIONS: dict[str, str] = {
-    "candidate": FOLLOW_UP_CANDIDATE, "glass": FOLLOW_UP_CANDIDATE, "branch": FOLLOW_UP_CANDIDATE, "meaning": FOLLOW_UP_CANDIDATE,
-    "mode-indicator": FOLLOW_UP_CANDIDATE, "prediction": FOLLOW_UP_CANDIDATE,
     "settings": FOLLOW_UP_SETTINGS, "settings-windows": FOLLOW_UP_SETTINGS,
 }
 PENDING_FILES: dict[str, str] = {
-    "apps/macos/Hajime/UI/BranchView.swift": FOLLOW_UP_CANDIDATE,
-    "apps/macos/Hajime/UI/AssociationHeadingDrawing.swift": FOLLOW_UP_CANDIDATE,
-    "apps/windows/crates/candidate-ui/src/scene/branch.rs": FOLLOW_UP_CANDIDATE,
-    "apps/windows/crates/candidate-ui/src/scene/association.rs": FOLLOW_UP_CANDIDATE,
     "apps/macos/Hajime/Settings/AboutPage.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/AppearancePage.swift": FOLLOW_UP_SETTINGS,
     "apps/macos/Hajime/Settings/AssociationSection.swift": FOLLOW_UP_SETTINGS,

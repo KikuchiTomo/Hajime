@@ -250,7 +250,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         0.0
     };
     let heading_width = list.association.as_ref().map_or(0.0, |heading| {
-        super::association::width(&painter, heading) - padding * 2.0 + metrics.row_padding_x * 2.0
+        super::association::width(&painter, heading) + metrics.row_padding_x * 2.0
     });
     // 候補 1 つの行の地の幅: 左の余白・番号・文字・右の余白(文字の右は番号の左より広く空ける)．
     // 表では文字が収まる幅を切り上げ，上限から割った幅を超えない(列の位置を整数にそろえる)
@@ -375,11 +375,9 @@ fn draw_list(
     painter.panel(layout.body);
     if let Some(header) = layout.header {
         match &list.association {
-            Some(heading) => super::association::draw(
-                painter,
-                heading,
-                header.inset(metrics.row_padding_x - candidate::PADDING_X, 0.0),
-            ),
+            Some(heading) => {
+                super::association::draw(painter, heading, header.inset(metrics.row_padding_x, 0.0))
+            }
             None => variants(painter, list, header, metrics.row_padding_x),
         }
     }
@@ -878,6 +876,18 @@ mod tests {
             .hits
             .iter()
             .any(|hit| matches!(hit.target, ipc::PointerTarget::Comment { .. })));
+    }
+
+    #[test]
+    fn 連想の見出しが窓の幅を決めるときは説明と位置のあいだを_group_だけ空ける() {
+        use super::super::association::testing::{gap, long};
+        for name in ["platinum", "automatic"] {
+            let theme = theme(name);
+            let mut associated = list(Some(0));
+            associated.association = Some(long());
+            let scene = candidate_list(&associated, &Look::new(&theme, 15.0), &Fixed);
+            assert_eq!(gap(&scene), tokens::size::space::GROUP, "{name}");
+        }
     }
 
     #[test]
