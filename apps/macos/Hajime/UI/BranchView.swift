@@ -250,7 +250,8 @@ final class BranchView: NSView {
         if let focused {
             if side {
                 // 候補の右: 上の端は最初の候補の行の地の上の端，右の端は足元の区切りの線の右の端
-                let x = shiftedX[focused] + branchWidth + Glass.separatorGap
+                // 枝の行の右の端(drawBranches は枝の根もとの x を整数に丸めるので，行の右の端も同じだけずれる)
+                let x = (shiftedX[focused] + metrics.stemX).rounded() - metrics.stemX + branchWidth + Glass.separatorGap
                 slot = meaningSlot(for: panel, width: max(contentRight - x, Meaning.branchWidth).rounded(.down))
                 if let slot {
                     let frame = NSRect(x: x, y: lowerTop + metrics.rowInset, width: slot.size.width, height: slot.size.height)
@@ -380,8 +381,10 @@ final class BranchView: NSView {
                 if let slot = layout.slot, slot.placement == .side, let card = layout.card {
                     // 選んでいる候補から，枝の先へ意味のカードをつなぐ(分岐図の 3 段目)
                     if let selected = column.selectedAlternative, let layoutOfCard = slot.layout {
-                        let row = NSRect(x: node.minX, y: node.maxY + CGFloat(selected) * metrics.rowHeight, width: layout.branchWidth, height: metrics.rowHeight)
-                        let start = NSPoint(x: row.maxX.rounded(), y: row.midY.rounded())
+                        // 枝の行の右の端(枝の根もとの x を整数に丸めた分だけずれる)から出す
+                        let rowRight = (node.minX + metrics.stemX).rounded() - metrics.stemX + layout.branchWidth
+                        let rowMidY = node.maxY + (CGFloat(selected) + 0.5) * metrics.rowHeight
+                        let start = NSPoint(x: rowRight, y: rowMidY.rounded())
                         let end = NSPoint(x: card.minX, y: MeaningCardDrawing.headerMidY(layoutOfCard, in: card))
                         MeaningCardDrawing.drawConnector(from: start, to: end, theme: theme)
                     }

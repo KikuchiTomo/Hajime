@@ -290,7 +290,8 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, reserved: Optio
     if let Some((index, _)) = focused {
         if side {
             // 候補の右: 上の端は最初の候補の行の地の上の端，右の端は足元の区切りの線の右の端
-            let x = trunk_x[index] + branch_width + GAP;
+            // 枝の行の右の端(branches は枝の根もとの x を整数に丸めるので，行の右の端も同じだけずれる)
+            let x = (trunk_x[index] + metrics.stem_x).round() - metrics.stem_x + branch_width + GAP;
             let card_width = (content_right - x).max(card_size::BRANCH_WIDTH).floor();
             slot = meaning_slot(map, painter, reserved, card_width);
             if let Some(slot) = &slot {
@@ -474,8 +475,9 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
                     .filter(|index| (*index as usize) < column.alternatives.len());
                 if let (Some(selected), Some(content)) = (selected, &slot.card) {
                     let row_y = node.max_y() + selected as f32 * metrics.row_height;
+                    // 枝の行の右の端(枝の根もとの x を整数に丸めた分だけずれる)から出す
                     let start = Point::new(
-                        (node.x + layout.branch_width).round(),
+                        (node.x + metrics.stem_x).round() - metrics.stem_x + layout.branch_width,
                         (row_y + metrics.row_height / 2.0).round(),
                     );
                     let end = Point::new(card.x, content.header_mid_y(card));
