@@ -45,10 +45,16 @@ struct ResettableToggle: View {
     @ObservedObject var model: SettingsModel
     let title: String
     let keyPath: WritableKeyPath<HajimeDomain.Settings, Bool>
+    /// スイッチに付ける説明．行全体に .help を付けると「既定に戻す」のボタンの説明まで置き換わるので，スイッチにだけ付ける
+    var help: String?
 
     var body: some View {
         ResettableRow(model: model, keyPath: keyPath) {
-            Toggle(title, isOn: model.binding(keyPath))
+            if let help {
+                Toggle(title, isOn: model.binding(keyPath)).help(help)
+            } else {
+                Toggle(title, isOn: model.binding(keyPath))
+            }
         }
     }
 }

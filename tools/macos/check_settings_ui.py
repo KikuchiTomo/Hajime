@@ -21,8 +21,10 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -42,24 +44,45 @@ SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 # 同期の設定(この Mac だけのもの)．同期の記録(ledger)は設定を変えるたびに時刻が変わるので比べない
 SYNC_FILE = SETTINGS_DIR / "sync-state.json"
 SYNC_PREFIX = "syncState"
+SYNC_MODEL = ROOT / "core/Sources/HajimeDomain/Sync/SyncModel.swift"
+# 設定の値を持たない部品(一覧に足す行の下書き)．ページの名前・部品の名前と理由
+VIEW_ONLY = {
+    ("英語と日本語", "前"): "決まりを足す前の下書き",
+    ("英語と日本語", "結果"): "決まりを足す前の下書き",
+    ("除外設定", "動作"): "アプリを足す前の下書き",
+}
 RESTORE_ALL = ("バックアップ", "すべての設定を既定に戻す")
 # 範囲の名前が項目の名前と違うもの
 RANGE_NAMES = {"listCandidatesPerPage": "candidatesPerPage", "branchCandidatesPerPage": "candidatesPerPage"}
 STEP_NAMES = {"reviewCorrectionTimeout": "correctionTimeoutStep", "lateCorrectionTimeout": "correctionTimeoutStep",
               "associationLimit": "associationLimitStep", "paletteCellSize": "paletteCellSizeStep"}
 SECONDS = {"liveConversionDelay", "correctionDelay", "reviewCorrectionTimeout", "lateCorrectionTimeout", "modeIndicatorDuration"}
-ROLE_NAMES = {"AXCheckBox": "スイッチ", "AXPopUpButton": "選択肢", "AXIncrementor": "ステッパー", "AXSlider": "スライダー"}
+ROLE_NAMES = {"AXCheckBox": "スイッチ", "AXPopUpButton": "選択肢", "AXIncrementor": "ステッパー", "AXSlider": "スライダー", "AXButton": "ボタン"}
 
 
 class UIError(Exception):
     pass
 
 
+# 操作する開発版のプロセスの番号．ほかの人が同時に開発版を動かしても，そちらの窓を操作しない
+TARGET_PID: int | None = None
+
+
 def ui(*arguments: str, timeout: float = 120) -> str:
-    result = subprocess.run(["osascript", str(HELPER), *arguments], capture_output=True, text=True, timeout=timeout)
-    if result.returncode != 0:
+    environment = os.environ | ({"HAJIME_UI_PID": str(TARGET_PID)} if TARGET_PID else {})
+    for attempt in (1, 2):
+        try:
+            result = subprocess.run(["osascript", str(HELPER), *arguments], capture_output=True, text=True, timeout=timeout, env=environment)
+        except subprocess.TimeoutExpired:
+            raise UIError(f"System Events の操作({arguments[0]})が {timeout:.0f} 秒で終わらない") from None
+        if result.returncode == 0:
+            return result.stdout.rstrip("\n")
+        # 窓や部品を引く途中で画面が描き直されると，参照が一時的に使えなくなる(-1728・-1719)．部品を探す段階の誤りなので 1 回だけやり直す
+        if attempt == 1 and ("(-1728)" in result.stderr or "(-1719)" in result.stderr):
+            time.sleep(1)
+            continue
         raise UIError(result.stderr.strip())
-    return result.stdout.rstrip("\n")
+    raise UIError("System Events の操作に失敗した")
 
 
 @dataclass(frozen=True)
@@ -78,7 +101,9 @@ class Control:
 
     def act(self, operation: str, extra: str = "") -> str:
         arguments = [str(self.group), self.role, self.name, str(self.occurrence), operation]
-        return ui("act", *arguments, *([extra] if extra else []))
+        # 何段も動かすときは 1 段ごとに部品を探し直すので，段の数に合わせて待つ
+        steps = int(extra) if operation in ("increment", "decrement") and extra else 1
+        return ui("act", *arguments, *([extra] if extra else []), timeout=60 + 10 * steps)
 
 
 def controls(detailed: bool = True) -> list[Control]:
@@ -90,6 +115,11 @@ def controls(detailed: bool = True) -> list[Control]:
     return found
 
 
+def without_digits(name: str) -> str:
+    """部品の名前から今の値(数字)を除いたもの(「候補の文字サイズ: 15」→「候補の文字サイズ: 」)"""
+    return re.sub(r"[0-9.]", "", name)
+
+
 def read_json(path: Path) -> dict:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -97,12 +127,29 @@ def read_json(path: Path) -> dict:
         return {}
 
 
+def default_scopes() -> dict[str, str]:
+    """同期のまとまりごとの既定の範囲(SyncGroup.defaultScope)"""
+    text = SYNC_MODEL.read_text(encoding="utf-8")
+    block = text[text.index("var defaultScope"):]
+    block = block[:block.index("\n    }\n")]
+    scopes = {}
+    for groups, scope in re.findall(r"case ([.\w, ]+): \.(\w+)", block):
+        for group in re.findall(r"\.(\w+)", groups):
+            scopes[group] = scope
+    return scopes
+
+
+DEFAULT_SCOPES = default_scopes()
+
+
 def read_settings() -> dict:
-    """設定のファイルと，同期の設定(syncState．記録を除く)"""
+    """設定のファイルと，同期の設定(syncState．記録を除く)．
+    同期の範囲は，書いていないまとまりを既定の範囲で埋める(既定の値を書いたときと書いていないときを同じに扱う)"""
     settings = read_json(SETTINGS_FILE)
     sync = read_json(SYNC_FILE)
     sync.pop("ledger", None)
     if settings and sync:
+        sync["scopes"] = DEFAULT_SCOPES | sync.get("scopes", {})
         settings[SYNC_PREFIX] = sync
     return settings
 
@@ -122,12 +169,19 @@ def changed(before: dict, after: dict) -> dict[str, tuple[object, object]]:
     return {key: (a.get(key), b.get(key)) for key in sorted(set(a) | set(b)) if a.get(key) != b.get(key)}
 
 
-def settle(before: dict, wait: float = 3.0) -> dict:
-    """設定のファイルが書き換わるのを少し待つ．書き換わらなければそのまま返す"""
+def settle(before: dict, wait: float = 3.0, quiet: float = 0.5) -> dict:
+    """設定のファイルが書き換わるのを少し待つ．書き換わったら，quiet 秒変わらなくなるまで待つ．書き換わらなければそのまま返す"""
     deadline = time.monotonic() + wait
     while True:
         after = read_settings()
-        if after != before or time.monotonic() > deadline:
+        if after != before:
+            while True:
+                time.sleep(quiet)
+                latest = read_settings()
+                if latest == after:
+                    return after
+                after = latest
+        if time.monotonic() > deadline:
             return after
         time.sleep(0.1)
 
@@ -174,8 +228,10 @@ def windows_conditions() -> dict[str, list[str]]:
 
 
 class Checker:
-    def __init__(self, catalog: dict) -> None:
+    def __init__(self, catalog: dict, only: set[str] | None = None) -> None:
         self.catalog = catalog
+        # 確かめる部品の名前(数字を除いたもの)．None ならページのすべての部品
+        self.only = only
         self.rows: list[Row] = []
         # 項目ごとに，使えなくした親の値(macOS で見たもの)
         self.disabled_by: dict[str, set[str]] = {}
@@ -197,7 +253,8 @@ class Checker:
         time.sleep(0.5)
         baseline = controls()
         for control in baseline:
-            if control.role in ROLE_NAMES:
+            if control.role in ROLE_NAMES and (self.only is None or without_digits(control.name) in self.only):
+                wait_alone()
                 self.check(page, control, baseline)
 
     def check(self, page: str, control: Control, baseline: list[Control], depth: int = 0) -> None:
@@ -207,6 +264,10 @@ class Checker:
             self.tested_later.add((page, control.key))
         row = Row(page, control)
         self.rows.append(row)
+        if (page, control.name) in VIEW_ONLY and control.occurrence == 1:
+            row.restore = "-"
+            row.values.append(f"設定の値ではない({VIEW_ONLY[(page, control.name)]})")
+            return
         if not control.enabled:
             # 既定では使えない部品は，親の項目を変えて使えるようになったときに確かめる(links)．最後まで確かめられなければ NG
             row.restore = "-"
@@ -281,7 +342,7 @@ class Checker:
             row.values.append(f"{flatten(before).get(path)} → {flatten(after).get(path)}")
             self.links(row, baseline, f"{path}={json.dumps(flatten(after).get(path))}", depth)
         self.restore(row, before)
-        if row.restore == "対象外":
+        if row.restore in ("対象外", "ボタンなし"):
             row.control.act("click")
             settle(after)
 
@@ -334,11 +395,17 @@ class Checker:
         row.control.act("decrement", str(span * 2))
         bottom = flatten(settle(top_settings)).get(path)
         row.values.append(f"{bottom}〜{top}")
-        if same(top, high) and same(bottom, low):
+        # 端は目録の範囲の中でなければならない(少しでも越えた値を保存すると，読み直したときに丸められる)
+        if same(top, high) and same(bottom, low) and low <= bottom and top <= high:
             row.range_check = "OK"
         else:
             row.range_check = "NG"
             row.problems.append(f"範囲の端が {bottom}〜{top}(目録は {low}〜{high})")
+        # 下の端が既定の値なら「既定に戻す」は出ないので，1 段上げてから確かめる
+        if same(bottom, flatten(before).get(path)):
+            current = read_settings()
+            row.control.act("increment")
+            settle(current)
         self.restore(row, before)
 
     def check_restore_all(self, toggles: list[tuple[str, Control]]) -> Row:
@@ -352,12 +419,15 @@ class Checker:
             settle(defaults)
         changed_before = changed(defaults, read_settings())
         ui("select", page)
-        ui("press", button)
+        ui("press-last")
         after = settle(read_settings())
         if not changed_before:
             row.problems.append("試しに変えた値が保存されない")
-        elif diff := changed(defaults, after):
-            row.problems.append(f"既定に戻らない: {', '.join(diff)}")
+        elif left := [path for path in changed(defaults, after) if path in changed_before]:
+            row.problems.append(f"既定に戻らない: {', '.join(left)}")
+        # 共有の設定のフォルダは既定のままとは限らない．試しに変えた項目のほかに既定に戻った項目は，もとから既定と違っていたもの
+        if others := [path for path in changed(defaults, after) if path not in changed_before]:
+            row.values.append(f"もとから既定と違っていて既定に戻った項目: {', '.join(others)}")
         row.fields = list(changed_before)
         return row
 
@@ -401,14 +471,42 @@ def report(rows: list[Row], disabled_by: dict[str, set[str]]) -> str:
     return "\n".join(lines) + summary + ("\n連動の条件の食い違い:\n" + "\n".join(mismatches) + "\n" if mismatches else "")
 
 
+def restore_all_toggles(rows: list[Row], first_page: str) -> list[tuple[str, Control]]:
+    """「すべての設定を既定に戻す」を確かめる前に変えるスイッチ 2 つ．確かめたスイッチから選び，足りなければ最初のページから選ぶ"""
+    toggles = [(row.page, row.control) for row in rows if row.control.role == "AXCheckBox" and row.result == "OK"][:2]
+    if len(toggles) < 2:
+        ui("select", first_page)
+        toggles = [(first_page, control) for control in controls() if control.role == "AXCheckBox" and control.enabled][:2]
+    return toggles
+
+
 def running() -> bool:
     return subprocess.run(["pgrep", "-x", PROCESS], capture_output=True).returncode == 0
 
 
+def others_running() -> bool:
+    """ほかの開発版が動いているか．設定のフォルダを共有するので，動いているあいだは設定のファイルが書き換わりうる"""
+    found = subprocess.run(["pgrep", "-x", PROCESS], capture_output=True, text=True).stdout.split()
+    return any(int(pid) != TARGET_PID for pid in found)
+
+
+def wait_alone(limit: float = 600) -> None:
+    """ほかの開発版が終わるまで待つ．limit 秒たっても終わらなければ，そのページを確かめられなかったことにする"""
+    deadline = time.monotonic() + limit
+    while others_running():
+        if time.monotonic() > deadline:
+            raise UIError("ほかの開発版が動いていて，設定のファイルが書き換わるおそれがある")
+        time.sleep(5)
+
+
 def main() -> int:
+    # 止められたときも，開発版を終わらせて設定のフォルダを戻す(finally を通す)．裏で動かすと SIGINT は無視されるので付け直す
+    signal.signal(signal.SIGINT, signal.default_int_handler)
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(143))
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     parser.add_argument("--app", type=Path, default=DEFAULT_APP, help="開発版のアプリ(Debug の構成)")
-    parser.add_argument("--pages", help="確かめるページの名前(カンマ区切り)．無ければすべて")
+    parser.add_argument("--pages", help="確かめるページの名前(カンマ区切り)．無ければすべて．途中で止まったときは，止まったページから先だけを指定してやり直せる")
+    parser.add_argument("--controls", help="確かめる部品の名前(カンマ区切り)．無ければページのすべての部品．--pages と合わせて 1 つの部品だけをやり直せる")
     parser.add_argument("--report", type=Path, help="結果の表(Markdown)を書くファイル．無ければ標準出力")
     arguments = parser.parse_args()
     binary = arguments.app / "Contents/MacOS" / PROCESS
@@ -424,6 +522,8 @@ def main() -> int:
     if existed:
         shutil.copytree(SETTINGS_DIR, backup, symlinks=True)
     process = subprocess.Popen([str(binary), "--open-settings"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    global TARGET_PID
+    TARGET_PID = process.pid
     try:
         deadline = time.monotonic() + 180
         while True:
@@ -436,29 +536,46 @@ def main() -> int:
                 time.sleep(2)
         wanted = arguments.pages.split(",") if arguments.pages else pages
         catalog = json.loads(CATALOG.read_text(encoding="utf-8"))
-        checker = Checker(catalog)
-        # 設定のファイルが無ければ，スイッチを 2 回押して既定の値を書かせる(変わった項目を見分けるため)
-        if not SETTINGS_FILE.exists():
-            ui("select", pages[0])
-            first = next(control for control in controls() if control.role == "AXCheckBox" and control.enabled)
-            first.act("click")
-            settle({})
-            first.act("click")
-            time.sleep(0.5)
+        checker = Checker(catalog, {without_digits(name) for name in arguments.controls.split(",")} if arguments.controls else None)
+        # スイッチを 2 回押して，今のバージョンの形で設定のファイルを書き直させる．ファイルが無いときや，前のバージョンの形
+        # (キー設定の表の書き足しなど)のときに，最初に操作した部品で変わったように見えないようにする
+        ui("select", pages[0])
+        first = next(control for control in controls() if control.role == "AXCheckBox" and control.enabled)
+        current = read_settings()
+        first.act("click")
+        settle(current)
+        first.act("click")
+        settle(read_settings())
+
+        def write() -> str:
+            # 1 ページ終わるごとに書き直し，途中で止まってもそれまでの表を残す
+            text = report(checker.rows, checker.disabled_by)
+            if arguments.report:
+                arguments.report.write_text(text, encoding="utf-8")
+            return text
+
         for page in wanted:
             print(f"{page} を確かめています", file=sys.stderr)
-            try:
-                checker.check_page(page)
-            except UIError as error:
-                checker.rows.append(Row(page, Control(0, "-", "-", 1, False, "", False), problems=[f"ページを開けない: {error}"]))
+            # 操作が時間内に終わらないなどで確かめられなければ 1 回だけやり直し，それでもだめなら記録して次のページへ進む
+            for attempt in (1, 2):
+                try:
+                    checker.check_page(page)
+                    break
+                except UIError as error:
+                    checker.rows = [row for row in checker.rows if row.page != page]
+                    checker.waiting = [row for row in checker.waiting if row.page != page]
+                    if attempt == 2:
+                        checker.rows.append(Row(page, Control(0, "-", "-", 1, False, "", False), problems=[f"ページを確認できなかった: {error}"]))
+            write()
         checker.finish()
-        toggles = [(row.page, row.control) for row in checker.rows if row.control.role == "AXCheckBox" and not row.problems][:2]
-        if not arguments.pages and len(toggles) == 2:
-            checker.rows.append(checker.check_restore_all(toggles))
-        text = report(checker.rows, checker.disabled_by)
-        if arguments.report:
-            arguments.report.write_text(text, encoding="utf-8")
-        else:
+        if RESTORE_ALL[0] in wanted:
+            try:
+                checker.rows.append(checker.check_restore_all(restore_all_toggles(checker.rows, pages[0])))
+            except UIError as error:
+                page, button = RESTORE_ALL
+                checker.rows.append(Row(page, Control(0, "AXButton", button, 1, True, "", False), problems=[f"操作できない: {error}"]))
+        text = write()
+        if not arguments.report:
             print(text)
         return 0 if all(not row.problems for row in checker.rows) else 1
     finally:

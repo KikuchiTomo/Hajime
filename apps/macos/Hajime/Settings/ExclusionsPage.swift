@@ -23,7 +23,8 @@ struct ExclusionsPage: View {
                             Text(rule.applicationPrefix).lineLimit(1).truncationMode(.middle)
                         }
                         TableColumn(UIStrings.More.behavior) { rule in
-                            Picker("", selection: Binding(get: { rule.profile }, set: { change(rule, to: $0) })) {
+                            // 名前は見せないが，VoiceOver には読ませる
+                            Picker(UIStrings.More.behavior, selection: Binding(get: { rule.profile }, set: { change(rule, to: $0) })) {
                                 ForEach(Self.profiles, id: \.self) { Text(UIStrings.Settings.label(for: $0)).tag($0) }
                             }
                             .labelsHidden()
@@ -48,7 +49,7 @@ struct ExclusionsPage: View {
                 }
                 .frame(height: DesignTokens.Size.Settings.ruleTableHeight)
                 HStack {
-                    Picker("", selection: $newProfile) {
+                    Picker(UIStrings.More.behavior, selection: $newProfile) {
                         ForEach(Self.profiles, id: \.self) { Text(UIStrings.Settings.label(for: $0)).tag($0) }
                     }
                     .labelsHidden()
