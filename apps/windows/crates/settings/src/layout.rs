@@ -148,8 +148,9 @@ pub fn layout(
             });
             continue;
         }
+        // まとまりの行は 1 枚のカードに区切り線で並べる(macOS の Form の grouped)．行と行のあいだは空けない
         if shown > 0 {
-            y += size::SECTION_GAP - size::CARD_GAP;
+            y += size::SECTION_GAP;
         }
         shown += 1;
         let title = section.title.map(|_| {
@@ -179,7 +180,7 @@ pub fn layout(
                     reserve,
                 };
                 let card = place(index, row, &notes, frame, metrics);
-                y = card.card.max_y() + size::CARD_GAP;
+                y = card.card.max_y();
                 cards.push(card);
             }
             index = next;
@@ -190,10 +191,10 @@ pub fn layout(
                 .map(|text| metrics.lines(text, TextKind::Caption, width))
                 .max()
                 .unwrap_or(1);
-            y += size::FOOTER_GAP - size::CARD_GAP;
+            y += size::FOOTER_GAP;
             let height = longest as f32 * size::NOTE_LINE_HEIGHT;
             let rect = Rect::new(left, y, width, height);
-            y += height + size::CARD_GAP;
+            y += height;
             rect
         });
         result.push(SectionLayout {
