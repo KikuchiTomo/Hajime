@@ -168,14 +168,24 @@ pub fn layout(
     y += size::TITLE_HEIGHT;
     let mut result = Vec::new();
     let mut shown = 0;
-    // 候補の見本は，ページの中でいちばん長い名前のあとから書き出し，行ごとの左の端をそろえる(まとまりをまたいでも)
-    let example_title = sections
-        .iter()
-        .flat_map(|section| &section.rows)
-        .filter(|row| row.example.is_some() && shows_example(row))
-        .map(|row| metrics.width(row.title, TextKind::Body))
-        .fold(0.0, f32::max);
-    for section in sections {
+    // 候補の見本は，続けて見える範囲(見出しのあるまとまりと，そのすぐ下に続く見出しの無いまとまり)の中で
+    // いちばん長い見本付きの名前のあとから書き出し，左の端をそろえる．見出しで区切った別のまとまりとはそろえない
+    let mut example_titles = vec![0.0f32; sections.len()];
+    let mut start = 0;
+    for end in 1..=sections.len() {
+        if end < sections.len() && sections[end].title.is_none() {
+            continue;
+        }
+        let widest = sections[start..end]
+            .iter()
+            .flat_map(|section| &section.rows)
+            .filter(|row| row.example.is_some() && shows_example(row))
+            .map(|row| metrics.width(row.title, TextKind::Body))
+            .fold(0.0, f32::max);
+        example_titles[start..end].fill(widest);
+        start = end;
+    }
+    for (section, example_title) in sections.iter().zip(example_titles) {
         // 行がひとつも出ないまとまりは，見出しも間も置かない(カスタムテーマを選んでいないときの色・形など)
         if !section.rows.iter().any(&visible) {
             result.push(SectionLayout {
@@ -1362,12 +1372,11 @@ mod tests {
     fn 候補の見本は名前の横に置き_名前と同じ行の真ん中にそろえる() {
         let cards = example_cards(900.0);
         assert_eq!(cards.len(), 2);
-        // 2 つのタグの左の端は，ページの中でいちばん長い見本付きの名前のあとにそろえる
+        // 2 つのタグの左の端は，同じまとまりの中でいちばん長い見本付きの名前のあとにそろえる(見出しで区切った「候補」の見本とはそろえない)
         assert_eq!(cards[0].icon.x, cards[1].icon.x);
         let longest = [
             settings_strings::EMOJI_CONVERSION,
             settings_strings::EMOJI_WORD_CONVERSION,
-            crate::strings::more::LIST_SEGMENT_ALTERNATIVES,
         ]
         .iter()
         .map(|title| Estimate.width(title, TextKind::Body))
@@ -1430,10 +1439,10 @@ mod tests {
     }
 
     #[test]
-    fn 文節を入れ替えた候補の見本も絵文字の見本と左の端をそろえる() {
+    fn 見出しで区切ったまとまりの見本とは左の端をそろえない() {
         let page = sections(Page::Conversion).unwrap();
         let layout = layout(&page, 900.0, |_| true, |_| true, &Estimate);
-        let icons: Vec<f32> = page
+        let cards: Vec<(&str, CardLayout)> = page
             .iter()
             .zip(&layout.sections)
             .flat_map(|(section, placed)| {
@@ -1446,12 +1455,21 @@ mod tests {
                             "listSegmentAlternatives" | "emojiConversion"
                         )
                     })
-                    .map(|card| card.icon.x)
+                    .map(|card| (section.rows[card.row].path, card.clone()))
                     .collect::<Vec<_>>()
             })
             .collect();
-        assert_eq!(icons.len(), 2);
-        assert_eq!(icons[0], icons[1]);
+        assert_eq!(cards.len(), 2);
+        // 「候補」のまとまりの見本は 1 つだけなので，名前のすぐ後ろに置く(「絵文字」の見本の列にはそろえない)
+        let (_, segment) = cards
+            .iter()
+            .find(|(path, _)| *path == "listSegmentAlternatives")
+            .unwrap();
+        let title = Estimate.width(
+            crate::strings::more::LIST_SEGMENT_ALTERNATIVES,
+            TextKind::Body,
+        );
+        assert_eq!(segment.icon.x, segment.label.x + title + space::GROUP);
     }
 
     #[test]

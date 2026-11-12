@@ -54,7 +54,8 @@ struct KeymapPage: View {
             table
             footer
         }
-        .padding()
+        // Form でない画面なので，Form の余白にそろえてほかのページのカードと端を合わせる
+        .padding(DesignTokens.Size.Settings.formMargin)
         .alert(Keys.loadPresetTitle, isPresented: Binding(get: { pendingPreset != nil }, set: { if !$0 { pendingPreset = nil } }),
                presenting: pendingPreset) { preset in
             Button(Keys.load) { load(preset) }

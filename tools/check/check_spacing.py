@@ -54,6 +54,9 @@ ALLOWED_TOKENS: dict[str, tuple[str, ...]] = {
     "macOS の表(Table)が描く行の字の位置に，表の外の見出しをそろえる": (
         "settings.table-header-inset", "settings.table-column-spacing", "settings.table-popup-text-inset",
     ),
+    "macOS の Form(grouped)が中身のまわりに取る余白にそろえる(Form を使わない画面の端をほかのページとそろえる)": (
+        "settings.form-margin",
+    ),
     "窓の外の距離(画面の端・入力位置から窓まで，見本の画像の余白)．窓の中の余白ではない": (
         "candidate.screen-margin", "handwriting.anchor-gap", "prediction.gap", "snapshot.margin",
     ),
