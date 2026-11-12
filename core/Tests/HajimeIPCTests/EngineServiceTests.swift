@@ -583,7 +583,7 @@ struct EngineServiceTests {
         #expect(WireWordClass.allCases.map(\.rawValue) == WordClass.allCases.map(\.rawValue))
     }
 
-    @Test("入力方式を切り替えたら，モードの札に入力方式を出す．出さない設定なら出さない")
+    @Test("入力方式を切り替えたら，モード表示に入力方式を出す．出さない設定なら出さない")
     func styleIndicator() throws {
         let id = greeted()
         let session = try open(id)

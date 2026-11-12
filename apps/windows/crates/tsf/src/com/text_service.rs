@@ -445,7 +445,7 @@ impl TextService_Impl {
         if let Some(target) = &target {
             self.apply_late(target, RESPONSE_TIMEOUT);
         }
-        // 今の入力位置(モードの札をそこに出す)．読めなければ前の位置
+        // 今の入力位置(モード表示をそこに出す)．読めなければ前の位置
         let client_id = self.inner.borrow().client_id;
         let current = target
             .as_ref()
@@ -504,7 +504,7 @@ impl TextService_Impl {
         // 組み立てている途中は前の位置を使うので，入力位置の画面の上の位置は尋ねない(キーごとにアプリに配置を尋ねない)
         let field = read_field(context, client_id, wanted.unwrap_or(0), !composing);
         // 組み立てていないときは今の入力位置を使う(前の組み立ての位置は，ほかの欄やほかのアプリのことがある．
-        // モードの札や最初の候補の窓がそこに出てしまう)
+        // モード表示や最初の候補の窓がそこに出てしまう)
         let caret = match (composing, field.caret) {
             (false, Some(current)) => {
                 self.inner.borrow_mut().caret = Some(current.clone());

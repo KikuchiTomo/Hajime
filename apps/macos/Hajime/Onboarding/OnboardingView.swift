@@ -122,7 +122,7 @@ struct OnboardingView: View {
         }
     }
 
-    /// カードの札．モードの札と同じ文字(A・あ)を枠に入れて見せる．記憶は両方を並べる
+    /// カードのタグ．モード表示と同じ文字(A・あ)を枠に入れて見せる．記憶は両方を並べる
     private static func mark(for profile: AppProfile) -> String {
         switch profile {
         case .imeOff: UIStrings.ModeIndicator.label(for: InputMode.direct)
@@ -251,7 +251,7 @@ struct OnboardingView: View {
     }
 }
 
-/// 選択肢のカード．選んだカードはアクセントカラーの縁と地，推奨の選択肢には札を付ける
+/// 選択肢のカード．選んだカードはアクセントカラーの縁と地，推奨の選択肢にはタグを付ける
 private struct OptionCard: View {
     private typealias Size = DesignTokens.Size.Onboarding
     private typealias Opacity = DesignTokens.Opacity.Onboarding
@@ -294,7 +294,7 @@ private struct OptionCard: View {
     }
 }
 
-/// 「推奨」の札
+/// 「推奨」のバッジ
 private struct RecommendedBadge: View {
     private typealias Size = DesignTokens.Size.Onboarding
 
@@ -375,7 +375,7 @@ private struct CharacterRow<Value: Hashable & CaseIterable>: View where Value.Al
     }
 }
 
-/// 紹介だけのカード．入力モードの札と名前を並べる．ポインタを置くか押すと，左の舞台にそのモードの動きを見せる
+/// 紹介だけのカード．入力モード表示と名前を並べる．ポインタを置くか押すと，左の舞台にそのモードの動きを見せる
 private struct InfoCard: View {
     private typealias Size = DesignTokens.Size.Onboarding
     private typealias Opacity = DesignTokens.Opacity.Onboarding
@@ -392,7 +392,7 @@ private struct InfoCard: View {
                 .foregroundStyle(Color.accentColor)
                 .lineLimit(1)
                 .fixedSize()
-                // 3 つの札の幅をそろえる(記憶の札は A とあの 2 文字)
+                // 3 つのタグの幅をそろえる(記憶のタグは A とあの 2 文字)
                 .frame(width: Size.infoSymbolWidth * 2, height: Size.infoSymbolWidth)
                 .overlay(RoundedRectangle(cornerRadius: Size.cardRadius / 2, style: .continuous).stroke(Color.accentColor, lineWidth: 1.5))
                 .accessibilityHidden(true)
@@ -449,7 +449,7 @@ private struct SpotlightRow: View {
     }
 }
 
-/// 舞台の下に出す，見せている機能の説明の札．項目を移るたびに下から浮かび上がる
+/// 舞台の下に出す，見せている機能の説明のカード．項目を移るたびに下から浮かび上がる
 private struct SpotlightCaption: View {
     private typealias Size = DesignTokens.Size.Onboarding
 

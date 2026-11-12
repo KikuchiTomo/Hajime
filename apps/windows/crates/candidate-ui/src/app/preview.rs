@@ -29,7 +29,7 @@ pub enum Shown<'a> {
     CompactList(&'a ipc::CandidateList),
     /// 入力位置の下の案内(初期設定の実演の「修正」「もしかして」)
     Note(&'a ipc::Note),
-    /// モードの札(初期設定の実演の「あ」「A」)
+    /// モード表示(初期設定の実演の「あ」「A」)
     Mode(&'a str),
     /// 絵文字と記号のパレット(設定の画面のパレットの見本)
     Palette(&'a ipc::PalettePanel),

@@ -1,8 +1,8 @@
 import HajimeDomain
 
-/// モードの札と足元の案内の文言．macOS の候補ウィンドウと Windows のエンジン(FooterHints)が同じ表を使う
+/// モード表示と足元の案内の文言．macOS の候補ウィンドウと Windows のエンジン(FooterHints)が同じ表を使う
 public enum IndicatorLabels {
-    /// 日本語入力と英数のモードの札
+    /// 日本語入力と英数のモード表示
     public static func label(for mode: InputMode) -> String {
         switch mode {
         case .japanese: "あ"
@@ -10,7 +10,7 @@ public enum IndicatorLabels {
         }
     }
 
-    /// 入力方式を切り替えたときの札
+    /// 入力方式を切り替えたときのタグ
     public static func label(for style: InputStyle) -> String {
         switch style {
         case .romaji: "ローマ字"

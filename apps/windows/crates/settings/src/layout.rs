@@ -73,7 +73,7 @@ pub struct CardLayout {
     pub reset: Rect,
     /// 部品の中のボタン・入力欄(一覧は 左の欄・右の欄・上のボタン・検索欄・絞り込み・下のボタンの順)
     pub parts: Vec<Rect>,
-    /// 絵(情報のページのアイコン・テーマの見本の札・名前の横の候補の見本の札)．無ければ幅 0
+    /// 絵(情報のページのアイコン・テーマの見本・名前の横の候補の見本)．無ければ幅 0
     pub icon: Rect,
 }
 
@@ -168,7 +168,7 @@ pub fn layout(
         });
         let mut cards: Vec<CardLayout> = Vec::new();
         let rows = &section.rows;
-        // 候補の見本の札は，まとまりの中でいちばん長い名前のあとから書き出し，行ごとの左の端をそろえる
+        // 候補の見本は，まとまりの中でいちばん長い名前のあとから書き出し，行ごとの左の端をそろえる
         let example_title = rows
             .iter()
             .filter(|row| row.example.is_some())
@@ -232,7 +232,7 @@ struct Frame {
     y: f32,
     width: f32,
     reserve: bool,
-    /// まとまりの中で候補の見本の札を添える行の，いちばん長い名前の幅(札の左の端をそろえる)
+    /// まとまりの中で候補の見本を添える行の，いちばん長い名前の幅(タグの左の端をそろえる)
     example_title: f32,
 }
 
@@ -299,7 +299,7 @@ fn place(
     }
     match control {
         // 英語と日本語の試す欄は下に単語へ足すボタンを置く．変換マクロの結果は並べると長くなるので行を多く取る
-        // 英語と日本語の試す欄は，macOS と同じく打つ欄を縦に 2 つ並べ，下に結果の札(2 行の札)を置く
+        // 英語と日本語の試す欄は，macOS と同じく打つ欄を縦に 2 つ並べ，下に結果のタグ(2 行のタグ)を置く
         Control::Preview(TryKind::Language) => {
             let chip = size::BODY_LINE_HEIGHT
                 + size::NOTE_LINE_HEIGHT
@@ -422,7 +422,7 @@ fn place_labeled(
     } else {
         metrics.lines(row.title, TextKind::Body, label_width)
     };
-    // 名前の横の候補の見本の札．まとまりの中でいちばん長い名前のあとにそろえて置き，
+    // 名前の横の候補の見本．まとまりの中でいちばん長い名前のあとにそろえて置き，
     // 名前の 1 行目の横に収まらなければ，名前の下の行に置く
     let example = row
         .example
@@ -470,7 +470,7 @@ fn place_labeled(
     // 狭い窓で部品の幅が足りなければ縮める
     let trailing = trailing.min((frame.inner_width() - reset_space).max(0.0));
     let label = Rect::new(left, text_top, label_width.max(0.0), label_height);
-    // 札は名前の 1 行目と同じ大きさの文字を，行の真ん中にそろえて書く(ベースラインがそろう)
+    // タグは名前の 1 行目と同じ大きさの文字を，行の真ん中にそろえて書く(ベースラインがそろう)
     let icon = match example {
         Some((width, _)) if example_beside => Rect::new(
             example_x,
@@ -539,12 +539,12 @@ fn place_labeled(
     }
 }
 
-/// 候補の見本の札の高さ(名前と同じ大きさの文字の 1 行と上下の余白)
+/// 候補の見本の高さ(名前と同じ大きさの文字の 1 行と上下の余白)
 pub fn example_height() -> f32 {
     size::BODY_LINE_HEIGHT + size_settings::PREVIEW_CHIP_PADDING_Y * 2.0
 }
 
-/// 候補の見本の札の中身(読み・矢印・候補)の並び．札の左の端からの位置と幅を返す(描く側と同じ並べ方)
+/// 候補の見本の中身(読み・矢印・候補)の並び．タグの左の端からの位置と幅を返す(描く側と同じ並べ方)
 pub fn example_parts(example: (&str, &str), width: impl Fn(&str) -> f32) -> [(f32, f32); 3] {
     let (reading, candidate) = example;
     let mut x = size_settings::PREVIEW_CHIP_PADDING_X;
@@ -728,7 +728,7 @@ fn place_about(position: usize, title: &str, frame: Frame, metrics: &dyn Metrics
     card
 }
 
-/// 既成のテーマの 1 つ．選ぶ印・見本の札・名前を左から並べ，カードのどこを押しても選ぶ
+/// 既成のテーマの 1 つ．選ぶ印・見本・名前を左から並べ，カードのどこを押しても選ぶ
 fn place_option(position: usize, frame: Frame) -> CardLayout {
     let left = frame.inner_left();
     let height = size::ROW_HEIGHT;
@@ -1170,7 +1170,7 @@ mod tests {
         }
     }
 
-    /// 変換のページの「絵文字」の 2 つの切り替え(名前の横に候補の見本の札を添える行)
+    /// 変換のページの「絵文字」の 2 つの切り替え(名前の横に候補の見本を添える行)
     fn example_cards(width: f32) -> Vec<CardLayout> {
         let page = sections(Page::Conversion).unwrap();
         let layout = layout(&page, width, |_| true, &Estimate);
@@ -1188,10 +1188,10 @@ mod tests {
     }
 
     #[test]
-    fn 候補の見本の札は名前の横に置き_名前と同じ行の真ん中にそろえる() {
+    fn 候補の見本は名前の横に置き_名前と同じ行の真ん中にそろえる() {
         let cards = example_cards(900.0);
         assert_eq!(cards.len(), 2);
-        // 2 つの札の左の端は，長いほうの名前のあとにそろえる
+        // 2 つのタグの左の端は，長いほうの名前のあとにそろえる
         assert_eq!(cards[0].icon.x, cards[1].icon.x);
         let longest = [
             settings_strings::EMOJI_CONVERSION,
@@ -1238,7 +1238,7 @@ mod tests {
     }
 
     #[test]
-    fn 名前の横に収まらない窓では候補の見本の札を名前の下に置く() {
+    fn 名前の横に収まらない窓では候補の見本を名前の下に置く() {
         let cards = example_cards(260.0);
         assert_eq!(cards.len(), 2);
         for card in cards {

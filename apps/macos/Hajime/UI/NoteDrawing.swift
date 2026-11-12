@@ -1,10 +1,10 @@
 import AppKit
 import HajimeApplication
 
-/// 案内(Note)と候補の横の札を描く．分岐図・一覧の足元と，入力位置の下の案内の窓で同じものを使う．
+/// 案内(Note)と候補の横のタグを描く．分岐図・一覧の足元と，入力位置の下の案内の窓で同じものを使う．
 ///
 /// 案内は部品ごとに描き分ける: 頭のアイコン(補正の色の地の丸)，主な語(「修正」「もしかして」)，
-/// 対象の字(直す前の字は取り消し線，直した字は文字の色)，キーキャップの札とそのキーでできること
+/// 対象の字(直す前の字は取り消し線，直した字は文字の色)，キーキャップとそのキーでできること
 @MainActor
 enum NoteDrawing {
     private typealias Glass = DesignTokens.Size.Glass
@@ -74,26 +74,26 @@ enum NoteDrawing {
         return x + size.width.rounded(.up) + Glass.noteGap
     }
 
-    // MARK: - 候補の横の札
+    // MARK: - 候補の横のタグ
 
-    /// 札の幅
+    /// タグの幅
     static func tagWidth(_ text: String, theme: ResolvedTheme) -> CGFloat {
         (text.size(withAttributes: [.font: theme.labelFont(size: Glass.labelFontSize)]).width + Glass.tagPaddingX * 2).rounded(.up)
     }
 
-    /// 札の枠．描くときと押した位置を調べるときで同じものを使う
+    /// タグの枠．描くときと押した位置を調べるときで同じものを使う
     static func tagRect(_ text: String, maxX: CGFloat, midY: CGFloat, theme: ResolvedTheme) -> NSRect {
         let width = tagWidth(text, theme: theme)
         return NSRect(x: (maxX - width).rounded(), y: (midY - Glass.tagHeight / 2).rounded(), width: width, height: Glass.tagHeight)
     }
 
-    /// 札を押せる範囲．札の左右の幅で，行(row)の高さいっぱいにする(背の低い札でも押しやすいように)
+    /// タグを押せる範囲．タグの左右の幅で，行(row)の高さいっぱいにする(背の低いタグでも押しやすいように)
     static func tagHitRect(_ text: String, maxX: CGFloat, row: NSRect, theme: ResolvedTheme) -> NSRect {
         let tag = tagRect(text, maxX: maxX, midY: row.midY, theme: theme)
         return NSRect(x: tag.minX, y: row.minY, width: tag.width, height: row.height)
     }
 
-    /// 候補の横の札(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前，ユーザー辞書の語のコメント)．「修正」は補正の色の地，
+    /// 候補の横のタグ(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前，ユーザー辞書の語のコメント)．「修正」は補正の色の地，
     /// コマンドの候補(command)はアクセントの色の地，ほかは控えめな地．selected は選んでいる行の上(アクセント色の地)に描くとき
     static func drawTag(_ text: String, maxX: CGFloat, midY: CGFloat, theme: ResolvedTheme, selected: Bool, command: Bool = false) {
         let rect = tagRect(text, maxX: maxX, midY: midY, theme: theme)

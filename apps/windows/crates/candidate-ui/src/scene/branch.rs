@@ -61,7 +61,7 @@ impl Metrics {
         } else {
             0.0
         };
-        // 足元の行(と注釈・知らせの行)は，キーの札・案内のアイコン・文字の行の箱のいちばん高いもの
+        // 足元の行(と注釈・知らせの行)は，キーキャップ・案内のアイコン・文字の行の箱のいちばん高いもの
         let footer_height = glass::KEYCAP_HEIGHT
             .max(glass::NOTE_ICON_SIZE)
             .max(measure.height(Font::Label).ceil());
@@ -415,7 +415,7 @@ fn footer_width(map: &BranchMap, painter: &Painter) -> f32 {
     painter.hints_width(&map.hints) + source + association
 }
 
-/// 連想の知らせ(R-18)のキーキャップの札．キーが割り当てられていなければ None(語だけを文字で出す)
+/// 連想の知らせ(R-18)のキーキャップ．キーが割り当てられていなければ None(語だけを文字で出す)
 fn association_key_hint(map: &BranchMap) -> Option<KeyHint> {
     let label = map.association_hint.as_ref()?;
     map.association_key.as_ref().map(|key| KeyHint {
@@ -518,8 +518,8 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             );
             if pressable {
                 for index in 0..column.alternatives.len() {
-                    // コメントの札は枝の行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
-                    // 札を押すと候補の代わりにコメントを入れる
+                    // コメントのタグは枝の行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
+                    // タグを押すと候補の代わりにコメントを入れる
                     if let Some(comment) = super::alternative_comment(column, index) {
                         let row = branch_row(node, layout.branch_width, index, true, &metrics);
                         let frame = painter.tag_hit_frame(comment, tag_max_x(row), row);
@@ -622,7 +622,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     painter.finish(width, height)
 }
 
-/// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」の札の幅(前の空きを含む)．直していなければ 0
+/// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」のタグの幅(前の空きを含む)．直していなければ 0
 fn corrected_label_width(column: &BranchColumn, painter: &Painter) -> f32 {
     if column.is_corrected == Some(true) {
         painter.tag_width(strings::CORRECTED) + candidate::PADDING_X / 2.0
@@ -740,7 +740,7 @@ struct Row {
     opacity: f32,
     /// 打ったまま・修正・コマンドの添え書きか，ユーザー辞書の語のコメント
     note: Option<String>,
-    /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色の札にする)
+    /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色のタグにする)
     command: Option<CommandKind>,
     /// 文字のすぐあとに控えめに添える説明(絵文字の名前)
     detail: Option<String>,
@@ -788,7 +788,7 @@ fn upper_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
         .collect()
 }
 
-/// 枝の index 番目の行(番号・文字・札を描く枠)．描くときと押した位置を調べるときで同じものを使う
+/// 枝の index 番目の行(番号・文字・タグを描く枠)．描くときと押した位置を調べるときで同じものを使う
 fn branch_row(node: Frame, width: f32, index: usize, downward: bool, metrics: &Metrics) -> Frame {
     let stem_x = (node.x + metrics.stem_x).round();
     let y = if downward {
@@ -804,7 +804,7 @@ fn branch_row(node: Frame, width: f32, index: usize, downward: bool, metrics: &M
     )
 }
 
-/// 枝の行の札の右端
+/// 枝の行のタグの右端
 fn tag_max_x(row: Frame) -> f32 {
     row.max_x() - candidate::PADDING_X / 2.0
 }
@@ -844,7 +844,7 @@ fn lead_min_x(row: Frame) -> f32 {
     row.x + candidate::PADDING_X / 2.0
 }
 
-/// 幹の根元: 下の枝は文節の札の下の端，上の枝は上の端
+/// 幹の根元: 下の枝は文節のタグの下の端，上の枝は上の端
 fn root_y(node: Frame, downward: bool, metrics: &Metrics) -> f32 {
     if downward {
         node.max_y() - metrics.root_inset
@@ -1157,7 +1157,7 @@ mod tests {
     }
 
     #[test]
-    fn コマンドの枝は種類のアイコンと札を付け_選ぶと幹も印の代わりにアイコンで見せる() {
+    fn コマンドの枝は種類のアイコンとタグを付け_選ぶと幹も印の代わりにアイコンで見せる() {
         for name in ["platinum", "automatic"] {
             let theme = theme(name);
             let look = Look::new(&theme, 15.0);
@@ -1237,7 +1237,7 @@ mod tests {
     }
 
     #[test]
-    fn コメントの札を押すとコメント_札の外の枝と_コメントでない札は候補() {
+    fn コメントのタグを押すとコメント_タグの外の枝と_コメントでないタグは候補() {
         for name in ["platinum", "automatic"] {
             let theme = theme(name);
             let mut commented = map();
@@ -1253,23 +1253,23 @@ mod tests {
                     .map(|hit| hit.frame)
             };
             let comment = ipc::PointerTarget::Comment { index: 0 };
-            let tag = text_frame(&scene, "千代田区千代田1-1").expect("札を描く");
+            let tag = text_frame(&scene, "千代田区千代田1-1").expect("タグを描く");
             assert_eq!(
                 scene.target_at(tag.mid_x(), tag.mid_y()),
                 Some(comment.clone())
             );
-            // 札の上下の空きも，枝の行の高さいっぱいまで札として押せる
+            // タグの上下の空きも，枝の行の高さいっぱいまでタグとして押せる
             let row = hit(ipc::PointerTarget::Alternative { index: 0 }).expect("枝の行");
-            let area = hit(comment.clone()).expect("札を押せる範囲");
+            let area = hit(comment.clone()).expect("タグを押せる範囲");
             assert_eq!((area.y, area.height), (row.y, row.height), "{name}");
             assert!(area.max_x() <= row.max_x(), "{name}");
             assert_eq!(scene.target_at(tag.mid_x(), row.y + 1.0), Some(comment));
-            // 札の左(候補の文字の側)は候補
+            // タグの左(候補の文字の側)は候補
             assert_eq!(
                 scene.target_at(area.x - 1.0, row.mid_y()),
                 Some(ipc::PointerTarget::Alternative { index: 0 })
             );
-            // コメントでない札(修正)は押しても候補
+            // コメントでないタグ(修正)は押しても候補
             let corrected = scene
                 .draws
                 .iter()
@@ -1278,13 +1278,13 @@ mod tests {
                     _ => None,
                 })
                 .find(|frame| frame.y > row.y)
-                .expect("枝の札を描く");
+                .expect("枝のタグを描く");
             assert_eq!(
                 scene.target_at(corrected.mid_x(), corrected.mid_y()),
                 Some(ipc::PointerTarget::Alternative { index: 1 })
             );
         }
-        // コメントの無い分岐図には札の押せる範囲を足さない
+        // コメントの無い分岐図にはタグの押せる範囲を足さない
         let theme = theme("automatic");
         let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
         assert!(!scene
@@ -1545,9 +1545,9 @@ mod tests {
                     "{name}: {text}"
                 );
             }
-            // 同音語は耳のアイコンと札だけ．見出しの言葉は置かない
+            // 同音語は耳のアイコンとタグだけ．見出しの言葉は置かない
             assert!(!texts.iter().any(|(shown, _)| shown == "同音語"), "{name}");
-            // 同音語の札には，枝に出ている語(取る)を出さない
+            // 同音語のタグには，枝に出ている語(取る)を出さない
             let tags = texts.iter().filter(|(shown, _)| shown == "取る").count();
             assert_eq!(tags, 1, "{name}");
             // 語の意味は候補の枝の右に，つなぐ線を引く幅を空けて置く

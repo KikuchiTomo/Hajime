@@ -1,6 +1,6 @@
 [package]
 name = "candidate-ui"
-description = "候補ウィンドウ・分岐図・モードの札を描くプロセス"
+description = "候補ウィンドウ・分岐図・モード表示を描くプロセス"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

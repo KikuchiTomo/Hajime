@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 子を横に並べ，幅に収まらなければ次の行に送る(「試す」の結果の札を並べる)
+/// 子を横に並べ，幅に収まらなければ次の行に送る(「試す」の結果のタグを並べる)
 struct WrappingStack: Layout {
     var spacing: CGFloat
 

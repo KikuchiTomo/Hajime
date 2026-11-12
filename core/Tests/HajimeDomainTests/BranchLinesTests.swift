@@ -3,12 +3,12 @@ import Testing
 
 @Suite("分岐図の枝の線の配置")
 struct BranchLinesTests {
-    /// 下の枝: 文節の札の下の端(y = 40)から，28 ずつ離れた 5 つの行へ
+    /// 下の枝: 文節のタグの下の端(y = 40)から，28 ずつ離れた 5 つの行へ
     private func downward(radius: Double = 8, lineWidth: Double = 1.5, scale: Double = 2) -> BranchLines {
         BranchLines(stemX: 22, rootY: 40, rowMidYs: (0..<5).map { 56 + Double($0) * 28 }, tipX: 47, radius: radius, lineWidth: lineWidth, scale: scale)
     }
 
-    /// 上の枝: 文節の札の上の端(y = 100)から，上へ 3 つの行へ
+    /// 上の枝: 文節のタグの上の端(y = 100)から，上へ 3 つの行へ
     private func upward(radius: Double = 8) -> BranchLines {
         BranchLines(stemX: 22, rootY: 100, rowMidYs: [84, 56, 28], tipX: 47, radius: radius, lineWidth: 1.5, scale: 2)
     }

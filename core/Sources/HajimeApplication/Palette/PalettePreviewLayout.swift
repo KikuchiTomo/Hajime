@@ -5,13 +5,13 @@ import HajimeDomain
 /// 情報の列は，上に見出しの行，その下に「項目名 → 値」の表を置く．
 /// - 見出しの行: 名前を大きく出し，名前を定めたところ(CLDR)を同じベースラインに小さく添える．ピン留めのボタンは見出しの行の縦の中心に置く
 /// - 表: 項目名はいちばん長い項目名の幅の列に置き，値はどの行も同じ x から書き出す．折り返した値の 2 行目以降も値の x にそろえる
-/// - 項目名と値は文字のベースラインで合わせる．ショートコードとコードポイントの札も，中の文字のベースラインを項目名に合わせる
+/// - 項目名と値は文字のベースラインで合わせる．ショートコードとコードポイントのチップも，中の文字のベースラインを項目名に合わせる
 /// - 行の間は metrics.rowGap 1 つ
 ///
 /// 欄の高さ(height)は，設定で出る行がすべて出たときの高さ(Unicode の名前は metrics.unicodeNameLines 行)にし，選んでいる文字では変えない．
 /// Unicode の名前がその行数に入らなければ末尾を「…」で省く(読み上げでは全体を伝える)．中身が欄に入りきらなければ
-/// (長いショートコードや多くのコードポイントの札が何行にもなるとき)，読みを省き，Unicode の名前を 1 行にし，Unicode の名前を省く順に詰め，
-/// それでも入らない札は「+n」にまとめる．
+/// (長いショートコードや多くのコードポイントのチップが何行にもなるとき)，読みを省き，Unicode の名前を 1 行にし，Unicode の名前を省く順に詰め，
+/// それでも入らないタグは「+n」にまとめる．
 ///
 /// 文字の幅と書体の高さは描く側が測る(PalettePreviewMeasuring)．座標は上が y の小さい側．
 /// macOS の PalettePreviewDrawing がこの配置を描き，Windows の候補ウィンドウ(palette::preview)は同じ決め方を Rust で持つ
@@ -26,11 +26,11 @@ public struct PalettePreviewLayout: Sendable, Equatable {
         case label
         /// 表の値(Unicode の名前と読み)
         case value
-        /// 入らなかった読みや札の数(「+n」)
+        /// 入らなかった読みやタグの数(「+n」)
         case more
-        /// ショートコードとコードポイントの札の文字
+        /// ショートコードとコードポイントのチップの文字
         case code
-        /// 行に入らない札を縮めた文字
+        /// 行に入らないタグを縮めた文字
         case smallCode
     }
 
@@ -66,7 +66,7 @@ public struct PalettePreviewLayout: Sendable, Equatable {
         public var width: Double
     }
 
-    /// 等幅の文字の札．lines は札の中の行(行より広い札だけ 2 行以上)で，baselines はその行のベースライン
+    /// 等幅の文字のタグ．lines はタグの中の行(行より広いタグだけ 2 行以上)で，baselines はその行のベースライン
     public struct Chip: Sendable, Equatable {
         public var lines: [String]
         public var role: Role
@@ -83,7 +83,7 @@ public struct PalettePreviewLayout: Sendable, Equatable {
         public var readings: String
         public var shortcodes: String
         public var codePoints: String
-        /// 入らなかった読みや札の数
+        /// 入らなかった読みやタグの数
         public var more: @Sendable (Int) -> String
 
         public init(unicode: String, english: String, readings: String, shortcodes: String, codePoints: String, more: @escaping @Sendable (Int) -> String) {
@@ -108,13 +108,13 @@ public struct PalettePreviewLayout: Sendable, Equatable {
         public var rowGap: Double
         public var chipPaddingX: Double
         public var chipPaddingY: Double
-        /// 札と札のあいだ(横)
+        /// タグとタグのあいだ(横)
         public var chipGap: Double
         /// Unicode の名前の行の数の上限(欄の高さもこの数で見込む)
         public var unicodeNameLines: Int
         /// 見出しの行の高さ
         public var headingHeight: Double
-        /// 表の 1 行の高さ(文字の値の行も札の行も同じ)
+        /// 表の 1 行の高さ(文字の値の行もタグの行も同じ)
         public var rowHeight: Double
 
         public init(tileGap: Double, labelGap: Double, sourceGap: Double, rowGap: Double, chipPaddingX: Double, chipPaddingY: Double, chipGap: Double,
@@ -212,7 +212,7 @@ public struct PalettePreviewLayout: Sendable, Equatable {
         PreviewLineBreaking.wrapped(text, width: width, maxLines: maxLines, measure: measure)
     }
 
-    /// 文字と札の枠(文字は書体の高さの枠)．重なりと欄からのはみ出しを確かめるのに使う
+    /// 文字とタグの枠(文字は書体の高さの枠)．重なりと欄からのはみ出しを確かめるのに使う
     public func frames(_ measuring: some PalettePreviewMeasuring) -> [Box] {
         texts.map { Box(x: $0.x, y: $0.baseline - measuring.ascent($0.role), width: $0.width, height: measuring.ascent($0.role) + measuring.descent($0.role)) }
             + chips.map(\.frame)
@@ -247,17 +247,17 @@ struct PreviewRowMetrics {
     func height(lines: Int) -> Double { pitch * Double(max(lines, 1)) }
 }
 
-/// 見出しの行と表の行．表の行は，文字の値の行も札の行も同じ高さにし，縦の間隔をそろえる
+/// 見出しの行と表の行．表の行は，文字の値の行もタグの行も同じ高さにし，縦の間隔をそろえる
 private struct Rows {
     var heading: PreviewRowMetrics
     var text: PreviewRowMetrics
-    /// 札の行も text と同じ
+    /// タグの行も text と同じ
     var chip: PreviewRowMetrics { text }
 
     init(measuring: some PalettePreviewMeasuring, metrics: PalettePreviewLayout.Metrics) {
         heading = PreviewRowMetrics(pitch: metrics.headingHeight, fontAscent: max(measuring.ascent(.heading), measuring.ascent(.source)),
                                     fontDescent: max(measuring.descent(.heading), measuring.descent(.source)))
-        // 札は中の文字の上下に余白を足しても，行の高さに収める
+        // タグは中の文字の上下に余白を足しても，行の高さに収める
         text = PreviewRowMetrics(
             pitch: metrics.rowHeight,
             fontAscent: max(measuring.ascent(.label), measuring.ascent(.value), measuring.ascent(.more), measuring.ascent(.code) + metrics.chipPaddingY),
@@ -359,7 +359,7 @@ private struct Planner<Measuring: PalettePreviewMeasuring> {
             }
             y += rows.text.height(lines: 1)
         }
-        // ショートコードとコードポイントの札
+        // ショートコードとコードポイントのチップ
         // 出さない設定の項目は，値があっても出さない(PalettePanel.Preview(item:) は空にして渡す)
         for (label, values, shown) in [(labels.shortcodes, preview.shortcodes, fields.shortcodes), (labels.codePoints, preview.codePoints, fields.codePoints)]
             where shown && !values.isEmpty {
@@ -376,7 +376,7 @@ private struct Planner<Measuring: PalettePreviewMeasuring> {
         .init(text: text, role: .label, x: left, baseline: baseline, width: measuring.width(text, .label))
     }
 
-    /// 札を値の幅で流し込む．入らない札は次の行へ送り，値の幅より広い札は字を縮め，それでも入らなければ札の中で折り返す(札の高さは行の数だけ)
+    /// タグを値の幅で流し込む．入らないタグは次の行へ送り，値の幅より広いタグは字を縮め，それでも入らなければタグの中で折り返す(タグの高さは行の数だけ)
     private func flowChips(_ values: [String], top: Double, x left: Double, width: Double) -> ([PalettePreviewLayout.Chip], Int) {
         var chips: [PalettePreviewLayout.Chip] = []
         var line = 0
@@ -394,13 +394,13 @@ private struct Planner<Measuring: PalettePreviewMeasuring> {
                     chipWidth = (lines.map { measuring.width($0, .smallCode) }.max() ?? 0) + padding
                 }
             }
-            // 行の途中で入らない札と，2 行以上の札は，次の行の頭から置く
+            // 行の途中で入らないタグと，2 行以上のタグは，次の行の頭から置く
             if x > left, x + chipWidth > left + width || lines.count > 1 {
                 line += 1
                 x = left
             }
             let baselines = lines.indices.map { top + rows.chip.ascent + rows.chip.pitch * Double(line + $0) }
-            // 札は文字の上下に chipPaddingY を足した高さで，行の中の縦の真ん中に置く(行の高さに収め，縁はドットにそろえる)
+            // タグは文字の上下に chipPaddingY を足した高さで，行の中の縦の真ん中に置く(行の高さに収め，縁はドットにそろえる)
             let pitch = rows.chip.pitch
             let height = min((measuring.ascent(role) + measuring.descent(role) + metrics.chipPaddingY * 2).rounded(), pitch)
             let rowTop = top + pitch * Double(line)
@@ -417,7 +417,7 @@ private struct Planner<Measuring: PalettePreviewMeasuring> {
         return (chips, x > left ? line + 1 : line)
     }
 
-    /// 欄の下の端を越える札を除き，除いた数を最後に残した札の後ろに「+n」で示す．「+n」が入らなければその札も除く
+    /// 欄の下の端を越えるタグを除き，除いた数を最後に残したタグの後ろに「+n」で示す．「+n」が入らなければそのタグも除く
     func limitingChips(_ layout: PalettePreviewLayout) -> PalettePreviewLayout {
         guard layout.rowsBottom > area.maxY else { return layout }
         var result = layout

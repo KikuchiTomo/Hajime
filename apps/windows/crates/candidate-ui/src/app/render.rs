@@ -730,7 +730,7 @@ impl Renderer {
     }
 
     /// target に scene を描く．BeginDraw と EndDraw は呼ぶ側が受け持つ．
-    /// scale は 1 ドットのデバイスピクセル数，opacity は全体の濃さ(モードの札のフェード)
+    /// scale は 1 ドットのデバイスピクセル数，opacity は全体の濃さ(モード表示のフェード)
     pub fn paint(
         &self,
         target: &ID2D1RenderTarget,

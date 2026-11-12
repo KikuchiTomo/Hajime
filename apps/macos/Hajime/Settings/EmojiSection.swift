@@ -30,7 +30,7 @@ struct EmojiSection: View {
         }
     }
 
-    /// 2 つの切り替えの名前のうち長いほうの幅(Form の名前と同じ本文の書体で測る)．札の左の端をそろえる．
+    /// 2 つの切り替えの名前のうち長いほうの幅(Form の名前と同じ本文の書体で測る)．タグの左の端をそろえる．
     /// 名前の欄は最小の幅として使うので，測り方の差で名前が欠けることはない
     private var titleWidth: CGFloat {
         let font = NSFont.preferredFont(forTextStyle: .body)
@@ -39,8 +39,8 @@ struct EmojiSection: View {
             .max() ?? 0
     }
 
-    /// オン・オフの項目．名前の横に，その設定で出る候補の見本(「びーる → 🍺」)を札の形で添える．
-    /// 札は 2 つの名前の長いほうのあとから書き出し，行ごとの左の端をそろえる
+    /// オン・オフの項目．名前の横に，その設定で出る候補の見本(「びーる → 🍺」)をタグの形で添える．
+    /// タグは 2 つの名前の長いほうのあとから書き出し，行ごとの左の端をそろえる
     private func exampleToggle(_ title: String, keyPath: WritableKeyPath<HajimeDomain.Settings, Bool>,
                                example: (reading: String, candidate: String)) -> some View {
         ResettableRow(model: model, keyPath: keyPath) {
@@ -54,7 +54,7 @@ struct EmojiSection: View {
     }
 }
 
-/// 読みと，その読みで出る候補を並べた札(「ねこが → 🐈が」)
+/// 読みと，その読みで出る候補を並べたタグ(「ねこが → 🐈が」)
 struct CandidateExample: View {
     let reading: String
     let candidate: String

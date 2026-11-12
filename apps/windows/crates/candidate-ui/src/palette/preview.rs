@@ -6,15 +6,15 @@
 //! 情報の列は，上に見出しの行，その下に「項目名 → 値」の表を置く．
 //! - 見出しの行: 名前を大きく出し，名前を定めたところ(CLDR)を同じベースラインに小さく添える．ピン留めのボタンは見出しの行の縦の中心に置く
 //! - 表: 項目名はいちばん長い項目名の幅の列に置き，値はどの行も同じ x から書き出す．折り返した値の 2 行目以降も値の x にそろえる
-//! - 項目名と値は文字のベースラインで合わせる．ショートコードとコードポイントの札も，中の文字のベースラインを項目名に合わせる
+//! - 項目名と値は文字のベースラインで合わせる．ショートコードとコードポイントのチップも，中の文字のベースラインを項目名に合わせる
 //! - 行の高さはトークンで決める(見出しの行は preview-heading-height，表の行は text-row-height)．文字は行の縦の真ん中に置く．
 //!   行の間は間隔の段階の item-gap 1 つ，見本と情報の列・項目名と値・名前と出どころのあいだは group-gap
 //!
 //! 欄の高さ(`height`)は，その種類で設定により出る行がすべて出たときの高さ(Unicode の名前は preview-name-lines 行)にし，
 //! 選んでいる文字では変えない．行の高さはトークンなので書体を測らずに求まり，core の PaletteSession と同じ値になる．
 //! Unicode の名前がその行数に入らなければ末尾を「…」で省く(読み上げでは全体を伝える)．中身が欄に入りきらなければ
-//! (長いショートコードや多くのコードポイントの札が何行にもなるとき)，読みを省き，Unicode の名前を 1 行にし，Unicode の名前を省く順に詰め，
-//! それでも入らない札は「+n」にまとめる
+//! (長いショートコードや多くのコードポイントのチップが何行にもなるとき)，読みを省き，Unicode の名前を 1 行にし，Unicode の名前を省く順に詰め，
+//! それでも入らないタグは「+n」にまとめる
 
 use super::layout::Fonts;
 use crate::geometry::Frame;
@@ -36,11 +36,11 @@ pub enum Role {
     Label,
     /// 表の値(Unicode の名前と読み)
     Value,
-    /// 入らなかった読みや札の数(「+n」)
+    /// 入らなかった読みやタグの数(「+n」)
     More,
-    /// ショートコードとコードポイントの札の文字
+    /// ショートコードとコードポイントのチップの文字
     Code,
-    /// 行に入らない札を縮めた文字
+    /// 行に入らないタグを縮めた文字
     SmallCode,
 }
 
@@ -67,7 +67,7 @@ pub enum Part {
         baseline: f32,
         width: f32,
     },
-    /// 等幅の文字の札．lines は札の中の行(行より広い札だけ 2 行以上)で，baselines はその行のベースライン
+    /// 等幅の文字のタグ．lines はタグの中の行(行より広いタグだけ 2 行以上)で，baselines はその行のベースライン
     Chip {
         lines: Vec<String>,
         role: Role,
@@ -164,7 +164,7 @@ pub fn frame_of(part: &Part, fonts: &Fonts, measure: &dyn Measure) -> Frame {
     }
 }
 
-/// 名前・項目名・値・札を置く．kind は今の種類(項目名の列の幅は，その種類で出しうる項目名で決める)
+/// 名前・項目名・値・タグを置く．kind は今の種類(項目名の列の幅は，その種類で出しうる項目名で決める)
 pub fn place(
     shown: &PalettePreview,
     fields: &PalettePreviewFields,
@@ -225,7 +225,7 @@ struct Metrics<'a> {
 
 /// 書体の高さを測る字(英字と，書体の代わりに使う日本語の字の両方)
 const LINE_SAMPLE: &str = "Aあ";
-/// 札の書体の高さを測る字(札には英数字だけを書く)
+/// タグの書体の高さを測る字(タグには英数字だけを書く)
 const CODE_SAMPLE: &str = "U+1F";
 
 impl Metrics<'_> {
@@ -275,7 +275,7 @@ impl RowMetrics {
     }
 }
 
-/// 見出しの行と表の行．表の行は，文字の値の行も札の行も同じ高さにし，縦の間隔をそろえる
+/// 見出しの行と表の行．表の行は，文字の値の行もタグの行も同じ高さにし，縦の間隔をそろえる
 struct Rows {
     heading: RowMetrics,
     table: RowMetrics,
@@ -297,7 +297,7 @@ impl Rows {
                 })
         };
         let (heading_ascent, heading_descent) = max(&[Role::Heading, Role::Source], 0.0);
-        // 札は中の文字の上下に余白を足しても，行の高さに収める
+        // タグは中の文字の上下に余白を足しても，行の高さに収める
         let (table_ascent, table_descent) = max(
             &[Role::Label, Role::Value, Role::More, Role::Code],
             palette::CHIP_PADDING_Y,
@@ -455,7 +455,7 @@ impl Planner<'_> {
             }
             y += rows.table.height(1);
         }
-        // ショートコードとコードポイントの札
+        // ショートコードとコードポイントのチップ
         let code_points: Vec<String> = self
             .shown
             .code_points
@@ -491,7 +491,7 @@ impl Planner<'_> {
         }
     }
 
-    /// 札を値の幅で流し込む．入らない札は次の行へ送り，値の幅より広い札は字を縮め，それでも入らなければ札の中で折り返す(札の高さは行の数だけ)
+    /// タグを値の幅で流し込む．入らないタグは次の行へ送り，値の幅より広いタグは字を縮め，それでも入らなければタグの中で折り返す(タグの高さは行の数だけ)
     fn flow_chips(&self, values: &[String], top: f32, left: f32, width: f32) -> (Vec<Part>, usize) {
         let padding_x = palette::CHIP_PADDING_X;
         let pitch = self.rows.table.pitch;
@@ -519,7 +519,7 @@ impl Planner<'_> {
                         + padding_x * 2.0;
                 }
             }
-            // 行の途中で入らない札と，2 行以上の札は，次の行の頭から置く
+            // 行の途中で入らないタグと，2 行以上のタグは，次の行の頭から置く
             if x > left && (x + chip_width > left + width || lines.len() > 1) {
                 line += 1;
                 x = left;
@@ -527,7 +527,7 @@ impl Planner<'_> {
             let baselines: Vec<f32> = (0..lines.len())
                 .map(|index| top + self.rows.table.ascent + pitch * (line + index) as f32)
                 .collect();
-            // 札は文字の上下に chip-padding-y を足した高さで，行の中の縦の真ん中に置く(行の高さに収め，縁はドットにそろえる)
+            // タグは文字の上下に chip-padding-y を足した高さで，行の中の縦の真ん中に置く(行の高さに収め，縁はドットにそろえる)
             let (ascent, descent) = self.metrics.font_extent(role);
             let height = (ascent + descent + palette::CHIP_PADDING_Y * 2.0)
                 .round()
@@ -558,7 +558,7 @@ impl Planner<'_> {
         (chips, lines)
     }
 
-    /// 欄の下の端を越える札を除き，除いた数を最後に残した札の後ろに「+n」で示す．「+n」が入らなければその札も除く
+    /// 欄の下の端を越えるタグを除き，除いた数を最後に残したタグの後ろに「+n」で示す．「+n」が入らなければそのタグも除く
     fn limiting_chips(&self, mut placed: Placed) -> Placed {
         let limit = self.area.content.max_y();
         if placed.rows_bottom <= limit {
@@ -694,7 +694,7 @@ mod tests {
     fn assert_aligned(setup: &Setup) {
         let placed = &setup.placed;
         let left = setup.area.tile.max_x() + palette::GROUP_GAP;
-        // 値は，どの行も同じ x から書き出す(行の頭の札も)
+        // 値は，どの行も同じ x から書き出す(行の頭のタグも)
         for (text, x, _) in texts(placed, Role::Value) {
             assert_eq!(x, placed.value_x, "{text}");
         }
@@ -834,7 +834,7 @@ mod tests {
     }
 
     #[test]
-    fn 長い_unicode_の名前は_2_行目の末尾を省き_長いショートコードは縮めて札の中で折り返す() {
+    fn 長い_unicode_の名前は_2_行目の末尾を省き_長いショートコードは縮めてタグの中で折り返す() {
         let panel = sample::long_name();
         let setup = setup(
             panel.preview.as_ref().unwrap(),
@@ -849,7 +849,7 @@ mod tests {
             long.0.concat(),
             ":black_right_pointing_double_triangle_with_vertical_bar:"
         );
-        // 札の中の行も表の行と同じ間隔
+        // タグの中の行も表の行と同じ間隔
         let pitches: Vec<f32> = long.2.windows(2).map(|pair| pair[1] - pair[0]).collect();
         assert!(pitches.windows(2).all(|pair| pair[0] == pair[1]));
         // 欄が足りないので，Unicode の名前(2 行)より先に読みを省く
@@ -880,7 +880,7 @@ mod tests {
     }
 
     #[test]
-    fn 札が入りきらなければ詰め_入らない札は数にまとめる() {
+    fn タグが入りきらなければ詰め_入らないタグは数にまとめる() {
         let shown = PalettePreview {
             code_points:
                 "U+1F469 U+1F3FD U+200D U+2764 U+FE0F U+200D U+1F48B U+200D U+1F468 U+1F3FF".into(),
@@ -975,7 +975,7 @@ mod tests {
         let above = heading - ascent - top;
         let below = top + palette::PREVIEW_HEADING_HEIGHT - (heading + descent);
         assert!((above - below).abs() <= 1.0, "{above} {below}");
-        // 札は行の高さに収まる
+        // タグは行の高さに収まる
         for (lines, frame, _) in chips(&setup.placed) {
             assert!(frame.height <= palette::TEXT_ROW_HEIGHT, "{lines:?}");
         }

@@ -127,7 +127,7 @@ enum OnboardingSpotlight: Int, CaseIterable, Identifiable {
         }
     }
 
-    /// 説明の札に出す SF Symbols のアイコン
+    /// 説明のカードに出す SF Symbols のアイコン
     var symbol: String {
         switch self {
         case .association: "point.3.connected.trianglepath.dotted"

@@ -657,7 +657,7 @@ impl Drawing<'_> {
         self.painter.text(text, font, color, x, row);
     }
 
-    /// 説明の名前・項目名・値・札の 1 つ
+    /// 説明の名前・項目名・値・タグの 1 つ
     fn preview_part(&mut self, part: Part) {
         let theme = self.theme;
         let fonts = self.layout.fonts;
@@ -700,7 +700,7 @@ impl Drawing<'_> {
         }
     }
 
-    /// 足元．キーの案内(収まらないものは後ろから出さない)と，右の端に既定の肌の色のボタン(キーの札と同じ形・高さ・縦の中心)
+    /// 足元．キーの案内(収まらないものは後ろから出さない)と，右の端に既定の肌の色のボタン(キーキャップと同じ形・高さ・縦の中心)
     fn footer(&mut self) {
         let footer = self.layout.footer;
         let button = self.layout.skin_tone_button;
@@ -710,7 +710,7 @@ impl Drawing<'_> {
         );
         self.painter.hints(&hints, footer.x, footer.mid_y());
         self.painter.keycap(button);
-        // 余白は札の縁(platinum は外枠と立体の縁)の内側から測る．キーの札の中の記号と同じ余白
+        // 余白はタグの縁(platinum は外枠と立体の縁)の内側から測る．キーキャップの中の記号と同じ余白
         let border = keycap_border(self.theme);
         self.emoji(
             &skin_tone_sample(self.panel.skin_tone),
@@ -770,7 +770,7 @@ impl Drawing<'_> {
     }
 }
 
-/// キーの札の縁の太さ．platinum は外枠と立体の縁，ほかは縁の線(scene::paint の keycap と同じ形)
+/// キーキャップの縁の太さ．platinum は外枠と立体の縁，ほかは縁の線(scene::paint の keycap と同じ形)
 fn keycap_border(theme: &ResolvedTheme) -> f32 {
     if theme.kind == Kind::Platinum {
         candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH
@@ -1202,7 +1202,7 @@ mod tests {
         let value_x = first_line.1.x;
         assert_eq!(second_line.1.x, value_x);
         assert_eq!(find("えがお、すまいる、はっぴー、わーい").1.x, value_x);
-        // 札の文字は札の余白の分だけ内側から書く
+        // タグの文字はタグの余白の分だけ内側から書く
         for chip in [":smile:", "U+1F604"] {
             assert_eq!(find(chip).1.x, value_x + palette::CHIP_PADDING_X);
             assert_eq!(find(chip).2, fonts.code);
@@ -1233,7 +1233,7 @@ mod tests {
     }
 
     #[test]
-    fn 国旗の英語の名前は英語の行に出し_platinum_の札は入力欄の形にする() {
+    fn 国旗の英語の名前は英語の行に出し_platinum_のタグは入力欄の形にする() {
         let theme = theme("platinum");
         let measure = Uneven;
         let (layout, scene) = draw(&sample::flag(), "platinum", &measure);
@@ -1417,7 +1417,7 @@ mod tests {
             .collect();
         let preview = layout.preview.unwrap();
         let tile = Frame::new(preview.x, preview.y, palette::TILE_SIZE, palette::TILE_SIZE);
-        // 肌の色のボタンは札の縁(角丸のテーマは線 1)の内側から余白を空ける
+        // 肌の色のボタンはタグの縁(角丸のテーマは線 1)の内側から余白を空ける
         let line = candidate::FRAME_WIDTH;
         let mut boxes = vec![
             (
@@ -1463,7 +1463,7 @@ mod tests {
     }
 
     #[test]
-    fn 肌の色のボタンはキーの札と同じ形で_足元の右の端に置く() {
+    fn 肌の色のボタンはキーキャップと同じ形で_足元の右の端に置く() {
         for name in ["automatic", "platinum", "desk"] {
             let (layout, scene) = draw(&sample::emoji(), name, &Fixed);
             let resolved = theme(name);

@@ -1,7 +1,7 @@
 #![forbid(unsafe_code)]
 
 //! 初期設定の実演の台本(macOS の DemoScripts と同じ)．入力欄の文字(確定した文字と組み立て中の文字)と，その下に出す
-//! 候補の窓(分岐図・一覧・案内)とモードの札を，時間で切り替わるコマの並びにする．選んでいる値で中身を変える．
+//! 候補の窓(分岐図・一覧・案内)とモード表示を，時間で切り替わるコマの並びにする．選んでいる値で中身を変える．
 //! 打っている途中の読みは，打ちかけのローマ字を含めて 1 キーずつ見せる．OS に依らない(描くのは app::wizard)．
 //! 実演の文字は台本に書いた見本だけで，利用者の入力は使わない
 
@@ -41,7 +41,7 @@ pub enum Panel {
     Note(Note),
 }
 
-/// 入力モード(札に出す)
+/// 入力モード(タグに出す)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
     Direct,
@@ -54,11 +54,11 @@ pub struct Frame {
     pub committed: String,
     pub marked: Vec<Segment>,
     pub panel: Option<Panel>,
-    /// 文字の終わりの横に出すモードの札
+    /// 文字の終わりの横に出すモード表示
     pub mode: Option<Mode>,
     /// 入力欄の上に出すアプリの名前(アプリを切り替える実演)
     pub application: Option<&'static str>,
-    /// このコマで押したキー(入力欄の右上にキーの札で出す)
+    /// このコマで押したキー(入力欄の右上にキーキャップで出す)
     pub key: Option<&'static str>,
     /// このコマを見せておく時間(ミリ秒)
     pub duration: f64,
@@ -547,7 +547,7 @@ fn mode_switch(choices: &Choices) -> Vec<Frame> {
     frames
 }
 
-/// アプリを切り替えたときに，モードの札が選んだカードのとおりに変わるのを見せる(macOS の appModes)
+/// アプリを切り替えたときに，モード表示が選んだカードのとおりに変わるのを見せる(macOS の appModes)
 /// - IME をオフ: メモ帳で日本語を打ち，ターミナルに切り替えると英数になる
 /// - IME をオン: ターミナルで英数を打ち，メモ帳に切り替えると日本語になる
 /// - オンオフを記憶: メモ帳で英数に切り替えてからターミナルに移り，メモ帳に戻ると英数のまま
@@ -825,7 +825,7 @@ fn characters(choices: &Choices) -> Vec<Frame> {
 // MARK: - 機能ごとの実演
 
 /// 一覧の候補を from から to まで 1 つずつ選び，最後に確定する(commit が None なら確定しない)．
-/// command はコマンドの候補の位置．一覧では種類のアイコンと札を付け，選んでいるあいだは確定のキーで動くことを出す
+/// command はコマンドの候補の位置．一覧では種類のアイコンとタグを付け，選んでいるあいだは確定のキーで動くことを出す
 struct Choosing<'a> {
     entries: &'a [&'a str],
     to: usize,

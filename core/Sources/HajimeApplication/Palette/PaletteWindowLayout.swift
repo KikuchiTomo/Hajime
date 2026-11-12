@@ -27,7 +27,7 @@ public struct PaletteWindowLayout: Sendable, Equatable {
         public var scrollbarWidth: Double
         /// 区切りの線の太さ
         public var lineWidth: Double
-        /// 足元の行の高さ(キーの札の高さ)．肌の色のボタンもこの高さの正方形
+        /// 足元の行の高さ(キーキャップの高さ)．肌の色のボタンもこの高さの正方形
         public var footerHeight: Double
         /// 窓の縁の太さ(角丸のテーマは縁の線，platinum と desk は外枠と立体の縁)
         public var border: Double

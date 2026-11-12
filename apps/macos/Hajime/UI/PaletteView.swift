@@ -580,7 +580,7 @@ final class PaletteView: NSView {
         text.draw(at: glyphs.origin(text, font: font, centeredIn: box), withAttributes: [.font: font])
     }
 
-    /// 足元．キーの案内と，右の端に既定の肌の色のボタン(キーの札と同じ高さ・縦の中心)
+    /// 足元．キーの案内と，右の端に既定の肌の色のボタン(キーキャップと同じ高さ・縦の中心)
     private func drawFooter(_ panel: PalettePanel, layout: Layout) {
         let footer = layout.footer
         let hints = panel.hints.map { KeyHint(key: $0.key, label: $0.action) }
@@ -588,7 +588,7 @@ final class PaletteView: NSView {
         GlassDrawing.drawHints(fitting, x: footer.minX, midY: footer.midY, theme: theme)
         let button = layout.skinToneButton
         GlassDrawing.drawKeycap(button, theme: theme)
-        // 余白は札の縁(platinum と desk は立体の縁)の内側から測る．キーの札の中の記号と同じ余白
+        // 余白はタグの縁(platinum と desk は立体の縁)の内側から測る．キーキャップの中の記号と同じ余白
         let border = GlassDrawing.keycapBorder(theme: theme)
         drawEmoji(PaletteStrings.skinToneSample.text(skinTone: panel.skinTone), in: button.insetBy(dx: border, dy: border), padding: Size.skinButtonPadding)
     }
