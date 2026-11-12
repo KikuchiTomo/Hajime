@@ -1227,7 +1227,21 @@ impl App {
                 }
                 if element.part == Part::Table {
                     let page_y = y + self.scroll.offset(now);
+                    let (width, _) = self.size();
+                    let page_x = x - nav_width(width);
+                    // 見出しを押したらその列で並べ替える(macOS の表と同じ)
+                    if self.view.table_header_click(element.row, page_x, page_y) {
+                        ffi::invalidate(self.window);
+                        return;
+                    }
                     if let Some(position) = self.view.table_position(element.row, page_y, now) {
+                        // 「有効」の列の印を押したら，その行の有効・無効を切り替える
+                        if let Some(event) =
+                            self.view.table_check_click(element.row, page_x, position)
+                        {
+                            self.dispatch(Some(event));
+                            return;
+                        }
                         let (control, shift) = ffi::modifiers();
                         let event =
                             self.view
@@ -1431,9 +1445,12 @@ impl App {
                     k if k == VK_END.0 => Move::End,
                     k if k == VK_DELETE.0 => {
                         // 選んだ行を消すボタンを押す
+                        let Some(part) = self.view.remove_part(element.row) else {
+                            return true;
+                        };
                         let remove = Element {
                             row: element.row,
-                            part: Part::Top(1),
+                            part,
                         };
                         if self.view.enabled(remove) {
                             let event = self.view.activate(remove, now);

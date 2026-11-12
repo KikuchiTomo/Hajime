@@ -448,6 +448,7 @@ enum DesignTokens {
             static let themeSwatchRadius: CGFloat = 6
             static let themeSwatchFontSize: CGFloat = 11
             static let aboutIcon: CGFloat = 64
+            static let listArrowWidth: CGFloat = 24
             static let titleBarHeight: CGFloat = 32
             static let titleBarIconSize: CGFloat = 16
             static let titleBarPaddingX: CGFloat = 16
@@ -607,6 +608,7 @@ enum DesignTokens {
             static let link: CGFloat = 0.4
             static let linkHoverMix: CGFloat = 0.35
             static let sliderTrackDisabled: CGFloat = 0.5
+            static let tableStripe: CGFloat = 0.035
         }
     }
 }

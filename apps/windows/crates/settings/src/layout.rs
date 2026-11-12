@@ -699,6 +699,7 @@ pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     search: false,
     filter: false,
     files: None,
+    arrow: false,
 };
 
 const NO_BUTTONS: ListButtons = ListButtons {
@@ -707,10 +708,13 @@ const NO_BUTTONS: ListButtons = ListButtons {
     search: false,
     filter: false,
     files: None,
+    arrow: false,
 };
 
-/// 入力欄の並ぶカード(一覧・試す欄)．上に入力欄とボタン，下に表か結果を置き，表の下の帯に検索欄・絞り込み・ボタンを左から，
-/// ファイルを読み込む・書き出すボタンを右に寄せて並べる．parts は入力欄・上のボタン・検索欄・絞り込み・下のボタン・ファイルのボタンの順
+/// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
+/// 下に表か結果を置き，表の下の帯は左にボタン(削除など)，右に絞り込み・検索欄・ファイルを読み込む・書き出すボタンを並べる．
+/// 帯が 1 行に収まらなければ，右の組だけを次の行に右寄せで置く．
+/// parts は入力欄・上のボタン・検索欄・絞り込み・下のボタン・ファイルのボタンの順
 fn place_inputs(
     position: usize,
     fields: usize,
@@ -729,13 +733,20 @@ fn place_inputs(
         .collect();
     let buttons_width: f32 = widths.iter().map(|width| width + size::CONTROL_GAP).sum();
     let count = fields.max(1) as f32;
-    let field_width =
-        ((inner - buttons_width - size::CONTROL_GAP * (count - 1.0)) / count).max(0.0);
+    // 矢印を置くときは先頭の 2 つの欄のあいだを広げる
+    let arrow = buttons.arrow && fields >= 2;
+    let arrow_extra = if arrow { size::LIST_ARROW_WIDTH } else { 0.0 };
+    let field_width = ((inner - buttons_width - size::CONTROL_GAP * (count - 1.0) - arrow_extra)
+        / count)
+        .max(0.0);
     let mut parts = Vec::new();
     let mut cursor = x;
-    for _ in 0..fields {
+    for index in 0..fields {
         parts.push(Rect::new(cursor, top, field_width, size::CONTROL_HEIGHT));
         cursor += field_width + size::CONTROL_GAP;
+        if arrow && index == 0 {
+            cursor += arrow_extra;
+        }
     }
     for width in widths {
         parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
@@ -746,20 +757,14 @@ fn place_inputs(
     } else {
         top + size::CONTROL_HEIGHT + size::CONTROL_GAP
     };
-    // 表の下の帯
+    // 表の下の帯: 左の組(下のボタン)と右の組(絞り込み・検索欄・ファイルのボタン)
     let leading: Vec<f32> = buttons
-        .search
-        .then_some(size::CONTROL_WIDTH)
-        .into_iter()
-        .chain(buttons.filter.then_some(size::STEPPER_WIDTH))
-        .chain(
-            buttons
-                .bottom
-                .iter()
-                .map(|label| button_width(label, metrics)),
-        )
+        .bottom
+        .iter()
+        .map(|label| button_width(label, metrics))
         .collect();
-    let trailing: Vec<f32> = buttons
+    let search_width = tokens::size::settings::RULE_SEARCH_WIDTH;
+    let file_widths: Vec<f32> = buttons
         .files
         .map(|files| {
             files
@@ -769,53 +774,75 @@ fn place_inputs(
                 .collect()
         })
         .unwrap_or_default();
-    let trailing_total: f32 = trailing.iter().sum::<f32>()
-        + size::CONTROL_GAP * (trailing.len().saturating_sub(1)) as f32;
-    let mut lines = flow(&leading, inner);
+    let trailing: Vec<f32> = buttons
+        .filter
+        .then_some(size::STEPPER_WIDTH)
+        .into_iter()
+        .chain(buttons.search.then_some(search_width))
+        .chain(file_widths.iter().copied())
+        .collect();
+    let total = |widths: &[f32]| -> f32 {
+        widths.iter().sum::<f32>() + size::CONTROL_GAP * widths.len().saturating_sub(1) as f32
+    };
+    let leading_lines = flow(&leading, inner);
+    let trailing_total = total(&trailing);
+    let leading_end = leading_lines
+        .last()
+        .and_then(|line| line.last())
+        .map_or(0.0, |(offset, width)| offset + width);
     let line_top = list_top + below + size::CONTROL_GAP;
-    let mut placed_trailing = Vec::new();
-    if !trailing.is_empty() {
-        // ファイルのボタンは右に寄せる．最後の行に収まらなければ次の行に置く
-        let used = lines
-            .last()
-            .and_then(|line| line.last())
-            .map_or(0.0, |(offset, width)| offset + width);
-        let fits = lines.is_empty() || used + size::CONTROL_GAP + trailing_total <= inner;
-        let line = if fits && !lines.is_empty() {
-            lines.len() - 1
-        } else {
-            lines.push(Vec::new());
-            lines.len() - 1
-        };
+    let line_height = size::CONTROL_HEIGHT + size::CONTROL_GAP;
+    // 右の組を置く行(左の組の最後の行に収まればその行，収まらなければ次の行)
+    let trailing_line = if trailing.is_empty() {
+        None
+    } else if leading_lines.is_empty() || leading_end + size::CONTROL_GAP + trailing_total <= inner
+    {
+        Some(leading_lines.len().saturating_sub(1))
+    } else {
+        Some(leading_lines.len())
+    };
+    let mut trailing_rects = Vec::new();
+    if let Some(line) = trailing_line {
         let mut offset = (inner - trailing_total).max(0.0);
         for width in &trailing {
-            placed_trailing.push((line, offset, *width));
-            offset += width + size::CONTROL_GAP;
-        }
-    }
-    let line_height = size::CONTROL_HEIGHT + size::CONTROL_GAP;
-    for (index, line) in lines.iter().enumerate() {
-        for (offset, width) in line {
-            parts.push(Rect::new(
+            trailing_rects.push(Rect::new(
                 x + offset,
-                line_top + index as f32 * line_height,
+                line_top + line as f32 * line_height,
                 *width,
                 size::CONTROL_HEIGHT,
             ));
+            offset += width + size::CONTROL_GAP;
         }
     }
-    for (line, offset, width) in placed_trailing {
-        parts.push(Rect::new(
-            x + offset,
-            line_top + line as f32 * line_height,
-            width,
-            size::CONTROL_HEIGHT,
-        ));
-    }
-    let bottom = if lines.is_empty() {
+    let leading_rects: Vec<Rect> = leading_lines
+        .iter()
+        .enumerate()
+        .flat_map(|(index, line)| {
+            line.iter().map(move |(offset, width)| {
+                Rect::new(
+                    x + offset,
+                    line_top + index as f32 * line_height,
+                    *width,
+                    size::CONTROL_HEIGHT,
+                )
+            })
+        })
+        .collect();
+    // parts の順に入れる: 検索欄・絞り込み・下のボタン・ファイルのボタン
+    let mut trailing_iter = trailing_rects.into_iter();
+    let filter_rect = buttons.filter.then(|| trailing_iter.next()).flatten();
+    let search_rect = buttons.search.then(|| trailing_iter.next()).flatten();
+    parts.extend(search_rect);
+    parts.extend(filter_rect);
+    parts.extend(leading_rects);
+    parts.extend(trailing_iter);
+    let lines = leading_lines
+        .len()
+        .max(trailing_line.map_or(0, |line| line + 1));
+    let bottom = if lines == 0 {
         list_top + below
     } else {
-        line_top + lines.len() as f32 * line_height - size::CONTROL_GAP
+        line_top + lines as f32 * line_height - size::CONTROL_GAP
     };
     let height = bottom + size::CARD_PADDING_Y - frame.y;
     let mut card = empty(frame.card(height), position);
@@ -1009,17 +1036,24 @@ mod tests {
         let layout = all(Page::Correction, 800.0);
         // 0 は修正の対象，1 は手のずれ
         let card = &layout.sections[2].cards[0];
-        // 入力欄 2 つ・追加・削除・検索欄・インポート・エクスポート
-        assert_eq!(card.parts.len(), 7);
+        // 入力欄 2 つ・追加・キャンセル・検索欄・削除・インポート・エクスポート
+        assert_eq!(card.parts.len(), 8);
         for pair in card.parts[..4].windows(2) {
             assert!(pair[0].max_x() <= pair[1].x);
         }
+        // 打つもの → 置き換えるものの欄のあいだは矢印の分だけ広い
+        assert!(card.parts[1].x - card.parts[0].max_x() >= size::LIST_ARROW_WIDTH);
         assert!(card.parts[3].max_x() <= card.card.max_x());
         assert!(card.control.y >= card.parts[0].max_y());
+        // 表の下の帯は 1 行で，削除は左の端，検索欄とファイルのボタンは右に寄せる(macOS の RuleListEditor)
         let search = card.parts[4];
+        let remove = card.parts[5];
+        let export = card.parts[7];
         assert!(search.y >= card.control.max_y());
-        // ファイルのボタンは右の端
-        let export = card.parts[6];
+        assert_eq!(remove.y, search.y);
+        assert_eq!(export.y, search.y);
+        assert!((remove.x - (card.card.x + size::CARD_PADDING_X)).abs() < 0.01);
+        assert!(remove.max_x() < search.x);
         assert!((export.max_x() - (card.card.max_x() - size::CARD_PADDING_X)).abs() < 0.01);
         assert!(export.max_y() <= card.card.max_y());
     }
