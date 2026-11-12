@@ -8,7 +8,7 @@ use super::ffi::{self, edit, Window};
 use super::paint::{self, Canvas, State, TextLayout, TextStyle};
 use super::theme::{Color, Theme};
 use crate::catalog::Catalog;
-use crate::layout::{self, PageLayout, Rect};
+use crate::layout::{self, Metrics, PageLayout, Rect, TextKind};
 use crate::list::{Item, ListSpec};
 use crate::model::SettingsModel;
 use crate::options;
@@ -26,6 +26,7 @@ use ipc::SymbolKind;
 use serde_json::Value;
 use std::collections::HashMap;
 use tokens::motion::settings_windows as motion;
+use tokens::opacity::settings_windows as opacity;
 use tokens::size::settings_windows as size;
 
 /// 部品の番号の始まり(0 は使わない．窓の部品の番号と分ける)
@@ -224,9 +225,11 @@ impl<S: SettingsStore> Values for SettingsModel<S> {
     }
 }
 
-/// 設定のファイルの項目でない値の道筋か(同期の状態「sync.」と，編集しているカスタムテーマ「customTheme.」)
+/// 設定のファイルの項目でない値の道筋か(同期の状態「sync.」，編集しているカスタムテーマ「customTheme.」，画面の中だけの値「page.」)
 pub fn is_extra_path(path: &str) -> bool {
-    crate::sync::is_sync_path(path) || crate::themes::is_theme_path(path)
+    crate::sync::is_sync_path(path)
+        || crate::themes::is_theme_path(path)
+        || pages::is_view_path(path)
 }
 
 /// 設定の値に，同期の状態と編集しているカスタムテーマの値(is_extra_path の道筋)を重ねたもの
@@ -248,8 +251,11 @@ impl<V: Values> Values for WithExtras<'_, V> {
         is_extra_path(path) || self.values.is_default(path)
     }
 
-    /// 重ねた値は読めたときだけ使える
+    /// 重ねた値は読めたときだけ使える．画面の中だけの値はいつも使える(まだ選んでいなければ先頭を選んでいる)
     fn is_readable(&self, path: &str) -> bool {
+        if pages::is_view_path(path) {
+            return true;
+        }
         if is_extra_path(path) {
             return self.extra.contains_key(path);
         }
@@ -330,6 +336,19 @@ pub enum Part {
     PreviewAdd(usize),
     /// 謝辞のライセンスの全文を開く・閉じる
     Expand,
+    /// 数を 1 段減らす・増やすボタン
+    Decrement,
+    Increment,
+    /// スライダー
+    Slider,
+    /// 選ぶ印(テーマ)．カードのどこを押しても選ぶ
+    Radio,
+    /// 一覧を切り替える部品の欄
+    Segment(usize),
+    /// 1 つのカードに並べたボタン
+    Button(usize),
+    /// 表の下の状態で絞り込む欄(キー設定)
+    Filter,
 }
 
 /// ページの中の部品(行の番号と部品)
@@ -346,6 +365,10 @@ pub enum Described {
     Toggle(bool),
     /// 選んでいる選択肢の名前
     Dropdown(String),
+    /// スライダー(今の値の文字)
+    Slider(String),
+    /// 選ぶ印(選んでいるか)
+    Radio(bool),
     Table,
     Text,
     /// 標準の EDIT(自分で読ませる)
@@ -407,6 +430,10 @@ struct RowState {
     expanded: bool,
     /// 謝辞のカードの中の置き場所(ページの中の座標)
     acknowledgement: Option<AcknowledgementLayout>,
+    /// スライダーを動かしているあいだの値(手を離したときに書く．macOS と同じく 1 段ごとに書かない)
+    dragging: Option<f64>,
+    /// 表の下の状態で絞り込む欄で選んでいる番号(0 はすべての状態)
+    filter: usize,
 }
 
 /// 謝辞のカードの中の置き場所
@@ -517,7 +544,9 @@ impl AcknowledgementLayout {
 impl RowState {
     fn new(row: &Row, section: usize, catalog: &Catalog) -> Self {
         let numbers = match &row.control {
-            Control::Stepper(range) => options::steps(range.range(catalog), range.step(catalog)),
+            Control::Stepper(range) | Control::Slider(range) => {
+                options::steps(range.range(catalog), range.step(catalog))
+            }
             Control::Seconds(range) => {
                 options::steps(range.range(catalog), range.seconds_step(catalog))
             }
@@ -554,7 +583,121 @@ impl RowState {
             text_scroll: Scroller::default(),
             expanded: false,
             acknowledgement: None,
+            dragging: None,
+            filter: 0,
         }
+    }
+
+    /// 数の部品の今の値(動かしているあいだはその値)
+    fn number(&self) -> Option<f64> {
+        self.dragging.or_else(|| {
+            self.choice
+                .and_then(|index| self.numbers.get(index).copied())
+        })
+    }
+
+    /// 数の部品の値を出す文字
+    fn number_text(&self, value: f64) -> String {
+        match &self.row.control {
+            Control::Stepper(
+                RangeKind::LiveConversionSkipLength | RangeKind::EnglishSkipLength,
+            ) => more::skip_length(value),
+            Control::Stepper(RangeKind::SuggestionSkipCount) => more::skip_count(value),
+            Control::Seconds(_) => more::seconds(value),
+            _ => format!("{value}"),
+        }
+    }
+
+    /// 名前(スライダーは名前に今の値を付ける．macOS の「候補の文字サイズ: 15」)
+    fn title(&self) -> String {
+        match (&self.row.control, self.number()) {
+            (Control::Slider(RangeKind::CandidateFontSize), Some(value)) => {
+                settings::font_size(value)
+            }
+            (Control::Slider(RangeKind::PaletteCellSize), Some(value)) => {
+                crate::strings::palette::cell_size_value(value)
+            }
+            _ => self.row.title.to_string(),
+        }
+    }
+
+    /// スライダーの値を右に出すか(秒と角の丸さ．ほかは名前に付ける)
+    fn shows_value(&self) -> bool {
+        matches!(
+            self.row.control,
+            Control::Seconds(_) | Control::Slider(RangeKind::CustomThemeCornerRadius)
+        )
+    }
+
+    /// スライダーの溝の位置(値を右に出すものは値の欄を除く)
+    fn slider_rect(&self) -> Option<Rect> {
+        let control = self.card.as_ref()?.control;
+        Some(if self.shows_value() {
+            Rect::new(
+                control.x,
+                control.y,
+                (control.width - size::SECONDS_LABEL_WIDTH - size::CONTROL_GAP).max(0.0),
+                control.height,
+            )
+        } else {
+            control
+        })
+    }
+
+    /// スライダーの x の位置の値(刻みに丸める)
+    fn slider_value(&self, x: f32) -> Option<f64> {
+        let rect = self.slider_rect()?;
+        let first = *self.numbers.first()?;
+        let last = *self.numbers.last()?;
+        let thumb = size::SLIDER_THUMB_SIZE;
+        let width = (rect.width - thumb).max(1.0);
+        let progress = f64::from(((x - rect.x - thumb / 2.0) / width).clamp(0.0, 1.0));
+        let value = first + (last - first) * progress;
+        Some(self.numbers[options::nearest(&self.numbers, value)])
+    }
+
+    /// スライダーのつまみの位置(0〜1)
+    fn slider_progress(&self) -> f32 {
+        let (Some(first), Some(last), Some(value)) =
+            (self.numbers.first(), self.numbers.last(), self.number())
+        else {
+            return 0.0;
+        };
+        if last <= first {
+            return 0.0;
+        }
+        ((value - first) / (last - first)).clamp(0.0, 1.0) as f32
+    }
+
+    /// 数を delta 段動かして書く頼み．端を越えたら端で止め，動かなければ None
+    fn step(&mut self, delta: isize) -> Option<Event> {
+        let index = self.choice?;
+        let last = self.numbers.len().checked_sub(1)?;
+        let next = index.saturating_add_signed(delta).min(last);
+        if next == index {
+            return None;
+        }
+        self.choice = Some(next);
+        Some(Event::Set {
+            path: self.row.path,
+            value: crate::model::number(self.numbers[next]),
+            clears: self.row.clears,
+        })
+    }
+
+    /// 表の下のボタンの数(ファイルのボタンを除く)
+    fn bottom_count(&self) -> usize {
+        self.row
+            .control
+            .list_buttons()
+            .map_or(0, |buttons| buttons.bottom.len())
+    }
+
+    /// 表の下のファイルのボタンの操作(index は表の下のボタンの通し番号)
+    fn file_task(&self, index: usize) -> Option<crate::files::FileTask> {
+        let files = self.row.control.list_buttons()?.files?;
+        let position = index.checked_sub(self.bottom_count())?;
+        (position < 2).then(|| files.task(position))
     }
 
     /// 謝辞の項目(番号が無ければ None)
@@ -702,10 +845,33 @@ impl RowState {
         let buttons = self.row.control.list_buttons();
         let top = buttons.map_or(0, |buttons| buttons.top.len());
         let search = buttons.is_some_and(|buttons| buttons.search);
+        let filter = buttons.is_some_and(|buttons| buttons.filter);
+        let stepper_button = |index: f32| {
+            let width = size::STEPPER_BUTTON_WIDTH;
+            let control = card.control;
+            Rect::new(
+                control.max_x() - width * (2.0 - index),
+                control.y,
+                width,
+                control.height,
+            )
+        };
         match part {
             Part::Reset => Some(card.reset),
-            // バージョンの行の更新を確かめるボタンは値の右
-            Part::Action if self.row.control == Control::Version => card.parts.first().copied(),
+            // 更新を確かめるボタン・値の右のボタンは部品の欄の外
+            Part::Action
+                if matches!(self.row.control, Control::Version | Control::InfoAction(..)) =>
+            {
+                card.parts.first().copied()
+            }
+            Part::Decrement => Some(stepper_button(0.0)),
+            Part::Increment => Some(stepper_button(1.0)),
+            Part::Slider => self.slider_rect(),
+            Part::Radio => Some(card.card),
+            Part::Segment(index) | Part::Button(index) => card.parts.get(index).copied(),
+            Part::Filter => filter
+                .then(|| card.parts.get(fields + top + usize::from(search)).copied())
+                .flatten(),
             Part::Link(index) => self
                 .acknowledgement
                 .as_ref()
@@ -731,7 +897,7 @@ impl RowState {
                 .flatten(),
             Part::Bottom(index) => card
                 .parts
-                .get(fields + top + usize::from(search) + index)
+                .get(fields + top + usize::from(search) + usize::from(filter) + index)
                 .copied(),
         }
     }
@@ -741,13 +907,16 @@ impl RowState {
         let mut parts = Vec::new();
         match &self.row.control {
             Control::Toggle => parts.push(Part::Toggle),
-            Control::Choice(_)
-            | Control::ThemeFont(_)
-            | Control::Stepper(_)
-            | Control::Seconds(_) => parts.push(Part::Dropdown),
-            Control::Action(_) | Control::LabeledAction(..) | Control::Version => {
-                parts.push(Part::Action)
-            }
+            Control::Choice(_) | Control::ThemeFont(_) => parts.push(Part::Dropdown),
+            Control::Stepper(_) => parts.extend([Part::Decrement, Part::Increment]),
+            Control::Seconds(_) | Control::Slider(_) => parts.push(Part::Slider),
+            Control::ThemeOption(_) => parts.push(Part::Radio),
+            Control::Segmented(choices) => parts.extend((0..choices.len()).map(Part::Segment)),
+            Control::Buttons(buttons) => parts.extend((0..buttons.len()).map(Part::Button)),
+            Control::Action(_)
+            | Control::LabeledAction(..)
+            | Control::Version
+            | Control::InfoAction(..) => parts.push(Part::Action),
             Control::Acknowledgement(_) => {
                 if let Some(item) = self.notice() {
                     parts.extend(
@@ -779,12 +948,16 @@ impl RowState {
                     if buttons.search {
                         parts.push(Part::Search);
                     }
-                    parts.extend((0..buttons.bottom.len()).map(Part::Bottom));
+                    if buttons.filter {
+                        parts.push(Part::Filter);
+                    }
+                    parts.extend((0..buttons.bottom_labels().len()).map(Part::Bottom));
                 }
             }
         }
+        // 既定に戻すボタンは部品の右にあるので，フォーカスも部品のあと
         if self.resettable {
-            parts.insert(0, Part::Reset);
+            parts.push(Part::Reset);
         }
         parts
     }
@@ -801,6 +974,12 @@ impl RowState {
             .list_spec()
             .map_or(0, |spec| spec.fields.len());
         match part {
+            Part::Decrement => self.choice.is_some_and(|index| index > 0),
+            Part::Increment => self
+                .choice
+                .is_some_and(|index| index + 1 < self.numbers.len()),
+            // ファイルを読み込む・書き出すボタンはいつでも使える
+            Part::Bottom(index) if self.file_task(index).is_some() => true,
             Part::Top(0) if self.has_add_remove() => {
                 self.editing.is_some()
                     || self
@@ -829,13 +1008,21 @@ impl RowState {
                 .and_then(|buttons| buttons.top.get(index).copied())
                 .unwrap_or(""),
             Part::Bottom(index) => buttons
-                .and_then(|buttons| buttons.bottom.get(index).copied())
+                .and_then(|buttons| buttons.bottom_labels().get(index).copied())
                 .unwrap_or(""),
             Part::PresetLoad => keys::LOAD,
             Part::Action => match self.row.control {
                 Control::Version => more::CHECK_FOR_UPDATES,
-                Control::LabeledAction(_, label) => label,
+                Control::LabeledAction(_, label) | Control::InfoAction(_, _, label) => label,
                 _ => self.row.title,
+            },
+            Part::Button(index) => match self.row.control {
+                Control::Buttons(buttons) => buttons.get(index).map_or("", |(label, _)| label),
+                _ => "",
+            },
+            Part::Segment(index) => match self.row.control {
+                Control::Segmented(choices) => choices.get(index).map_or("", |(_, label)| label),
+                _ => "",
             },
             Part::Link(index) => self
                 .notice()
@@ -862,30 +1049,9 @@ impl RowState {
                 .map(|(_, name)| (*name).to_string())
                 .chain(self.extra_choice.clone())
                 .collect(),
-            (
-                Control::Stepper(
-                    RangeKind::LiveConversionSkipLength | RangeKind::EnglishSkipLength,
-                ),
-                Part::Dropdown,
-            ) => self
-                .numbers
-                .iter()
-                .map(|number| more::skip_length(*number))
-                .collect(),
-            (Control::Stepper(RangeKind::SuggestionSkipCount), Part::Dropdown) => self
-                .numbers
-                .iter()
-                .map(|number| more::skip_count(*number))
-                .collect(),
-            (Control::Stepper(_), Part::Dropdown) => self
-                .numbers
-                .iter()
-                .map(|number| format!("{number}"))
-                .collect(),
-            (Control::Seconds(_), Part::Dropdown) => self
-                .numbers
-                .iter()
-                .map(|number| more::seconds(*number))
+            (_, Part::Filter) => std::iter::once(keys::ALL_STATES)
+                .chain(keys::STATES.iter().map(|(_, label)| *label))
+                .map(str::to_string)
                 .collect(),
             (Control::Preset, Part::Dropdown) => keys::PRESETS
                 .iter()
@@ -910,6 +1076,7 @@ impl RowState {
     fn dropdown_selected(&self, part: Part) -> Option<usize> {
         match part {
             Part::Dropdown => self.choice,
+            Part::Filter => Some(self.filter),
             Part::Field(index) => match self.inputs.get(index) {
                 Some(Input::Choice(selected)) => Some(*selected),
                 _ => None,
@@ -921,7 +1088,7 @@ impl RowState {
     /// 部品が選ぶ欄か
     fn is_dropdown(&self, part: Part) -> bool {
         match part {
-            Part::Dropdown => true,
+            Part::Dropdown | Part::Filter => true,
             Part::Field(index) => matches!(self.inputs.get(index), Some(Input::Choice(_))),
             _ => false,
         }
@@ -1113,16 +1280,37 @@ impl PageView {
                         None => options::index_of(choices, &values.text(row.row.path)),
                     });
                 }
-                Control::Stepper(_) | Control::Seconds(_) => {
+                Control::Stepper(_) | Control::Seconds(_) | Control::Slider(_) => {
                     let value = values
                         .value(row.row.path)
                         .and_then(Value::as_f64)
                         .unwrap_or(0.0);
                     row.choice = Some(options::nearest(&row.numbers, value));
                 }
+                Control::ThemeOption(value) => {
+                    // カスタムテーマを使っているときは，既成のテーマのどれも選ばない(macOS と同じ)
+                    let custom = crate::themes::active_name(
+                        values.value(crate::themes::THEMES),
+                        &values.text(crate::themes::ACTIVE),
+                    );
+                    row.on = custom.is_none()
+                        && options::index_of(options::THEMES, &values.text(row.row.path))
+                            == options::index_of(options::THEMES, value);
+                }
+                Control::Segmented(choices) => {
+                    row.choice = Some(options::index_of(choices, &values.text(row.row.path)));
+                }
                 Control::Stat(stat) => row.text = extras.usage.text(*stat),
-                Control::Info(Info::SyncFolder) => row.text = extras.sync_folder.clone(),
-                Control::Info(Info::LastSynced) => row.text = extras.last_synced.clone(),
+                Control::Info(Info::SyncFolder) | Control::InfoAction(Info::SyncFolder, ..) => {
+                    row.text = extras.sync_folder.clone()
+                }
+                Control::Info(Info::LastSynced) | Control::InfoAction(Info::LastSynced, ..) => {
+                    row.text = extras.last_synced.clone()
+                }
+                Control::Info(Info::PaletteKeys(command))
+                | Control::InfoAction(Info::PaletteKeys(command), ..) => {
+                    row.text = crate::keys::assigned(values.value("keymap"), command)
+                }
                 Control::KeymapReport => row.text = extras.keymap_report.clone(),
                 Control::ThemeReport => row.text = extras.theme_report.clone(),
                 Control::Color => row.color = values.text(row.row.path),
@@ -1136,6 +1324,7 @@ impl PageView {
                 if let Some(search) = row.search {
                     row.table.filter(&ffi::window_text(search));
                 }
+                row.table.restrict(0, state_filter(row.filter));
                 let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
                 row.table_scroll.set_extent(content, table_viewport(row));
             }
@@ -1173,28 +1362,16 @@ impl PageView {
             .flat_map(|section| &section.rows)
             .collect();
         let expanded: Vec<bool> = self.rows.iter().map(|row| row.expanded).collect();
-        let line = size::NOTE_LINE_HEIGHT;
-        let position = |row: &Row| {
-            all.iter()
-                .position(|candidate| std::ptr::eq(*candidate, row))
+        let metrics = Measured {
+            measure,
+            all: &all,
+            expanded: &expanded,
         };
-        self.layout = layout::layout_with(
+        self.layout = layout::layout(
             &self.sections,
             width,
-            |row| position(row).is_none_or(|index| visible[index]),
-            |text, width| {
-                let height = measure.wrapped_height(text, TextStyle::Caption, width);
-                ((height / line).ceil() as usize).max(1)
-            },
-            |row, width| {
-                let Control::Acknowledgement(index) = row.control else {
-                    return None;
-                };
-                let open = position(row).is_some_and(|position| expanded[position]);
-                let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
-                let item = crate::notices::installed().get(index);
-                Some(AcknowledgementLayout::new(item, (0.0, 0.0, inner), open, measure).1)
-            },
+            |row| metrics.position(row).is_none_or(|index| visible[index]),
+            &metrics,
         );
         for row in &mut self.rows {
             row.card = None;
@@ -1323,6 +1500,11 @@ impl PageView {
         };
         match element.part {
             Part::Reset => format!("{} {}", row.row.title, features::RESTORE_DEFAULT),
+            Part::Decrement => format!("{} {}", row.row.title, text::DECREASE),
+            Part::Increment => format!("{} {}", row.row.title, text::INCREASE),
+            Part::Slider => row.title(),
+            Part::Filter => keys::STATE.to_string(),
+            Part::Segment(_) | Part::Button(_) => row.button_label(element.part).to_string(),
             Part::Top(_)
             | Part::Bottom(_)
             | Part::PresetLoad
@@ -1352,7 +1534,14 @@ impl PageView {
         let row = self.rows.get(element.row)?;
         Some(match element.part {
             Part::Toggle => Described::Toggle(row.on),
-            Part::Dropdown | Part::Field(_) if row.is_dropdown(element.part) => {
+            Part::Slider => Described::Slider(
+                row.number()
+                    .map(|value| row.number_text(value))
+                    .unwrap_or_default(),
+            ),
+            Part::Radio => Described::Radio(row.on),
+            Part::Segment(index) => Described::Radio(row.choice == Some(index)),
+            Part::Dropdown | Part::Field(_) | Part::Filter if row.is_dropdown(element.part) => {
                 let items = row.dropdown_items(element.part);
                 let label = row
                     .dropdown_selected(element.part)
@@ -1376,6 +1565,13 @@ impl PageView {
             Part::Action => 3,
             Part::Color => 4,
             Part::PresetLoad => 5,
+            Part::Decrement => 6,
+            Part::Increment => 7,
+            Part::Slider => 8,
+            Part::Radio => 9,
+            Part::Filter => 31,
+            Part::Segment(index) => 90 + index,
+            Part::Button(index) => 95 + index,
             Part::Field(index) => 10 + index,
             Part::Top(index) => 20 + index,
             Part::Search => 30,
@@ -1493,6 +1689,36 @@ impl PageView {
         let part = element.part;
         match (&row.row.control, part) {
             (_, Part::Reset) => return Some(Event::Reset(row.row.path)),
+            (Control::Stepper(_), Part::Decrement) => return row.step(-1),
+            (Control::Stepper(_), Part::Increment) => return row.step(1),
+            (Control::ThemeOption(value), Part::Radio) => {
+                row.on = true;
+                return Some(Event::Set {
+                    path: row.row.path,
+                    value: Value::String((*value).to_string()),
+                    clears: row.row.clears,
+                });
+            }
+            (Control::Segmented(choices), Part::Segment(index)) => {
+                let (value, _) = choices.get(index)?;
+                row.choice = Some(index);
+                return Some(Event::Set {
+                    path: row.row.path,
+                    value: Value::String((*value).to_string()),
+                    clears: None,
+                });
+            }
+            (Control::Buttons(buttons), Part::Button(index)) => {
+                return Some(Event::Action(buttons.get(index)?.1))
+            }
+            (Control::InfoAction(_, action, _), Part::Action) => {
+                return Some(Event::Action(*action))
+            }
+            (_, Part::Bottom(index)) if row.file_task(index).is_some() => {
+                return row
+                    .file_task(index)
+                    .map(|task| Event::Action(Action::File(task)));
+            }
             (Control::Toggle, Part::Toggle) => {
                 let on = !row.on;
                 row.on = on;
@@ -1709,14 +1935,15 @@ impl PageView {
                     clears: row.row.clears,
                 })
             }
-            (Control::Stepper(_) | Control::Seconds(_), Part::Dropdown) => {
-                let number = *row.numbers.get(index)?;
-                row.choice = Some(index);
-                Some(Event::Set {
-                    path: row.row.path,
-                    value: crate::model::number(number),
-                    clears: row.row.clears,
-                })
+            (_, Part::Filter) => {
+                row.filter = index;
+                row.table.restrict(0, state_filter(index));
+                row.editing = None;
+                let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
+                let viewport = table_viewport(row);
+                row.table_scroll.set_extent(content, viewport);
+                row.table_scroll.jump_to(0.0);
+                None
             }
             (Control::Preset, Part::Dropdown) => {
                 row.choice = Some(index);
@@ -2029,6 +2256,46 @@ impl PageView {
         }
     }
 
+    /// スライダーを x(ページの中の座標)まで動かす．値を書くのは手を離したとき(slider_release)
+    pub fn slider_drag(&mut self, element: Element, x: f32) {
+        let Some(row) = self.rows.get_mut(element.row) else {
+            return;
+        };
+        if element.part == Part::Slider && row.enabled {
+            row.dragging = row.slider_value(x);
+        }
+    }
+
+    /// スライダーから手を離した．値が変わっていれば書く
+    pub fn slider_release(&mut self) -> Option<Event> {
+        let row = self.rows.iter_mut().find(|row| row.dragging.is_some())?;
+        let value = row.dragging.take()?;
+        let index = options::nearest(&row.numbers, value);
+        if row.choice == Some(index) {
+            return None;
+        }
+        row.choice = Some(index);
+        Some(Event::Set {
+            path: row.row.path,
+            value: crate::model::number(row.numbers[index]),
+            clears: row.row.clears,
+        })
+    }
+
+    /// 数の部品(数を 1 段ずつ変える部品・スライダー)を delta 段動かす(キーボード)．端を越えたら端で止める
+    pub fn step(&mut self, element: Element, delta: isize) -> Option<Event> {
+        let row = self.rows.get_mut(element.row)?;
+        if !row.enabled
+            || !matches!(
+                element.part,
+                Part::Slider | Part::Decrement | Part::Increment
+            )
+        {
+            return None;
+        }
+        row.step(delta)
+    }
+
     /// 試した結果を出す
     pub fn show_preview(&mut self, text: &str) {
         for row in &mut self.rows {
@@ -2038,13 +2305,17 @@ impl PageView {
         }
     }
 
-    /// 外観の見本を描く場所(ページの中の座標)
-    pub fn preview_rect(&self) -> Option<Rect> {
-        self.rows
-            .iter()
-            .find(|row| row.row.control == Control::ThemePreview && row.visible)
-            .and_then(|row| row.card.as_ref())
-            .map(|card| card.control)
+    /// 見本の画像を描く場所(ページの中の座標)と，描くもの(外観の見本・パレットの見本・情報のページのアイコン)
+    pub fn preview_rect(&self) -> Option<(PreviewKind, Rect)> {
+        self.rows.iter().filter(|row| row.visible).find_map(|row| {
+            let card = row.card.as_ref()?;
+            match row.row.control {
+                Control::ThemePreview => Some((PreviewKind::Theme, card.control)),
+                Control::PalettePreview => Some((PreviewKind::Palette, card.control)),
+                Control::Version => Some((PreviewKind::Icon, card.icon)),
+                _ => None,
+            }
+        })
     }
 
     /// 注記に入れ替えて出す文(キー設定のコマンドの説明)を，入力欄で選んでいる値に合わせる．合う文が無ければ元の注記
@@ -2099,7 +2370,14 @@ impl PageView {
                     TextLayout::LINE,
                 );
             }
+            let rows = self.sections.get(index).map(|section| &section.rows);
             for card in section.cards.iter().filter(|card| frame.shows(card.card)) {
+                let control = rows
+                    .and_then(|rows| rows.get(card.row))
+                    .map(|row| &row.control);
+                if matches!(control, Some(Control::Segmented(_))) {
+                    continue;
+                }
                 canvas.fill_round(card.card, size::CARD_RADIUS, Color::from(palette.card));
                 canvas.stroke_round(
                     card.card,
@@ -2146,18 +2424,50 @@ impl PageView {
         let theme = frame.theme;
         let palette = &theme.palette;
         let Some(card) = &row.card else { return };
-        let label_color = if row.enabled || row.row.control == Control::Note {
-            palette.text
+        // テーマの行はカードのどこを押しても選ぶので，ポインターを載せたらカードの地を変える(名前より先に塗る)
+        if let Control::ThemeOption(_) = row.row.control {
+            let hover = self.hover_value(
+                Element {
+                    row: index,
+                    part: Part::Radio,
+                },
+                frame.now,
+            );
+            canvas.fill_round(
+                card.card,
+                size::CARD_RADIUS,
+                Color::from(palette.nav_hover).with_alpha(hover),
+            );
+        }
+        // 値の右のボタンだけを使えなくする行(今すぐ同期)は，名前と値をふつうの色で出す
+        let label_color =
+            if row.enabled || matches!(row.row.control, Control::Note | Control::InfoAction(..)) {
+                palette.text
+            } else {
+                palette.text_disabled
+            };
+        let label_style = if row.row.control == Control::Version {
+            TextStyle::Subtitle
         } else {
-            palette.text_disabled
+            TextStyle::Body
         };
         if card.label.width > 0.0 && card.label.height > 0.0 {
+            // 名前が収まらなければ折り返す(狭い窓で名前を消さない)
+            let layout = if card.label.height > size::BODY_LINE_HEIGHT {
+                TextLayout::WRAP
+            } else {
+                TextLayout::LINE
+            };
+            let title = match row.row.control {
+                Control::Version => text::APP_NAME.to_string(),
+                _ => row.title(),
+            };
             canvas.text(
                 card.label,
-                row.row.title,
-                TextStyle::Body,
+                &title,
+                label_style,
                 Color::from(label_color),
-                TextLayout::LINE,
+                layout,
             );
         }
         for (position, rect) in &card.descriptions {
@@ -2203,11 +2513,138 @@ impl PageView {
                     self.state(frame, toggle, row.enabled),
                 );
             }
-            Control::Choice(_)
-            | Control::ThemeFont(_)
-            | Control::Stepper(_)
-            | Control::Seconds(_)
-            | Control::Preset => {
+            Control::Stepper(_) => {
+                let value = row
+                    .number()
+                    .map(|value| row.number_text(value))
+                    .unwrap_or_default();
+                paint::stepper_frame(canvas, theme, card.control, &value, row.enabled);
+                for (part, glyph) in [
+                    (Part::Decrement, theme.glyphs.minus),
+                    (Part::Increment, theme.glyphs.plus),
+                ] {
+                    if let Some(rect) = row.part_rect(part) {
+                        let inset = size::CONTROL_GAP / 2.0;
+                        let rect = Rect::new(
+                            rect.x,
+                            rect.y + inset,
+                            rect.width - inset,
+                            rect.height - inset * 2.0,
+                        );
+                        paint::button(
+                            canvas,
+                            theme,
+                            rect,
+                            glyph,
+                            paint::ButtonKind::Quiet,
+                            self.state(frame, element(part), row.part_enabled(part)),
+                        );
+                    }
+                }
+            }
+            Control::Seconds(_) | Control::Slider(_) => {
+                let slider = element(Part::Slider);
+                let mut state = self.state(frame, slider, row.enabled);
+                state.pressed |= row.dragging.is_some();
+                if let Some(rect) = row.slider_rect() {
+                    paint::slider(canvas, theme, rect, row.slider_progress(), state);
+                }
+                if row.shows_value() {
+                    let value = row
+                        .number()
+                        .map(|value| row.number_text(value))
+                        .unwrap_or_default();
+                    let color = if row.enabled {
+                        palette.text
+                    } else {
+                        palette.text_disabled
+                    };
+                    canvas.text(
+                        Rect::new(
+                            card.control.max_x() - size::SECONDS_LABEL_WIDTH,
+                            card.control.y,
+                            size::SECONDS_LABEL_WIDTH,
+                            card.control.height,
+                        ),
+                        &value,
+                        TextStyle::Body,
+                        Color::from(color),
+                        TextLayout::TRAILING,
+                    );
+                }
+            }
+            Control::ThemeOption(value) => {
+                let radio = element(Part::Radio);
+                let state = self.state(frame, radio, row.enabled);
+                if let Some(rect) = card.parts.first() {
+                    paint::radio(canvas, theme, *rect, row.on, state);
+                }
+                paint_swatch(canvas, theme, card.icon, value);
+                if state.focus_visible {
+                    paint::focus_ring(canvas, theme, card.card, size::CARD_RADIUS);
+                }
+            }
+            Control::Segmented(_) => {
+                canvas.fill_round(
+                    card.control,
+                    size::CONTROL_RADIUS,
+                    Color::from(palette.control),
+                );
+                canvas.stroke_round(
+                    card.control,
+                    size::CONTROL_RADIUS,
+                    1.0,
+                    Color::from(palette.control_stroke),
+                );
+                for part in row.parts() {
+                    if let (Part::Segment(position), Some(rect)) = (part, row.part_rect(part)) {
+                        paint::segment(
+                            canvas,
+                            theme,
+                            rect,
+                            row.button_label(part),
+                            row.choice == Some(position),
+                            self.state(frame, element(part), row.enabled),
+                        );
+                    }
+                }
+            }
+            Control::Buttons(buttons) => {
+                for (position, (label, action)) in buttons.iter().enumerate() {
+                    let part = Part::Button(position);
+                    if let Some(rect) = row.part_rect(part) {
+                        paint::button(
+                            canvas,
+                            theme,
+                            rect,
+                            label,
+                            button_kind(*action),
+                            self.state(frame, element(part), row.enabled),
+                        );
+                    }
+                }
+            }
+            Control::InfoAction(..) => {
+                canvas.text(
+                    card.control,
+                    &row.text,
+                    TextStyle::Body,
+                    Color::from(palette.text_secondary),
+                    value_layout(card),
+                );
+                if let Some(rect) = row.part_rect(Part::Action) {
+                    paint::button(
+                        canvas,
+                        theme,
+                        rect,
+                        row.button_label(Part::Action),
+                        paint::ButtonKind::Standard,
+                        self.state(frame, element(Part::Action), row.enabled),
+                    );
+                }
+            }
+            Control::PalettePreview => canvas.preview(card.control),
+            Control::Choice(_) | Control::ThemeFont(_) | Control::Preset => {
                 let dropdown = element(Part::Dropdown);
                 let items = row.dropdown_items(Part::Dropdown);
                 let label = row
@@ -2237,14 +2674,14 @@ impl PageView {
                     );
                 }
             }
-            Control::Action(_) => {
+            Control::Action(kind) => {
                 let action = element(Part::Action);
                 paint::button(
                     canvas,
                     theme,
                     card.control,
                     row.row.title,
-                    paint::ButtonKind::Standard,
+                    button_kind(*kind),
                     self.state(frame, action, row.enabled),
                 );
             }
@@ -2262,12 +2699,13 @@ impl PageView {
             }
             Control::Acknowledgement(_) => self.paint_acknowledgement(canvas, frame, index, row),
             Control::Version => {
+                canvas.preview(card.icon);
                 canvas.text(
                     card.control,
                     &row.text,
                     TextStyle::Body,
                     Color::from(palette.text_secondary),
-                    TextLayout::TRAILING,
+                    TextLayout::LINE,
                 );
                 if let Some(rect) = row.part_rect(Part::Action) {
                     let update = element(Part::Action);
@@ -2282,12 +2720,17 @@ impl PageView {
                 }
             }
             Control::Stat(_) | Control::Info(_) => {
+                let color = if row.enabled {
+                    palette.text_secondary
+                } else {
+                    palette.text_disabled
+                };
                 canvas.text(
                     card.control,
                     &row.text,
                     TextStyle::Body,
-                    Color::from(palette.text_secondary),
-                    TextLayout::TRAILING,
+                    Color::from(color),
+                    value_layout(card),
                 );
             }
             Control::KeymapReport | Control::ThemeReport => {
@@ -2518,12 +2961,15 @@ impl PageView {
                     };
                     let state = self.state(frame, element, row.enabled);
                     let accent = Color::from(palette.accent);
-                    let color = accent.mix(Color::from(palette.text), state.hover * 0.35);
+                    let color = accent.mix(
+                        Color::from(palette.text),
+                        state.hover * opacity::LINK_HOVER_MIX,
+                    );
                     canvas.text(*link, url, TextStyle::Caption, color, TextLayout::LINE);
                     // 押せることを下線で示す(ポインターを載せると濃くする)
                     canvas.fill_rect(
                         Rect::new(link.x, link.max_y() - 2.0, link.width, 1.0),
-                        color.with_alpha(0.4 + 0.6 * state.hover),
+                        color.with_alpha(opacity::LINK + (1.0 - opacity::LINK) * state.hover),
                     );
                     // URL のあとの文(「(v0.2.0)」など)は，リンクにせず下に折り返して出す
                     if !suffix.trim().is_empty() {
@@ -2640,7 +3086,7 @@ impl PageView {
                 continue;
             };
             match part {
-                Part::Field(_) if row.is_dropdown(part) => {
+                Part::Field(_) | Part::Filter if row.is_dropdown(part) => {
                     let items = row.dropdown_items(part);
                     let label = row
                         .dropdown_selected(part)
@@ -2674,6 +3120,23 @@ impl PageView {
                 }
                 Part::Table => self.paint_table(canvas, frame, index, row, rect),
                 _ => {}
+            }
+        }
+        // 絞り込める表は，出している行の数を表の下の帯に出す(macOS の KeymapPage の行の数)
+        if let (Some(buttons), Some(card)) = (row.row.control.list_buttons(), &row.card) {
+            if buttons.filter {
+                let last = Part::Bottom(buttons.bottom_labels().len().saturating_sub(1));
+                if let Some(rect) = row.part_rect(last) {
+                    let left = rect.max_x() + size::CONTROL_GAP;
+                    let right = card.card.max_x() - size::CARD_PADDING_X;
+                    canvas.text(
+                        Rect::new(left, rect.y, (right - left).max(0.0), rect.height),
+                        &keys::row_count(row.table.len(), row.table.total()),
+                        TextStyle::Caption,
+                        Color::from(theme.palette.text_secondary),
+                        TextLayout::TRAILING,
+                    );
+                }
             }
         }
     }
@@ -2738,7 +3201,13 @@ impl PageView {
                 continue;
             };
             let top = body.y + position as f32 * row_height - offset;
-            let line = Rect::new(rect.x + 2.0, top + 1.0, rect.width - 4.0, row_height - 2.0);
+            let inset = size::TABLE_ROW_INSET;
+            let line = Rect::new(
+                rect.x + inset,
+                top + inset / 2.0,
+                rect.width - inset * 2.0,
+                row_height - inset,
+            );
             let selected = row.table.is_selected(position);
             if selected {
                 canvas.fill_round(
@@ -2746,7 +3215,8 @@ impl PageView {
                     size::CONTROL_RADIUS,
                     Color::from(palette.nav_selected),
                 );
-                let indicator = size::NAV_INDICATOR_HEIGHT.min(row_height - 8.0);
+                let indicator =
+                    size::NAV_INDICATOR_HEIGHT.min(row_height - size::TABLE_INDICATOR_INSET);
                 canvas.fill_round(
                     Rect::new(
                         line.x,
@@ -2970,7 +3440,7 @@ pub fn paint_status(
         left,
         middle + size::PROGRESS_RING_SIZE,
         content,
-        size::BODY_LINE_HEIGHT * 3.0,
+        size::BODY_LINE_HEIGHT * size::STATUS_LINES,
     );
     match availability {
         Availability::Loading => {
@@ -3015,6 +3485,139 @@ pub fn paint_status(
             );
         }
         Availability::Ready => {}
+    }
+}
+
+/// 名前の右の値の置き方．右の端にそろえ，狭い窓で名前の下に置いたときは左に寄せる
+fn value_layout(card: &layout::CardLayout) -> TextLayout {
+    if card.control.y >= card.label.max_y() {
+        TextLayout::LINE
+    } else {
+        TextLayout::TRAILING
+    }
+}
+
+/// 操作のボタンの種類(消す・戻す操作は危険の色)
+fn button_kind(action: Action) -> paint::ButtonKind {
+    if action.is_destructive() {
+        paint::ButtonKind::Destructive
+    } else {
+        paint::ButtonKind::Standard
+    }
+}
+
+/// テーマの見本の札(地・文字・選択の色．macOS の ThemeSwatch)．色は候補ウィンドウと同じ解き方で，今の画面の明暗の色にする
+fn paint_swatch(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, value: &str) {
+    use candidate_ui::theme::{ResolvedTheme, SystemLook};
+    let resolved = ResolvedTheme::resolve(
+        value,
+        None,
+        &SystemLook {
+            dark: theme.dark,
+            ..SystemLook::default()
+        },
+    );
+    let color = |color: candidate_ui::theme::Color| Color {
+        red: color.red,
+        green: color.green,
+        blue: color.blue,
+        alpha: color.alpha,
+    };
+    let radius = if resolved.is_rounded() {
+        (resolved.corner_radius / 2.0).min(size::THEME_SWATCH_RADIUS)
+    } else {
+        0.0
+    };
+    canvas.fill_round(rect, radius, color(resolved.surface));
+    canvas.stroke_round(rect, radius, 1.0, color(resolved.frame));
+    let mark = size::THEME_SWATCH_FONT_SIZE;
+    let selection_width = size::THEME_SWATCH_SELECTION_WIDTH;
+    let selection_height = size::THEME_SWATCH_SELECTION_HEIGHT;
+    let total = mark + size::THEME_SWATCH_GAP + selection_width;
+    let left = rect.x + (rect.width - total) / 2.0;
+    canvas.text(
+        Rect::new(left, rect.y, mark, rect.height),
+        text::JAPANESE_MODE,
+        TextStyle::Swatch,
+        color(resolved.text),
+        TextLayout::CENTER,
+    );
+    canvas.fill_round(
+        Rect::new(
+            left + mark + size::THEME_SWATCH_GAP,
+            rect.y + (rect.height - selection_height) / 2.0,
+            selection_width,
+            selection_height,
+        ),
+        radius / 2.0,
+        color(resolved.selection),
+    );
+}
+
+/// 見本の画像の種類
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PreviewKind {
+    /// 外観の見本(分岐図)
+    Theme,
+    /// パレットの見本
+    Palette,
+    /// 情報のページのアイコン
+    Icon,
+}
+
+/// 状態で絞り込む欄の index 番目の状態の名前(0 はすべての状態で，絞り込まない)
+fn state_filter(index: usize) -> Option<&'static str> {
+    index
+        .checked_sub(1)
+        .and_then(|index| keys::STATES.get(index))
+        .map(|(_, label)| *label)
+}
+
+/// 置くときに文字を測る口(layout::Metrics)．DirectWrite で測り，謝辞のカードは中身から高さを決める
+struct Measured<'a> {
+    measure: &'a dyn paint::Measure,
+    /// ページのすべての行(行の位置を引く)
+    all: &'a [&'a Row],
+    /// 謝辞のライセンスの全文を開いているか(行と同じ並び)
+    expanded: &'a [bool],
+}
+
+impl Measured<'_> {
+    fn position(&self, row: &Row) -> Option<usize> {
+        self.all
+            .iter()
+            .position(|candidate| std::ptr::eq(*candidate, row))
+    }
+}
+
+impl Metrics for Measured<'_> {
+    fn lines(&self, text: &str, kind: TextKind, width: f32) -> usize {
+        let (style, line) = match kind {
+            TextKind::Body => (TextStyle::Body, size::BODY_LINE_HEIGHT),
+            TextKind::Caption => (TextStyle::Caption, size::NOTE_LINE_HEIGHT),
+        };
+        let height = self.measure.wrapped_height(text, style, width.max(1.0));
+        ((height / line).round() as usize).max(1)
+    }
+
+    fn width(&self, text: &str, kind: TextKind) -> f32 {
+        let style = match kind {
+            TextKind::Body => TextStyle::Body,
+            TextKind::Caption => TextStyle::Caption,
+        };
+        self.measure.width(text, style)
+    }
+
+    fn height(&self, row: &Row, width: f32) -> Option<f32> {
+        let Control::Acknowledgement(index) = row.control else {
+            return None;
+        };
+        let open = self
+            .position(row)
+            .is_some_and(|position| self.expanded[position]);
+        let inner = (width - size::CARD_PADDING_X * 2.0).max(0.0);
+        let item = crate::notices::installed().get(index);
+        Some(AcknowledgementLayout::new(item, (0.0, 0.0, inner), open, self.measure).1)
     }
 }
 

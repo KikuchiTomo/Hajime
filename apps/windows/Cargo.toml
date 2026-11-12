@@ -30,4 +30,8 @@ unwrap_used = "deny"
 expect_used = "deny"
 
 [profile.release]
+# COM の境界(com::guard)で panic を受け止めるため，unwind のままにする
 panic = "unwind"
+# crate をまたいでインライン化し，候補の窓・設定・TSF の DLL を速く小さくする(動きは変わらない)
+lto = "fat"
+codegen-units = 1

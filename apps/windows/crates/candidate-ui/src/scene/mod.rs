@@ -224,6 +224,21 @@ pub trait Measure {
     }
 }
 
+/// 描く層が使い回す書体の組(Rc で共有する)も，そのまま測るのに使う
+impl<T: Measure + ?Sized> Measure for std::rc::Rc<T> {
+    fn width(&self, text: &str, font: Font) -> f32 {
+        (**self).width(text, font)
+    }
+
+    fn height(&self, font: Font) -> f32 {
+        (**self).height(font)
+    }
+
+    fn has_glyph(&self, font: Font, glyph: char) -> bool {
+        (**self).has_glyph(font, glyph)
+    }
+}
+
 /// どう描くか．テーマと文字の大きさと，出し始めの濃さ
 #[derive(Debug, Clone, Copy)]
 pub struct Look<'a> {

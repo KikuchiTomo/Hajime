@@ -9,7 +9,7 @@ use windows::Win32::Graphics::Direct2D::Common::{
     D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_PIXEL_FORMAT, D2D_SIZE_U,
 };
 use windows::Win32::Graphics::Direct2D::{
-    ID2D1HwndRenderTarget, D2D1_HWND_RENDER_TARGET_PROPERTIES, D2D1_PRESENT_OPTIONS_NONE,
+    ID2D1HwndRenderTarget, D2D1_HWND_RENDER_TARGET_PROPERTIES, D2D1_PRESENT_OPTIONS_IMMEDIATELY,
     D2D1_RENDER_TARGET_PROPERTIES,
 };
 use windows::Win32::Graphics::Dwm::{
@@ -36,8 +36,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowLongPtrW, KillTimer,
     LoadCursorW, PostMessageW, RegisterClassExW, SetTimer, SetWindowLongPtrW, SetWindowPos,
     ShowWindow, TranslateMessage, CS_DROPSHADOW, GWLP_USERDATA, HTTRANSPARENT, HWND_TOPMOST,
-    IDC_ARROW, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_APP, WM_LBUTTONDOWN,
-    WM_MOUSEACTIVATE, WM_NCHITTEST, WM_PAINT, WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES,
+    IDC_ARROW, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_APP,
+    WM_DWMCOLORIZATIONCOLORCHANGED, WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_NCHITTEST, WM_PAINT,
+    WM_SETTINGCHANGE, WM_SYSCOLORCHANGE, WM_THEMECHANGED, WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES,
     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 use windows_core::{w, Result, BOOL, BSTR, PCWSTR};
@@ -87,6 +88,9 @@ pub struct Window {
     side: std::cell::Cell<Option<Side>>,
     /// 候補を選んでいるときに置いた窓．続けて選んでいるあいだは，候補が並び始める辺をこの窓から動かさない
     held: std::cell::Cell<Option<Placed>>,
+    /// 最後に DWM に書いた地と角と縁(backdrop・dark・縁の色)と，書いたときの OS の設定の世代．
+    /// どれも同じなら書き直さない(OS の設定が変わったら書き直す)
+    chrome: std::cell::Cell<Option<(bool, bool, COLORREF, u64)>>,
 }
 
 /// 入力位置に対して窓を置いた側
@@ -230,6 +234,7 @@ impl Window {
             target: None,
             side: std::cell::Cell::new(None),
             held: std::cell::Cell::new(None),
+            chrome: std::cell::Cell::new(None),
         })
     }
 
@@ -263,6 +268,17 @@ impl Window {
     /// 窓の地と角と縁．backdrop なら地をすりガラスにして角を OS の丸みで丸め，縁を border の色で OS に描かせる．
     /// そうでなければ OS は何も描かず，角丸の形も影も中身の側(scene)が描く
     pub fn set_chrome(&self, backdrop: bool, dark: bool, border: Color) {
+        // 打つたびやアニメーションのコマごとに同じ値を DWM に書き直さない
+        let chrome = (
+            backdrop,
+            dark,
+            colorref(border),
+            super::system::settings_generation(),
+        );
+        if self.chrome.get() == Some(chrome) {
+            return;
+        }
+        self.chrome.set(Some(chrome));
         let dark = BOOL::from(dark);
         let _ = set_attribute(self.hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark);
         if backdrop {
@@ -430,7 +446,9 @@ impl Window {
                 &D2D1_HWND_RENDER_TARGET_PROPERTIES {
                     hwnd: self.hwnd,
                     pixelSize: size,
-                    presentOptions: D2D1_PRESENT_OPTIONS_NONE,
+                    // 画面の更新を待たずに EndDraw から戻る(打つたびに窓のスレッドが 1 フレーム止まらないように)．
+                    // 窓は DWM が合成するので，待たなくても絵が裂けることはない
+                    presentOptions: D2D1_PRESENT_OPTIONS_IMMEDIATELY,
                 },
             )?
         };
@@ -595,6 +613,12 @@ unsafe extern "system" fn procedure(
             // SAFETY: 同上
             let _ = unsafe { EndPaint(hwnd, &paint) };
             Some(LRESULT(0))
+        }
+        // OS の外観(ライト・ダーク・アクセントカラー・ハイコントラスト)やアニメーション効果の設定が変わった．
+        // 覚えた設定を読み直させ，処理は DefWindowProcW にも任せる
+        WM_SETTINGCHANGE | WM_THEMECHANGED | WM_SYSCOLORCHANGE | WM_DWMCOLORIZATIONCOLORCHANGED => {
+            super::system::settings_changed();
+            None
         }
         WM_MOUSEACTIVATE => Some(LRESULT(MA_NOACTIVATE as isize)),
         // 押しても受けない窓(予測の窓)は，押した位置を下の窓に通す

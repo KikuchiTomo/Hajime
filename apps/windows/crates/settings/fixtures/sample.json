@@ -1,0 +1,906 @@
+{
+  "defaults": {
+    "alphabetWidth": "halfwidth",
+    "alphanumericHyphen": true,
+    "association": true,
+    "associationDictionaries": [
+      {
+        "id": "8C1F0E2A-5B7D-4E39-9A61-3D2C4B5E6F70",
+        "name": "日本語 WordNet",
+        "isEnabled": true,
+        "groupCount": 0,
+        "isBundled": true
+      }
+    ],
+    "associationLimit": 60,
+    "brackets": "corner",
+    "branchCandidatesPerPage": 5,
+    "calculation": true,
+    "candidateFontSize": 15,
+    "candidatePresentation": "automatic",
+    "commands": [],
+    "contextualSegmentCandidates": true,
+    "conversionMacros": false,
+    "correction": {
+      "english": true,
+      "japanese": true,
+      "repeatedKeys": true,
+      "exceptions": [],
+      "rules": []
+    },
+    "correctionDelay": 0.8,
+    "correctionSensitivity": "standard",
+    "customRomaji": [],
+    "customThemeID": null,
+    "customThemes": [],
+    "cyclesLetterCase": true,
+    "dateConversion": true,
+    "dynamicDictionary": false,
+    "emojiConversion": true,
+    "englishInputLiveConversion": false,
+    "englishSkipLength": 2,
+    "englishTermCandidates": true,
+    "englishTerms": [],
+    "escapeSwitchesToDirect": false,
+    "handShiftCorrection": false,
+    "handwriting": false,
+    "homophoneNotes": true,
+    "importedDictionaries": [],
+    "initialFocus": "start",
+    "inputStyle": "romaji",
+    "keyboardLayout": "system",
+    "keymap": [
+      {
+        "state": "anywhere",
+        "key": "Ctrl Option ,",
+        "command": "openSettings"
+      },
+      {
+        "state": "anywhere",
+        "key": "Ctrl Option l",
+        "command": "toggleLiveConversion"
+      },
+      {
+        "state": "anywhere",
+        "key": "Ctrl Option h",
+        "command": "handwriting"
+      },
+      {
+        "state": "anywhere",
+        "key": "Ctrl Option e",
+        "command": "emojiPalette"
+      },
+      {
+        "state": "anywhere",
+        "key": "Ctrl Option k",
+        "command": "symbolPalette"
+      },
+      {
+        "state": "anywhere",
+        "key": "Eisu",
+        "command": "directMode"
+      },
+      {
+        "state": "anywhere",
+        "key": "Kana",
+        "command": "japaneseMode"
+      },
+      {
+        "state": "anywhere",
+        "key": "Hankaku/Zenkaku",
+        "command": "toggleMode"
+      },
+      {
+        "state": "anywhere",
+        "key": "Option Kana",
+        "command": "nextInputStyle"
+      },
+      {
+        "state": "idle",
+        "key": "Ctrl Shift r",
+        "command": "reconvert"
+      },
+      {
+        "state": "idle",
+        "key": "Henkan",
+        "command": "reconvert"
+      },
+      {
+        "state": "anywhere",
+        "key": "Enter",
+        "command": "commit"
+      },
+      {
+        "state": "anywhere",
+        "key": "Escape",
+        "command": "cancel"
+      },
+      {
+        "state": "anywhere",
+        "key": "F6",
+        "command": "toHiragana"
+      },
+      {
+        "state": "anywhere",
+        "key": "F7",
+        "command": "toKatakana"
+      },
+      {
+        "state": "anywhere",
+        "key": "F8",
+        "command": "toHalfwidthKatakana"
+      },
+      {
+        "state": "anywhere",
+        "key": "F9",
+        "command": "toFullwidthAlphanumeric"
+      },
+      {
+        "state": "anywhere",
+        "key": "F10",
+        "command": "toHalfwidthAlphanumeric"
+      },
+      {
+        "state": "anywhere",
+        "key": "Ctrl j",
+        "command": "toHiragana"
+      },
+      {
+        "state": "anywhere",
+        "key": "Ctrl k",
+        "command": "toKatakana"
+      },
+      {
+        "state": "anywhere",
+        "key": "Ctrl ;",
+        "command": "toHalfwidthKatakana"
+      },
+      {
+        "state": "anywhere",
+        "key": "Ctrl l",
+        "command": "toFullwidthAlphanumeric"
+      },
+      {
+        "state": "anywhere",
+        "key": "Ctrl :",
+        "command": "toHalfwidthAlphanumeric"
+      },
+      {
+        "state": "anywhere",
+        "key": "Ctrl '",
+        "command": "toHalfwidthAlphanumeric"
+      },
+      {
+        "state": "anywhere",
+        "key": "Muhenkan",
+        "command": "toKatakana"
+      },
+      {
+        "state": "anywhere",
+        "key": "Down",
+        "command": "nextCandidate"
+      },
+      {
+        "state": "anywhere",
+        "key": "Up",
+        "command": "previousCandidate"
+      },
+      {
+        "state": "idle",
+        "key": "Space",
+        "command": "insertSpace"
+      },
+      {
+        "state": "idle",
+        "key": "Shift Space",
+        "command": "insertAlternateSpace"
+      },
+      {
+        "state": "composing",
+        "key": "Space",
+        "command": "convert"
+      },
+      {
+        "state": "composing",
+        "key": "Shift Space",
+        "command": "associate"
+      },
+      {
+        "state": "composing",
+        "key": "Henkan",
+        "command": "convert"
+      },
+      {
+        "state": "composing",
+        "key": "Backspace",
+        "command": "deleteBackward"
+      },
+      {
+        "state": "composing",
+        "key": "Tab",
+        "command": "acceptSuggestion"
+      },
+      {
+        "state": "composing",
+        "key": "Option Space",
+        "command": "insertBoundary"
+      },
+      {
+        "state": "converting",
+        "key": "Space",
+        "command": "nextCandidate"
+      },
+      {
+        "state": "converting",
+        "key": "Henkan",
+        "command": "nextCandidate"
+      },
+      {
+        "state": "converting",
+        "key": "Shift Space",
+        "command": "previousCandidate"
+      },
+      {
+        "state": "converting",
+        "key": "Right",
+        "command": "nextSegment"
+      },
+      {
+        "state": "converting",
+        "key": "Left",
+        "command": "previousSegment"
+      },
+      {
+        "state": "converting",
+        "key": "Tab",
+        "command": "nextSegment"
+      },
+      {
+        "state": "converting",
+        "key": "Shift Tab",
+        "command": "previousSegment"
+      },
+      {
+        "state": "converting",
+        "key": "Option Right",
+        "command": "nextUncertainSegment"
+      },
+      {
+        "state": "converting",
+        "key": "Option Left",
+        "command": "previousUncertainSegment"
+      },
+      {
+        "state": "converting",
+        "key": "Shift Up",
+        "command": "associate"
+      },
+      {
+        "state": "converting",
+        "key": "Shift Right",
+        "command": "extendSegment"
+      },
+      {
+        "state": "converting",
+        "key": "Shift Left",
+        "command": "shrinkSegment"
+      },
+      {
+        "state": "converting",
+        "key": "Ctrl Shift Right",
+        "command": "extendSegmentToWord"
+      },
+      {
+        "state": "converting",
+        "key": "Ctrl Shift Left",
+        "command": "shrinkSegmentToWord"
+      },
+      {
+        "state": "converting",
+        "key": "Shift Down",
+        "command": "splitSegment"
+      },
+      {
+        "state": "converting",
+        "key": "Shift Backspace",
+        "command": "editSegment"
+      },
+      {
+        "state": "converting",
+        "key": "Backspace",
+        "command": "backToReading"
+      },
+      {
+        "state": "converting",
+        "key": "Ctrl Backspace",
+        "command": "forgetCandidate"
+      },
+      {
+        "state": "converting",
+        "key": "PageDown",
+        "command": "nextCandidatePage"
+      },
+      {
+        "state": "converting",
+        "key": "PageUp",
+        "command": "previousCandidatePage"
+      },
+      {
+        "state": "converting",
+        "key": "Home",
+        "command": "firstSegment"
+      },
+      {
+        "state": "converting",
+        "key": "End",
+        "command": "lastSegment"
+      },
+      {
+        "state": "converting",
+        "key": "F6",
+        "command": "segmentToHiragana"
+      },
+      {
+        "state": "converting",
+        "key": "F7",
+        "command": "segmentToKatakana"
+      },
+      {
+        "state": "converting",
+        "key": "F8",
+        "command": "segmentToHalfwidthKatakana"
+      },
+      {
+        "state": "converting",
+        "key": "Escape",
+        "command": "undoConversionEdit"
+      },
+      {
+        "state": "converting",
+        "key": "Delete",
+        "command": "resumeEditing"
+      }
+    ],
+    "keypadCalculation": false,
+    "keypadDirect": true,
+    "lateCorrectionTimeout": 5,
+    "latexConversion": false,
+    "launcherCommands": false,
+    "learning": "enabled",
+    "listCandidatesPerPage": 9,
+    "listSegmentAlternatives": true,
+    "liveConversion": true,
+    "liveConversionDelay": 0.4,
+    "liveConversionSkipLength": 2,
+    "looseReadings": false,
+    "macros": [
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000001",
+        "pattern": "「{text}」",
+        "isEnabled": true
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000002",
+        "pattern": "『{text}』",
+        "isEnabled": true
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000003",
+        "pattern": "【{text}】",
+        "isEnabled": true
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000004",
+        "pattern": "（{text}）",
+        "isEnabled": true
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000005",
+        "pattern": "{text}（{reading}）",
+        "isEnabled": true
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000006",
+        "pattern": "|{text}《{reading}》",
+        "isEnabled": true
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000007",
+        "pattern": "<ruby>{text}<rt>{reading}</rt></ruby>",
+        "isEnabled": true
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000008",
+        "pattern": "**{text}**",
+        "isEnabled": true
+      },
+      {
+        "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000009",
+        "pattern": "`{text}`",
+        "isEnabled": true
+      }
+    ],
+    "meaningPlacement": "side",
+    "meaningSenseLimit": 3,
+    "misreadings": true,
+    "misuseNotes": false,
+    "modeIndicatorDuration": 0.8,
+    "numberFormCircled": true,
+    "numberFormConversion": true,
+    "numberFormKanji": true,
+    "numberFormParenthesized": true,
+    "numberFormRoman": true,
+    "numberKeySelection": true,
+    "numberSeparators": true,
+    "numberWidth": "halfwidth",
+    "okuriganaStyle": "standard",
+    "palette": true,
+    "paletteCellSize": 36,
+    "paletteClosesAfterInsert": true,
+    "paletteColumns": 9,
+    "paletteFrequentRows": 1,
+    "paletteRecordsHistory": true,
+    "paletteRows": 6,
+    "paletteShowsPreview": true,
+    "phoneticSpelling": false,
+    "postalCodeConversion": true,
+    "predictionDisplay": "whenLiveConversionOff",
+    "prefersKatakana": true,
+    "profileRules": [
+      {
+        "applicationPrefix": "com.apple.Terminal",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "com.googlecode.iterm2",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "com.mitchellh.ghostty",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "net.kovidgoyal.kitty",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "dev.warp.Warp",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "io.alacritty",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "org.alacritty",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "com.github.wez.wezterm",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "windowsterminal.exe",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "cmd.exe",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "powershell.exe",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "pwsh.exe",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "conhost.exe",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "wezterm-gui.exe",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "alacritty.exe",
+        "profile": "terminal"
+      },
+      {
+        "applicationPrefix": "com.microsoft.VSCode",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "com.todesktop.230313mzl4w4u92",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "com.jetbrains.",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "com.google.android.studio",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "dev.zed.Zed",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "com.apple.dt.Xcode",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "com.sublimetext.",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "org.vim.MacVim",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "com.panic.Nova",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "code.exe",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "cursor.exe",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "devenv.exe",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "idea64.exe",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "pycharm64.exe",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "rider64.exe",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "clion64.exe",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "webstorm64.exe",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "goland64.exe",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "zed.exe",
+        "profile": "programming"
+      },
+      {
+        "applicationPrefix": "sublime_text.exe",
+        "profile": "programming"
+      }
+    ],
+    "proofreading": true,
+    "punctuation": "toutenKuten",
+    "punctuationCommits": false,
+    "questionExclamationCommits": false,
+    "recordsUsage": true,
+    "remembersRejectedCorrections": false,
+    "restrainsLiveConversionInCode": true,
+    "reviewCorrectionTimeout": 15,
+    "shiftStartsAlphabet": false,
+    "showsAssociationHint": true,
+    "showsHomophones": true,
+    "showsKeyHints": true,
+    "showsModeIndicator": true,
+    "showsPartOfSpeech": true,
+    "showsSuggestions": true,
+    "showsUsageExamples": true,
+    "showsVariantRow": true,
+    "slash": "nakaguro",
+    "spaceWidth": "halfwidth",
+    "suggestionDisplay": "whenLiveConversionOff",
+    "suggestionSkipCount": 0,
+    "symbolConversion": true,
+    "symbolRules": [],
+    "terminalCommands": true,
+    "theme": "automatic",
+    "typoCorrection": "standard",
+    "userDictionary": [],
+    "wordLanguage": {
+      "englishWords": [],
+      "japaneseWords": [],
+      "rules": [],
+      "usesContext": true,
+      "avoidsOffensive": true
+    },
+    "yenKey": "alwaysBackslash",
+    "zenzaiModel": "accurate",
+    "predictionPrefersHistory": true,
+    "predictionFromCorrection": true,
+    "hiddenPredictions": []
+  },
+  "changes": {
+    "liveConversionDelay": 0.6,
+    "candidateFontSize": 16,
+    "customRomaji": [
+      {
+        "keys": "xn",
+        "kana": "ん"
+      },
+      {
+        "keys": "lla",
+        "kana": "ゃあ"
+      }
+    ],
+    "correction": {
+      "english": true,
+      "japanese": true,
+      "repeatedKeys": true,
+      "exceptions": [
+        "teh",
+        "nihonn"
+      ],
+      "rules": [
+        {
+          "typed": "hte",
+          "word": "the"
+        },
+        {
+          "typed": "ありがおう",
+          "word": "ありがとう"
+        }
+      ]
+    },
+    "wordLanguage": {
+      "englishWords": [
+        "make",
+        "test"
+      ],
+      "japaneseWords": [
+        "sushi",
+        "kawaii"
+      ],
+      "rules": [
+        {
+          "word": "mail",
+          "context": "afterJapanese",
+          "language": "japanese"
+        }
+      ],
+      "usesContext": true,
+      "avoidsOffensive": true
+    },
+    "englishTerms": [
+      "Rust",
+      "Direct2D"
+    ],
+    "commands": [
+      {
+        "id": "C0000000-0000-0000-0000-000000000001",
+        "reading": "めも",
+        "title": "メモ帳",
+        "kind": "openApplication",
+        "target": "notepad.exe",
+        "isEnabled": true
+      },
+      {
+        "id": "C0000000-0000-0000-0000-000000000002",
+        "reading": "どきゅめんと",
+        "title": "Hajime IME のドキュメント",
+        "kind": "openURL",
+        "target": "https://haji.men/docs/",
+        "isEnabled": false
+      }
+    ],
+    "importedDictionaries": [
+      {
+        "id": "D0000000-0000-0000-0000-000000000001",
+        "name": "郵便の用語",
+        "field": "物流",
+        "isEnabled": true,
+        "condition": "always",
+        "wordCount": 1280
+      }
+    ]
+  },
+  "extras": {
+    "userDictionary": [
+      {
+        "reading": "はじめ",
+        "word": "Hajime IME"
+      },
+      {
+        "reading": "しぶや",
+        "word": "渋谷"
+      },
+      {
+        "reading": "かぶしきがいしゃ",
+        "word": "株式会社"
+      },
+      {
+        "reading": "めーる",
+        "word": "hajime@example.com"
+      }
+    ],
+    "symbols": {
+      "sequence": [
+        [
+          "->",
+          "→",
+          true,
+          "standard"
+        ],
+        [
+          "<-",
+          "←",
+          true,
+          "standard"
+        ],
+        [
+          "=>",
+          "⇒",
+          true,
+          "standard"
+        ],
+        [
+          "...",
+          "…",
+          false,
+          "changed"
+        ],
+        [
+          "~~",
+          "〜",
+          true,
+          "added"
+        ]
+      ],
+      "reading": [
+        [
+          "やじるし",
+          "→ ← ↑ ↓",
+          true,
+          "standard"
+        ],
+        [
+          "ほし",
+          "★ ☆ ＊",
+          true,
+          "standard"
+        ],
+        [
+          "まる",
+          "○ ● ◎",
+          true,
+          "standard"
+        ],
+        [
+          "ゆうびん",
+          "〒",
+          true,
+          "added"
+        ]
+      ]
+    },
+    "usage": {
+      "values": {
+        "commits": 18342,
+        "conversionsOpened": 2210,
+        "segmentsChanged": 431,
+        "readingCorrections": 96,
+        "readingCorrectionsUndone": 7,
+        "englishCorrections": 54,
+        "englishCorrectionsUndone": 3
+      },
+      "firstCandidateRate": 0.874
+    },
+    "sync": {
+      "isEnabled": true,
+      "isSyncing": false,
+      "folderName": "OneDrive",
+      "lastSyncedAt": "2026-11-12T03:04:05Z",
+      "groups": [
+        {
+          "group": "input",
+          "scope": "synced",
+          "fields": [
+            "inputStyle",
+            "punctuation",
+            "brackets"
+          ]
+        },
+        {
+          "group": "keyboard",
+          "scope": "local",
+          "fields": [
+            "keyboardLayout"
+          ]
+        },
+        {
+          "group": "keys",
+          "scope": "synced",
+          "fields": [
+            "keymap"
+          ]
+        },
+        {
+          "group": "conversion",
+          "scope": "synced",
+          "fields": [
+            "liveConversion",
+            "liveConversionDelay"
+          ]
+        },
+        {
+          "group": "correction",
+          "scope": "synced",
+          "fields": [
+            "correction"
+          ]
+        },
+        {
+          "group": "symbols",
+          "scope": "synced",
+          "fields": [
+            "symbolRules"
+          ]
+        },
+        {
+          "group": "dictionary",
+          "scope": "synced",
+          "fields": [
+            "userDictionary"
+          ]
+        },
+        {
+          "group": "importedDictionaries",
+          "scope": "local",
+          "fields": [
+            "importedDictionaries"
+          ]
+        },
+        {
+          "group": "associationDictionaries",
+          "scope": "local",
+          "fields": [
+            "associationDictionaries"
+          ]
+        },
+        {
+          "group": "appearance",
+          "scope": "synced",
+          "fields": [
+            "theme",
+            "candidateFontSize"
+          ]
+        },
+        {
+          "group": "exclusions",
+          "scope": "synced",
+          "fields": [
+            "profileRules"
+          ]
+        },
+        {
+          "group": "usage",
+          "scope": "local",
+          "fields": [
+            "recordsUsage"
+          ]
+        }
+      ],
+      "localFields": [
+        "liveConversionDelay"
+      ]
+    }
+  }
+}

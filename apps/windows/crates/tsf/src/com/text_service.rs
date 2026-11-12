@@ -451,7 +451,7 @@ impl TextService_Impl {
         let client_id = self.inner.borrow().client_id;
         let current = target
             .as_ref()
-            .and_then(|target| read_field(target, client_id, 0).caret);
+            .and_then(|target| read_field(target, client_id, 0, true).caret);
         // エンジンはアプリの識別子だけを使う．入力欄の前の文字は読まない・送らない
         let context = {
             let mut inner = self.inner.borrow_mut();
@@ -501,7 +501,8 @@ impl TextService_Impl {
                 inner.composition.is_some(),
             )
         };
-        let field = read_field(context, client_id, wanted.unwrap_or(0));
+        // 組み立てている途中は前の位置を使うので，入力位置の画面の上の位置は尋ねない(キーごとにアプリに配置を尋ねない)
+        let field = read_field(context, client_id, wanted.unwrap_or(0), !composing);
         // 組み立てていないときは今の入力位置を使う(前の組み立ての位置は，ほかの欄やほかのアプリのことがある．
         // モードの札や最初の候補の窓がそこに出てしまう)
         let caret = match (composing, field.caret) {
@@ -715,7 +716,10 @@ impl TextService_Impl {
             if let Ok(compartment) =
                 compartments.GetCompartment(&GUID_COMPARTMENT_KEYBOARD_INPUTMODE_CONVERSION)
             {
-                let _ = compartment.SetValue(client_id, &variant_i32(conversion as i32));
+                // 返事のたびに同じ値を書き直さない(書くたびに compartment を見ているほかの部品へ知らせが飛ぶ)
+                if compartment_i32(&compartment) != Some(conversion as i32) {
+                    let _ = compartment.SetValue(client_id, &variant_i32(conversion as i32));
+                }
             }
         }
     }
@@ -811,15 +815,24 @@ impl TextService_Impl {
 
     /// 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く(エンジンが edit で返す)
     fn open_handwriting(&self) {
+        self.send_menu_edit(|session, context| RequestBody::OpenHandwriting { session, context });
+    }
+
+    /// 入力メニューの「絵文字と記号」(R-26)．組み立て中の文字を確定してから，前に見ていた種類でパレットを開く(エンジンが edit で返す．
+    /// 開いているあいだは状態の isComposing が真になり，キーをすべてエンジンに送る)
+    fn open_palette(&self) {
+        self.send_menu_edit(|session, context| RequestBody::OpenPalette { session, context });
+    }
+
+    /// 入力メニューから，文書を書き換えられる要求をエンジンに送る．セッションが無ければ先に作る
+    fn send_menu_edit(&self, make: impl FnOnce(u32, FieldContext) -> RequestBody) {
         if self.inner.borrow().session.is_none() {
             self.ensure_session();
         }
         let Some((context, engine, session)) = self.focused_context() else {
             return;
         };
-        self.send_edit(&context, engine, session, |session, context| {
-            RequestBody::OpenHandwriting { session, context }
-        });
+        self.send_edit(&context, engine, session, make);
     }
 
     /// 再変換．入力先で選んでいる文字(maximum_length 文字まで)を読み，Windows の日本語の解析で読みを求めて，エンジンに変換し直してもらう．
@@ -935,6 +948,12 @@ impl langbar::Actions for MenuActions {
     fn open_handwriting(&self) {
         if let Some(service) = Self::active() {
             service.open_handwriting();
+        }
+    }
+
+    fn open_palette(&self) {
+        if let Some(service) = Self::active() {
+            service.open_palette();
         }
     }
 
@@ -1328,8 +1347,13 @@ struct FieldReading {
 }
 
 /// 入力欄が秘密の欄か(パスワードなど)と，入力位置の前の文字列(最大 length 文字．UTF-16 で数える)を 1 回の読み取りで読む．
-/// 秘密の欄では前の文字列を読まない
-fn read_field(context: &ITfContext, client_id: u32, length: u32) -> FieldReading {
+/// 秘密の欄では前の文字列を読まない．wants_caret なら入力位置の画面の上の位置も読む
+fn read_field(
+    context: &ITfContext,
+    client_id: u32,
+    length: u32,
+    wants_caret: bool,
+) -> FieldReading {
     let reading = Rc::new(RefCell::new(FieldReading::default()));
     let output = reading.clone();
     let target = context.clone();
@@ -1338,7 +1362,11 @@ fn read_field(context: &ITfContext, client_id: u32, length: u32) -> FieldReading
             return Ok(());
         };
         let secure = input_scope_is_secure(ec, &target, &selection)?;
-        let caret = range_rect(ec, &target, &selection).ok();
+        let caret = if wants_caret {
+            range_rect(ec, &target, &selection).ok()
+        } else {
+            None
+        };
         let mut field = output.borrow_mut();
         field.is_secure = secure;
         field.caret = caret;

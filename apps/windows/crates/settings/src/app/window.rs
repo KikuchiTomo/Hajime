@@ -133,11 +133,15 @@ pub struct App {
     pub(super) sync_rows: Vec<crate::sync::FieldRow>,
     /// 同期の状態の値(「sync.」の道筋)
     pub(super) sync_values: crate::store::Fields,
+    /// 画面の中だけの値(「page.」の道筋．ユーザー辞書のページで出している一覧など)
+    pub(super) view_values: crate::store::Fields,
     /// 外観のページで編集しているカスタムテーマの id
     pub(super) editing_theme: Option<String>,
     /// 外観の見本を描くもの(初めて描くときに作る．作れなければ見本を描かない)
     preview: Option<candidate_ui::app::preview::Preview>,
     preview_pixels: Option<(String, PreviewPixels)>,
+    /// 見本の画像の通し番号(作り直すたびに増やす)
+    preview_generation: u64,
     /// 記号の決まり(表の行と同じ並び．外す・切り替えるときに引く)
     pub(super) sequences: Vec<SymbolItem>,
     pub(super) readings: Vec<SymbolItem>,
@@ -171,6 +175,8 @@ pub struct App {
     measure: Option<Measurement>,
     /// 「更新を確認」の進み具合(R-19)
     pub(super) update: super::update::Updater,
+    /// 見本のエンジンで開いた(--offline)
+    pub(super) offline: bool,
 }
 
 thread_local! {
@@ -234,9 +240,11 @@ pub fn open(
         dictionary: Vec::new(),
         sync_rows: Vec::new(),
         sync_values: crate::store::Fields::new(),
+        view_values: crate::store::Fields::new(),
         editing_theme: None,
         preview: None,
         preview_pixels: None,
+        preview_generation: 0,
         sequences: Vec::new(),
         readings: Vec::new(),
         field_font,
@@ -262,6 +270,7 @@ pub fn open(
         breakdown: (0.0, 0.0, 0.0),
         measure: options.measure.map(Measurement::new),
         update: super::update::Updater::default(),
+        offline: options.offline,
     };
     APP.with(|cell| *cell.borrow_mut() = Some(app));
     uia::install(uia::Hooks {
@@ -315,6 +324,8 @@ pub struct Options {
     pub measure: Option<std::path::PathBuf>,
     /// 初めに開くページ(見本の撮影)
     pub page: Option<Page>,
+    /// 見本のエンジンで開いた(--offline)．設定のファイルを開かず，ウィザードも見本の値で開く
+    pub offline: bool,
 }
 
 /// 状態を借りて f を呼ぶ．借りられない(手続きの中から呼ばれた)ときは None
@@ -531,6 +542,7 @@ impl App {
                 .as_deref()
                 .and_then(|id| entries.iter().find(|entry| entry.id == id));
             let mut extra = self.sync_values.clone();
+            extra.extend(self.view_values.clone());
             extra.extend(crate::themes::values(editing, &self.extras.theme_report));
             self.extras.extra = extra;
             let values = page::WithExtras {
@@ -712,12 +724,16 @@ impl App {
         }
     }
 
-    /// 外観の見本の画像を作り直す(見本の中身か大きさが変わったときだけ)
+    /// 見本の画像(外観の見本・パレットの見本・情報のページのアイコン)を作り直す(中身か大きさが変わったときだけ)
     fn update_preview(&mut self) {
-        let Some(rect) = self.view.preview_rect() else {
+        let Some((kind, rect)) = self.view.preview_rect() else {
             self.preview_pixels = None;
             return;
         };
+        if kind == page::PreviewKind::Icon {
+            self.update_icon(rect);
+            return;
+        }
         let Some(model) = &self.model else { return };
         let entries = crate::themes::entries(model.value(crate::themes::THEMES));
         let shown = self
@@ -742,10 +758,43 @@ impl App {
             .map_or(tokens::size::candidate::FONT_SIZE, |size| size as f32);
         let width = u32::try_from(self.theme.px(rect.width)).unwrap_or(0);
         let height = u32::try_from(self.theme.px(rect.height)).unwrap_or(0);
+        // パレットの見本は設定のとおりの列数・行数・マスの大きさで描く(macOS の PalettePreview)
+        let number = |name: &str| {
+            model
+                .value(name)
+                .and_then(serde_json::Value::as_f64)
+                .unwrap_or(0.0)
+        };
+        let on = |name: &str| {
+            model
+                .value(name)
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false)
+        };
+        let palette = (kind == page::PreviewKind::Palette).then(|| {
+            candidate_ui::palette::sample::settings(
+                number("paletteColumns") as u32,
+                number("paletteRows") as u32,
+                if on("paletteRecordsHistory") {
+                    number("paletteFrequentRows") as u32
+                } else {
+                    0
+                },
+                on("paletteShowsPreview"),
+                number("paletteCellSize"),
+            )
+        });
         // カスタムテーマはすべての項目(元のテーマ・色・書体・角の丸み)で見分ける．一部だけで見分けると，
         // ほかの項目を変えても見本を作り直さず，変えたことがすぐ映らない
         let key = format!(
-            "{theme_name}|{}|{font_size}|{}|{}|{width}x{height}",
+            "{kind:?}|{:?}|{theme_name}|{}|{font_size}|{}|{}|{width}x{height}",
+            palette.as_ref().map(|panel| (
+                panel.columns,
+                panel.visible_rows,
+                panel.cell_size,
+                panel.shows_preview,
+                panel.rows.len()
+            )),
             shown
                 .as_ref()
                 .and_then(|theme| serde_json::to_string(theme).ok())
@@ -773,10 +822,9 @@ impl App {
         let resolved =
             candidate_ui::theme::ResolvedTheme::resolve(&theme_name, shown.as_ref(), &look);
         let scale = self.theme.dpi as f32 / ffi::BASE_DPI as f32;
-        let generation = self
-            .preview_pixels
-            .as_ref()
-            .map_or(1, |(_, pixels)| pixels.generation + 1);
+        // 見本を捨てたあと(refresh)も前と同じ番号にしない．同じ番号だと描き先が前の画像を使い回す
+        self.preview_generation += 1;
+        let generation = self.preview_generation;
         // 見本は少し内側に描く(カードの縁と重ねない)
         let request = d2d::PreviewRequest {
             theme: &resolved,
@@ -784,10 +832,42 @@ impl App {
             dark: self.theme.dark,
             scale,
             background: self.theme.palette.card,
-            shown: candidate_ui::app::preview::Shown::Sample,
+            shown: match &palette {
+                Some(panel) => candidate_ui::app::preview::Shown::Palette(panel),
+                None => candidate_ui::app::preview::Shown::Sample,
+            },
             placement: candidate_ui::app::preview::Placement::Center,
         };
         let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {
+            return;
+        };
+        self.preview_pixels = Some((
+            key,
+            PreviewPixels {
+                generation,
+                width,
+                height,
+                pixels,
+            },
+        ));
+    }
+
+    /// 情報のページのアイコン(実行ファイルのリソースの 1 番)の画像を作る．カードの地の上に描く
+    fn update_icon(&mut self, rect: Rect) {
+        let width = u32::try_from(self.theme.px(rect.width)).unwrap_or(0);
+        let height = u32::try_from(self.theme.px(rect.height)).unwrap_or(0);
+        let key = format!("icon|{}|{width}x{height}", self.theme.dark);
+        if self
+            .preview_pixels
+            .as_ref()
+            .is_some_and(|(current, _)| *current == key)
+        {
+            return;
+        }
+        // 見本を捨てたあと(refresh)も前と同じ番号にしない．同じ番号だと描き先が前の画像を使い回す
+        self.preview_generation += 1;
+        let generation = self.preview_generation;
+        let Some(pixels) = d2d::render_icon(width, height, self.theme.palette.card) else {
             return;
         };
         self.preview_pixels = Some((
@@ -871,6 +951,11 @@ impl App {
             Some(Target::InnerScrollbar(element)) => {
                 let page_y = y + self.scroll.offset(now);
                 self.view.drag_inner_scrollbar(element, page_y, now);
+                ffi::invalidate(self.window);
+                return;
+            }
+            Some(Target::Page(element)) if element.part == Part::Slider => {
+                self.view.slider_drag(element, x - nav_width(width));
                 ffi::invalidate(self.window);
                 return;
             }
@@ -987,6 +1072,10 @@ impl App {
                 if self.view.edit(element).is_none() {
                     self.set_focus(Focus::Page(element));
                 }
+                if element.part == Part::Slider {
+                    let (width, _) = self.size();
+                    self.view.slider_drag(element, x - nav_width(width));
+                }
                 if element.part == Part::Table {
                     let page_y = y + self.scroll.offset(now);
                     if let Some(position) = self.view.table_position(element.row, page_y, now) {
@@ -1009,6 +1098,13 @@ impl App {
         self.scroll.release(now);
         self.nav_scroll.release(now);
         self.view.release_inner_scrollbars(now);
+        // スライダーは手を離したときに値を書く(押したところから外れても書く)
+        if matches!(pressed, Some(Target::Page(element)) if element.part == Part::Slider) {
+            let event = self.view.slider_release();
+            self.dispatch(event);
+            ffi::invalidate(self.window);
+            return;
+        }
         let target = self.target_at(x, y);
         match (pressed, target) {
             (Some(Target::Nav(index)), Some(Target::Nav(over))) if index == over => {
@@ -1203,12 +1299,29 @@ impl App {
                 let delta = match key {
                     k if k == VK_UP.0 => -step,
                     k if k == VK_DOWN.0 => step,
-                    k if k == VK_PRIOR.0 => -step * 4.0,
-                    k if k == VK_NEXT.0 => step * 4.0,
+                    k if k == VK_PRIOR.0 => -step * size::TABLE_PAGE_ROWS,
+                    k if k == VK_NEXT.0 => step * size::TABLE_PAGE_ROWS,
                     _ => return false,
                 };
                 self.view.scroll_inside(element, delta, now);
                 ffi::invalidate(self.window);
+                true
+            }
+            // 数の部品は矢印で 1 段ずつ，Home・End で端まで動かす(WinUI の Slider と同じ)
+            Part::Slider | Part::Decrement | Part::Increment => {
+                let delta = match key {
+                    k if k == VK_LEFT.0 || k == VK_DOWN.0 => -1,
+                    k if k == VK_RIGHT.0 || k == VK_UP.0 => 1,
+                    k if k == VK_HOME.0 => isize::MIN / 2,
+                    k if k == VK_END.0 => isize::MAX / 2,
+                    k if (k == VK_SPACE.0 || k == VK_RETURN.0) && element.part != Part::Slider => {
+                        self.press(element);
+                        return true;
+                    }
+                    _ => return false,
+                };
+                let event = self.view.step(element, delta);
+                self.dispatch(event);
                 true
             }
             _ if self.view.is_dropdown(element) => {
@@ -1251,8 +1364,8 @@ impl App {
         let (_, height) = self.size();
         let line = size::SCROLL_LINE;
         match key {
-            k if k == VK_PRIOR.0 => self.scroll.scroll_by(-height * 0.8, now),
-            k if k == VK_NEXT.0 => self.scroll.scroll_by(height * 0.8, now),
+            k if k == VK_PRIOR.0 => self.scroll.scroll_by(-height * size::PAGE_SCROLL, now),
+            k if k == VK_NEXT.0 => self.scroll.scroll_by(height * size::PAGE_SCROLL, now),
             k if k == VK_HOME.0 && control => self.scroll.scroll_to(0.0, now),
             k if k == VK_END.0 && control => self.scroll.scroll_to(f32::MAX, now),
             k if k == VK_UP.0 && self.focus != Focus::Nav => self.scroll.scroll_by(-line, now),
@@ -1363,6 +1476,7 @@ impl App {
                 continue;
             };
             let mut host = None;
+            let mut selected = None;
             let (role, toggled, expanded, value) = match described {
                 // 打つ欄は標準の EDIT を元にする(中身と操作は EDIT が答える)
                 Described::Edit => {
@@ -1384,6 +1498,11 @@ impl App {
                     ),
                     Some(label),
                 ),
+                Described::Slider(value) => (uia::Role::Slider, None, None, Some(value)),
+                Described::Radio(on) => {
+                    selected = Some(on);
+                    (uia::Role::RadioButton, None, None, None)
+                }
                 Described::Table => (uia::Role::List, None, None, None),
                 Described::Text => (uia::Role::Document, None, None, None),
             };
@@ -1399,7 +1518,7 @@ impl App {
                 toggled,
                 expanded,
                 value,
-                selected: None,
+                selected,
                 host,
             });
         }
@@ -2073,7 +2192,7 @@ fn paint_tooltip(
     let left = (x + padding)
         .min(width - bubble_width - size::CARD_GAP)
         .max(0.0);
-    let below = y + size::CONTROL_HEIGHT * 0.75;
+    let below = y + size::TOOLTIP_OFFSET;
     let top = if below + bubble_height > height {
         y - bubble_height - size::CARD_GAP
     } else {
@@ -2288,7 +2407,13 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
                 return Some(LRESULT(0));
             };
             if let Some((title, text)) = super::actions::confirmation(&event) {
-                if !ffi::confirm(window, &title, &text) {
+                // 窓の題は設定の画面の名前にし，尋ねる文と説明を本文に並べる(Windows の確かめる窓の書き方)
+                let body = if title == settings::WINDOW_TITLE {
+                    text
+                } else {
+                    format!("{title}\n\n{text}")
+                };
+                if !ffi::confirm(window, settings::WINDOW_TITLE, &body) {
                     return Some(LRESULT(0));
                 }
             }

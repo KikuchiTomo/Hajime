@@ -27,10 +27,11 @@ use windows::Win32::UI::Accessibility::{
     UIA_DocumentControlTypeId, UIA_EditControlTypeId, UIA_ExpandCollapsePatternId,
     UIA_HasKeyboardFocusPropertyId, UIA_InvokePatternId, UIA_IsEnabledPropertyId,
     UIA_IsKeyboardFocusablePropertyId, UIA_ListControlTypeId, UIA_ListItemControlTypeId,
-    UIA_NamePropertyId, UIA_SelectionItemPatternId, UIA_TogglePatternId, UIA_ValuePatternId,
-    UiaAppendRuntimeId, UiaClientsAreListening, UiaHostProviderFromHwnd, UiaRaiseAutomationEvent,
-    UiaRect, UiaReturnRawElementProvider, UiaRootObjectId, UIA_E_ELEMENTNOTAVAILABLE,
-    UIA_PATTERN_ID, UIA_PROPERTY_ID,
+    UIA_NamePropertyId, UIA_RadioButtonControlTypeId, UIA_SelectionItemPatternId,
+    UIA_SliderControlTypeId, UIA_TogglePatternId, UIA_ValuePatternId, UiaAppendRuntimeId,
+    UiaClientsAreListening, UiaHostProviderFromHwnd, UiaRaiseAutomationEvent, UiaRect,
+    UiaReturnRawElementProvider, UiaRootObjectId, UIA_E_ELEMENTNOTAVAILABLE, UIA_PATTERN_ID,
+    UIA_PROPERTY_ID,
 };
 use windows_core::{
     implement, ComObject, Error, IUnknown, IUnknownImpl, Result, BOOL, BSTR, HRESULT, PCWSTR,
@@ -47,6 +48,10 @@ pub enum Role {
     Document,
     /// 打つ欄．中身と操作は標準の EDIT が受け持つ(Node::host)
     Edit,
+    /// スライダー(値は Node::value の文字．矢印のキーで変える)
+    Slider,
+    /// 選ぶ印(選んでいるかは Node::selected)
+    RadioButton,
 }
 
 /// 要素(窓が今の状態から作る)
@@ -329,9 +334,10 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
             Role::ComboBox => {
                 patternid == UIA_ExpandCollapsePatternId || patternid == UIA_ValuePatternId
             }
-            Role::ListItem => {
+            Role::ListItem | Role::RadioButton => {
                 patternid == UIA_SelectionItemPatternId || patternid == UIA_InvokePatternId
             }
+            Role::Slider => patternid == UIA_ValuePatternId,
             // 打つ欄の値の読み書きは標準の EDIT(host)が答える
             Role::List | Role::Document | Role::Edit => false,
         };
@@ -352,6 +358,8 @@ impl IRawElementProviderSimple_Impl for NodeProvider_Impl {
             Role::List => UIA_ListControlTypeId,
             Role::Document => UIA_DocumentControlTypeId,
             Role::Edit => UIA_EditControlTypeId,
+            Role::Slider => UIA_SliderControlTypeId,
+            Role::RadioButton => UIA_RadioButtonControlTypeId,
         };
         Ok(match propertyid {
             UIA_NamePropertyId => variant_text(&node.name),

@@ -286,6 +286,11 @@ public final class EngineService {
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
             if let caret = context.caret { lastAnchor = caret }
             return edit(current.input.openHandwriting(), handled: true, session: session, anchor: context.caret ?? lastAnchor)
+        case .openPalette(let session, let context):
+            // 入力メニューの「絵文字と記号」(R-26)．macOS の入力メニューと同じく，組み立て中の文字を確定し，前に見ていた種類で開く
+            guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
+            if let caret = context.caret { lastAnchor = caret }
+            return edit(current.input.openPalette(), handled: true, session: session, anchor: context.caret ?? lastAnchor)
         case .caret(let session, let rect, let composition):
             guard owned(session, by: id) != nil else { return .error(code: .unknownSession) }
             lastAnchor = rect
@@ -467,7 +472,7 @@ public final class EngineService {
         let current = settings.current
         return WireSettingsSnapshot(theme: current.theme.rawValue, inputStyle: current.inputStyle.rawValue, liveConversion: current.liveConversion,
                                     showsModeIndicator: current.showsModeIndicator, showsKeyHints: current.showsKeyHints,
-                                    candidateFontSize: current.candidateFontSize, handwriting: current.handwriting)
+                                    candidateFontSize: current.candidateFontSize, handwriting: current.handwriting, palette: current.palette)
     }
 
     /// セッションの今のモードを，入力先のアプリのモードとして覚える．キーで切り替えたモードも，ほかのアプリに移る前に覚えておく

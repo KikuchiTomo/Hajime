@@ -188,6 +188,32 @@ pub fn display(notation: &str) -> String {
         .join(" ")
 }
 
+/// command に割り当てたキー(入力していないときに効く行．状態が「どこでも」か「入力していないとき」)を「、」で並べる．
+/// 無ければ「なし」(macOS の PalettePage の keys(for:))
+pub fn assigned(keymap: Option<&serde_json::Value>, command: &str) -> String {
+    let mut keys: Vec<String> = Vec::new();
+    for row in keymap
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let text = |name: &str| row.get(name).and_then(serde_json::Value::as_str);
+        if text("command") != Some(command) || !matches!(text("state"), Some("anywhere" | "idle")) {
+            continue;
+        }
+        if let Some(key) = text("key").map(display) {
+            if !keys.contains(&key) {
+                keys.push(key);
+            }
+        }
+    }
+    if keys.is_empty() {
+        crate::strings::palette::NO_KEY.to_string()
+    } else {
+        keys.join("、")
+    }
+}
+
 fn label(choices: &[(&str, &'static str)], value: &str) -> String {
     choices
         .iter()
@@ -251,6 +277,20 @@ pub fn report_lines(report: &KeymapReport, entries: &[(String, String, String)])
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn コマンドに割り当てたキーを並べる() {
+        let keymap = serde_json::json!([
+            {"state": "anywhere", "key": "Ctrl Option e", "command": "emojiPalette"},
+            {"state": "converting", "key": "Ctrl e", "command": "emojiPalette"},
+            {"state": "idle", "key": "F12", "command": "emojiPalette"},
+        ]);
+        assert_eq!(
+            super::assigned(Some(&keymap), "emojiPalette"),
+            "Ctrl Alt E、F12"
+        );
+        assert_eq!(super::assigned(Some(&keymap), "symbolPalette"), "なし");
+    }
+
     #[test]
     fn 押したキーを書き方にする() {
         assert_eq!(
