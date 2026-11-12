@@ -370,6 +370,10 @@ mod tests {
         fn wrapped_height(&self, _: &str, _: TextStyle, _: f32) -> f32 {
             size::BODY_LINE_HEIGHT
         }
+
+        fn baseline(&self, _: &str, _: TextStyle) -> f32 {
+            size::BODY_LINE_HEIGHT * 0.8
+        }
     }
 
     #[test]

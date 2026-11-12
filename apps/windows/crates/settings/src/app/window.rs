@@ -65,10 +65,50 @@ const TEMPLATE_TIMER: usize = 3;
 const TEMPLATE_INTERVAL: u32 = 1000;
 /// ポインターを載せてから説明の吹き出しを出すまで(ミリ秒．OS のツールチップと同じくらい)
 const TOOLTIP_DELAY: u32 = 500;
+/// 見本の書き出しで，動き(トグルのつまみ・ページの入り・送り)が終わったとみなす時刻のずれ(ミリ秒)．
+/// どの動きの長さ(motion.settings-windows)よりも長くする
+const SNAPSHOT_SETTLE: f64 = 10_000.0;
 /// 読み込みのスレッドが終わった知らせ
 const WM_LOADED: u32 = WM_APP + 20;
 /// 測る手順を 1 つ進める知らせ(--measure)
 const WM_MEASURE: u32 = WM_APP + 21;
+/// 見本の書き出しで写す状態(書き方のチップ．macOS の settings-templates-* と同じ 4 つと，変換マクロ)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Shot {
+    /// ふつう(チップは閉じている)
+    Plain,
+    /// チップを開いた
+    Open,
+    /// 単語の欄で「{da」を打って絞り込んだ
+    Typing,
+    /// 「入力時の値にする」がオフ(ボタンもチップも出さない)
+    DynamicOff,
+}
+
+impl Shot {
+    /// ふつうの 1 枚のほかに写すページと状態
+    const TEMPLATES: [(Page, Shot); 4] = [
+        (Page::Dictionary, Shot::Open),
+        (Page::Dictionary, Shot::Typing),
+        (Page::Dictionary, Shot::DynamicOff),
+        (Page::Commands, Shot::Open),
+    ];
+
+    fn suffix(self) -> &'static str {
+        match self {
+            Shot::Plain => "",
+            Shot::Open => "-templates-open",
+            Shot::Typing => "-templates-typing",
+            Shot::DynamicOff => "-templates-off",
+        }
+    }
+}
+
+/// 見本の書き出しの 1 枚(ページ・状態・暗いか)
+type SnapshotJob = (Page, Shot, bool);
+
+/// 見本の書き出しの次の 1 枚(--render-snapshots)
+const WM_SNAPSHOT: u32 = WM_APP + 26;
 /// 手の空いたときに打つ欄を前もって作る知らせ
 const WM_WARM: u32 = WM_APP + 24;
 /// 前もって作っておく打つ欄の数(1 ページの欄の数の上限．記号のページの 6 つに少し足す)
@@ -203,12 +243,16 @@ pub struct App {
     /// ページを開く時間の内わけ(部品を作る・エンジンから読む・値を映して置く．測るとき)
     breakdown: (f64, f64, f64),
     measure: Option<Measurement>,
+    /// 見本の書き出し(--render-snapshots)．書き出し先と，残りのページと状態と見た目(暗いか)
+    snapshots: Option<(std::path::PathBuf, Vec<SnapshotJob>)>,
     /// 「更新を確認」の進み具合(R-19)
     pub(super) update: super::update::Updater,
     /// 辞書を取り込んだ結果の受け箱(取り込みは別のスレッドで待ち，終えたら WM_DICTIONARY_IMPORTED を送る)
     pub(super) dictionary_import: super::actions::ImportInbox,
     /// 見本のエンジンで開いた(--offline)
     pub(super) offline: bool,
+    /// 書き方のチップを開いている一覧(ページごとに覚える．見本のエンジンで開いたときは覚えない)
+    pub(super) templates_open: std::collections::HashSet<pages::TemplateTarget>,
     /// 単語の登録で開いた(--register-word)．つながったら，エンジンが持っている語と読みを登録の欄に入れる
     register_word: bool,
 }
@@ -310,9 +354,27 @@ pub fn open(
         measuring: options.measure.is_some(),
         breakdown: (0.0, 0.0, 0.0),
         measure: options.measure.map(Measurement::new),
+        snapshots: options.snapshots.map(|directory| {
+            let jobs = Page::ALL
+                .into_iter()
+                .map(|page| (page, Shot::Plain))
+                .chain(Shot::TEMPLATES)
+                .flat_map(|(page, shot)| [(page, shot, false), (page, shot, true)])
+                .rev()
+                .collect();
+            (directory, jobs)
+        }),
         update: super::update::Updater::default(),
         dictionary_import: super::actions::ImportInbox::default(),
         offline: options.offline,
+        templates_open: if options.offline {
+            std::collections::HashSet::new()
+        } else {
+            [pages::TemplateTarget::Word, pages::TemplateTarget::Macro]
+                .into_iter()
+                .filter(|target| ffi::user_switch(target.storage_name()))
+                .collect()
+        },
         register_word: options.register_word,
     };
     APP.with(|cell| *cell.borrow_mut() = Some(app));
@@ -369,6 +431,8 @@ pub struct Options {
     pub theme: Option<ForcedTheme>,
     /// 測った結果を書くファイル
     pub measure: Option<std::path::PathBuf>,
+    /// 見本を書き出すディレクトリ(--render-snapshots)
+    pub snapshots: Option<std::path::PathBuf>,
     /// 初めに開くページ(見本の撮影)
     pub page: Option<Page>,
     /// 見本のエンジンで開いた(--offline)．設定のファイルを開かず，ウィザードも見本の値で開く
@@ -505,6 +569,9 @@ impl App {
                     measurement.content = Some(self.started.elapsed().as_secs_f64() * 1000.0);
                     ffi::post(self.window, WM_MEASURE, 0, 0);
                 }
+                if self.snapshots.is_some() {
+                    ffi::post(self.window, WM_SNAPSHOT, 0, 0);
+                }
             }
             None => self.disconnect(),
         }
@@ -605,6 +672,9 @@ impl App {
         );
         std::mem::replace(&mut self.view, view).release(&mut pool);
         self.pool = pool;
+        let open = self.templates_open.clone();
+        self.view
+            .set_templates_open(|target| open.contains(&target));
         // 更新を確かめている途中に情報のページを開き直しても，進み具合を出し続ける
         self.view.set_version_status(self.update.status());
         let built = start.elapsed().as_secs_f64() * 1000.0;
@@ -725,16 +795,25 @@ impl App {
                     super::actions::keymap_report(model);
                 self.extras.keymap_preset = super::actions::matching_preset(model);
             }
-            // ユーザー辞書の書き方の表は今の値を出す．開いているあいだは 1 秒ごとに読み直す(macOS の TimelineView)
-            if self.view.page == Page::Dictionary {
-                self.extras.template_values =
-                    super::actions::template_values(model, &self.extras.template_values);
+            // 書き方のチップは今の値を添える．開いているあいだは 1 秒ごとに読み直す(macOS の TimelineView)
+            if let Some(items) = self.view.template_items() {
+                let sample = self
+                    .view
+                    .macro_preview_inputs()
+                    .map(|(text, reading, _)| (text, reading));
+                let (text, reading) = sample.unwrap_or_default();
+                self.extras.template_values = super::actions::template_values(
+                    model,
+                    &items,
+                    (&text, &reading),
+                    &self.extras.template_values,
+                );
                 ffi::set_timer(self.window, TEMPLATE_TIMER, TEMPLATE_INTERVAL);
             }
             // 変換マクロの一覧やオン・オフが変わったら，試した結果も読み直す
-            if let Some((text, reading, draft)) = self.view.macro_preview_inputs() {
-                self.extras.macro_preview =
-                    super::actions::macro_preview(model, &text, &reading, &draft);
+            if let Some((text, reading, _)) = self.view.macro_preview_inputs() {
+                self.extras.macro_preview = super::actions::macro_preview(model, &text, &reading);
+                self.extras.macro_results = super::actions::macro_results(model, &text, &reading);
             }
             if self.view.page == Page::Appearance && self.extras.fonts.is_empty() {
                 self.extras.fonts = candidate_ui::app::fonts::installed();
@@ -907,6 +986,7 @@ impl App {
             theme_sheet: self
                 .theme_sheet()
                 .map(|layout| (layout, self.theme_sheet_state())),
+            draw_fields: false,
         };
         let tooltip = self.tooltip.as_ref().filter(|(.., since)| {
             now - since >= f64::from(TOOLTIP_DELAY) && self.pressed.is_none()
@@ -1429,6 +1509,16 @@ impl App {
             _ => None,
         };
         let changed = self.view.set_table_hover(table_hover);
+        let template_hover = match target {
+            Some(Target::Page(element)) if element.part == Part::TemplateChips => {
+                let page_y = y + self.scroll.offset(now);
+                self.view
+                    .template_chip_at(element.row, x - nav_width(width), page_y)
+                    .map(|item| (element.row, item))
+            }
+            _ => None,
+        };
+        let changed = self.view.set_template_hover(template_hover) || changed;
         let _ = width;
         if changed || self.animating(now) || target.is_some() {
             ffi::invalidate(self.window);
@@ -1445,6 +1535,7 @@ impl App {
         self.view.set_hover(None, now);
         self.view.set_scrollbar_hover(None, now);
         self.view.set_table_hover(None);
+        self.view.set_template_hover(None);
         self.scroll.set_hover(false, now);
         self.nav_scroll.set_hover(false, now);
         ffi::invalidate(self.window);
@@ -1537,6 +1628,17 @@ impl App {
                     let (width, _) = self.size();
                     self.view.slider_drag(element, x - nav_width(width));
                 }
+                if element.part == Part::TemplateChips {
+                    let page_y = y + self.scroll.offset(now);
+                    let (width, _) = self.size();
+                    if let Some(item) =
+                        self.view
+                            .template_chip_at(element.row, x - nav_width(width), page_y)
+                    {
+                        self.insert_template(element.row, Some(item));
+                    }
+                    return;
+                }
                 if element.part == Part::Table {
                     let page_y = self.page_y(y, now);
                     let (width, _) = self.size();
@@ -1546,6 +1648,8 @@ impl App {
                         ffi::invalidate(self.window);
                         return;
                     }
+                    let (width, _) = self.size();
+                    let page_x = x - nav_width(width);
                     if let Some(position) = self.view.table_position(element.row, page_y, now) {
                         // 「有効」の列の印を押したら，その行の有効・無効を切り替える
                         if let Some(event) =
@@ -1615,6 +1719,10 @@ impl App {
             return;
         }
         if element.part == Part::Table || element.part == Part::Text {
+            return;
+        }
+        if element.part == Part::TemplateChips {
+            self.insert_template(element.row, None);
             return;
         }
         if let Some(window) = self.view.edit(element) {
@@ -1791,7 +1899,40 @@ impl App {
     /// フォーカスのある部品でのキー
     fn element_key(&mut self, element: Element, key: u16, shift: bool) -> bool {
         let now = self.now();
+        // 書き方のチップの欄の中で Esc を押したら閉じて，書き方を入れる欄に戻る
+        if key == VK_ESCAPE.0
+            && matches!(
+                element.part,
+                Part::TemplateChips | Part::TemplateSegment(_) | Part::TemplateButton
+            )
+        {
+            let field = self.view.template_field(element.row);
+            let event = self.view.close_templates(element.row);
+            if event.is_some() {
+                self.dispatch(event);
+                if let Some(field) = field {
+                    ffi::focus(field);
+                }
+                return true;
+            }
+        }
         match element.part {
+            // チップは矢印で隣に移り，Space・Enter で欄に入れる
+            Part::TemplateChips => {
+                let delta = match key {
+                    k if k == VK_LEFT.0 || k == VK_UP.0 => -1,
+                    k if k == VK_RIGHT.0 || k == VK_DOWN.0 => 1,
+                    k if k == VK_SPACE.0 || k == VK_RETURN.0 => {
+                        self.press(element);
+                        return true;
+                    }
+                    _ => return false,
+                };
+                if self.view.move_template_cursor(element.row, delta) {
+                    ffi::invalidate(self.window);
+                }
+                true
+            }
             Part::Table => {
                 let page = self.view.table_page(element.row);
                 let movement = match key {
@@ -2524,9 +2665,43 @@ impl App {
         let Some(element) = self.view.element_of(window) else {
             return;
         };
+        // 書き方を入れる欄で「{」を打ったらチップを開き，打ちかけの書き方で絞り込む
+        let typed = self.view.template_typed(element);
+        self.dispatch(typed);
         let event = self.view.edited(element);
         self.dispatch(event);
         // 打った行の確かめの文と追加のボタンを描き直す
+        ffi::invalidate(self.window);
+    }
+
+    /// 欄で Esc を押した．書き方のチップを開いていれば閉じる(欄のフォーカスはそのまま)
+    fn field_escape(&mut self, window: Window) {
+        if self.editor.is_some() {
+            self.dispatch(Some(Event::ThemeEditor(EditorAction::Cancel)));
+            return;
+        }
+        if self.sheet.is_some() {
+            self.close_sheet();
+            return;
+        }
+        let Some(element) = self.view.element_of(window) else {
+            return;
+        };
+        let event = self.view.close_templates(element.row);
+        self.dispatch(event);
+    }
+
+    /// 書き方のチップ(item 番目．None ならキーボードで選んでいるチップ)を欄に入れる．
+    /// ポインターで押したときは欄にフォーカスを戻し，続けて打てるようにする．キーボードで押したときはチップに残る
+    fn insert_template(&mut self, row: usize, item: Option<usize>) {
+        let Some(window) = self.view.insert_template(row, item) else {
+            return;
+        };
+        // 窓の処理の中で書き換えたので，欄の知らせ(EN_CHANGE)の代わりにここで映す
+        self.field_changed(window);
+        if item.is_some() {
+            ffi::focus(window);
+        }
         ffi::invalidate(self.window);
     }
 
@@ -2541,6 +2716,108 @@ impl App {
         let now = self.now();
         let event = self.view.submit(element, now);
         self.dispatch(event);
+    }
+
+    // MARK: - 見本の書き出し(--render-snapshots)
+
+    /// 残りの 1 枚を書き出して，次を頼む．終わったら窓を閉じる(プロセスを終える)．
+    /// ページは中身の高さまで伸ばして 1 枚にし(送らずに全体を写す)，打つ欄の文字は自分で描く(EDIT は写らない)
+    fn snapshot_step(&mut self) {
+        let Some((directory, mut jobs)) = self.snapshots.take() else {
+            return;
+        };
+        let Some((page, shot, dark)) = jobs.pop() else {
+            ffi::destroy(self.window);
+            return;
+        };
+        // 書き方のチップ: 開いているか(閉じた状態はふつうの 1 枚)と，「入力時の値にする」のオン・オフ
+        self.templates_open = if matches!(shot, Shot::Plain | Shot::DynamicOff) {
+            std::collections::HashSet::new()
+        } else {
+            [pages::TemplateTarget::Word, pages::TemplateTarget::Macro].into()
+        };
+        if page == Page::Dictionary {
+            if let Some(model) = &mut self.model {
+                let _ = model.set(
+                    "dynamicDictionary",
+                    serde_json::Value::Bool(shot != Shot::DynamicOff),
+                );
+            }
+        }
+        self.forced_theme = Some(if dark {
+            ForcedTheme::Dark
+        } else {
+            ForcedTheme::Light
+        });
+        let dpi = self.theme.dpi;
+        self.reload_theme(dpi);
+        self.open_page(page);
+        // 打ちかけの書き方で絞り込んだ状態: 単語の欄に「締切 {da」を打ったことにする(窓の処理の中なので知らせを自分で映す)
+        if shot == Shot::Typing {
+            if let Some(field) = self.view.first_template_field() {
+                ffi::edit::replace(field, 0..0, "締切 {da");
+                self.field_changed(field);
+            }
+        }
+        self.scroll.jump_to(0.0);
+        let (width, height) = self.size();
+        let content = self.view.arrange(width - nav_width(width), &self.graphics);
+        let total = content.max(height);
+        let now = self.now() + SNAPSHOT_SETTLE;
+        let name = format!(
+            "settings-{}{}-{}.png",
+            format!("{page:?}").to_lowercase(),
+            shot.suffix(),
+            if dark { "dark" } else { "light" }
+        );
+        let _ = std::fs::create_dir_all(&directory);
+        let state = PaintState {
+            theme: &self.theme,
+            now,
+            width,
+            height: total,
+            focus: Focus::Nav,
+            focus_visible: false,
+            focused_edit: None,
+            pressed: None,
+            open: None,
+            nav_hover: &self.nav_hover,
+            nav_indicator: self.nav_indicator.value(now),
+            enter: 1.0,
+            availability: self.availability(),
+            search: self.search_rect(),
+            nav_top: self.nav_top(),
+            // ページは中身の高さまで伸ばして 1 枚にする(送らずに全体を写す)
+            frame: PageFrame {
+                top: page_header(),
+                bottom: total,
+                shift: 0.0,
+            },
+            theme_sheet: None,
+            draw_fields: true,
+        };
+        let written = ffi::d2d::write_png(
+            &self.graphics,
+            (width, total),
+            tokens::size::snapshot::SCALE,
+            Color::from(self.theme.palette.background),
+            &directory.join(&name),
+            |canvas| {
+                paint_window(
+                    canvas,
+                    &state,
+                    &self.nav,
+                    &self.nav_scroll,
+                    &self.view,
+                    &self.scroll,
+                )
+            },
+        );
+        if let Err(error) = written {
+            eprintln!("{name} を書き出せませんでした: {error}");
+        }
+        self.snapshots = Some((directory, jobs));
+        ffi::post(self.window, WM_SNAPSHOT, 0, 0);
     }
 
     // MARK: - 測る(--measure)
@@ -2989,6 +3266,8 @@ struct PaintState<'a> {
     frame: PageFrame,
     /// 開いているカスタムテーマの編集の画面
     theme_sheet: Option<(super::editor::SheetLayout, super::editor::SheetState)>,
+    /// 打つ欄の文字を自分で描く(見本の書き出し．EDIT は写らない)
+    draw_fields: bool,
 }
 
 /// 上に留めるページの題の帯の高さ(DIP)．ページはこの下で送る
@@ -3059,7 +3338,7 @@ fn paint_window(
                 },
                 open: state.open,
                 focused_edit: state.focused_edit,
-                draw_fields: false,
+                draw_fields: state.draw_fields,
                 visible: (
                     frame.top - frame.shift + scroll_offset - offset,
                     frame.bottom - frame.shift + scroll_offset - offset,
@@ -3447,6 +3726,10 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
             with_app(App::measure_step);
             Some(LRESULT(0))
         }
+        WM_SNAPSHOT => {
+            with_app(App::snapshot_step);
+            Some(LRESULT(0))
+        }
         super::update::WM_UPDATE => {
             super::update::receive(window);
             Some(LRESULT(0))
@@ -3466,7 +3749,7 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
                     ffi::kill_timer(app.window, TEMPLATE_TIMER);
                     return;
                 };
-                if app.view.page != Page::Dictionary {
+                if app.view.template_items().is_none() {
                     // ほかのページに移ったら読み直さない(開いたときの例も捨てる)
                     ffi::kill_timer(app.window, TEMPLATE_TIMER);
                     app.extras.template_values.clear();
@@ -3579,15 +3862,10 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
             });
             Some(LRESULT(0))
         }
-        // 欄の中で Esc を押したら，シートかカスタムテーマの編集の画面を閉じる(macOS の cancelAction)
+        // 欄の中で Esc を押したら，カスタムテーマの編集の画面かシートか，書き方のチップを閉じる(macOS の cancelAction)
         edit::WM_FIELD_ESCAPE => {
-            with_app(|app| {
-                if app.editor.is_some() {
-                    app.dispatch(Some(Event::ThemeEditor(EditorAction::Cancel)));
-                } else {
-                    app.close_sheet();
-                }
-            });
+            let field = HWND(lparam.0 as *mut _);
+            with_app(|app| app.field_escape(field));
             Some(LRESULT(0))
         }
         edit::WM_FIELD_ENTER => {

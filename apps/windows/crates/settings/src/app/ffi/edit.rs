@@ -9,6 +9,7 @@ use windows::Win32::Graphics::Gdi::{
     SetTextColor, DT_LEFT, DT_NOPREFIX, DT_SINGLELINE, DT_VCENTER, HBRUSH, HDC, HGDIOBJ,
     PAINTSTRUCT, TRANSPARENT,
 };
+use windows::Win32::UI::Controls::{EM_GETSEL, EM_REPLACESEL, EM_SETSEL};
 use windows::Win32::UI::Input::Ime::{ImmAssociateContextEx, HIMC, IACE_CHILDREN, IACE_DEFAULT};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     GetKeyState, MapVirtualKeyW, MAPVK_VK_TO_CHAR, VK_CONTROL, VK_ESCAPE, VK_MENU, VK_RETURN,
@@ -32,7 +33,7 @@ pub const WM_FIELD_ENTER: u32 = WM_APP + 2;
 pub const WM_FIELD_FOCUS: u32 = WM_APP + 3;
 /// 親に届く知らせ: キーを記録した(lparam は欄)
 pub const WM_FIELD_RECORDED: u32 = WM_APP + 4;
-/// 親に届く知らせ: Esc を押した(lparam は欄．シート・カスタムテーマの編集の画面を閉じる)
+/// 親に届く知らせ: Esc を押した(lparam は欄．シート・カスタムテーマの編集の画面と，書き方のチップを閉じる)
 pub const WM_FIELD_ESCAPE: u32 = WM_APP + 5;
 
 const SUBCLASS: usize = 0x5391;
@@ -86,6 +87,42 @@ pub fn create(parent: HWND, id: u16, placeholder: &str, font: &Font) -> Option<H
         );
     }
     Some(window)
+}
+
+/// 欄で選んでいる範囲(UTF-16 の位置．入力位置なら空の範囲)．欄にフォーカスが無くても前の範囲を返す
+pub fn selection(window: HWND) -> std::ops::Range<usize> {
+    let (mut start, mut end) = (0u32, 0u32);
+    // SAFETY: このスレッドの欄．start と end はこの関数の中の値で，EDIT が書き込む
+    unsafe {
+        SendMessageW(
+            window,
+            EM_GETSEL,
+            Some(WPARAM((&raw mut start) as usize)),
+            Some(LPARAM((&raw mut end) as isize)),
+        );
+    }
+    start as usize..end.max(start) as usize
+}
+
+/// 欄の range(UTF-16 の位置)を text に置き換え，入力位置をそのあとに置く．欄の取り消し(Ctrl+Z)で戻せる．
+/// 欄は変わったことを知らせる(EN_CHANGE)
+pub fn replace(window: HWND, range: std::ops::Range<usize>, text: &str) {
+    let text = windows_core::HSTRING::from(text);
+    // SAFETY: このスレッドの欄．text は呼び出しのあいだ生きている
+    unsafe {
+        SendMessageW(
+            window,
+            EM_SETSEL,
+            Some(WPARAM(range.start)),
+            Some(LPARAM(range.end as isize)),
+        );
+        SendMessageW(
+            window,
+            EM_REPLACESEL,
+            Some(WPARAM(1)),
+            Some(LPARAM(text.as_ptr() as isize)),
+        );
+    }
 }
 
 /// 案内の文字を変える

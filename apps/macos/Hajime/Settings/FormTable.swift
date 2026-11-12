@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// Form(.grouped)の中に置く表を，表の中でスクロールできるようにする．
+/// Form(.grouped)の中に置く表(と ScrollView)を，表の中でスクロールできるようにする．
 ///
 /// Form は中に置いた表(Table)を行に埋め込むものとして扱い，表の縦のスクロールを止める(スクロールバーを出さず，ホイールでも動かない)．
 /// 高さを決めた表では，はみ出した行が見えなくなる．scrollDisabled(false)・isScrollEnabled・別の NSHostingView に入れる，
@@ -42,14 +42,18 @@ struct FormTableHost<Content: View>: NSViewRepresentable {
         @available(*, unavailable)
         required init?(coder: NSCoder) { nil }
 
-        /// 中の表のスクロールビュー(表の行を並べる NSTableView を持つもの)
+        /// 中の表のスクロールビュー(表の行を並べる NSTableView を持つもの)．表が無ければ最初のスクロールビュー(書き方の早見表の ScrollView)
         private var tableScrollView: NSScrollView? {
             var stack: [NSView] = [hosting]
+            var first: NSScrollView?
             while let view = stack.popLast() {
-                if let scroll = view as? NSScrollView, scroll.documentView is NSTableView { return scroll }
+                if let scroll = view as? NSScrollView {
+                    if scroll.documentView is NSTableView { return scroll }
+                    first = first ?? scroll
+                }
                 stack.append(contentsOf: view.subviews)
             }
-            return nil
+            return first
         }
 
         override func layout() {

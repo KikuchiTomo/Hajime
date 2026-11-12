@@ -28,11 +28,11 @@ use windows::Win32::Graphics::DirectWrite::{
     DWriteCreateFactory, IDWriteFactory2, IDWriteFontCollection, IDWriteFontFallback,
     IDWriteTextFormat, IDWriteTextFormat1, IDWriteTextLayout, DWRITE_FACTORY_TYPE_SHARED,
     DWRITE_FONT_STRETCH_NORMAL, DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT,
-    DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_PARAGRAPH_ALIGNMENT_CENTER,
-    DWRITE_PARAGRAPH_ALIGNMENT_NEAR, DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_TEXT_ALIGNMENT_LEADING,
-    DWRITE_TEXT_ALIGNMENT_TRAILING, DWRITE_TEXT_METRICS, DWRITE_TRIMMING,
-    DWRITE_TRIMMING_GRANULARITY_CHARACTER, DWRITE_UNICODE_RANGE, DWRITE_WORD_WRAPPING_NO_WRAP,
-    DWRITE_WORD_WRAPPING_WRAP,
+    DWRITE_FONT_WEIGHT_NORMAL, DWRITE_FONT_WEIGHT_SEMI_BOLD, DWRITE_LINE_METRICS,
+    DWRITE_PARAGRAPH_ALIGNMENT_CENTER, DWRITE_PARAGRAPH_ALIGNMENT_NEAR,
+    DWRITE_TEXT_ALIGNMENT_CENTER, DWRITE_TEXT_ALIGNMENT_LEADING, DWRITE_TEXT_ALIGNMENT_TRAILING,
+    DWRITE_TEXT_METRICS, DWRITE_TRIMMING, DWRITE_TRIMMING_GRANULARITY_CHARACTER,
+    DWRITE_UNICODE_RANGE, DWRITE_WORD_WRAPPING_NO_WRAP, DWRITE_WORD_WRAPPING_WRAP,
 };
 use windows::Win32::Graphics::Dxgi::Common::DXGI_FORMAT_B8G8R8A8_UNORM;
 use windows_core::{Interface, Result, BOOL, HSTRING, PCWSTR};
@@ -312,6 +312,22 @@ impl Measure for Graphics {
     fn wrapped_height(&self, text: &str, style: TextStyle, width: f32) -> f32 {
         self.metrics(text, style, TextLayout::WRAP, width.max(1.0))
             .map_or(0.0, |metrics| metrics.height)
+    }
+
+    fn baseline(&self, text: &str, style: TextStyle) -> f32 {
+        let Some(layout) = self.layout(text, style, TextLayout::WRAP, f32::MAX, f32::MAX) else {
+            return 0.0;
+        };
+        let mut count = 0u32;
+        // 1 回目で行の数を聞く(足りないと E_NOT_SUFFICIENT_BUFFER を返す)
+        // SAFETY: count は書き込める領域
+        let _ = unsafe { layout.GetLineMetrics(None, &mut count) };
+        let mut lines = vec![DWRITE_LINE_METRICS::default(); count.max(1) as usize];
+        // SAFETY: lines は count 行分の書き込める領域
+        if unsafe { layout.GetLineMetrics(Some(&mut lines), &mut count) }.is_err() {
+            return 0.0;
+        }
+        lines.first().map_or(0.0, |line| line.baseline)
     }
 }
 
@@ -593,6 +609,10 @@ impl Measure for D2dCanvas<'_> {
     fn wrapped_height(&self, text: &str, style: TextStyle, width: f32) -> f32 {
         self.graphics.wrapped_height(text, style, width)
     }
+
+    fn baseline(&self, text: &str, style: TextStyle) -> f32 {
+        self.graphics.baseline(text, style)
+    }
 }
 
 impl Canvas for D2dCanvas<'_> {
@@ -823,6 +843,95 @@ impl Canvas for D2dCanvas<'_> {
     fn set_opacity(&mut self, opacity: f32) {
         self.opacity = opacity.clamp(0.0, 1.0);
     }
+}
+
+/// draw で描いたものを PNG に書き出す(見本の書き出し．--render-snapshots)．size は DIP で，scale 倍のピクセルで描く．
+/// candidate-ui の見本の書き出しと同じく，WIC のビットマップに Direct2D で描いて PNG にする
+pub fn write_png(
+    graphics: &Graphics,
+    size: (f32, f32),
+    scale: f32,
+    clear: Color,
+    path: &std::path::Path,
+    draw: impl FnOnce(&mut dyn Canvas),
+) -> Result<()> {
+    use windows::Win32::Foundation::GENERIC_WRITE;
+    use windows::Win32::Graphics::Direct2D::D2D1_RENDER_TARGET_PROPERTIES;
+    use windows::Win32::Graphics::Imaging::{
+        CLSID_WICImagingFactory, GUID_ContainerFormatPng, GUID_WICPixelFormat32bppPBGRA,
+        IWICImagingFactory, WICBitmapCacheOnLoad, WICBitmapEncoderNoCache,
+    };
+    use windows::Win32::System::Com::StructuredStorage::IPropertyBag2;
+    use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
+    let width = (size.0 * scale).ceil().max(1.0) as u32;
+    let height = (size.1 * scale).ceil().max(1.0) as u32;
+    // SAFETY: WIC の工場とビットマップを作る(COM はこのスレッドで初期化済み)
+    let imaging: IWICImagingFactory =
+        unsafe { CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)? };
+    // SAFETY: 引数は定数と大きさ
+    let bitmap = unsafe {
+        imaging.CreateBitmap(
+            width,
+            height,
+            &GUID_WICPixelFormat32bppPBGRA,
+            WICBitmapCacheOnLoad,
+        )?
+    };
+    let properties = D2D1_RENDER_TARGET_PROPERTIES {
+        pixelFormat: D2D1_PIXEL_FORMAT {
+            format: DXGI_FORMAT_B8G8R8A8_UNORM,
+            alphaMode: D2D1_ALPHA_MODE_PREMULTIPLIED,
+        },
+        dpiX: BASE_DPI * scale,
+        dpiY: BASE_DPI * scale,
+        ..Default::default()
+    };
+    // SAFETY: bitmap は作ったばかりの WIC のビットマップ．properties は呼び出しのあいだ有効
+    let target = unsafe {
+        graphics
+            .d2d
+            .CreateWicBitmapRenderTarget(&bitmap, &properties)?
+    };
+    // SAFETY: 作ったばかりの描き先．BeginDraw と EndDraw を対にする
+    unsafe {
+        target.SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+        target.BeginDraw();
+        target.Clear(Some(&color(clear, 1.0)));
+    }
+    // SAFETY: 同上
+    let brush = unsafe { target.CreateSolidColorBrush(&color(clear, 1.0), None)? };
+    let mut canvas = D2dCanvas {
+        graphics,
+        target: &target,
+        brush,
+        dx: 0.0,
+        dy: 0.0,
+        opacity: 1.0,
+        pixel: 1.0 / scale,
+        previews: Vec::new(),
+    };
+    draw(&mut canvas);
+    // SAFETY: 同上
+    unsafe { target.EndDraw(None, None)? };
+    // SAFETY: WIC の部品を順に作って書く．どれも呼び出しのあいだ有効
+    unsafe {
+        let stream = imaging.CreateStream()?;
+        stream.InitializeFromFilename(&HSTRING::from(path.as_os_str()), GENERIC_WRITE.0)?;
+        let encoder = imaging.CreateEncoder(&GUID_ContainerFormatPng, std::ptr::null())?;
+        encoder.Initialize(&stream, WICBitmapEncoderNoCache)?;
+        let mut frame = None;
+        let mut options: Option<IPropertyBag2> = None;
+        encoder.CreateNewFrame(&mut frame, &mut options)?;
+        let frame = frame.ok_or_else(windows_core::Error::empty)?;
+        frame.Initialize(options.as_ref())?;
+        frame.SetSize(width, height)?;
+        let mut format = GUID_WICPixelFormat32bppPBGRA;
+        frame.SetPixelFormat(&mut format)?;
+        frame.WriteSource(&bitmap, std::ptr::null())?;
+        frame.Commit()?;
+        encoder.Commit()?;
+    }
+    Ok(())
 }
 
 /// 外観の見本の描き方

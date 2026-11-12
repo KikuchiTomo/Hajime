@@ -181,7 +181,11 @@ fn parse_options(arguments: &[String], started: std::time::Instant) -> window::O
             _ => None,
         }),
         measure: value("--measure").map(std::path::PathBuf::from),
-        offline: arguments.iter().any(|argument| argument == OFFLINE),
+        snapshots: value(RENDER_SNAPSHOTS).map(std::path::PathBuf::from),
+        // 見本の書き出しは見本のエンジンで開く(利用者の設定を読まない)
+        offline: arguments
+            .iter()
+            .any(|argument| argument == OFFLINE || argument == RENDER_SNAPSHOTS),
         register_word: arguments.iter().any(|argument| argument == REGISTER_WORD),
         // 「更新を確認」のボタンと進み具合はバージョンの行にあるので，ページを決めていなければ情報のページで開く
         page: page.or(check_for_updates.then_some(crate::pages::Page::About)),
@@ -194,6 +198,9 @@ pub(crate) const SETUP: &str = "--setup";
 const SETUP_IF_NEEDED: &str = "--setup-if-needed";
 /// エンジンにつながずに見本の値で開く(開発用．画面の確かめと見本の撮影)
 pub(crate) const OFFLINE: &str = "--offline";
+/// すべてのページを明るい・暗い見た目で PNG に書き出して終える(--render-snapshots <書き出し先>．CI の Windows のジョブの成果物．
+/// macOS の SnapshotRenderer と見比べる)．見本のエンジンで開く
+const RENDER_SNAPSHOTS: &str = "--render-snapshots";
 /// 情報のページで開き，「更新を確認」を押したときと同じ確認を始める(入力メニューの「更新を確認」．
 /// macOS の入力メニューと情報のページが同じ更新用のアプリを起動するのと同じく，両方を同じ流れにする)
 pub const CHECK_FOR_UPDATES: &str = "--check-for-updates";
@@ -269,7 +276,9 @@ pub fn run() {
     if matches!(mode, Mode::Nothing) {
         return;
     }
-    let offline = arguments.iter().any(|argument| argument == OFFLINE);
+    // 見本の書き出し(--render-snapshots)も見本の値で開く．エンジンを起動せず，つなぎにも行かない
+    let options = options(started);
+    let offline = options.offline;
     // エンジンの起動は窓を出すのを待たせない(見本の値で開くときは起動しない)
     if !offline {
         let _ = std::thread::Builder::new()
@@ -286,7 +295,7 @@ pub fn run() {
         Mode::Setup => wizard::open(catalog, connect, setup_options(started)).is_some(),
         _ => {
             let link = if offline { connect_sample } else { connect };
-            window::open(catalog, link, options(started)).is_some()
+            window::open(catalog, link, options).is_some()
         }
     };
     if !opened {
@@ -315,6 +324,16 @@ mod tests {
         assert_eq!(options.page, Some(Page::About));
         assert!(!options.offline);
         assert!(!options.register_word);
+    }
+
+    #[test]
+    fn 見本の書き出しは見本の値で開く() {
+        let options = parse(&[RENDER_SNAPSHOTS, "target/settings-snapshots"]);
+        assert!(options.offline);
+        assert_eq!(
+            options.snapshots,
+            Some(std::path::PathBuf::from("target/settings-snapshots"))
+        );
     }
 
     #[test]

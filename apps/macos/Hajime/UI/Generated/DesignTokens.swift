@@ -504,7 +504,6 @@ enum DesignTokens {
             static let themeSwatchRadius: CGFloat = 6
             static let themeSwatchFontSize: CGFloat = 11
             static let aboutIcon: CGFloat = 64
-            static let templateNowWidth: CGFloat = 160
             static let keymapListHeight: CGFloat = 400
             static let segmentInset: CGFloat = 2
             static let listArrowWidth: CGFloat = 24
@@ -580,6 +579,9 @@ enum DesignTokens {
         enum CandidateWindow {
             static let resize: Double = 150
             static let update: Double = 120
+        }
+        enum Settings {
+            static let disclosure: Double = 167
         }
         enum SettingsWindows {
             static let pageEnter: Double = 167

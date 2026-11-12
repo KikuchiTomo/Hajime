@@ -246,6 +246,59 @@ enum SnapshotRenderer {
             render(frame, name: "settings-dictionary-words", to: output, appearance: NSAppearance(named: .aqua))
         }
         dictionaryWindow.close()
+        // 単語と変換マクロの書き方のチップ(R-21・R-22)．縦に長い窓でページを開き，欄・欄の下の結果・チップをまとめて写す．
+        // 前に開いた窓の欄が単語の下書きを受け取らないよう，別の設定で開く
+        let templateFixture = SettingsFixture.make(name: "templates")
+        // 変換マクロの一覧の結果の列と形の欄の下の結果を写すため，「試す」の仕組みを持たせた設定にする
+        let macroPreview = ConversionMacroPreview(settings: templateFixture.store, calendar: SystemCalendar(clock: Date.init))
+        // 単語の下書きは開いているすべての窓の欄が受け取るので，窓ごとに別の SettingsModel を作る(設定の入れ物は同じ)
+        let makeTemplateModel = {
+            SettingsModel(store: templateFixture.store, usage: nil, resetLearning: {},
+                          previewMacros: { macroPreview.preview(text: $0, reading: $1, pattern: $2) })
+        }
+        // チップを開いているかはページごとに UserDefaults に覚えるので，写すあいだだけの入れ物を使う(Debug 版の記録を変えない)
+        let storageName = "men.haji.snapshot.templates"
+        let storage = UserDefaults(suiteName: storageName) ?? .standard
+        // 閉じた状態(結果の行だけ)・ボタンで開いた状態・「{da」で絞り込んだ状態・スイッチがオフの状態と，変換マクロ(開いた状態)．
+        // 単語の欄には，読める書き方と知らない名前を入れておく(結果と誤りの印)
+        let dictionary = { (model: SettingsModel) in AnyView(DictionaryPage(model: model)) }
+        let templatePages: [(name: String, dynamic: Bool, open: Bool, word: String, page: (SettingsModel) -> AnyView)] = [
+            ("settings-templates-dictionary", true, false, "{date:M月D日(ddd)} {dat}", dictionary),
+            ("settings-templates-dictionary-open", true, true, "{date:M月D日(ddd)} {dat}", dictionary),
+            ("settings-templates-dictionary-typing", true, true, "締切 {da", dictionary),
+            ("settings-templates-dictionary-off", false, true, "{date:M月D日(ddd)} {dat}", dictionary),
+            ("settings-templates-macros", true, true, "", { AnyView(CommandsPage(model: $0, bookmarks: nil)) }),
+        ]
+        for (name, dynamic, open, word, page) in templatePages {
+            makeTemplateModel().update { $0.dynamicDictionary = dynamic }
+            storage.set(open, forKey: "settings.templates.dictionary.open")
+            storage.set(open, forKey: "settings.templates.macros.open")
+            // ダークの外観では，表の中を写すために窓を作り直す(外観を変えたあとの表の行が描き直されないことがある)
+            for (appearance, suffix) in [(NSAppearance.Name.aqua, ""), (.darkAqua, "-dark")] {
+                NSApp.appearance = NSAppearance(named: appearance)
+                let templateModel = makeTemplateModel()
+                let pageSize = NSSize(width: SettingsView.size.width - DesignTokens.Size.Settings.sidebarWidth, height: SettingsView.size.height * 2)
+                let host = NSHostingView(rootView: page(templateModel).defaultAppStorage(storage).frame(width: pageSize.width, height: pageSize.height))
+                let pageWindow = NSWindow(contentRect: NSRect(origin: .zero, size: pageSize), styleMask: [.borderless], backing: .buffered, defer: false)
+                pageWindow.contentView = host
+                pageWindow.orderFrontRegardless()
+                SettingsFixture.settle(pageWindow)
+                if !word.isEmpty {
+                    templateModel.userWordDraft = RuleDraft(key: "dt", value: word)
+                    SettingsFixture.settle(pageWindow)
+                    // 単語の欄は選ぶと中身をすべて選ぶので，入力位置を末尾に置く(打ちかけの「{da」で絞り込む)
+                    (pageWindow.firstResponder as? NSTextView)?.setSelectedRange(NSRange(location: word.utf16.count, length: 0))
+                    SettingsFixture.settle(pageWindow)
+                }
+                // 欄に入力位置があると選んだ文字が写るので，入力位置を外す
+                pageWindow.makeFirstResponder(nil)
+                SettingsFixture.settle(pageWindow)
+                render(host, name: "\(name)\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+                pageWindow.close()
+            }
+        }
+        storage.removePersistentDomain(forName: storageName)
+        NSApp.appearance = NSAppearance(named: .aqua)
         // 左の一覧は窓の中では写らない(背景のぼかしの層を写せない)ので，一覧だけを別に描く
         let sidebar = NSHostingView(rootView: SettingsSidebar(query: "", selection: .constant(.correction)).listStyle(.inset))
         let sidebarWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: DesignTokens.Size.Settings.sidebarWidth, height: SettingsView.size.height),
@@ -920,7 +973,7 @@ enum SnapshotRenderer {
         rep.size = size
         (appearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
             view.cacheDisplay(in: view.bounds, to: rep)
-            drawNestedTables(of: view, into: rep)
+            drawNestedTables(of: view, into: rep, dark: appearance?.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua)
         }
         try? rep.representation(using: .png, properties: [:])?.write(to: directory.appendingPathComponent("\(name).png"))
     }
@@ -928,8 +981,8 @@ enum SnapshotRenderer {
     /// Form の中の表(FormTableHost)は別の NSHostingView で描くので，外のビューの cacheDisplay では写らない(白く抜ける)．
     /// 表のすぐ左(Form の行の背景)の色で塗り，表の入れ物と見えている行を 1 つずつ写して乗算で重ねる．
     /// cacheDisplay は透明なところを白で埋めるので，乗算で白を背景の色に戻す．
-    /// ダークの外観では白い文字が乗算で消えるので，表の中は写らない(背景の色だけになる)
-    static func drawNestedTables(of root: NSView, into rep: NSBitmapImageRep) {
+    /// ダークの外観では白い文字が乗算で消えるので，透明な背景のまま描いて上に重ねる
+    static func drawNestedTables(of root: NSView, into rep: NSBitmapImageRep, dark: Bool) {
         guard let context = NSGraphicsContext(bitmapImageRep: rep) else { return }
         let scale = CGFloat(rep.pixelsWide) / root.bounds.width
         // rep は左下が原点
@@ -954,7 +1007,7 @@ enum SnapshotRenderer {
             ground.setFill()
             flip(frame).fill()
             NSGraphicsContext.restoreGraphicsState()
-            draw(view, at: flip(frame), into: context, clip: nil)
+            draw(view, at: flip(frame), into: context, clip: nil, dark: dark)
             var rows = view.subviews
             while let row = rows.popLast() {
                 guard row is NSTableRowView, let scroll = row.enclosingScrollView else {
@@ -966,18 +1019,22 @@ enum SnapshotRenderer {
                 var visible = clip.bounds
                 visible.size.height -= scroll.contentInsets.top
                 if clip.isFlipped { visible.origin.y += scroll.contentInsets.top }
-                draw(row, at: flip(row.convert(row.bounds, to: root)), into: context, clip: flip(clip.convert(visible, to: root)))
+                draw(row, at: flip(row.convert(row.bounds, to: root)), into: context, clip: flip(clip.convert(visible, to: root)), dark: dark)
             }
         }
     }
 
-    private static func draw(_ view: NSView, at rect: NSRect, into context: NSGraphicsContext, clip: NSRect?) {
+    private static func draw(_ view: NSView, at rect: NSRect, into context: NSGraphicsContext, clip: NSRect?, dark: Bool) {
         guard let image = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return }
-        view.cacheDisplay(in: view.bounds, to: image)
+        if dark, let viewContext = NSGraphicsContext(bitmapImageRep: image) {
+            view.displayIgnoringOpacity(view.bounds, in: viewContext)
+        } else {
+            view.cacheDisplay(in: view.bounds, to: image)
+        }
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = context
         if let clip { NSBezierPath(rect: clip).setClip() }
-        image.draw(in: rect, from: .zero, operation: .multiply, fraction: 1, respectFlipped: false, hints: nil)
+        image.draw(in: rect, from: .zero, operation: dark ? .sourceOver : .multiply, fraction: 1, respectFlipped: false, hints: nil)
         NSGraphicsContext.restoreGraphicsState()
     }
 }

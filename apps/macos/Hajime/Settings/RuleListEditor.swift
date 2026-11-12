@@ -1,3 +1,5 @@
+import AppKit
+import HajimeDomain
 import SwiftUI
 
 /// 決まりの一覧の 1 行(「打った英字 → 置き換える語」「読み → 単語」など)
@@ -32,6 +34,26 @@ struct RuleItem: Identifiable, Hashable {
 struct RuleDraft: Equatable {
     var key: String
     var value: String
+}
+
+/// 入力欄に書き方(TextTemplate)を入れる手助け(R-21・R-22)．欄の右の「{ }」のボタンで，欄の下に書き方のチップを開け閉めする．
+/// 欄で「{」を打つと開き，続けて打った文字でチップを絞り込む．チップを押すと入力位置に入る(打ちかけの書き方は置き換える)
+struct TemplateAssist {
+    enum Target { case key, value }
+
+    var reference: TemplateReference
+    /// 変換マクロの {text} と {reading} に入れる語と読み(単語では nil)
+    var sample: (text: String, reading: String)?
+    /// 書き方を入れる欄(単語は右の欄，変換マクロは左の欄)
+    var target: Target
+    /// チップを開いているか．ページごとに覚える
+    var isOpen: Binding<Bool>
+}
+
+/// 入力欄に入れたときの結果と，置き換えられない部分(書き方の誤り)
+struct RuleResult: Equatable {
+    var text: String
+    var problems: [String] = []
 }
 
 /// 行ごとに選ぶ種類(ユーザー辞書の品詞)．入力欄の右のポップアップで選び，表の右の列に出す
@@ -91,10 +113,14 @@ struct RuleListEditor: View {
     /// 左が重ならない一覧か．重なってよい一覧(ユーザー辞書の読み)では，左と右の両方が同じ行だけを重なりとみなす
     let keysAreUnique: Bool
     let tableHeight: CGFloat
-    /// 上の欄の左に打っている文字が変わるたびに知らせる(変換マクロの書いている途中の形を試すため)
-    let draftChanged: ((String) -> Void)?
     /// 外から入力欄に入れる値．入れたら nil に戻す
     var prefill: Binding<RuleDraft?>?
+    /// 書き方を入れる手助け(単語・変換マクロ)．nil なら出さない(書き方を値にしない設定のときも)
+    var templateAssist: TemplateAssist?
+    /// 入力欄の文字(左と右)を入れたときの結果．入力欄のすぐ下に出す(書き方を入れた単語・変換マクロの形)．無ければ nil
+    var draftResult: ((_ key: String, _ value: String) -> RuleResult?)?
+    /// 一覧の行を入れたときの結果．左の列の右の「結果」の列に出す(変換マクロの形)．無ければ nil
+    var itemResult: ((RuleItem) -> String?)?
 
     @State private var key = ""
     @State private var value = ""
@@ -105,24 +131,27 @@ struct RuleListEditor: View {
     @State private var selection = Set<RuleItem.ID>()
     @State private var sortOrder: [KeyPathComparator<RuleItem>] = []
     @FocusState private var focusedField: Field?
+    /// 書き方を入れる欄で最後に選んでいた範囲(UTF-16)．欄を離れても，チップを押したときはここに入れる
+    @State private var templateSelection: NSRange?
+    /// キーボードで選んでいるチップ(書き方)
+    @FocusState private var focusedChip: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private enum Field { case key, value, note }
 
     init(labels: Labels, items: [RuleItem], problem: @escaping (_ key: String, _ value: String) -> String?,
          save: @escaping (_ key: String, _ value: String, _ editing: RuleItem?) -> Bool, remove: @escaping (_ items: [RuleItem]) -> Void,
          setEnabled: ((RuleItem, Bool) -> Void)? = nil, importFile: (() -> Void)? = nil, exportFile: (() -> Void)? = nil,
-         keysAreUnique: Bool = true, tableHeight: CGFloat = DesignTokens.Size.Settings.ruleTableHeight,
-         draftChanged: ((String) -> Void)? = nil) {
+         keysAreUnique: Bool = true, tableHeight: CGFloat = DesignTokens.Size.Settings.ruleTableHeight) {
         self.init(labels: labels, items: items, kinds: nil, problem: problem, save: { key, value, _, _, editing in save(key, value, editing) },
                   remove: remove, setEnabled: setEnabled, importFile: importFile, exportFile: exportFile, keysAreUnique: keysAreUnique,
-                  tableHeight: tableHeight, draftChanged: draftChanged)
+                  tableHeight: tableHeight)
     }
 
     init(labels: Labels, items: [RuleItem], kinds: RuleKinds?, problem: @escaping (_ key: String, _ value: String) -> String?,
          save: @escaping (_ key: String, _ value: String, _ kind: String?, _ note: String?, _ editing: RuleItem?) -> Bool,
          remove: @escaping (_ items: [RuleItem]) -> Void, setEnabled: ((RuleItem, Bool) -> Void)? = nil, importFile: (() -> Void)? = nil,
-         exportFile: (() -> Void)? = nil, keysAreUnique: Bool = true, tableHeight: CGFloat = DesignTokens.Size.Settings.ruleTableHeight,
-         draftChanged: ((String) -> Void)? = nil) {
+         exportFile: (() -> Void)? = nil, keysAreUnique: Bool = true, tableHeight: CGFloat = DesignTokens.Size.Settings.ruleTableHeight) {
         self.labels = labels
         self.items = items
         self.kinds = labels.value == nil ? nil : kinds
@@ -135,7 +164,6 @@ struct RuleListEditor: View {
         self.exportFile = exportFile
         self.keysAreUnique = keysAreUnique
         self.tableHeight = tableHeight
-        self.draftChanged = draftChanged
     }
 
     /// 外から入力欄に値を入れられるようにした部品(単語の登録)
@@ -145,7 +173,32 @@ struct RuleListEditor: View {
         return copy
     }
 
+    /// 入力欄に書き方を入れる手助けを付けた部品(単語・変換マクロ)
+    func assistingTemplates(_ assist: TemplateAssist?) -> Self {
+        var copy = self
+        copy.templateAssist = assist
+        return copy
+    }
+
+    /// 入力欄の文字を入れたときの結果を，入力欄のすぐ下に出す部品(書き方を試す)
+    func showingResult(_ result: @escaping (_ key: String, _ value: String) -> RuleResult?) -> Self {
+        var copy = self
+        copy.draftResult = result
+        return copy
+    }
+
+    /// 一覧の行ごとに，入れたときの結果を「結果」の列に出す部品(変換マクロの形)
+    func showingItemResults(_ result: @escaping (RuleItem) -> String?) -> Self {
+        var copy = self
+        copy.itemResult = result
+        return copy
+    }
+
     private var hasValue: Bool { labels.value != nil }
+    /// 右の列に，値の代わりに行の結果を出すか(値の無い一覧だけ)
+    private var showsResults: Bool { !hasValue && itemResult != nil }
+    /// 左の列の右にもう 1 つ列があるか．あれば左の列の幅を決めて，右の列の左の端をそろえる
+    private var hasSecondColumn: Bool { hasValue || showsResults }
 
     private var trimmedKey: String { key.trimmingCharacters(in: .whitespaces) }
     private var trimmedValue: String { value.trimmingCharacters(in: .whitespaces) }
@@ -189,7 +242,38 @@ struct RuleListEditor: View {
     var body: some View {
         // 添え書きの欄は，入力の行と同じまとまり(Form の 1 行)に置き，あいだに区切りの線を入れない
         VStack(alignment: .leading, spacing: DesignTokens.Size.Settings.ruleNoteFieldGap) {
-            editor
+            // 入れたときの結果は，結果を求めた欄(右の欄．無ければ左の欄)の左端にそろえて，そのすぐ下に出す
+            VStack(alignment: .resultField, spacing: DesignTokens.Size.Settings.ruleNoteFieldGap) {
+                editor
+                if let result = shownDraftResult {
+                    HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Size.Space.group) {
+                        HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Size.Space.inline) {
+                            Image(systemName: "arrow.turn.down.right").accessibilityHidden(true)
+                            Text(result.text).textSelection(.enabled)
+                        }
+                        .foregroundStyle(.secondary)
+                        // 置き換えられない部分(書き方の誤り)を，その書き方のまま印を付けて見せる
+                        if !result.problems.isEmpty {
+                            HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Size.Space.inline) {
+                                Image(systemName: "exclamationmark.triangle.fill").accessibilityHidden(true)
+                                Text(result.problems.joined(separator: " ")).monospaced()
+                            }
+                            .foregroundStyle(.orange)
+                        }
+                    }
+                    .alignmentGuide(.resultField) { $0[.leading] }
+                }
+            }
+            // 書き方のチップ．欄(と結果)のすぐ下に開く
+            if let templateAssist, templateAssist.isOpen.wrappedValue {
+                TemplatePalette(reference: templateAssist.reference, sample: templateAssist.sample,
+                                matches: templateAssist.reference.matches(for: templateTyping), focus: $focusedChip) { item, kind in
+                    insertTemplate(item, kind: kind)
+                }
+                // 欄と結果(上)・コメントの欄(下)とのあいだを section にし，入力の行とは別のまとまりに見せる
+                .padding(.vertical, DesignTokens.Size.Space.section - DesignTokens.Size.Settings.ruleNoteFieldGap)
+                .transition(.opacity)
+            }
             if hasNote, let noteLabel = labels.note {
                 TextField(noteLabel, text: $note, prompt: Text(labels.notePrompt ?? noteLabel))
                     .textFieldStyle(.roundedBorder)
@@ -217,8 +301,11 @@ struct RuleListEditor: View {
         if setEnabled != nil {
             columns.append(.init(title: UIStrings.RuleList.enabled, width: DesignTokens.Size.Settings.ruleCheckColumnWidth))
         }
-        columns.append(.init(title: labels.key, width: hasValue ? DesignTokens.Size.Settings.ruleKeyColumnWidth : nil,
+        columns.append(.init(title: labels.key, width: hasSecondColumn ? DesignTokens.Size.Settings.ruleKeyColumnWidth : nil,
                              sort: { toggleSort(\.key) }, ascending: sortDirection(\.key)))
+        if showsResults {
+            columns.append(.init(title: UIStrings.RuleList.result))
+        }
         if let valueLabel = labels.value {
             columns.append(.init(title: valueLabel, width: kinds == nil ? nil : DesignTokens.Size.Settings.ruleValueColumnWidth,
                                  sort: { toggleSort(\.value) }, ascending: sortDirection(\.value)))
@@ -252,15 +339,19 @@ struct RuleListEditor: View {
         HStack {
             TextField(labels.key, text: $key, prompt: Text(labels.keyPrompt ?? labels.key))
                 .textFieldStyle(.roundedBorder)
+                .resultFieldGuide(!hasValue)
                 .focused($focusedField, equals: .key)
                 .disabled(editing?.isKeyFixed ?? false)
                 .onSubmit { hasValue ? (focusedField = .value) : commit() }
+            if templateAssist?.target == .key { templateButton }
             if let valueLabel = labels.value {
                 Image(systemName: "arrow.right").foregroundStyle(.secondary).accessibilityHidden(true)
                 TextField(valueLabel, text: $value, prompt: Text(labels.valuePrompt ?? valueLabel))
                     .textFieldStyle(.roundedBorder)
+                    .alignmentGuide(.resultField) { $0[.leading] }
                     .focused($focusedField, equals: .value)
                     .onSubmit(commit)
+                if templateAssist?.target == .value { templateButton }
             }
             if let kinds {
                 Picker(kinds.label, selection: $kind) {
@@ -276,16 +367,29 @@ struct RuleListEditor: View {
                 .fixedSize()
             }
             if editing != nil {
+                // チップを開いているあいだの Esc は，チップを閉じるほうに使う
                 Button(UIStrings.Settings.cancel, action: clear)
-                    .keyboardShortcut(.cancelAction)
+                    .keyboardShortcut(templateAssist?.isOpen.wrappedValue == true ? nil : .cancelAction)
             }
             Button(editing == nil ? UIStrings.Settings.add : UIStrings.RuleList.update, action: commit)
                 .disabled(!isFilled || message?.isProblem == true)
         }
         .labelsHidden()
-        .onChange(of: key) { _, typed in draftChanged?(typed) }
+        // 書き方のボタンを欄と同じ高さに伸ばす
+        .fixedSize(horizontal: false, vertical: true)
         .onAppear(perform: applyPrefill)
         .onChange(of: prefill?.wrappedValue) { _, _ in applyPrefill() }
+        // 欄で「{」を打って書き方を打ち始めたら，チップを開く
+        .onChange(of: templateTyping != nil) { _, typing in
+            if typing { setTemplatesOpen(true) }
+        }
+        // 書き方を入れる欄の入力位置を覚える．文字を打ったときは，欄の文字が変わったあとで読む(打った途中の通知は欄の文字とずれる)．
+        // 欄を離れるときに編集の部品が空になる通知は，欄の文字と合わないので受け取らない(離れたあとも入力位置を残す)
+        .onReceive(NotificationCenter.default.publisher(for: NSTextView.didChangeSelectionNotification)) { notification in
+            guard let editor = notification.object as? NSTextView, editor.string == templateText else { return }
+            readTemplateSelection(from: editor)
+        }
+        .onChange(of: templateText) { _, _ in readTemplateSelection(from: nil) }
     }
 
     /// 外から渡された値を入力欄に入れる．読み(左)が空なら左の欄に，あれば右の欄に入力位置を置く
@@ -344,18 +448,25 @@ struct RuleListEditor: View {
 
     private var keyColumn: some TableColumnContent<RuleItem, KeyPathComparator<RuleItem>> {
         TableColumn(labels.key, value: \.key) { item in
-            Text(item.key).monospaced().foregroundStyle(item.isEnabled ? .primary : .secondary)
+            // 長い形は列の中で「…」で切る
+            Text(item.key).monospaced().lineLimit(1).truncationMode(.tail)
+                .foregroundStyle(item.isEnabled ? .primary : .secondary)
         }
-        // 右に値の列があるときは，表の外の見出し(FormTableHeader)とそろえるため幅を決める
-        .width(min: hasValue ? DesignTokens.Size.Settings.ruleKeyColumnWidth : 80,
-               ideal: hasValue ? DesignTokens.Size.Settings.ruleKeyColumnWidth : 400,
-               max: hasValue ? DesignTokens.Size.Settings.ruleKeyColumnWidth : .infinity)
+        // 右に値や結果の列があるときは，表の外の見出し(FormTableHeader)とそろえるため幅を決める
+        .width(min: hasSecondColumn ? DesignTokens.Size.Settings.ruleKeyColumnWidth : 80,
+               ideal: hasSecondColumn ? DesignTokens.Size.Settings.ruleKeyColumnWidth : 400,
+               max: hasSecondColumn ? DesignTokens.Size.Settings.ruleKeyColumnWidth : .infinity)
     }
 
     private var valueColumn: some TableColumnContent<RuleItem, KeyPathComparator<RuleItem>> {
         TableColumn(labels.value ?? "", value: \.value) { item in
             HStack {
-                Text(item.value).foregroundStyle(item.isEnabled ? .primary : .secondary)
+                if showsResults {
+                    // 行の形を試す語と読みに当てた結果．形の列とは別に「…」で切る
+                    Text(itemResult?(item) ?? "").lineLimit(1).truncationMode(.tail).foregroundStyle(.secondary)
+                } else {
+                    Text(item.value).foregroundStyle(item.isEnabled ? .primary : .secondary)
+                }
                 Spacer()
                 // 既定から変えた・足したことを示すタグ
                 if let badge = item.badge {
@@ -457,6 +568,100 @@ struct RuleListEditor: View {
         focusedField = hasValue ? .value : .key
     }
 
+    // MARK: 書き方を入れる手助け
+
+    /// 書き方を入れる欄
+    private var templateField: Field? {
+        switch templateAssist?.target {
+        case .key: .key
+        case .value: .value
+        case nil: nil
+        }
+    }
+
+    private var templateText: String {
+        templateAssist?.target == .key ? key : value
+    }
+
+    /// 書き方を入れる欄の入力位置(選んでいる範囲)．まだ選んでいなければ末尾
+    private var templateRange: Range<Int> {
+        let count = templateText.utf16.count
+        guard let selection = templateSelection, selection.location != NSNotFound else { return count..<count }
+        let lower = min(selection.location, count)
+        return lower..<min(selection.location + selection.length, count)
+    }
+
+    /// 入れたときの結果．打っている途中の書き方(入力位置の前の閉じていない `{da`)は，誤りの印を付けない
+    private var shownDraftResult: RuleResult? {
+        guard var result = draftResult?(key, value) else { return nil }
+        if templateAssist != nil, let typing = TextTemplate.openPlaceholder(before: templatePrefix) {
+            result.problems.removeAll { $0 == typing }
+        }
+        return result
+    }
+
+    /// 書き方を入れる欄を編集しているなら，編集の部品(欄の編集を受け持つ NSTextView)から入力位置を読む
+    private func readTemplateSelection(from editor: NSTextView?) {
+        guard let field = templateField, focusedField == field,
+              let editor = editor ?? (NSApp.keyWindow?.firstResponder as? NSTextView), editor.isFieldEditor, editor.string == templateText else { return }
+        templateSelection = editor.selectedRange()
+    }
+
+    /// 書き方を入れる欄の，入力位置より前の文字
+    private var templatePrefix: String {
+        String(decoding: Array(templateText.utf16)[..<templateRange.lowerBound], as: UTF16.self)
+    }
+
+    /// 入力位置の前で打ちかけの書き方(チップの絞り込みと，「{」で開くのに使う)
+    private var templateTyping: TextTemplate.Typing? {
+        guard templateAssist != nil else { return nil }
+        return TextTemplate.typing(before: templatePrefix)
+    }
+
+    /// 欄の右の「{ }」のボタン．押すとチップを開け閉めする．開いているあいだは Esc でも閉じる
+    private var templateButton: some View {
+        Toggle(isOn: Binding(get: { templateAssist?.isOpen.wrappedValue ?? false }, set: { setTemplatesOpen($0) })) {
+            Image(systemName: "curlybraces")
+                .accessibilityLabel(UIStrings.Templates.button)
+        }
+        .toggleStyle(FieldAccessoryToggleStyle())
+        .help(UIStrings.Templates.buttonHelp)
+        .keyboardShortcut(templateAssist?.isOpen.wrappedValue == true ? .cancelAction : nil)
+    }
+
+    /// チップを開け閉めする．動きを減らす設定ではすぐ切り替える．チップを選んでいたときに閉じたら，書き方を入れる欄に戻す
+    private func setTemplatesOpen(_ open: Bool) {
+        guard let assist = templateAssist, assist.isOpen.wrappedValue != open else { return }
+        withAnimation(reduceMotion ? nil : .easeOut(duration: DesignTokens.Motion.Settings.disclosure / 1000)) {
+            assist.isOpen.wrappedValue = open
+        }
+        if !open, focusedChip != nil { focusedField = templateField }
+    }
+
+    /// 押したチップを入力位置に入れる．欄を編集中なら欄の編集として入れ(取り消しで戻せる)，そうでなければ文字を書き換える．
+    /// ポインターで押したときは欄に入力位置を戻し，続けて打てるようにする．キーボードで押したときはチップに残る
+    private func insertTemplate(_ item: TemplateReference.Item, kind: TemplateReference.Kind) {
+        guard let field = templateField else { return }
+        let byKeyboard = focusedChip != nil
+        let edit = TemplateReference.insertion(of: item, kind: kind, in: templateText, selection: templateRange)
+        let range = NSRange(location: edit.range.lowerBound, length: edit.range.count)
+        let caret = edit.range.lowerBound + edit.replacement.utf16.count
+        if focusedField == field, let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isFieldEditor {
+            editor.insertText(edit.replacement, replacementRange: range)
+            return
+        }
+        let replaced = (templateText as NSString).replacingCharacters(in: range, with: edit.replacement)
+        if field == .key { key = replaced } else { value = replaced }
+        templateSelection = NSRange(location: caret, length: 0)
+        guard !byKeyboard else { return }
+        focusedField = field
+        // 欄は選ばれると中身をすべて選ぶので，入力位置は次の回で置く
+        DispatchQueue.main.async {
+            guard let editor = NSApp.keyWindow?.firstResponder as? NSTextView, editor.isFieldEditor else { return }
+            editor.setSelectedRange(NSRange(location: caret, length: 0))
+        }
+    }
+
     private func commit() {
         guard isFilled, message?.isProblem != true else { return }
         if save(trimmedKey, trimmedValue, kinds == nil ? nil : kind, hasNote ? trimmedNote : nil, editing) { clear() }
@@ -469,5 +674,26 @@ struct RuleListEditor: View {
         if let kinds { kind = kinds.defaultID }
         note = ""
         focusedField = .key
+    }
+}
+
+private extension HorizontalAlignment {
+    /// 入れたときの結果を，結果を求めた欄の左端にそろえる
+    enum ResultField: AlignmentID {
+        static func defaultValue(in context: ViewDimensions) -> CGFloat { context[.leading] }
+    }
+
+    static let resultField = HorizontalAlignment(ResultField.self)
+}
+
+private extension View {
+    /// 入れたときの結果をこの欄の左端にそろえる(enabled のときだけ)
+    @ViewBuilder
+    func resultFieldGuide(_ enabled: Bool) -> some View {
+        if enabled {
+            alignmentGuide(.resultField) { $0[.leading] }
+        } else {
+            self
+        }
     }
 }

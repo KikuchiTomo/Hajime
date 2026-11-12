@@ -1,5 +1,6 @@
 import AppKit
 import HajimeDomain
+import HajimePersistence
 import SwiftUI
 
 /// 読みで呼び出すコマンド(R-22)と，変換マクロ(R-18)
@@ -11,8 +12,8 @@ struct CommandsPage: View {
     /// 変換マクロを試す語と読み．空なら見本の語(DefaultSettings.macroSampleText)
     @State private var sampleText = ""
     @State private var sampleReading = ""
-    /// 変換マクロの欄に書いている途中の形
-    @State private var macroDraft = ""
+    /// 形の欄の下の書き方のチップを開いているか(次に開いたときも同じにする)
+    @AppStorage("settings.templates.macros.open") private var templatesOpen = false
 
     var body: some View {
         Form {
@@ -45,6 +46,14 @@ struct CommandsPage: View {
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.conversionMacros, keyPath: \.conversionMacros)
                 ResettableToggle(model: model, title: UIStrings.Extras.macroSkipsSameReading, keyPath: \.macroSkipsSameReading)
+                // 試す語と読み．チップの {text} と {reading} の値，形の欄の下の結果，下の「試す」の結果に使う
+                HStack {
+                    TextField(UIStrings.Extras.tryMacroWord, text: $sampleText, prompt: Text(UIStrings.Extras.tryMacroWord))
+                        .textFieldStyle(.roundedBorder)
+                    TextField(UIStrings.Extras.tryMacroReading, text: $sampleReading, prompt: Text(UIStrings.Extras.tryMacroReading))
+                        .textFieldStyle(.roundedBorder)
+                }
+                .labelsHidden()
                 RuleListEditor(
                     labels: .init(key: UIStrings.Extras.macroPattern, value: nil, empty: UIStrings.Extras.macrosEmpty),
                     items: model.settings.macros.map { RuleItem(id: $0.id, key: $0.pattern, value: "", isEnabled: $0.isEnabled) },
@@ -58,13 +67,21 @@ struct CommandsPage: View {
                         model.update { settings in
                             if let index = settings.macros.firstIndex(where: { $0.id == item.id }) { settings.macros[index].isEnabled = enabled }
                         }
-                    },
-                    draftChanged: { macroDraft = $0 }
+                    }
                 )
+                .assistingTemplates(TemplateAssist(reference: UIStrings.Templates.macro, sample: macroSample, target: .key, isOpen: $templatesOpen))
+                .showingResult { pattern, _ in
+                    let draft = pattern.trimmingCharacters(in: .whitespaces)
+                    guard !draft.isEmpty, let result = macroResult(draft) else { return nil }
+                    let sample = macroSample
+                    let values = TextTemplate.Values(now: SystemCalendar(clock: Date.init).now(), uuid: { UUID().uuidString },
+                                                     random: { Int.random(in: $0) }, text: sample.text, reading: sample.reading)
+                    return RuleResult(text: result, problems: TextTemplate.problems(in: draft, values: values))
+                }
+                // 一覧の「結果」の列に，試す語と読みに当てた結果を出す
+                .showingItemResults { item in macroResult(item.key) }
             } header: {
                 Text(UIStrings.Extras.macrosSection)
-            } footer: {
-                Text(UIStrings.Extras.macrosNote).font(.caption).foregroundStyle(.secondary)
             }
             if let preview = model.previewMacros {
                 macroPreview(preview)
@@ -78,34 +95,35 @@ struct CommandsPage: View {
         }
     }
 
-    /// 試す語に変換マクロを当てた結果．欄に形を書いている途中なら，その形だけを当てる
+    /// 試す語に，オンの変換マクロを当てた結果
     private func macroPreview(_ preview: (String, String, String?) -> [String]) -> some View {
         Section {
-            HStack {
-                TextField(UIStrings.Extras.tryMacroWord, text: $sampleText, prompt: Text(UIStrings.Extras.tryMacroWord))
-                    .textFieldStyle(.roundedBorder)
-                TextField(UIStrings.Extras.tryMacroReading, text: $sampleReading, prompt: Text(UIStrings.Extras.tryMacroReading))
-                    .textFieldStyle(.roundedBorder)
-            }
-            .labelsHidden()
-            let draft = macroDraft.trimmingCharacters(in: .whitespaces)
-            let results = preview(sampleText, sampleReading, draft.isEmpty ? nil : draft)
-            if draft.isEmpty {
-                WrappingStack(spacing: DesignTokens.Size.Settings.previewChipGap) {
-                    ForEach(Array(results.enumerated()), id: \.offset) { _, result in
-                        Text(result)
-                            .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
-                            .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
-                            .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
-                            .textSelection(.enabled)
-                    }
+            // 書いている途中の形の結果は形の欄のすぐ下に出すので，ここではオンの形をすべて当てた結果を並べる
+            WrappingStack(spacing: DesignTokens.Size.Settings.previewChipGap) {
+                ForEach(Array(preview(sampleText, sampleReading, nil).enumerated()), id: \.offset) { _, result in
+                    Text(result)
+                        .padding(.horizontal, DesignTokens.Size.Settings.previewChipPaddingX)
+                        .padding(.vertical, DesignTokens.Size.Settings.previewChipPaddingY)
+                        .background(.quaternary, in: RoundedRectangle(cornerRadius: DesignTokens.Size.Settings.previewChipRadius))
+                        .textSelection(.enabled)
                 }
-            } else {
-                Text(UIStrings.Extras.macroDraftResult + (results.first ?? "")).textSelection(.enabled)
             }
         } header: {
             Text(UIStrings.Extras.tryMacros)
         }
+    }
+
+    /// 形を試す語と読みに当てた結果(試せなければ nil)
+    private func macroResult(_ pattern: String) -> String? {
+        model.previewMacros?(sampleText, sampleReading, pattern).first
+    }
+
+    /// チップの {text} と {reading} の値に入れる語と読み．試す語が空なら見本の語(ConversionMacroPreview と同じ)
+    private var macroSample: (text: String, reading: String) {
+        let text = sampleText.trimmingCharacters(in: .whitespaces)
+        let reading = KanaWidth.hiragana(from: sampleReading.trimmingCharacters(in: .whitespaces))
+        guard !text.isEmpty else { return (DefaultSettings.macroSampleText, reading.isEmpty ? DefaultSettings.macroSampleReading : reading) }
+        return (text, reading.isEmpty ? KanaWidth.hiragana(from: text) : reading)
     }
 
     private var commandTable: some View {

@@ -228,62 +228,11 @@ pub mod extras {
     pub const ENGLISH_TERMS_EMPTY: &str = "足した語はありません";
     pub const ENGLISH_TERMS_NOTE: &str = "同梱の辞書に無い語を、大文字と小文字を書き方どおりにして足します。足した語は同梱の語より先に出ます。";
     pub const DYNAMIC_DICTIONARY: &str = "単語に書いた日付や時刻などを入力時の値にする";
-    pub const TEMPLATE_SYNTAX: &str = "書き方";
-    pub const TEMPLATE_MEANING: &str = "入るもの";
-    pub const TEMPLATE_NOW: &str = "今入れると";
-    /// 単語に書ける書き方(TextTemplate)と，入るもの．「今入れると」の列は書き方を今の値に置き換えて出す
-    pub const TEMPLATE_ROWS: &[(&str, &str)] = &[
-        ("{date}", "今日の日付"),
-        ("{time}", "今の時刻"),
-        ("{datetime:YYYY/MM/DD hh:mm:ss}", "書式を決めた日時"),
-        ("{datetime+1d:MM/DD}", "日をずらした日付（-7d なら 7 日前）"),
-        (
-            "{time+30m}",
-            "ずらした時刻（m 分・h 時間・d 日・w 週・M 月・y 年）",
-        ),
-        (
-            "{date+1w@mon:M/D(ddd)}",
-            "来週の月曜（@mon〜@sun その週の曜日、@1〜@31 その月の日、@end 月末）",
-        ),
-        (
-            "{date+3b:M/D(ddd)}",
-            "3 営業日後（b は土日と祝日を除いて数える）",
-        ),
-        (
-            "{date:GGEE年M月D日|kansuji}",
-            "漢数字の和暦（1 年は「元年」）",
-        ),
-        ("{date:FFFF年度 NN JJ}", "年度・和風月名・干支"),
-        ("{utc}", "協定世界時の日時"),
-        ("{unixtime}", "UNIX 時間（秒）"),
-        (
-            "{holiday:平日}",
-            "祝日の名前（祝日でなければ : のあとの文字）",
-        ),
-        ("{season}", "その月の時候の挨拶"),
-        ("{greeting}", "時刻に合った挨拶"),
-        (
-            "{days:12/25}",
-            "その日までの日数（2027-03-31 のように年も書ける）",
-        ),
-        ("{age:1990-04-01}", "その日に生まれた人の満年齢"),
-        ("{uuid}", "UUID（入れるたびに変わる）"),
-        ("{random:1-6}", "範囲の中の整数（入れるたびに変わる）"),
-        (
-            "{alnum:8}",
-            "英数字 8 文字（{hex:8} なら 16 進数。入れるたびに変わる）",
-        ),
-        (
-            "{pick:はい,いいえ}",
-            "並べたうちのどれか 1 つ（入れるたびに変わる）",
-        ),
-        ("{date|fullwidth}", "| のあとの名前で変えた値"),
-        ("{{ }}", "「{」と「}」の文字そのもの"),
-    ];
     pub const COMMANDS_PAGE: &str = "コマンド";
     pub const COMMANDS_SECTION: &str = "コマンド";
     pub const LAUNCHER_COMMANDS: &str = "読みでコマンドを呼び出す";
-    pub const COMMANDS_NOTE: &str = "読みを変換すると、候補の一覧に「コマンド」のタグを付けた名前が並びます。選んで確定したときだけ動き、第 1 候補にはなりません。コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。";
+    pub const COMMANDS_NOTE: &str =
+        "コマンドはこのコンピュータだけに保存し、同期や設定の読み込みでは変わりません。";
     pub const COMMAND_READING: &str = "読み";
     pub const COMMAND_TITLE: &str = "名前";
     pub const COMMAND_KIND: &str = "動作";
@@ -302,7 +251,6 @@ pub mod extras {
     pub const TARGET_PLACEHOLDER_SHORTCUT: &str = "ショートカットの名前";
     pub const MACROS_SECTION: &str = "変換マクロ";
     pub const CONVERSION_MACROS: &str = "連想変換のキーで変換マクロを表示";
-    pub const MACROS_NOTE: &str = "変換中に連想変換のキーを押すと、選んでいる語を整えた形が「整形」に並びます。チェックを入れた形だけを出します。{text} が語、{reading} が読みです。日時・乱数・{reading|romaji} のような変換も使えます。";
     pub const MACRO_PATTERN: &str = "形";
     pub const MACROS_EMPTY: &str = "マクロはありません";
     pub const INVALID_MACRO: &str = "{text} か {reading} を含めてください";
@@ -310,7 +258,278 @@ pub mod extras {
     pub const TRY_MACROS: &str = "変換マクロを試す";
     pub const TRY_MACRO_WORD: &str = "試す語";
     pub const TRY_MACRO_READING: &str = "読み";
-    pub const MACRO_DRAFT_RESULT: &str = "入力中の形: ";
+}
+
+/// UIStrings.Templates(単語と変換マクロに書ける書き方のチップ．まとまりとチップは macOS と同じで，tools/check/check_strings.py が確かめる．
+/// チップに添える値は Windows だけのもので，2026/04/01(水) 09:30:15 の値(macOS は今の値を出す)．{text} と {reading} は見本の語「東京」)
+pub mod templates {
+    use crate::template_reference::{Group, Item, Kind};
+
+    /// 欄の右の「{ }」のボタン(チップを開け閉めする)の読み上げとツールチップ
+    pub const BUTTON: &str = "書き方";
+    pub const BUTTON_HELP: &str = "日付・時刻・乱数などの書き方";
+
+    /// 単語に書ける書き方(ユーザー辞書)
+    pub const WORD: &[Group] = &[
+        DATE_TIME, SHIFT, CALENDAR, NUMBERS, GREETINGS, RANDOM, BRACES, FILTERS, SYMBOLS,
+    ];
+    /// 変換マクロに書ける書き方．単語に書けるものに，選んでいる語と読みを足す
+    pub const MACRO: &[Group] = &[
+        TEXT, DATE_TIME, SHIFT, CALENDAR, NUMBERS, GREETINGS, RANDOM, BRACES, FILTERS, SYMBOLS,
+    ];
+
+    const TEXT: Group = Group {
+        title: "語",
+        kind: Kind::Syntax,
+        items: &[
+            Item::new("{text}", "選んでいる語", "東京"),
+            Item::new("{reading}", "読み", "とうきょう"),
+            Item::new("{reading|katakana}", "読みのカタカナ", "トウキョウ"),
+            Item::new("{reading|romaji}", "読みのローマ字", "toukyou"),
+        ],
+    };
+    const DATE_TIME: Group = Group {
+        title: "日時",
+        kind: Kind::Syntax,
+        items: &[
+            Item::new("{date}", "今日の日付", "2026/04/01"),
+            Item::new("{time}", "今の時刻", "09:30"),
+            Item::new("{datetime}", "今の日時", "2026/04/01 09:30:15"),
+            Item::new("{date:M月D日(ddd)}", "書式を決めた日付", "4月1日(水)"),
+            Item::new("{time:A K時m分}", "書式を決めた時刻", "午前 9時30分"),
+            Item::new("{utc}", "協定世界時の日時", "2026-04-01T00:30:15Z"),
+            Item::new("{unixtime}", "UNIX 時間（秒）", "1775003415"),
+        ],
+    };
+    const SHIFT: Group = Group {
+        title: "ずらす",
+        kind: Kind::Syntax,
+        items: &[
+            Item::new("{date+1d}", "明日", "2026/04/02"),
+            Item::new("{date-1d}", "昨日", "2026/03/31"),
+            Item::new("{date+1w}", "1 週間後", "2026/04/08"),
+            Item::new("{date+1M}", "1 か月後", "2026/05/01"),
+            Item::new("{date+1y}", "1 年後", "2027/04/01"),
+            Item::new("{time+30m}", "30 分後", "10:00"),
+            Item::new("{time+2h}", "2 時間後", "11:30"),
+            Item::new("{date+3b}", "3 営業日後（土日と祝日を除く）", "2026/04/06"),
+            Item::new("{date@fri}", "今週の金曜日", "2026/04/03"),
+            Item::new("{date+1w@mon}", "来週の月曜日", "2026/04/06"),
+            Item::new("{date@1}", "今月 1 日", "2026/04/01"),
+            Item::new("{date@end}", "今月末", "2026/04/30"),
+            Item::new("{date+1M@1}", "来月 1 日", "2026/05/01"),
+        ],
+    };
+    const CALENDAR: Group = Group {
+        title: "暦",
+        kind: Kind::Syntax,
+        items: &[
+            Item::new("{date:GGE年M月D日}", "和暦", "令和8年4月1日"),
+            Item::new("{date:GGEE年}", "1 年を「元年」と書く和暦", "令和8年"),
+            Item::new(
+                "{date:GGEE年M月D日|kansuji}",
+                "漢数字の和暦",
+                "令和八年四月一日",
+            ),
+            Item::new("{date:FFFF年度}", "年度（4 月始まり）", "2026年度"),
+            Item::new("{date:NN}", "和風月名", "卯月"),
+            Item::new("{date:JJ}", "干支", "丙午"),
+            Item::new("{holiday}", "祝日の名前（祝日でなければ空）", ""),
+            Item::new(
+                "{holiday:平日}",
+                "祝日の名前（祝日でなければ「平日」）",
+                "平日",
+            ),
+        ],
+    };
+    const NUMBERS: Group = Group {
+        title: "数",
+        kind: Kind::Syntax,
+        items: &[
+            Item::new("{days:12/25}", "12 月 25 日までの日数", "268"),
+            Item::new("{days:2027-03-31}", "2027 年 3 月 31 日までの日数", "364"),
+            Item::new("{age:1990-04-01}", "1990 年 4 月 1 日生まれの満年齢", "36"),
+            Item::new("{date:DDD}", "年の何日目か", "91"),
+            Item::new("{date:WW}", "週番号（ISO 8601）", "14"),
+            Item::new("{date:Q}", "四半期", "2"),
+        ],
+    };
+    const GREETINGS: Group = Group {
+        title: "挨拶",
+        kind: Kind::Syntax,
+        items: &[
+            Item::new("{season}", "その月の時候の挨拶", "陽春の候"),
+            Item::new("{greeting}", "時刻に合った挨拶", "おはようございます"),
+        ],
+    };
+    const RANDOM: Group = Group {
+        title: "乱数",
+        kind: Kind::Syntax,
+        items: &[
+            Item::new("{uuid}", "UUID", "3F2504E0-4F89-11D3-9A0C-0305E82C3301").code_value(),
+            Item::new(
+                "{uuid|lower}",
+                "小文字の UUID",
+                "3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+            )
+            .code_value(),
+            Item::new("{random:1-6}", "1〜6 の整数", "4"),
+            Item::new("{alnum:8}", "英数字 8 文字", "8TYwkwUz").code_value(),
+            Item::new("{hex:8}", "16 進数 8 桁", "68e2aff0").code_value(),
+            Item::new("{pick:はい,いいえ}", "並べたうちのどれか", "はい"),
+        ],
+    };
+    const BRACES: Group = Group {
+        title: "括弧",
+        kind: Kind::Syntax,
+        items: &[
+            Item::new("{{", "「{」の文字", "{"),
+            Item::new("}}", "「}」の文字", "}"),
+        ],
+    };
+    const FILTERS: Group = Group {
+        title: "変換",
+        kind: Kind::Filter,
+        items: &[
+            Item::with_sample("|upper", "大文字", "{date:MMM|upper}", "APR"),
+            Item::with_sample("|lower", "小文字", "{date:EEE|lower}", "wed"),
+            Item::with_sample(
+                "|capitalize",
+                "先頭だけ大文字",
+                "{date:EEE|lower|capitalize}",
+                "Wed",
+            ),
+            Item::with_sample(
+                "|katakana",
+                "カタカナ",
+                "{greeting|katakana}",
+                "オハヨウゴザイマス",
+            ),
+            Item::with_sample(
+                "|hiragana",
+                "ひらがな",
+                "{greeting|katakana|hiragana}",
+                "おはようございます",
+            ),
+            Item::with_sample(
+                "|halfwidth",
+                "半角カタカナ",
+                "{greeting|halfwidth}",
+                "ｵﾊﾖｳｺﾞｻﾞｲﾏｽ",
+            ),
+            Item::with_sample(
+                "|fullwidth",
+                "全角英数",
+                "{date|fullwidth}",
+                "２０２６／０４／０１",
+            ),
+            Item::with_sample("|ascii", "半角英数", "{date|fullwidth|ascii}", "2026/04/01"),
+            Item::with_sample(
+                "|romaji",
+                "ローマ字",
+                "{greeting|romaji}",
+                "ohayougozaimasu",
+            ),
+            Item::with_sample(
+                "|snake",
+                "小文字を _ でつなぐ",
+                "{date:MMMM EEEE|snake}",
+                "april_wednesday",
+            )
+            .code_value(),
+            Item::with_sample(
+                "|camel",
+                "2 語目から先頭を大文字にしてつなぐ",
+                "{date:MMMM EEEE|camel}",
+                "aprilWednesday",
+            )
+            .code_value(),
+            Item::with_sample(
+                "|pascal",
+                "語の先頭を大文字にしてつなぐ",
+                "{date:MMMM EEEE|pascal}",
+                "AprilWednesday",
+            )
+            .code_value(),
+            Item::with_sample(
+                "|kebab",
+                "小文字を - でつなぐ",
+                "{date:MMMM EEEE|kebab}",
+                "april-wednesday",
+            )
+            .code_value(),
+            Item::with_sample(
+                "|url",
+                "URL に入れる形",
+                "{date:NN|url}",
+                "%E5%8D%AF%E6%9C%88",
+            )
+            .code_value(),
+            Item::with_sample("|length", "文字数", "{greeting|length}", "9"),
+            Item::with_sample("|kansuji", "漢数字", "{date:YYYY|kansuji}", "二千二十六"),
+            Item::with_sample(
+                "|kanjidigits",
+                "1 字ずつの漢数字",
+                "{date:YYYY|kanjidigits}",
+                "二〇二六",
+            ),
+            Item::with_sample("|daiji", "大字", "{date:YYYY|daiji}", "弐千弐拾六"),
+            Item::with_sample("|comma", "3 桁区切り", "{unixtime|comma}", "1,775,003,415"),
+            Item::with_sample("|circled", "丸数字", "{date:D|circled}", "①"),
+            Item::with_sample("|html", "HTML に入れる形", "{pick:<b>|html}", "&lt;b&gt;")
+                .code_value(),
+            Item::with_sample("|base64", "Base64", "{date|base64}", "MjAyNi8wNC8wMQ==")
+                .code_value(),
+            Item::with_sample(
+                "|upper|fullwidth",
+                "左から順にかける",
+                "{date:MMM|upper|fullwidth}",
+                "ＡＰＲ",
+            ),
+        ],
+    };
+    const SYMBOLS: Group = Group {
+        title: "書式",
+        kind: Kind::FormatSymbol,
+        items: &[
+            Item::with_sample("YYYY", "年", "{date:YYYY}", "2026"),
+            Item::with_sample("YY", "年（下 2 桁）", "{date:YY}", "26"),
+            Item::with_sample("MM", "月（2 桁）", "{date:MM}", "04"),
+            Item::with_sample("M", "月", "{date:M}", "4"),
+            Item::with_sample("MMMM", "英語の月", "{date:MMMM}", "April"),
+            Item::with_sample("MMM", "英語の月（略）", "{date:MMM}", "Apr"),
+            Item::with_sample("DD", "日（2 桁）", "{date:DD}", "01"),
+            Item::with_sample("D", "日", "{date:D}", "1"),
+            Item::with_sample("DDDD", "年の何日目か（3 桁）", "{date:DDDD}", "091"),
+            Item::with_sample("DDD", "年の何日目か", "{date:DDD}", "91"),
+            Item::with_sample("dddd", "曜日", "{date:dddd}", "水曜日"),
+            Item::with_sample("ddd", "曜日（略）", "{date:ddd}", "水"),
+            Item::with_sample("EEEE", "英語の曜日", "{date:EEEE}", "Wednesday"),
+            Item::with_sample("EEE", "英語の曜日（略）", "{date:EEE}", "Wed"),
+            Item::with_sample("hh", "時（24 時間制、2 桁）", "{time:hh}", "09"),
+            Item::with_sample("h", "時（24 時間制）", "{time:h}", "9"),
+            Item::with_sample("KK", "時（12 時間制、2 桁）", "{time:KK}", "09"),
+            Item::with_sample("K", "時（12 時間制）", "{time:K}", "9"),
+            Item::with_sample("A", "午前・午後", "{time:A}", "午前"),
+            Item::with_sample("AA", "AM・PM", "{time:AA}", "AM"),
+            Item::with_sample("mm", "分（2 桁）", "{time:mm}", "30"),
+            Item::with_sample("m", "分", "{time:m}", "30"),
+            Item::with_sample("ss", "秒（2 桁）", "{time:ss}", "15"),
+            Item::with_sample("s", "秒", "{time:s}", "15"),
+            Item::with_sample("GG", "元号", "{date:GG}", "令和"),
+            Item::with_sample("E", "元号の年", "{date:E}", "8"),
+            Item::with_sample("EE", "元号の年（1 年は「元」）", "{date:EE}", "8"),
+            Item::with_sample("FFFF", "年度（4 月始まり）", "{date:FFFF}", "2026"),
+            Item::with_sample("FF", "年度（下 2 桁）", "{date:FF}", "26"),
+            Item::with_sample("NN", "和風月名", "{date:NN}", "卯月"),
+            Item::with_sample("JJ", "干支", "{date:JJ}", "丙午"),
+            Item::with_sample("WW", "週番号（2 桁）", "{date:WW}", "14"),
+            Item::with_sample("W", "週番号", "{date:W}", "14"),
+            Item::with_sample("Q", "四半期", "{date:Q}", "2"),
+            Item::with_sample("ZZ", "時間帯", "{time:ZZ}", "+09:00"),
+            Item::with_sample("'Q'", "' で囲んだ文字はそのまま入る", "{date:'Q'Q}", "Q2"),
+        ],
+    };
 }
 
 /// UIStrings.More
@@ -631,6 +850,7 @@ pub mod keys {
 pub mod rule_list {
     pub const UPDATE: &str = "更新";
     pub const ENABLED: &str = "有効";
+    pub const RESULT: &str = "結果";
     pub const FULL: &str = "これ以上は追加できません。";
     pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
     pub const CHANGES_KIND: &str =
@@ -944,6 +1164,12 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
+    /// 入力欄のすぐ下の，入れたときの結果の頭に置く印(macOS は arrow.turn.down.right の絵)
+    pub const RESULT_MARK: &str = "↪ ";
+    /// 書き方のチップを開け閉めするボタンの字(macOS は curlybraces の記号)
+    pub const TEMPLATE_BUTTON_LABEL: &str = "{ }";
+    /// 置き換えられない部分(書き方の誤り)の頭に置く印(macOS は exclamationmark.triangle.fill の絵)
+    pub const PROBLEM_MARK: &str = "⚠ ";
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使った文字の記録を消去しました";
     /// 製品の名前(情報のページの見出し．macOS は Bundle の名前を出す)

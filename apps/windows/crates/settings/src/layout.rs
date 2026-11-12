@@ -56,6 +56,21 @@ pub trait Metrics {
     fn height(&self, _row: &Row, _width: f32) -> Option<f32> {
         None
     }
+    /// 一覧のカードの中で，そのときの状態で変わるもの(書き方のボタン・結果の行・書き方のチップの欄)．width はカードの幅
+    fn list_state(&self, _row: &Row, _width: f32) -> ListState {
+        ListState::default()
+    }
+}
+
+/// 一覧のカードの中で，画面の状態で出し入れするもの(macOS の RuleListEditor の TemplateAssist と showingResult)
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct ListState {
+    /// 書き方を入れる欄のすぐ右に「{ }」のボタンを置く(書き方を値にしない設定では置かない)
+    pub template_button: bool,
+    /// 入れたときの結果の行を置く(結果のあるときだけ)
+    pub result: bool,
+    /// 書き方のチップの欄の高さ．閉じていれば None
+    pub panel: Option<f32>,
 }
 
 /// 1 行のカードと，その中の部品の位置
@@ -75,6 +90,12 @@ pub struct CardLayout {
     pub parts: Vec<Rect>,
     /// 絵(情報のページのアイコン・テーマの見本・名前の横の候補の見本)．無ければ幅 0
     pub icon: Rect,
+    /// 一覧の入れたときの結果の行(押せない．ListState::result)
+    pub result: Option<Rect>,
+    /// 一覧の書き方のボタン(ListState::template_button)
+    pub template_button: Option<Rect>,
+    /// 一覧の書き方のチップの欄(ListState::panel)
+    pub template_panel: Option<Rect>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -268,6 +289,9 @@ fn empty(card: Rect, row: usize) -> CardLayout {
         reset: Rect::new(card.x, card.y, 0.0, 0.0),
         parts: Vec::new(),
         icon: Rect::new(card.x, card.y, 0.0, 0.0),
+        result: None,
+        template_button: None,
+        template_panel: None,
     }
 }
 
@@ -292,10 +316,12 @@ fn place(
             Control::List(spec, _) if spec.path == "keymap" => size::KEYMAP_LIST_HEIGHT,
             _ => size::LIST_HEIGHT,
         };
+        let state = metrics.list_state(row, frame.width);
         return place_list(
             position,
             (fields, &bottom_fields),
             buttons,
+            state,
             frame,
             height,
             metrics,
@@ -317,10 +343,21 @@ fn place(
                 metrics,
             )
         }
+        // 変換マクロの試す語と読みは欄だけ．結果は下の節の PreviewChips に並べる
         Control::Preview(TryKind::Macros) => place_inputs(
             position,
             2,
             NO_BUTTONS,
+            ListState::default(),
+            frame,
+            0.0,
+            metrics,
+        ),
+        Control::PreviewChips(_) => place_inputs(
+            position,
+            0,
+            NO_BUTTONS,
+            ListState::default(),
             frame,
             size::BODY_LINE_HEIGHT * size::MACRO_PREVIEW_LINES,
             metrics,
@@ -329,6 +366,7 @@ fn place(
             position,
             0,
             NO_BUTTONS,
+            ListState::default(),
             frame,
             size::BODY_LINE_HEIGHT * size::REPORT_LINES,
             metrics,
@@ -336,8 +374,8 @@ fn place(
         Control::ThemePreview | Control::PalettePreview | Control::EmojiPreview => {
             place_preview(position, row, frame, metrics)
         }
-        // 謝辞・書き方の表・読みにくい組み合わせの知らせは中身を画面の側で測って置く．部品の欄はカードの中の全体
-        Control::Acknowledgement(_) | Control::TemplateReference | Control::ThemeIssue(_) => {
+        // 謝辞・読みにくい組み合わせの知らせは中身を画面の側で測って置く．部品の欄はカードの中の全体
+        Control::Acknowledgement(_) | Control::ThemeIssue(_) => {
             let height = metrics.height(row, frame.width).unwrap_or(size::ROW_HEIGHT);
             let mut card = empty(frame.card(height), position);
             card.control = Rect::new(frame.inner_left(), frame.y, frame.inner_width(), height);
@@ -563,6 +601,9 @@ fn place_labeled(
         reset,
         parts,
         icon,
+        result: None,
+        template_button: None,
+        template_panel: None,
     }
 }
 
@@ -831,6 +872,8 @@ pub const PREVIEW_BUTTONS: ListButtons = ListButtons {
     sheet: false,
     move_icons: false,
     message_line: false,
+    result: false,
+    template_field: None,
 };
 
 const NO_BUTTONS: ListButtons = ListButtons {
@@ -848,6 +891,8 @@ const NO_BUTTONS: ListButtons = ListButtons {
     sheet: false,
     move_icons: false,
     message_line: false,
+    result: false,
+    template_field: None,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -858,11 +903,20 @@ fn place_inputs(
     position: usize,
     fields: usize,
     buttons: ListButtons,
+    state: ListState,
     frame: Frame,
     below: f32,
     metrics: &dyn Metrics,
 ) -> CardLayout {
-    place_list(position, (fields, &[]), buttons, frame, below, metrics)
+    place_list(
+        position,
+        (fields, &[]),
+        buttons,
+        state,
+        frame,
+        below,
+        metrics,
+    )
 }
 
 /// place_inputs と同じ．fields の 2 つ目は表の下の帯の左に置く欄の幅(下のボタンの前に並べる．
@@ -871,6 +925,7 @@ fn place_list(
     position: usize,
     (fields, bottom_fields): (usize, &[f32]),
     buttons: ListButtons,
+    state: ListState,
     frame: Frame,
     below: f32,
     metrics: &dyn Metrics,
@@ -945,13 +1000,34 @@ fn place_list(
         0.0
     };
     let gaps = size::CONTROL_GAP * (fields.max(1) - 1) as f32;
-    let field_width = ((inner - buttons_width - gaps - arrow_extra - fixed_total) / count).max(0.0);
+    // 書き方のボタンは書き方を入れる欄のすぐ右に，欄と同じ高さの正方形で置く(macOS の RuleListEditor の templateButton)
+    let template_after = buttons
+        .template_field
+        .filter(|index| state.template_button && *index < fields);
+    let template_extra = if template_after.is_some() {
+        size::CONTROL_HEIGHT + size::CONTROL_GAP
+    } else {
+        0.0
+    };
+    let field_width = ((inner - buttons_width - gaps - arrow_extra - template_extra - fixed_total)
+        / count)
+        .max(0.0);
     let mut parts = Vec::new();
+    let mut template_button = None;
     let mut cursor = x;
     for index in 0..fields {
         let width = fixed.get(index).copied().unwrap_or(field_width);
         parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
         cursor += width + size::CONTROL_GAP;
+        if template_after == Some(index) {
+            template_button = Some(Rect::new(
+                cursor,
+                top,
+                size::CONTROL_HEIGHT,
+                size::CONTROL_HEIGHT,
+            ));
+            cursor += template_extra;
+        }
         if arrow == Some(index) {
             cursor += arrow_extra;
         }
@@ -967,6 +1043,29 @@ fn place_list(
     } else {
         top + size::CONTROL_HEIGHT + size::CONTROL_GAP
     };
+    // 入れたときの結果の行は，結果を求める欄(単語・形)の左端から，入力欄のすぐ下に置く(結果のあるときだけ)
+    let result = (buttons.result && state.result).then(|| {
+        let field = parts
+            .get(1)
+            .filter(|_| fields >= 2)
+            .or(parts.first())
+            .copied();
+        let left = field.map_or(x, |field| field.x);
+        let rect = Rect::new(
+            left,
+            list_top,
+            (x + inner - left).max(0.0),
+            size::BODY_LINE_HEIGHT,
+        );
+        list_top += size::BODY_LINE_HEIGHT + size::CONTROL_GAP;
+        rect
+    });
+    // 書き方のチップの欄は欄(と結果)のすぐ下に幅いっぱいで置き，上下を section 空けて入力の行とは別のまとまりに見せる
+    let template_panel = state.panel.map(|height| {
+        let panel_top = list_top - size::CONTROL_GAP + tokens::size::space::SECTION;
+        list_top = panel_top + height + tokens::size::space::SECTION;
+        Rect::new(x, panel_top, inner, height)
+    });
     if note_line {
         let note = Rect::new(x, list_top, inner, size::CONTROL_HEIGHT);
         parts.insert(fields, note);
@@ -1080,7 +1179,10 @@ fn place_list(
     let lines = leading_lines
         .len()
         .max(trailing_line.map_or(0, |line| line + 1));
-    let bottom = if lines == 0 {
+    // 下に何も置かない(欄だけの)カードは，最後の欄のすぐ下で終える
+    let bottom = if lines == 0 && below <= 0.0 {
+        list_top - size::CONTROL_GAP
+    } else if lines == 0 {
         list_top + below
     } else {
         line_top + lines as f32 * line_height - size::CONTROL_GAP
@@ -1089,6 +1191,9 @@ fn place_list(
     let mut card = empty(frame.card(height), position);
     card.control = Rect::new(x, list_top, inner, below);
     card.parts = parts;
+    card.result = result;
+    card.template_button = template_button;
+    card.template_panel = template_panel;
     card
 }
 
@@ -1104,7 +1209,15 @@ fn place_stacked_inputs(
 ) -> CardLayout {
     let extra = (size::CONTROL_HEIGHT + size::CONTROL_GAP) * fields as f32;
     // 欄を置かずに place_inputs で下のボタンを置き(欄の分を結果の上に足しておく)，あとで欄を縦に置く
-    let mut card = place_inputs(position, 0, buttons, frame, below + extra, metrics);
+    let mut card = place_inputs(
+        position,
+        0,
+        buttons,
+        ListState::default(),
+        frame,
+        below + extra,
+        metrics,
+    );
     let x = frame.inner_left();
     let top = frame.y + size::CARD_PADDING_Y;
     let fields_rects: Vec<Rect> = (0..fields)
@@ -1153,7 +1266,8 @@ impl Metrics for Estimate {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::pages::{sections, Page};
+    use crate::pages::{sections, Page, Section};
+    use crate::strings::extras;
     use crate::strings::settings as settings_strings;
 
     fn all(page: Page, width: f32) -> PageLayout {
@@ -1296,17 +1410,113 @@ mod tests {
     }
 
     #[test]
-    fn 書き方の表は切り替えと同じカードに置く() {
+    fn 説明の長い行は部品を名前の高さに置く() {
+        // 説明(注記)が何行も続くトグルの行
+        let section = Section {
+            title: None,
+            rows: std::iter::once(Row::toggle(extras::DYNAMIC_DICTIONARY, "dynamicDictionary"))
+                .chain((0..6).map(|_| Row::note(extras::HAND_SHIFT_NOTE)))
+                .collect(),
+            footer: None,
+            footer_variants: &[],
+        };
+        let layout = layout(&[section], 800.0, |_| true, &Estimate);
+        let card = &layout.sections[0].cards[0];
+        assert!(card.descriptions.len() > 5);
+        assert!(card.card.height > size::ROW_HEIGHT * 2.0);
+        assert!(card.control.max_y() <= card.card.y + size::ROW_HEIGHT);
+    }
+
+    /// 一覧の行に，書き方のボタン・結果の行・チップの欄を出す状態を返す(画面の側の RowState の代わり)
+    struct WithList(ListState);
+
+    impl Metrics for WithList {
+        fn lines(&self, text: &str, kind: TextKind, width: f32) -> usize {
+            Estimate.lines(text, kind, width)
+        }
+
+        fn width(&self, text: &str, kind: TextKind) -> f32 {
+            Estimate.width(text, kind)
+        }
+
+        fn list_state(&self, row: &Row, _width: f32) -> ListState {
+            if row.control.template_target().is_some() {
+                self.0
+            } else {
+                ListState::default()
+            }
+        }
+    }
+
+    /// 登録した単語の一覧のカード
+    fn word_card(state: ListState) -> CardLayout {
         let page = sections(Page::Dictionary).unwrap();
-        let layout = layout(&page, 800.0, |_| true, &Estimate);
-        // ユーザー辞書の 2 つ目の区切り: 切り替えと，その下の書き方の表(macOS の UserWordsView)
-        let section = &layout.sections[1];
-        assert_eq!(section.cards.len(), 2);
-        let (toggle, table) = (&section.cards[0], &section.cards[1]);
-        assert!(toggle.descriptions.is_empty());
-        assert_eq!(page[1].rows[table.row].control, Control::TemplateReference);
-        // 間を空けずに続ける(1 枚のカードに区切り線で並べる)
-        assert_eq!(table.card.y, toggle.card.max_y());
+        let layout = layout(&page, 800.0, |_| true, &WithList(state));
+        layout
+            .sections
+            .iter()
+            .zip(&page)
+            .flat_map(|(placed, section)| placed.cards.iter().map(move |card| (card, section)))
+            .find(|(card, section)| {
+                matches!(section.rows[card.row].control, Control::Dictionary(_))
+            })
+            .map(|(card, _)| card.clone())
+            .expect("登録した単語の行")
+    }
+
+    #[test]
+    fn 単語の一覧は結果のあるときだけ_単語の欄の左端から結果の行を置く() {
+        let card = word_card(ListState {
+            result: true,
+            ..ListState::default()
+        });
+        let (word, result) = (card.parts[1], card.result.expect("結果の行"));
+        assert_eq!(result.x, word.x);
+        assert_eq!(result.y, word.max_y() + size::CONTROL_GAP);
+        assert_eq!(result.height, size::BODY_LINE_HEIGHT);
+        // 表は結果の行の下から
+        assert!(card.control.y >= result.max_y() + size::CONTROL_GAP);
+        // 結果が無ければ行を取らない(入力欄と次の部品のあいだを広げない)
+        let plain = word_card(ListState::default());
+        assert_eq!(plain.result, None);
+        assert_eq!(plain.parts[1].max_y() + size::CONTROL_GAP, plain.parts[3].y);
+    }
+
+    #[test]
+    fn 書き方のボタンは単語の欄のすぐ右に_欄と同じ高さで置く() {
+        let card = word_card(ListState {
+            template_button: true,
+            ..ListState::default()
+        });
+        let (word, button) = (card.parts[1], card.template_button.expect("ボタン"));
+        assert_eq!(button.x, word.max_x() + size::CONTROL_GAP);
+        assert_eq!((button.y, button.height), (word.y, word.height));
+        assert_eq!(button.width, button.height);
+        // 次の部品(品詞)はボタンのすぐ右から
+        assert_eq!(card.parts[2].x, button.max_x() + size::CONTROL_GAP);
+        // スイッチがオフなら置かず，欄が広がる
+        let plain = word_card(ListState::default());
+        assert_eq!(plain.template_button, None);
+        assert!(plain.parts[1].width > word.width);
+    }
+
+    #[test]
+    fn 書き方のチップの欄は結果の下に幅いっぱいで_上下を_section_空けて置く() {
+        let card = word_card(ListState {
+            template_button: true,
+            result: true,
+            panel: Some(100.0),
+        });
+        let result = card.result.expect("結果の行");
+        let panel = card.template_panel.expect("チップの欄");
+        assert_eq!(panel.y, result.max_y() + tokens::size::space::SECTION);
+        assert_eq!(panel.height, 100.0);
+        assert_eq!(panel.x, card.parts[0].x);
+        // コメントの欄はチップの欄の下から
+        assert_eq!(
+            card.parts[3].y,
+            panel.max_y() + tokens::size::space::SECTION
+        );
     }
 
     #[test]
