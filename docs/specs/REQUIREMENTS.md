@@ -208,7 +208,7 @@ JIS キーボードの ¥ キーで何を入れるかを，設定ひとつで変
 
 ## R-19 更新の確認
 
-- 設定の画面の「情報」(Hajime IME のアイコン・名前・バージョンの横)と，macOS の入力メニューに「更新を確認」を置く．Windows は設定の画面の「情報」に置く
+- 設定の画面の「情報」(Hajime IME のアイコン・名前・バージョンの横)と，入力メニューに「更新を確認」を置く．どちらから選んでも同じ確認になる(Windows の入力メニューは設定の画面を「情報」のページで開き，そこの「更新を確認」と同じ確認を始める)
 - 押したときだけ https://haji.men/download/latest.json(`DefaultSettings.updateManifestURL`)を取り，今のバージョンより新しければ，飛ばしたバージョンも含めた変更点(CHANGELOG.md の節)を見せて更新するかを聞く．新しくなければ最新であることを知らせる
 - 「更新する」を選ぶと，配布物を https://haji.men/download/ の下からだけ取り，latest.json の SHA-256 と合うかを確かめてから入れる．大きさと待ち時間に上限を設ける(`DefaultSettings` の update で始まる値)
   - macOS: IME の本体はサンドボックスの中で通信の権限を持たないまま，Contents/Helpers の更新用のアプリ(Hajime IME Updater)が通信とインストールを行う．.pkg が Apple の公証を通り，本体と同じチームの Developer ID で署名されているかを `spctl` で確かめ，管理者のパスワードを聞いて OS のインストーラーで入れる．入れたあとはログアウトを求めず，postinstall が古い本体を止めて次の入力から新しいバージョンで動く

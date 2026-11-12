@@ -245,6 +245,7 @@ pub mod size {
         pub const SM: f32 = 8.0;
         pub const MD: f32 = 12.0;
         pub const LG: f32 = 16.0;
+        pub const INLINE: f32 = 4.0;
     }
     pub mod candidate {
         pub const ROW_HEIGHT: f32 = 22.0;
@@ -352,9 +353,7 @@ pub mod size {
         pub const MODE_INDICATOR_FONT_SIZE: f32 = 17.0;
         pub const SELECTION_INSET_Y: f32 = 2.0;
         pub const VARIANT_INSET_Y: f32 = 4.0;
-        pub const CURVE_START_OVERLAP: f32 = 2.0;
-        pub const CURVE_END_GAP: f32 = 3.0;
-        pub const CURVE_BEND: f32 = 0.35;
+        pub const BRANCH_TURN_RADIUS: f32 = 8.0;
         pub const DOT_PITCH: f32 = 5.0;
         pub const KEYCAP_PART_GAP: f32 = 1.0;
         pub const KEYCAP_GAP: f32 = 3.0;
@@ -485,7 +484,7 @@ pub mod size {
         pub const CARD_GAP: f32 = 4.0;
         pub const CARD_RADIUS: f32 = 4.0;
         pub const CARD_PADDING_X: f32 = 16.0;
-        pub const ROW_HEIGHT: f32 = 68.0;
+        pub const ROW_HEIGHT: f32 = 48.0;
         pub const CONTROL_HEIGHT: f32 = 32.0;
         pub const DROPDOWN_HEIGHT: f32 = 384.0;
         pub const CONTROL_WIDTH: f32 = 240.0;
@@ -553,7 +552,7 @@ pub mod size {
         pub const SLIDER_THUMB_SIZE: f32 = 20.0;
         pub const SLIDER_THUMB_INNER: f32 = 12.0;
         pub const SLIDER_THUMB_INNER_HOVER: f32 = 14.0;
-        pub const CARD_PADDING_Y: f32 = 16.0;
+        pub const CARD_PADDING_Y: f32 = 12.0;
         pub const FOOTER_GAP: f32 = 8.0;
         pub const LABEL_MIN_WIDTH: f32 = 160.0;
         pub const RADIO_SIZE: f32 = 20.0;
@@ -566,6 +565,7 @@ pub mod size {
         pub const THEME_SWATCH_RADIUS: f32 = 6.0;
         pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;
         pub const ABOUT_ICON: f32 = 64.0;
+        pub const KEYMAP_LIST_HEIGHT: f32 = 400.0;
         pub const LIST_ARROW_WIDTH: f32 = 24.0;
         pub const TITLE_BAR_HEIGHT: f32 = 32.0;
         pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;

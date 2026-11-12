@@ -103,15 +103,28 @@ fn start_engine() {
 /// 起動の引数．--measure <ファイル> で窓を出すまで・中身を出すまで・ページを開く・送る時間を測って書き，終える．
 /// --theme light|dark で OS の設定によらず明暗を決め，--page <名前> で初めに開くページを決める(見本の撮影．
 /// エンジンが入力メニューの「ユーザー辞書…」で --page dictionary を渡す)．
-/// --offline ならエンジンにつながず，見本の値で開く．--register-word なら単語の登録の語と読みをエンジンから受け取る
+/// --offline ならエンジンにつながず，見本の値で開く．--register-word なら単語の登録の語と読みをエンジンから受け取る．
+/// --check-for-updates なら情報のページで開き，情報のページの「更新を確認」を押したときと同じ確認を始める
 fn options(started: std::time::Instant) -> window::Options {
     let arguments: Vec<String> = std::env::args().collect();
+    parse_options(&arguments, started)
+}
+
+fn parse_options(arguments: &[String], started: std::time::Instant) -> window::Options {
     let value = |name: &str| {
         arguments
             .iter()
             .position(|argument| argument == name)
             .and_then(|index| arguments.get(index + 1))
     };
+    let check_for_updates = arguments
+        .iter()
+        .any(|argument| argument == CHECK_FOR_UPDATES);
+    let page = value("--page").and_then(|name| {
+        crate::pages::Page::ALL
+            .into_iter()
+            .find(|page| format!("{page:?}").eq_ignore_ascii_case(name))
+    });
     window::Options {
         started,
         theme: value("--theme").and_then(|theme| match theme.as_str() {
@@ -123,11 +136,9 @@ fn options(started: std::time::Instant) -> window::Options {
         measure: value("--measure").map(std::path::PathBuf::from),
         offline: arguments.iter().any(|argument| argument == OFFLINE),
         register_word: arguments.iter().any(|argument| argument == REGISTER_WORD),
-        page: value("--page").and_then(|name| {
-            crate::pages::Page::ALL
-                .into_iter()
-                .find(|page| format!("{page:?}").eq_ignore_ascii_case(name))
-        }),
+        // 「更新を確認」のボタンと進み具合はバージョンの行にあるので，ページを決めていなければ情報のページで開く
+        page: page.or(check_for_updates.then_some(crate::pages::Page::About)),
+        check_for_updates,
     }
 }
 
@@ -136,7 +147,8 @@ pub(crate) const SETUP: &str = "--setup";
 const SETUP_IF_NEEDED: &str = "--setup-if-needed";
 /// エンジンにつながずに見本の値で開く(開発用．画面の確かめと見本の撮影)
 pub(crate) const OFFLINE: &str = "--offline";
-/// 最新のリリースのページをブラウザーで開いて終える(入力メニューの「更新を確認」．macOS と同じく通信しない)
+/// 情報のページで開き，「更新を確認」を押したときと同じ確認を始める(入力メニューの「更新を確認」．
+/// macOS の入力メニューと情報のページが同じ更新用のアプリを起動するのと同じく，両方を同じ流れにする)
 pub const CHECK_FOR_UPDATES: &str = "--check-for-updates";
 /// 単語の登録で開く(EngineService.settingsRegistrationArgument)．つながったら，エンジンが持っている語と読みを
 /// ユーザー辞書の登録の欄に入れる．語と読みは入力内容なので引数では受け取らない
@@ -206,16 +218,6 @@ pub fn run() {
     {
         ffi::add_input_method_once();
     }
-    if arguments
-        .iter()
-        .any(|argument| argument == CHECK_FOR_UPDATES)
-    {
-        if let Ok(catalog) = Catalog::load() {
-            ffi::initialize_com();
-            ffi::open_url(&catalog.latest_release_url);
-        }
-        return;
-    }
     let mode = mode(&arguments);
     if matches!(mode, Mode::Nothing) {
         return;
@@ -244,4 +246,55 @@ pub fn run() {
         return;
     }
     ffi::run_message_loop();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::pages::Page;
+
+    fn parse(arguments: &[&str]) -> window::Options {
+        let arguments: Vec<String> = std::iter::once("hajime-settings.exe")
+            .chain(arguments.iter().copied())
+            .map(String::from)
+            .collect();
+        parse_options(&arguments, std::time::Instant::now())
+    }
+
+    #[test]
+    fn 更新を確認の引数で情報のページを開いて確認を始める() {
+        let options = parse(&[CHECK_FOR_UPDATES]);
+        assert!(options.check_for_updates);
+        assert_eq!(options.page, Some(Page::About));
+        assert!(!options.offline);
+        assert!(!options.register_word);
+    }
+
+    #[test]
+    fn 引数が無ければ確認を始めない() {
+        let options = parse(&[]);
+        assert!(!options.check_for_updates);
+        assert_eq!(options.page, None);
+    }
+
+    #[test]
+    fn ページを決めていればそのページで開いて確認を始める() {
+        let options = parse(&["--page", "dictionary", CHECK_FOR_UPDATES]);
+        assert!(options.check_for_updates);
+        assert_eq!(options.page, Some(Page::Dictionary));
+    }
+
+    #[test]
+    fn 更新を確認の引数ではウィザードを開かない() {
+        let arguments = vec![
+            "hajime-settings.exe".to_string(),
+            CHECK_FOR_UPDATES.to_string(),
+        ];
+        assert!(matches!(mode(&arguments), Mode::Settings));
+    }
+
+    #[test]
+    fn 入力メニューと同じ引数を受け取る() {
+        assert_eq!(CHECK_FOR_UPDATES, "--check-for-updates");
+    }
 }
