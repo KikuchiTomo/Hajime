@@ -36,10 +36,11 @@ use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DispatchMessageW, GetMessageW, GetWindowLongPtrW, KillTimer,
     LoadCursorW, PostMessageW, RegisterClassExW, SetTimer, SetWindowLongPtrW, SetWindowPos,
     ShowWindow, TranslateMessage, CS_DROPSHADOW, GWLP_USERDATA, HTTRANSPARENT, HWND_TOPMOST,
-    IDC_ARROW, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_SHOWWINDOW, SW_HIDE, WM_APP,
-    WM_DWMCOLORIZATIONCOLORCHANGED, WM_LBUTTONDOWN, WM_MOUSEACTIVATE, WM_NCHITTEST, WM_PAINT,
-    WM_SETTINGCHANGE, WM_SYSCOLORCHANGE, WM_THEMECHANGED, WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES,
-    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
+    IDC_ARROW, MA_NOACTIVATE, MSG, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOREDRAW, SWP_NOSIZE,
+    SWP_SHOWWINDOW, SW_HIDE, WM_APP, WM_DWMCOLORIZATIONCOLORCHANGED, WM_LBUTTONDOWN,
+    WM_MOUSEACTIVATE, WM_NCHITTEST, WM_PAINT, WM_SETTINGCHANGE, WM_SYSCOLORCHANGE, WM_THEMECHANGED,
+    WM_TIMER, WNDCLASSEXW, WNDCLASS_STYLES, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_POPUP,
 };
 use windows_core::{w, Result, BOOL, BSTR, PCWSTR};
 
@@ -67,16 +68,25 @@ struct Callbacks {
     paint: fn(),
     /// 窓の中を押した(窓の中のピクセルの座標)
     click: fn(i32, i32),
+    /// OS の外観やアニメーション効果の設定が変わった
+    settings: fn(),
 }
 
 static CALLBACKS: OnceLock<Callbacks> = OnceLock::new();
 
-pub fn set_callbacks(inbox: fn(), timer: fn(Timer), paint: fn(), click: fn(i32, i32)) {
+pub fn set_callbacks(
+    inbox: fn(),
+    timer: fn(Timer),
+    paint: fn(),
+    click: fn(i32, i32),
+    settings: fn(),
+) {
     let _ = CALLBACKS.set(Callbacks {
         click,
         inbox,
         timer,
         paint,
+        settings,
     });
 }
 
@@ -432,6 +442,25 @@ impl Window {
         );
     }
 
+    /// 出している窓を最前面に付け直す．位置・大きさ・中身は変えず，描き直さない(隠している窓は出さない)
+    pub fn raise(&self) {
+        if self.shown.get().is_none() {
+            return;
+        }
+        // SAFETY: hwnd はこの窓
+        let _ = unsafe {
+            SetWindowPos(
+                self.hwnd,
+                Some(HWND_TOPMOST),
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOREDRAW,
+            )
+        };
+    }
+
     /// 窓を (x, y) に width × height で出す(画面のピクセル)．前と同じ位置と大きさで出していれば何もしない
     fn show_at(&self, x: i32, y: i32, width: i32, height: i32) {
         let rect = RECT {
@@ -665,6 +694,10 @@ unsafe extern "system" fn procedure(
         // 覚えた設定を読み直させ，処理は DefWindowProcW にも任せる
         WM_SETTINGCHANGE | WM_THEMECHANGED | WM_SYSCOLORCHANGE | WM_DWMCOLORIZATIONCOLORCHANGED => {
             super::system::settings_changed();
+            // 次のキーを待たずに，今の外観で描き直させる
+            if let Some(callbacks) = CALLBACKS.get() {
+                (callbacks.settings)();
+            }
             None
         }
         WM_MOUSEACTIVATE => Some(LRESULT(MA_NOACTIVATE as isize)),
