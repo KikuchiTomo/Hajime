@@ -8,11 +8,11 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$version = '0.5.2'
+$version = '0.5.3'
 $url = "https://github.com/KikuchiTomo/hajime-dictionary/releases/download/v$version/hajime-dictionary-$version.tar.gz"
-$expected = '3134fb044fb164a03c2ba5458afa41542863cd0b0f1bf87c3a331f08122160f0'
+$expected = 'af10cad7cc14565f82748200cf9cdd5402a9aff293c32d044170ab1190a2681a'
 # 展開した Dictionary\SHA256SUMS の SHA-256(BundledDictionary.expectedManifestSHA256 と同じ値)
-$manifest = '1db61a19285d4c96b9fab496a23a51bd920548b3fd4bb6905386d0de832a7eec'
+$manifest = 'c5672a2bdc38f636cddf0853b1ea9ceb2acf85f0a0d565779030d529c20cb478'
 
 New-Item -ItemType Directory -Force -Path $Output | Out-Null
 $directory = Join-Path $Output "hajime-dictionary-$version"

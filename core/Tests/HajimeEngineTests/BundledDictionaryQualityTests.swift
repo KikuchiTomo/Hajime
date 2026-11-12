@@ -49,7 +49,8 @@ struct BundledDictionaryQualityTests {
     ]
 
     /// 辞書から除いた，促音で切った交ぜ書き(元の語の頭の漢字を読みのかなにした書き方)．どれも変換の候補の上位に出ない．
-    /// v0.5.1 で足した辞書の語を，v0.5.2 で azooKey の辞書の語(てっ底・やっ介・ひっ算・まっ赤)を除いた
+    /// v0.5.1 で足した辞書の語を，v0.5.2 で azooKey の辞書の語(てっ底・やっ介・ひっ算・まっ赤)を除いた．
+    /// v0.5.3 で送りがなを落とした 1 字の名詞(待 の まち・考 の かんがえ)を除いた
     private nonisolated static let removedSpellings: [(reading: String, spellings: [String])] = [
         ("はっせい", ["はっ声", "はっ生", "ハッ声", "ハッ生"]),
         ("はっちゅう", ["はっ注", "ハッ注"]),
@@ -61,6 +62,8 @@ struct BundledDictionaryQualityTests {
         ("やっかい", ["やっ介"]),
         ("ひっさん", ["ひっ算"]),
         ("まっか", ["まっ赤"]),
+        ("まち", ["待"]),
+        ("かんがえ", ["考"]),
     ]
 
     /// 辞書に残した，新聞の交ぜ書き(常用漢字になる前の表外字をかなにした書き方)．候補に出る
@@ -94,6 +97,8 @@ struct BundledDictionaryQualityTests {
     /// 数と助数詞の書き方．数のあとの語の決まりで除かず，一覧の上位 5 に出る
     private nonisolated static let counterCases: [(reading: String, text: String)] = [
         ("はっぽん", "8本"), ("いっぷん", "1分"), ("じゅっかい", "10回"), ("ろっぽん", "6本"), ("ろっけん", "6件"), ("はっさい", "8歳"),
+        // v0.5.3 で足した助数詞の音の変わる読み(匹 の ピキ・ビキ)
+        ("ろっぴき", "6匹"), ("よんびき", "四匹"),
     ]
 
     /// 語末で前のかなの母音を伸ばす書き方．拍の途中の字種の切り替えとして除かず，一覧の上位 5 に出る
@@ -232,7 +237,7 @@ struct BundledDictionaryQualityTests {
         #expect(try convert(reading, presentation: .list).entries.first == (reading == "いっぷん" ? "1分" : "一緒に"))
     }
 
-    @Test("数と助数詞(8本・1分・10回・6本・6件・8歳)は除かず，一覧の上位 5 に出る", arguments: counterCases)
+    @Test("数と助数詞(8本・1分・10回・6本・6件・8歳・6匹・四匹)は除かず，一覧の上位 5 に出る", arguments: counterCases)
     func keepsCounters(reading: String, text: String) throws {
         let list = try convert(reading, presentation: .list)
         #expect(list.entries.prefix(5).contains(text), "一覧の候補: \(list.entries.prefix(5))")
