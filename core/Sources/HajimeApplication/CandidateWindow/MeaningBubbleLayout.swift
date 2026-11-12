@@ -78,7 +78,9 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         func vertical(at x: Double) -> (y: Double, pointer: Double)? {
             guard x >= screen.x, x + windowWidth <= screen.maxX else { return nil }
             var top = max(screen.y, candidate.y), bottom = screen.maxY
-            for obstacle in obstacles where obstacle.x < x + windowWidth && x < obstacle.maxX {
+            // 候補の窓の上の端より上にある物(入力中の文字の行など)は，上の端にそろえるだけで覆わないので見ない．
+            // 見ると，窓と入力中の文字のあいだが gap より狭いときに，吹き出しだけが窓の上の端より下がる
+            for obstacle in obstacles where obstacle.x < x + windowWidth && x < obstacle.maxX && obstacle.maxY > candidate.y {
                 if obstacle.y >= targetY {
                     bottom = min(bottom, obstacle.y - metrics.gap)
                 } else if obstacle.maxY <= targetY {
