@@ -256,12 +256,16 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
     let association_hint = footer.association_hint.as_deref().map_or(0.0, |hint| {
         painter.width(hint, Font::Label) + glass::HINT_GAP
     });
-    let footer_width = (hints_width
-        + association_hint
-        + painter.width(&footer.position, Font::Label)
-        + metrics.row_padding_x * 2.0
-        + glass::HINT_GAP)
-        .ceil();
+    let footer_width = if look.shows_footer {
+        (hints_width
+            + association_hint
+            + painter.width(&footer.position, Font::Label)
+            + metrics.row_padding_x * 2.0
+            + glass::HINT_GAP)
+            .ceil()
+    } else {
+        0.0
+    };
     let heading_width = list.association.as_ref().map_or(0.0, |heading| {
         super::association::width(&painter, heading) - padding * 2.0 + metrics.row_padding_x * 2.0
     });
@@ -321,6 +325,7 @@ pub fn candidate_list(list: &CandidateList, look: &Look, measure: &dyn Measure) 
         limit,
         &metrics.layout,
         look.size,
+        look.shows_footer,
     );
     let cells = cells(list, &layout, cell_width);
     draw_list(
@@ -558,8 +563,10 @@ fn draw_list(
             meaning::connector(painter, start, end);
         }
     }
-    painter.rect(layout.footer_separator, theme.line);
-    footer_section(painter, footer, layout.footer, metrics.row_padding_x);
+    if layout.footer.height > 0.0 {
+        painter.rect(layout.footer_separator, theme.line);
+        footer_section(painter, footer, layout.footer, metrics.row_padding_x);
+    }
 }
 
 /// 候補の行の札の右端(行の地の内側の余白の内側．足元の位置の右の端と同じ x)

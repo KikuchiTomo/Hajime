@@ -947,6 +947,22 @@ impl App {
         };
         let resolved =
             candidate_ui::theme::ResolvedTheme::resolve(&theme_name, shown.as_ref(), &look);
+        // 絵文字の見本は描いた高さで行を置く(足元の無い小さな窓．行の数は位置と数で変わる)．高さが変わったら置き直して次に描く
+        if let Some(list) = &emoji {
+            let height = preview
+                .size(
+                    &resolved,
+                    font_size,
+                    candidate_ui::app::preview::Shown::CompactList(list),
+                )
+                .ok()
+                .map(|(_, height)| height.ceil());
+            if height.is_some() && self.view.emoji_preview_height != height {
+                self.view.emoji_preview_height = height;
+                self.arrange();
+                return;
+            }
+        }
         let scale = self.theme.dpi as f32 / ffi::BASE_DPI as f32;
         // 見本を捨てたあと(refresh)も前と同じ番号にしない．同じ番号だと描き先が前の画像を使い回す
         self.preview_generation += 1;
@@ -960,11 +976,18 @@ impl App {
             background: self.theme.palette.card,
             shown: match (&palette, &emoji) {
                 (Some(panel), _) => candidate_ui::app::preview::Shown::Palette(panel),
-                (None, Some(list)) => candidate_ui::app::preview::Shown::List(list),
+                (None, Some(list)) => candidate_ui::app::preview::Shown::CompactList(list),
                 (None, None) => candidate_ui::app::preview::Shown::Sample,
             },
-            placement: candidate_ui::app::preview::Placement::Center {
-                ground: self.theme.palette.card,
+            // 絵文字の見本は設定の項目の名前と同じ左の端から置く．ほかの見本は欄の真ん中
+            placement: if emoji.is_some() {
+                candidate_ui::app::preview::Placement::TopLeft {
+                    ground: self.theme.palette.card,
+                }
+            } else {
+                candidate_ui::app::preview::Placement::Center {
+                    ground: self.theme.palette.card,
+                }
             },
         };
         let Some(pixels) = d2d::render_preview(preview, width, height, &request) else {

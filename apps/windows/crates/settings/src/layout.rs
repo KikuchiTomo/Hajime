@@ -51,7 +51,7 @@ pub trait Metrics {
     fn lines(&self, text: &str, kind: TextKind, width: f32) -> usize;
     /// 1 行にしたときの幅
     fn width(&self, text: &str, kind: TextKind) -> f32;
-    /// 中身で高さの変わるカード(謝辞)の高さ．width はカードの幅．None なら決まった高さ
+    /// 中身で高さの変わるカード(謝辞)と見本(絵文字の候補の見本は部品の高さ)の高さ．width はカードの幅．None なら決まった高さ
     fn height(&self, _row: &Row, _width: f32) -> Option<f32> {
         None
     }
@@ -318,12 +318,15 @@ fn place(
             size::PALETTE_PREVIEW_HEIGHT,
             metrics,
         ),
+        // 絵文字の見本は描いた高さ(窓が測る)で置く．測る前は決まった高さ
         Control::EmojiPreview => place_inputs(
             position,
             0,
             NO_BUTTONS,
             frame,
-            size::EMOJI_PREVIEW_HEIGHT,
+            metrics
+                .height(row, frame.width)
+                .unwrap_or(size::EMOJI_PREVIEW_HEIGHT),
             metrics,
         ),
         // 謝辞は中身(名前・出どころ・ライセンスの全文)を画面の側で測って置く．部品の欄はカードの中の全体

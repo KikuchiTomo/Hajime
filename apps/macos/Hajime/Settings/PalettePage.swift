@@ -39,16 +39,10 @@ struct PalettePage: View {
                 .disabled(!model.settings.palette)
             }
             Section(UIStrings.Palette.look) {
-                ResettableRow(model: model, keyPath: \.paletteColumns) {
-                    Stepper(value: model.binding(\.paletteColumns), in: DefaultSettings.paletteColumnsRange) {
-                        LabeledContent(UIStrings.Palette.columns, value: "\(model.settings.paletteColumns)")
-                    }
-                }
-                ResettableRow(model: model, keyPath: \.paletteRows) {
-                    Stepper(value: model.binding(\.paletteRows), in: DefaultSettings.paletteRowsRange) {
-                        LabeledContent(UIStrings.Palette.rows, value: "\(model.settings.paletteRows)")
-                    }
-                }
+                ResettableStepper(model: model, title: UIStrings.Palette.columns, keyPath: \.paletteColumns, range: DefaultSettings.paletteColumnsRange,
+                                  value: "\(model.settings.paletteColumns)")
+                ResettableStepper(model: model, title: UIStrings.Palette.rows, keyPath: \.paletteRows, range: DefaultSettings.paletteRowsRange,
+                                  value: "\(model.settings.paletteRows)")
                 ResettableRow(model: model, keyPath: \.paletteCellSize) {
                     LabeledContent(UIStrings.Palette.cellSizeValue(Int(cellSize ?? model.settings.paletteCellSize))) {
                         Slider(value: Binding(get: { cellSize ?? model.settings.paletteCellSize }, set: { cellSize = $0 }),
@@ -59,11 +53,8 @@ struct PalettePage: View {
                         }
                     }
                 }
-                ResettableRow(model: model, keyPath: \.paletteFrequentRows) {
-                    Stepper(value: model.binding(\.paletteFrequentRows), in: DefaultSettings.paletteFrequentRowsRange) {
-                        LabeledContent(UIStrings.Palette.frequentRows, value: "\(model.settings.paletteFrequentRows)")
-                    }
-                }
+                ResettableStepper(model: model, title: UIStrings.Palette.frequentRows, keyPath: \.paletteFrequentRows, range: DefaultSettings.paletteFrequentRowsRange,
+                                  value: "\(model.settings.paletteFrequentRows)")
                 .disabled(!model.settings.paletteRecordsHistory)
                 ResettableToggle(model: model, title: UIStrings.Palette.showsPreview, keyPath: \.paletteShowsPreview)
                 Group {

@@ -13,24 +13,17 @@ struct EmojiSection: View {
             exampleToggle(UIStrings.Settings.emojiConversion, keyPath: \.emojiConversion, example: UIStrings.Settings.emojiConversionExample)
             exampleToggle(UIStrings.Settings.emojiWordConversion, keyPath: \.emojiWordConversion, example: UIStrings.Settings.emojiWordConversionExample)
             Group {
-                ResettableRow(model: model, keyPath: \.emojiCandidatePosition) {
-                    Stepper(value: model.binding(\.emojiCandidatePosition), in: DefaultSettings.emojiCandidatePositionRange) {
-                        LabeledContent(UIStrings.Settings.emojiCandidatePosition,
-                                       value: UIStrings.Settings.emojiCandidatePositionValue(model.settings.emojiCandidatePosition))
-                    }
-                }
-                ResettableRow(model: model, keyPath: \.emojiCandidateCount) {
-                    Stepper(value: model.binding(\.emojiCandidateCount), in: DefaultSettings.emojiCandidateCountRange) {
-                        LabeledContent(UIStrings.Settings.emojiCandidateCount, value: "\(model.settings.emojiCandidateCount)")
-                    }
-                }
+                ResettableStepper(model: model, title: UIStrings.Settings.emojiCandidatePosition, keyPath: \.emojiCandidatePosition, range: DefaultSettings.emojiCandidatePositionRange,
+                                  value: UIStrings.Settings.emojiCandidatePositionValue(model.settings.emojiCandidatePosition))
+                ResettableStepper(model: model, title: UIStrings.Settings.emojiCandidateCount, keyPath: \.emojiCandidateCount, range: DefaultSettings.emojiCandidateCountRange,
+                                  value: "\(model.settings.emojiCandidateCount)")
                 ResettableToggle(model: model, title: UIStrings.Settings.showsEmojiNames, keyPath: \.showsEmojiNames)
             }
             .disabled(model.settings.emojiPlacement == nil)
+            // 見本は設定の項目の名前と同じ左の端から置く(足元の行を出さない小さな窓)
             if let panel = SamplePanels.emojiPlacement(model.settings) {
                 CandidatePreview(choice: ThemeChoice(model.settings), fontSize: model.settings.candidateFontSize, panel: panel)
-                    .padding(DesignTokens.Size.Settings.previewPadding)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
     }
@@ -78,7 +71,7 @@ struct CandidateExample: View {
     }
 }
 
-/// 候補の一覧の見本．テーマ・文字の大きさ・中身を変えると，その場で描き直す(欄が狭ければ同じ比で縮める)
+/// 候補の一覧の見本(足元の行を出さない)．テーマ・文字の大きさ・中身を変えると，その場で描き直す(欄が狭ければ同じ比で縮める)
 struct CandidatePreview: NSViewRepresentable {
     let choice: ThemeChoice
     let fontSize: Double
@@ -87,6 +80,7 @@ struct CandidatePreview: NSViewRepresentable {
     func makeNSView(context: Context) -> ScaledPreview<CandidateView> {
         let view = CandidateView()
         view.fillsSurface = true
+        view.showsFooter = false
         return ScaledPreview(content: view)
     }
 

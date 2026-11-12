@@ -161,11 +161,8 @@ private struct ConversionTab: View {
                 ResettablePicker(model: model, title: UIStrings.Choice.presentation, keyPath: \.candidatePresentation, label: UIStrings.Choice.label(for:))
                 ResettablePicker(model: model, title: UIStrings.Choice.initialFocus, keyPath: \.initialFocus, label: UIStrings.Choice.label(for:))
                 ResettablePicker(model: model, title: UIStrings.Choice.suggestionDisplay, keyPath: \.suggestionDisplay, label: UIStrings.Choice.label(for:))
-                ResettableRow(model: model, keyPath: \.suggestionSkipCount) {
-                    Stepper(value: model.binding(\.suggestionSkipCount), in: DefaultSettings.suggestionSkipCountRange) {
-                        LabeledContent(UIStrings.More.suggestionSkipCount, value: UIStrings.More.skipCount(model.settings.suggestionSkipCount))
-                    }
-                }
+                ResettableStepper(model: model, title: UIStrings.More.suggestionSkipCount, keyPath: \.suggestionSkipCount, range: DefaultSettings.suggestionSkipCountRange,
+                                  value: UIStrings.More.skipCount(model.settings.suggestionSkipCount))
                 .disabled(model.settings.suggestionDisplay == .off)
                 ResettablePicker(model: model, title: UIStrings.Choice.predictionDisplay, keyPath: \.predictionDisplay, label: UIStrings.Choice.label(for:))
                 ResettableToggle(model: model, title: UIStrings.Choice.predictionPrefersHistory, keyPath: \.predictionPrefersHistory)
@@ -179,11 +176,8 @@ private struct ConversionTab: View {
                                   range: DefaultSettings.liveConversionDelayRange)
                 }
                 .disabled(!model.settings.liveConversion)
-                ResettableRow(model: model, keyPath: \.liveConversionSkipLength) {
-                    Stepper(value: model.binding(\.liveConversionSkipLength), in: DefaultSettings.liveConversionSkipLengthRange) {
-                        LabeledContent(UIStrings.More.liveConversionSkipLength, value: UIStrings.More.skipLength(model.settings.liveConversionSkipLength))
-                    }
-                }
+                ResettableStepper(model: model, title: UIStrings.More.liveConversionSkipLength, keyPath: \.liveConversionSkipLength, range: DefaultSettings.liveConversionSkipLengthRange,
+                                  value: UIStrings.More.skipLength(model.settings.liveConversionSkipLength))
                 .disabled(!model.settings.liveConversion)
             }
             Section(UIStrings.Choice.hiddenPredictions) {
@@ -192,21 +186,12 @@ private struct ConversionTab: View {
                     empty: UIStrings.Choice.hiddenPredictionsEmpty))
             }
             Section(UIStrings.More.candidates) {
-                ResettableRow(model: model, keyPath: \.branchCandidatesPerPage) {
-                    Stepper(value: model.binding(\.branchCandidatesPerPage), in: DefaultSettings.candidatesPerPageRange) {
-                        LabeledContent(UIStrings.More.branchCandidates, value: "\(model.settings.branchCandidatesPerPage)")
-                    }
-                }
-                ResettableRow(model: model, keyPath: \.listCandidatesPerPage) {
-                    Stepper(value: model.binding(\.listCandidatesPerPage), in: DefaultSettings.candidatesPerPageRange) {
-                        LabeledContent(UIStrings.More.listCandidates, value: "\(model.settings.listCandidatesPerPage)")
-                    }
-                }
-                ResettableRow(model: model, keyPath: \.candidateGridColumns) {
-                    Stepper(value: model.binding(\.candidateGridColumns), in: DefaultSettings.candidateGridColumnsRange) {
-                        LabeledContent(UIStrings.More.gridColumns, value: "\(model.settings.candidateGridColumns)")
-                    }
-                }
+                ResettableStepper(model: model, title: UIStrings.More.branchCandidates, keyPath: \.branchCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange,
+                                  value: "\(model.settings.branchCandidatesPerPage)")
+                ResettableStepper(model: model, title: UIStrings.More.listCandidates, keyPath: \.listCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange,
+                                  value: "\(model.settings.listCandidatesPerPage)")
+                ResettableStepper(model: model, title: UIStrings.More.gridColumns, keyPath: \.candidateGridColumns, range: DefaultSettings.candidateGridColumnsRange,
+                                  value: "\(model.settings.candidateGridColumns)")
                 Text(UIStrings.More.gridColumnsNote).font(.caption).foregroundStyle(.secondary)
                 ResettableToggle(model: model, title: UIStrings.More.expandsGridOnPaging, keyPath: \.expandsGridOnPaging)
                 ResettableToggle(model: model, title: UIStrings.More.contextualSegmentCandidates, keyPath: \.contextualSegmentCandidates)
@@ -216,11 +201,8 @@ private struct ConversionTab: View {
             }
             Section(UIStrings.More.typo) {
                 ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))
-                ResettableRow(model: model, keyPath: \.englishSkipLength) {
-                    Stepper(value: model.binding(\.englishSkipLength), in: DefaultSettings.englishSkipLengthRange) {
-                        LabeledContent(UIStrings.More.englishSkipLength, value: UIStrings.More.skipLength(model.settings.englishSkipLength))
-                    }
-                }
+                ResettableStepper(model: model, title: UIStrings.More.englishSkipLength, keyPath: \.englishSkipLength, range: DefaultSettings.englishSkipLengthRange,
+                                  value: UIStrings.More.skipLength(model.settings.englishSkipLength))
                 Group {
                     ResettablePicker(model: model, title: UIStrings.More.correctionSensitivity, keyPath: \.correctionSensitivity, label: UIStrings.More.label(for:))
                     ResettableToggle(model: model, title: UIStrings.More.showsSuggestions, keyPath: \.showsSuggestions)
@@ -269,11 +251,8 @@ private struct ConversionTab: View {
                 ResettableToggle(model: model, title: UIStrings.Settings.homophoneNotes, keyPath: \.homophoneNotes)
                 Group {
                     ResettablePicker(model: model, title: UIStrings.Settings.meaningPlacement, keyPath: \.meaningPlacement, label: UIStrings.Settings.label(for:))
-                    ResettableRow(model: model, keyPath: \.meaningSenseLimit) {
-                        Stepper(value: model.binding(\.meaningSenseLimit), in: DefaultSettings.meaningSenseLimitRange) {
-                            LabeledContent(UIStrings.Settings.meaningSenseLimit, value: "\(model.settings.meaningSenseLimit)")
-                        }
-                    }
+                    ResettableStepper(model: model, title: UIStrings.Settings.meaningSenseLimit, keyPath: \.meaningSenseLimit, range: DefaultSettings.meaningSenseLimitRange,
+                                      value: "\(model.settings.meaningSenseLimit)")
                     ResettableToggle(model: model, title: UIStrings.Settings.showsPartOfSpeech, keyPath: \.showsPartOfSpeech)
                     ResettableToggle(model: model, title: UIStrings.Settings.showsUsageExamples, keyPath: \.showsUsageExamples)
                     ResettableToggle(model: model, title: UIStrings.Settings.showsHomophones, keyPath: \.showsHomophones)

@@ -1160,6 +1160,8 @@ pub struct PageView {
     table_hover: Option<(usize, usize)>,
     /// 中身の幅(DIP)
     width: f32,
+    /// 絵文字の候補の見本を描いた高さ(DIP)．窓が見本を描いて測ったら入れ，その高さで行を置く
+    pub emoji_preview_height: Option<f32>,
 }
 
 /// 描くときに窓から渡すもの
@@ -1235,6 +1237,7 @@ impl PageView {
             hover: HashMap::new(),
             table_hover: None,
             width: 0.0,
+            emoji_preview_height: None,
         }
     }
 
@@ -1399,6 +1402,7 @@ impl PageView {
             measure,
             all: &all,
             expanded: &expanded,
+            emoji_preview_height: self.emoji_preview_height,
         };
         self.layout = layout::layout(
             &self.sections,
@@ -4043,6 +4047,8 @@ struct Measured<'a> {
     all: &'a [&'a Row],
     /// 謝辞のライセンスの全文を開いているか(行と同じ並び)
     expanded: &'a [bool],
+    /// 絵文字の候補の見本の高さ(測っていなければ None)
+    emoji_preview_height: Option<f32>,
 }
 
 impl Measured<'_> {
@@ -4078,6 +4084,9 @@ impl Metrics for Measured<'_> {
     }
 
     fn height(&self, row: &Row, width: f32) -> Option<f32> {
+        if row.control == Control::EmojiPreview {
+            return self.emoji_preview_height;
+        }
         let Control::Acknowledgement(index) = row.control else {
             return None;
         };
