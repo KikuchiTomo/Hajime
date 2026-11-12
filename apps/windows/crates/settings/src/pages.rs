@@ -175,6 +175,7 @@ impl Page {
                 association::DICTIONARIES,
                 settings::MEANING,
                 settings::SHOWS_PART_OF_SPEECH,
+                settings::CANDIDATE_RERANKING,
             ],
             Page::Correction => vec![
                 features::EXCEPTIONS,
@@ -228,6 +229,8 @@ impl Page {
                 extras::LAUNCHER_COMMANDS,
                 extras::MACROS_SECTION,
                 extras::CONVERSION_MACROS,
+                extras::MACRO_SKIPS_SAME_READING,
+                extras::TRY_MACROS,
             ],
             Page::Appearance => vec![more::THEME, more::CUSTOM_THEMES, more::FONT],
             Page::Sync => vec![sync::FOLDER, sync::SCOPES, settings::DICTIONARY_TAB],
@@ -594,10 +597,8 @@ impl Control {
                 (ADD_REMOVE, &[windows::TOGGLE_ENABLED])
             }
             Control::List(..) | Control::Dictionary(_) => (ADD_REMOVE, &[]),
-            Control::Symbols(..) => (
-                &[settings::ADD, settings::REMOVE, windows::TOGGLE_ENABLED],
-                &[],
-            ),
+            // 有効・無効の切り替えは，ほかの一覧と同じく表の下に置く(上に並べると入力欄が狭くなり，案内の文字が欠ける)
+            Control::Symbols(..) => (ADD_REMOVE, &[windows::TOGGLE_ENABLED]),
             Control::SyncFields(_) => (&[windows::TOGGLE_SYNC_SCOPE], &[]),
             Control::Dictionaries(DictionaryList::Imported, _) => (
                 &[rule_list::UPDATE],

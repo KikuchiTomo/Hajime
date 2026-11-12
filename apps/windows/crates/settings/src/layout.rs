@@ -362,10 +362,17 @@ fn place_labeled(
         let height = size::ROW_HEIGHT
             .max(text_height + size::CARD_PADDING_Y * 2.0)
             .max(size::CONTROL_HEIGHT + size::CARD_PADDING_Y * 2.0);
+        // 説明が長くてカードが 2 行分より高いときは，部品をカードの真ん中でなく名前の行の高さに置く
+        // (ユーザー辞書の書き方の表のように説明が長いと，真ん中の部品がどの行のものか分からない)
+        let control_top = if height > size::ROW_HEIGHT * 2.0 {
+            frame.y + (size::ROW_HEIGHT - size::CONTROL_HEIGHT) / 2.0
+        } else {
+            frame.y + (height - size::CONTROL_HEIGHT) / 2.0
+        };
         (
             height,
             frame.y + (height - text_height) / 2.0,
-            frame.y + (height - size::CONTROL_HEIGHT) / 2.0,
+            control_top,
             right - reset_space - trailing,
         )
     };
@@ -837,6 +844,17 @@ mod tests {
             assert!(card.control.max_y() <= card.card.max_y());
             assert!(card.control.max_x() <= card.card.max_x());
         }
+    }
+
+    #[test]
+    fn 説明の長い行は部品を名前の高さに置く() {
+        let page = sections(Page::Dictionary).unwrap();
+        let layout = layout(&page, 800.0, |_| true, &Estimate);
+        // 単語に書ける書き方の表を説明に持つ行(ユーザー辞書の 2 つ目の区切り)
+        let card = &layout.sections[1].cards[0];
+        assert!(card.descriptions.len() > 5);
+        assert!(card.card.height > size::ROW_HEIGHT * 2.0);
+        assert!(card.control.max_y() <= card.card.y + size::ROW_HEIGHT);
     }
 
     #[test]
