@@ -34,7 +34,6 @@ final class MeaningBubbleController {
         let placement = MeaningBubbleLayout(
             row: box(row), window: box(anchor),
             size: (metrics.width, content.size.height + metrics.padding * 2),
-            preferredPointer: metrics.padding + header / 2,
             screen: .init(x: screen.minX, y: 0, width: screen.width, height: screen.height),
             obstacles: obstacles.map(box),
             metrics: metrics
