@@ -151,11 +151,10 @@ pub fn run_after(window: Window, after: Option<After>) {
             run_after(window, after);
         }
         Some(After::ChooseColor { path, current }) => {
-            let Some((red, green, blue)) = ffi::choose_color(window, crate::themes::rgb(&current))
-            else {
+            let Some(chosen) = ffi::choose_color(window, crate::themes::rgb(&current)) else {
                 return;
             };
-            let value = serde_json::Value::String(format!("#{red:02X}{green:02X}{blue:02X}"));
+            let value = serde_json::Value::String(crate::themes::hex_of(chosen));
             let after = with_app(|app| {
                 app.handle(Event::Set {
                     path,
@@ -677,8 +676,7 @@ impl App {
     fn edit_theme(&mut self, path: &str, value: &serde_json::Value) -> Option<After> {
         let id = self.editing_theme.clone()?;
         let model = self.model.as_mut()?;
-        let changed = crate::themes::edited(model.value(crate::themes::THEMES), &id, path, value)?;
-        if let Err(error) = model.set(crate::themes::THEMES, changed) {
+        if let Err(error) = crate::themes::write(model, &id, path, value)? {
             return self.failure(error);
         }
         self.check_theme();
