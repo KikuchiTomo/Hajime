@@ -1483,10 +1483,10 @@ mod tests {
                 meaning.y > last.max_y() && meaning.max_y() < footer.y,
                 "{name}"
             );
-            // 線でつながない
+            // 吹き出しには出さない
+            let map = meaning_map(ipc::MeaningPlacement::Below);
             assert!(
-                !scene.draws.iter().any(|draw| matches!(draw,
-                Draw::Ellipse { frame, .. } if frame.width == card_size::DOT_SIZE)),
+                super::super::bubble::for_branch(&map, &scene).is_none(),
                 "{name}"
             );
         }

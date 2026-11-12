@@ -1,14 +1,13 @@
-/// 候補の一覧の窓の区画の配置．上から，文字種の行(連想の一覧では見出しの行)・候補・語の意味のカード・足元．
+/// 候補の一覧の窓の区画の配置．上から，文字種の行(連想の一覧では見出しの行)・候補・候補の下の語の意味・足元．
+/// 候補の右(吹き出し)に出す設定の語の意味は窓の外の吹き出し(MeaningBubbleLayout)に出すので，ここには入らない
 ///
 /// 角丸のテーマ(rounded)
-/// - 縁の線の内側に，上下左右とも metrics.padding の余白を空ける．候補の行の地・区切りの線・カードの左右の端は余白の内側の端にそろう
-/// - 区切りの線の上と下は metrics.separatorGap．候補の下のカードと候補のあいだも同じ
-/// - 候補の右の語の意味と一覧のあいだは metrics.cardGap(選んでいる候補と語の意味をつなぐ線をここに引く)．語の意味は箱を描かない
-/// - 候補の右のカードは，上の端を候補の 1 行目の地の上の端に，右の端を足元の区切りの線の右の端にそろえる
+/// - 縁の線の内側に，上下左右とも metrics.padding の余白を空ける．候補の行の地・区切りの線・語の意味の左右の端は余白の内側の端にそろう
+/// - 区切りの線の上と下は metrics.separatorGap．候補の下の語の意味と候補のあいだも同じ
 ///
 /// platinum と desk(bevel)
 /// - 候補の行は立体の縁の内側いっぱいに置く(余白を空けない)．区画と区画は 1 ドットの線で区切る
-/// - 候補の右の語の意味は角丸のテーマと同じく箱を描かずに置く．候補の下は区画にし，一覧とのあいだに横の線を引く
+/// - 候補の下の語の意味は区画にし，一覧とのあいだに横の線を引く
 ///
 /// 座標は窓の左上が原点で，下が y の正．macOS の CandidateView がこの配置を描き，
 /// Windows の候補ウィンドウ(scene::list)は同じ決め方を Rust で持つ
@@ -22,11 +21,9 @@ public struct CandidateListLayout: Sendable, Equatable {
         case bevel
     }
 
-    /// 語の意味のカード
+    /// 候補の下に出す語の意味
     public enum Card: Sendable, Equatable {
-        /// 候補の右．width・height は語の意味の場所の大きさ
-        case side(width: Double, height: Double)
-        /// 候補の下．width は窓の中身の幅の下限(belowCardWidth)で，カードは窓の中身の幅いっぱいに置く
+        /// width は窓の中身の幅の下限(belowCardWidth)で，語の意味は窓の中身の幅いっぱいに置く
         case below(width: Double, height: Double)
     }
 
@@ -38,8 +35,6 @@ public struct CandidateListLayout: Sendable, Equatable {
         public var padding: Double
         /// 区切りの線の上と下の空き
         public var separatorGap: Double
-        /// 候補の右の語の意味と一覧のあいだ
-        public var cardGap: Double
         public var separatorWidth: Double
         /// 候補の行の間隔(行の地の高さと，行と行のあいだの和)
         public var rowPitch: Double
@@ -52,12 +47,11 @@ public struct CandidateListLayout: Sendable, Equatable {
         /// desk の影の幅(右と下)
         public var shadow: Double
 
-        public init(edge: Double, padding: Double, separatorGap: Double, cardGap: Double, separatorWidth: Double, rowPitch: Double, rowInset: Double,
+        public init(edge: Double, padding: Double, separatorGap: Double, separatorWidth: Double, rowPitch: Double, rowInset: Double,
                     headerHeight: Double, footerHeight: Double, shadow: Double) {
             self.edge = edge
             self.padding = padding
             self.separatorGap = separatorGap
-            self.cardGap = cardGap
             self.separatorWidth = separatorWidth
             self.rowPitch = rowPitch
             self.rowInset = rowInset
@@ -69,15 +63,15 @@ public struct CandidateListLayout: Sendable, Equatable {
         /// 角丸のテーマ．行の間隔と行の高さは文字の大きさで変わるので描く側が渡す
         public static func rounded(rowPitch: Double, headerHeight: Double, footerHeight: Double) -> Metrics {
             Metrics(edge: LayoutTokens.Candidate.frameWidth, padding: LayoutTokens.Glass.windowPadding, separatorGap: LayoutTokens.Glass.separatorGap,
-                    cardGap: LayoutTokens.Meaning.cardGap, separatorWidth: LayoutTokens.Candidate.frameWidth, rowPitch: rowPitch, rowInset: LayoutTokens.Glass.selectionInsetY,
+                    separatorWidth: LayoutTokens.Candidate.frameWidth, rowPitch: rowPitch, rowInset: LayoutTokens.Glass.selectionInsetY,
                     headerHeight: headerHeight, footerHeight: footerHeight, shadow: 0)
         }
 
-        /// platinum と desk．文字種の行と足元の行は同じ高さ(sectionHeight)
-        public static func bevel(rowPitch: Double, sectionHeight: Double, hasShadow: Bool) -> Metrics {
-            Metrics(edge: LayoutTokens.Candidate.frameWidth + LayoutTokens.Candidate.bevelWidth, padding: 0, separatorGap: 0, cardGap: LayoutTokens.Meaning.cardGap,
-                    separatorWidth: LayoutTokens.Candidate.frameWidth, rowPitch: rowPitch, rowInset: 0, headerHeight: sectionHeight,
-                    footerHeight: sectionHeight, shadow: hasShadow ? LayoutTokens.Candidate.shadowOffset : 0)
+        /// platinum と desk．余白と区切りの線の上下は角丸のテーマと同じ(余白の決まり)．候補の行の地は角を丸めず，上下を縮めない
+        public static func bevel(rowPitch: Double, headerHeight: Double, footerHeight: Double, hasShadow: Bool) -> Metrics {
+            Metrics(edge: LayoutTokens.Candidate.frameWidth + LayoutTokens.Candidate.bevelWidth, padding: LayoutTokens.Glass.windowPadding,
+                    separatorGap: LayoutTokens.Glass.separatorGap, separatorWidth: LayoutTokens.Candidate.frameWidth, rowPitch: rowPitch, rowInset: 0,
+                    headerHeight: headerHeight, footerHeight: footerHeight, shadow: hasShadow ? LayoutTokens.Candidate.shadowOffset : 0)
         }
     }
 
@@ -116,15 +110,8 @@ public struct CandidateListLayout: Sendable, Equatable {
         let outer = metrics.edge + metrics.padding
         let gap = metrics.separatorGap
         let line = metrics.separatorWidth
-        // 候補の右の語の意味と一覧のあいだ(つなぐ線を引く幅)
-        let sideGap = metrics.cardGap
-
         var contentWidth = max(listWidth, footerWidth)
-        switch card {
-        case .side(let cardWidth, _)?: contentWidth = max(listWidth + sideGap + cardWidth, footerWidth)
-        case .below(let cardWidth, _)?: contentWidth = max(contentWidth, cardWidth)
-        case nil: break
-        }
+        if case .below(let cardWidth, _)? = card { contentWidth = max(contentWidth, cardWidth) }
         let bodyWidth = size.map { $0.width - metrics.shadow } ?? min(contentWidth + outer * 2, max(maximumWidth - metrics.shadow, 0)).rounded(.up)
         contentWidth = bodyWidth - outer * 2
 
@@ -141,22 +128,18 @@ public struct CandidateListLayout: Sendable, Equatable {
         let rowHeight = metrics.rowPitch - metrics.rowInset * 2
         let rowsHeight = rowCount > 0 ? metrics.rowPitch * Double(rowCount) - metrics.rowInset * 2 : 0
         var listBottom = rowsTop + rowsHeight
-        var listColumn = contentWidth
+        let listColumn = contentWidth
         var cardBox: Box?
         var cardLine: Box?
-        switch card {
-        case .side(let cardWidth, let cardHeight)?:
-            listColumn = max(contentWidth - sideGap - cardWidth, 0)
-            let regionHeight = max(rowsHeight, cardHeight)
-            cardBox = Box(x: outer + listColumn + sideGap, y: rowsTop, width: cardWidth, height: regionHeight)
-            listBottom = rowsTop + regionHeight
-        case .below(_, let cardHeight)?:
-            let top = listBottom + (style == .rounded ? gap : line)
-            if style == .bevel { cardLine = Box(x: outer, y: listBottom, width: contentWidth, height: line) }
+        if case .below(_, let cardHeight)? = card {
+            // platinum と desk は，一覧とのあいだに区切りの線を引く(線の上と下は同じ空き)
+            var top = listBottom + gap
+            if style == .bevel {
+                cardLine = Box(x: outer, y: top, width: contentWidth, height: line)
+                top += line + gap
+            }
             cardBox = Box(x: outer, y: top, width: contentWidth, height: cardHeight)
             listBottom = top + cardHeight
-        case nil:
-            break
         }
         rows = (0..<rowCount).map { index in
             Box(x: outer, y: rowsTop + metrics.rowPitch * Double(index), width: listColumn, height: rowHeight)

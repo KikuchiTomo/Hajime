@@ -49,7 +49,7 @@ public enum LayoutTokens {
         public static let stroke: Double = 1
     }
     public enum Candidate {
-        public static let rowHeight: Double = 22
+        public static let rowHeight: Double = 28
         public static let fontSize: Double = 15
         public static let fontSizeMin: Double = 12
         public static let fontSizeMax: Double = 24
@@ -132,22 +132,22 @@ public enum LayoutTokens {
     }
     public enum Glass {
         public static let cornerRadius: Double = 12
-        public static let windowPadding: Double = 8
+        public static let windowPadding: Double = 12
         public static let compactPaddingX: Double = 8
         public static let compactPaddingY: Double = 4
-        public static let separatorGap: Double = 8
+        public static let separatorGap: Double = 12
         public static let rowPaddingX: Double = 4
         public static let headerHeight: Double = 20
         public static let rowHeight: Double = 28
         public static let labelFontSize: Double = 11.5
         public static let keyFontSize: Double = 10.5
-        public static let badgeSize: Double = 17
+        public static let badgeSize: Double = 16
         public static let selectionRadius: Double = 7
         public static let keycapRadius: Double = 4
         public static let keycapPaddingX: Double = 4
         public static let keycapPaddingY: Double = 3
-        public static let keycapHeight: Double = 17
-        public static let hintGap: Double = 12
+        public static let keycapHeight: Double = 16
+        public static let hintGap: Double = 8
         public static let footerHeight: Double = 28
         public static let trunkGap: Double = 8
         public static let branchIndent: Double = 28
@@ -155,7 +155,7 @@ public enum LayoutTokens {
         public static let lineWidth: Double = 1.5
         public static let lineWidthSelected: Double = 2
         public static let underlineOffset: Double = 4
-        public static let modeIndicatorSize: Double = 34
+        public static let modeIndicatorSize: Double = 32
         public static let modeIndicatorFontSize: Double = 17
         public static let selectionInsetY: Double = 2
         public static let branchTurnRadius: Double = 8
@@ -165,15 +165,14 @@ public enum LayoutTokens {
         public static let shadowRadius: Double = 12
         public static let shadowOffsetY: Double = 3
         public static let tagHeight: Double = 16
-        public static let tagPaddingX: Double = 8
-        public static let tagRadius: Double = 8
-        public static let noteIconSize: Double = 17
+        public static let tagPaddingX: Double = 4
+        public static let tagRadius: Double = 4
+        public static let noteIconSize: Double = 16
         public static let commandIconSize: Double = 18
         public static let commandIconRadius: Double = 5
         public static let noteGap: Double = 8
     }
     public enum Meaning {
-        public static let cardGap: Double = 16
         public static let markerWidth: Double = 16
         public static let markerGap: Double = 4
         public static let headerGap: Double = 8
@@ -194,9 +193,7 @@ public enum LayoutTokens {
         public static let partOfSpeechFontSize: Double = 10
         public static let numberFontSize: Double = 10
         public static let iconSize: Double = 13
-        public static let dotSize: Double = 6
         public static let listWidth: Double = 288
-        public static let branchWidth: Double = 300
         public static let meaningLines: Double = 3
         public static let exampleLines: Double = 2
     }

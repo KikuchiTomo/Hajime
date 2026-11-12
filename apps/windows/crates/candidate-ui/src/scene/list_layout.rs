@@ -71,16 +71,16 @@ impl Metrics {
     }
 
     /// platinum と desk．文字種の行と足元の行は同じ高さ(section_height)
-    pub fn bevel(row_pitch: f32, section_height: f32, has_shadow: bool) -> Self {
+    pub fn bevel(row_pitch: f32, header_height: f32, footer_height: f32, has_shadow: bool) -> Self {
         Self {
             edge: candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH,
-            padding: 0.0,
-            separator_gap: 0.0,
+            padding: glass::WINDOW_PADDING,
+            separator_gap: glass::SEPARATOR_GAP,
             separator_width: candidate::FRAME_WIDTH,
             row_pitch,
             row_inset: 0.0,
-            header_height: section_height,
-            footer_height: section_height,
+            header_height,
+            footer_height,
             shadow: if has_shadow {
                 candidate::SHADOW_OFFSET
             } else {
@@ -173,13 +173,11 @@ pub(super) fn place(
     let mut card_separator = None;
     match card {
         Some(Card::Below { height, .. }) => {
-            let top = list_bottom
-                + match style {
-                    Style::Rounded => gap,
-                    Style::Bevel => line,
-                };
+            // platinum と desk は，一覧とのあいだに区切りの線を引く(線の上と下は同じ空き)
+            let mut top = list_bottom + gap;
             if style == Style::Bevel {
-                card_separator = Some(Frame::new(outer, list_bottom, content_width, line));
+                card_separator = Some(Frame::new(outer, top, content_width, line));
+                top += line + gap;
             }
             card_frame = Some(Frame::new(outer, top, content_width, height));
             list_bottom = top + height;
@@ -243,7 +241,7 @@ mod tests {
     fn metrics(style: Style) -> Metrics {
         match style {
             Style::Rounded => Metrics::rounded(glass::ROW_HEIGHT, 20.0, 18.0),
-            Style::Bevel => Metrics::bevel(candidate::ROW_HEIGHT, 22.0, true),
+            Style::Bevel => Metrics::bevel(candidate::ROW_HEIGHT, 20.0, 18.0, true),
         }
     }
 
@@ -361,11 +359,14 @@ mod tests {
                 );
             }
             if let (Some(Card::Below { .. }), Some(card)) = (card, layout.card) {
-                let expected = match style {
-                    Style::Rounded => metrics.separator_gap,
-                    Style::Bevel => metrics.separator_width,
-                };
-                assert_eq!(card.y - last.max_y(), expected, "{name}");
+                // platinum と desk は一覧とのあいだに区切りの線を引き，線の上と下を同じ空きにする
+                match (style, layout.card_separator) {
+                    (Style::Bevel, Some(line)) => {
+                        assert_eq!(line.y - last.max_y(), metrics.separator_gap, "{name}");
+                        assert_eq!(card.y - line.max_y(), metrics.separator_gap, "{name}");
+                    }
+                    _ => assert_eq!(card.y - last.max_y(), metrics.separator_gap, "{name}"),
+                }
             }
         }
     }

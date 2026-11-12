@@ -36,8 +36,10 @@ final class CandidateView: NSView {
             let footer = max(Glass.keycapHeight, Glass.noteIconSize, (labelFont.ascender - labelFont.descender).rounded(.up))
             return .rounded(rowPitch: (Glass.rowHeight * scale).rounded(), headerHeight: Glass.headerHeight, footerHeight: footer)
         }
-        let section = max((labelFont.ascender - labelFont.descender).rounded(.up), Glass.keycapHeight) + Size.sectionPaddingY * 2
-        return .bevel(rowPitch: (Size.rowHeight * scale).rounded(), sectionHeight: section, hasShadow: theme.hasDropShadow)
+        // 文字種の行と足元の行は，角丸のテーマと同じく文字・キーの札・案内のアイコンのいちばん高いもの
+        let section = max(Glass.keycapHeight, Glass.noteIconSize, (labelFont.ascender - labelFont.descender).rounded(.up))
+        return .bevel(rowPitch: (Size.rowHeight * scale).rounded(), headerHeight: max(section, Glass.headerHeight), footerHeight: section,
+                      hasShadow: theme.hasDropShadow)
     }
 
     /// 行の地の内側の左右の余白．番号の丸(番号)の左と注釈の札の右，足元の案内と位置の左右の端をここにそろえる
@@ -62,8 +64,8 @@ final class CandidateView: NSView {
               headerMidY: sectionPadding + MeaningCardDrawing.headerHeight(theme: theme) / 2)
     }
 
-    /// platinum と desk は区画どうしを線で区切って空きを取らないので，語の意味の上と下に文字の行と同じ余白を足す
-    private var sectionPadding: CGFloat { theme.isRounded ? 0 : Size.sectionPaddingY }
+    /// 語の意味の上と下に足す余白．区切りの線の上下の空き(separatorGap)で取るので足さない
+    private var sectionPadding: CGFloat { 0 }
 
     private func belowSlot(for panel: CandidatePanel, width: CGFloat) -> MeaningSlot? {
         guard panel.meaningPlacement == .below, let note = panel.homophone else { return nil }

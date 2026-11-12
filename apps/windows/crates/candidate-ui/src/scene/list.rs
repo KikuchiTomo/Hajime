@@ -44,10 +44,12 @@ impl Metrics {
                 lead: glass::BADGE_SIZE + candidate::PADDING_X,
             }
         } else {
-            let section = label.max(glass::KEYCAP_HEIGHT) + candidate::SECTION_PADDING_Y * 2.0;
+            // 文字種の行と足元の行は，角丸のテーマと同じく文字・キーの札・案内のアイコンのいちばん高いもの
+            let section = label.max(glass::KEYCAP_HEIGHT).max(glass::NOTE_ICON_SIZE);
             Self {
                 layout: list_layout::Metrics::bevel(
                     (candidate::ROW_HEIGHT * scale).round(),
+                    section.max(glass::HEADER_HEIGHT),
                     section,
                     look.theme.has_drop_shadow(),
                 ),
@@ -103,12 +105,9 @@ fn footer(list: &CandidateList) -> Footer {
     }
 }
 
-/// platinum と desk は区画どうしを線で区切って空きを取らないので，語の意味の上と下に文字の行と同じ余白を足す
-fn section_padding(metrics: &Metrics) -> f32 {
-    match metrics.style {
-        Style::Rounded => 0.0,
-        Style::Bevel => candidate::SECTION_PADDING_Y,
-    }
+/// 語の意味の上と下に足す余白．区切りの線の上下の空き(separator_gap)で取るので足さない
+fn section_padding(_metrics: &Metrics) -> f32 {
+    0.0
 }
 
 /// 候補の下の語の意味の置き方．目印の列を候補の番号に，文の列を候補の文字にそろえる

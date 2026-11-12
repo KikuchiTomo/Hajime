@@ -86,10 +86,8 @@ PENDING_SECTIONS: dict[str, str] = {
 }
 PENDING_FILES: dict[str, str] = {
     "apps/macos/Hajime/UI/BranchView.swift": FOLLOW_UP_CANDIDATE,
-    "apps/macos/Hajime/UI/MeaningCardDrawing.swift": FOLLOW_UP_CANDIDATE,
     "apps/macos/Hajime/UI/AssociationHeadingDrawing.swift": FOLLOW_UP_CANDIDATE,
     "apps/windows/crates/candidate-ui/src/scene/branch.rs": FOLLOW_UP_CANDIDATE,
-    "apps/windows/crates/candidate-ui/src/scene/meaning.rs": FOLLOW_UP_CANDIDATE,
     "apps/windows/crates/candidate-ui/src/scene/association.rs": FOLLOW_UP_CANDIDATE,
     "apps/windows/crates/candidate-ui/src/handwriting/layout.rs": FOLLOW_UP_CANDIDATE,
     "apps/macos/Hajime/UI/PaletteView.swift": FOLLOW_UP_PALETTE,
