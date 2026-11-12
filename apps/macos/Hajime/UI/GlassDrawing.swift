@@ -73,7 +73,7 @@ enum GlassDrawing {
             image.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
             return
         }
-        drawCentered(label, attributes: [.font: theme.keyFont(size: fontSize), .foregroundColor: color], in: rect)
+        drawLineCentered(label, attributes: [.font: theme.keyFont(size: fontSize), .foregroundColor: color], in: rect)
     }
 
     // MARK: - 足元の案内
@@ -116,9 +116,7 @@ enum GlassDrawing {
                 }
                 capX = cap.maxX + Glass.keycapGap
             }
-            let labelSize = hint.label.size(withAttributes: labelAttributes)
-            hint.label.draw(at: NSPoint(x: x + keycapsWidth(hint, theme: theme) + Glass.keycapPaddingX, y: (midY - labelSize.height / 2).rounded()),
-                            withAttributes: labelAttributes)
+            TextFitting.draw(hint.label, attributes: labelAttributes, x: x + keycapsWidth(hint, theme: theme) + Glass.keycapPaddingX, midY: midY)
             x += hintWidth(hint, theme: theme) + Glass.hintGap
         }
     }
@@ -190,7 +188,7 @@ enum GlassDrawing {
             let size = image.size
             image.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
         case .text(let text):
-            drawCentered(text, attributes: [.font: theme.keyFont(size: Glass.keyFontSize), .foregroundColor: theme.text], in: rect)
+            drawLineCentered(text, attributes: [.font: theme.keyFont(size: Glass.keyFontSize), .foregroundColor: theme.text], in: rect)
         }
     }
 
@@ -215,6 +213,13 @@ enum GlassDrawing {
     static func drawCentered(_ text: String, attributes: [NSAttributedString.Key: Any], in rect: NSRect) {
         let size = text.size(withAttributes: attributes)
         text.draw(at: NSPoint(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2), withAttributes: attributes)
+    }
+
+    /// 文字の行の箱(書体の ascender から descender まで)を rect の真ん中に置いて描く．
+    /// 札や番号の丸の中の字を，横に並ぶ文字と同じ決め方で縦の真ん中にそろえる(TextFitting.draw)
+    static func drawLineCentered(_ text: String, attributes: [NSAttributedString.Key: Any], in rect: NSRect) {
+        let width = text.size(withAttributes: attributes).width
+        TextFitting.draw(text, attributes: attributes, x: rect.midX - width / 2, midY: rect.midY)
     }
 }
 

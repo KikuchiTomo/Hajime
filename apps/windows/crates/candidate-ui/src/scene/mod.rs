@@ -7,12 +7,16 @@
 mod association;
 mod branch;
 mod branch_lines;
+mod card_layout;
 pub(crate) mod fitting;
 mod list;
+mod list_layout;
 mod meaning;
 pub(crate) mod paint;
 pub mod sample;
 mod small;
+#[cfg(test)]
+mod svg;
 
 pub use crate::geometry::{Frame, Point};
 pub use crate::theme::{Color, Font, ResolvedTheme};

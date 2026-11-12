@@ -61,6 +61,16 @@ public enum RuleList: String, Sendable, Equatable, CaseIterable {
         }
     }
 
+    /// いつも英語にする語・いつも日本語にする語を足す．足した語はもう一方の一覧から除く(同じ語を両方に置かない)
+    private static func mergeLanguageWords(_ rows: [RuleListRow], into settings: inout WordLanguageSettings, language: WordLanguage) -> Int {
+        let words = rows.map { languageWord($0.key) }
+        let list: WritableKeyPath<WordLanguageSettings, [String]> = language == .english ? \.englishWords : \.japaneseWords
+        let count = RuleListEditing.merge(words, key: { $0 }, isValid: WordLanguageSettings.isValidWord,
+                                          limit: DefaultSettings.maximumWordLanguageEntries, into: &settings[keyPath: list])
+        settings.removeFromOtherList(words.filter { settings[keyPath: list].contains($0) }, addedTo: language)
+        return count
+    }
+
     /// 読み込んだ行を一覧に足す．同じ左の決まりは上書きし，形の誤った行と上限を超えた行は足さない．足した(上書きを含む)数を返す
     public func merge(_ rows: [RuleListRow], into settings: inout Settings) -> Int {
         switch self {
@@ -71,11 +81,9 @@ public enum RuleList: String, Sendable, Equatable, CaseIterable {
             RuleListEditing.merge(rows.map(\.key), key: { $0 }, isValid: RuleListEditing.isValidException,
                                   limit: DefaultSettings.maximumCorrectionRules, into: &settings.correction.exceptions)
         case .englishWords:
-            RuleListEditing.merge(rows.map { Self.languageWord($0.key) }, key: { $0 }, isValid: WordLanguageSettings.isValidWord,
-                                  limit: DefaultSettings.maximumWordLanguageEntries, into: &settings.wordLanguage.englishWords)
+            Self.mergeLanguageWords(rows, into: &settings.wordLanguage, language: .english)
         case .japaneseWords:
-            RuleListEditing.merge(rows.map { Self.languageWord($0.key) }, key: { $0 }, isValid: WordLanguageSettings.isValidWord,
-                                  limit: DefaultSettings.maximumWordLanguageEntries, into: &settings.wordLanguage.japaneseWords)
+            Self.mergeLanguageWords(rows, into: &settings.wordLanguage, language: .japanese)
         case .romaji:
             RuleListEditing.merge(rows.map { RuleListEditing.romajiRule(keys: $0.key, kana: $0.value) }, key: \.keys, isValid: \.isValid,
                                   limit: DefaultSettings.maximumRomajiRules, into: &settings.customRomaji)
