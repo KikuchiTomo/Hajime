@@ -185,6 +185,78 @@ struct InputExtrasScenarioTests {
         #expect(try #require(off.panel).entries.first?.text == entry.word)
     }
 
+    @Test("R-21: コメントを付けた語は候補の札にコメントを出し，札を押すとコメントを入れる．長いコメントは札では先頭だけを出す")
+    func userComment() throws {
+        let address = "東京都千代田区千代田1-1 ピヨピヨビル 10 階 受付"
+        let harness = harness(.listPresentation, table: ["かいしゃ": [("会社", nil)]]) {
+            $0.userDictionary = [UserDictionaryEntry(reading: "かいしゃ", word: "ピヨ株式会社", comment: address)]
+        }
+        harness.type("kaisya")
+        harness.press(.space)
+        let panel = try #require(harness.panel)
+        let index = try #require(panel.entries.firstIndex { $0.text == "ピヨ株式会社" })
+        #expect(panel.entries[index].hasComment)
+        #expect(panel.entries[index].annotation == String(address.prefix(DefaultSettings.userDictionaryCommentShownLength)) + "…")
+        #expect(panel.entries.filter(\.hasComment).count == 1)
+        harness.click(.comment(index))
+        #expect(harness.committed == address)
+    }
+
+    @Test("R-21: 分岐図でも，コメントを付けた語の枝にコメントを添え，押すとその文節をコメントにする")
+    func userCommentInLattice() throws {
+        let harness = harness(table: ["かいしゃ": [("会社", nil)]]) {
+            $0.userDictionary = [UserDictionaryEntry(reading: "かいしゃ", word: "ピヨ株式会社", comment: "ぴよ")]
+        }
+        harness.type("kaisya")
+        harness.press(.space)
+        let columns = harness.lattice?.columns ?? []
+        let column = try #require(columns.first { $0.isFocused })
+        let index = try #require(column.alternatives.firstIndex(of: "ピヨ株式会社"))
+        #expect(column.alternativeNotes[index] == "ぴよ")
+        #expect(column.alternativeComments[index])
+        harness.click(.comment(index))
+        harness.press(.enter)
+        #expect(harness.committed == "ぴよ")
+    }
+
+    // MARK: 単語の登録と入力メニュー(R-21)
+
+    @Test("R-21: 入力中の単語の登録のキーは，見えている語と読みを登録に渡し，組み立て中の文字は入れずに消す")
+    func registerWordWhileComposing() throws {
+        let harness = harness(table: ["かいしゃ": [("会社", nil)]])
+        harness.type("kaisya")
+        harness.press(.space)
+        harness.press(.function(7), .control)
+        #expect(harness.registrations.count == 1)
+        #expect(harness.registrations.first?.word == "会社")
+        #expect(harness.registrations.first?.reading == "かいしゃ")
+        #expect(harness.committed.isEmpty)
+        #expect(harness.marked.text.isEmpty)
+    }
+
+    @Test("R-21: 入力していないときの単語の登録は，選んでいる文字を読めるアプリなら読んでもらい，読めなければ空の欄で開く")
+    func registerWordWhileIdle() {
+        let harness = harness()
+        harness.press(.function(7), .control)
+        #expect(harness.registrations.count == 1)
+        #expect(harness.registrations.first?.word == nil)
+        harness.context.canReadSelectionForRegistration = false
+        harness.press(.function(7), .control)
+        #expect(harness.registrations.last?.word == "")
+    }
+
+    @Test("R-21: 入力メニューのキー(Ctrl+F10・Ctrl+変換)は入力メニューを出す．出せないアプリではキーをそのまま渡す")
+    func openMenu() {
+        let harness = harness()
+        harness.press(.function(10), .control)
+        harness.press(.henkan, .control)
+        #expect(harness.openedMenus == 2)
+        harness.context.canOpenMenu = false
+        harness.press(.function(10), .control)
+        #expect(harness.openedMenus == 2)
+        #expect(!harness.lastResult.handled)
+    }
+
     // MARK: 変換マクロ(R-22)
 
     @Test("R-22: 変換マクロをオンにすると，連想変換のキーで選んでいる語を整えた形の一覧を出す(連想の辞書が無くても)")

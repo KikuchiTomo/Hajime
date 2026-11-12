@@ -17,12 +17,14 @@ extension PalettePanel.Preview {
             isPinned: isPinned)
     }
 
-    /// 見出しの名前を定めたところ．絵文字の名前は CLDR の短い名前(tools/palette/build.py)．
-    /// 記号は CLDR の名前と Hajime IME で付けた名前が混ざっていて見分けられず，顔文字の名前は読みなので，どちらも示さない
+    /// 見出しの名前を定めたところ．表の「名前の出どころ」の列(tools/palette/build.py)のとおりに，CLDR の名前か Hajime IME が付けた名前かを示す．
+    /// 顔文字の名前は読みなので示さない．列の無い前の形の表では，絵文字だけ CLDR と示す(絵文字の名前はすべて CLDR の短い名前)
     private static func nameSource(of item: PaletteItem) -> String? {
-        switch item.kind {
-        case .emoji: item.japaneseName.isEmpty && item.englishName.isEmpty ? nil : PaletteStrings.cldrSource
-        case .symbol, .kaomoji: nil
+        guard item.kind != .kaomoji, !item.japaneseName.isEmpty || !item.englishName.isEmpty else { return nil }
+        switch item.nameSource ?? (item.kind == .emoji ? .cldr : nil) {
+        case .cldr: return PaletteStrings.cldrSource
+        case .hajime: return PaletteStrings.hajimeSource
+        case nil: return nil
         }
     }
 

@@ -46,7 +46,10 @@ extension InputContext {
             precedingText: wire.isSecure ? nil : wire.precedingText,
             applicationID: wire.applicationId,
             // 入力位置の前の文字を置き換えられる DLL だけが知らせる(古い DLL は setComposition の replacedLength を読まない)
-            canReplacePrecedingText: wire.canReplacePrecedingText ?? false
+            canReplacePrecedingText: wire.canReplacePrecedingText ?? false,
+            // 入力メニューを出せる DLL と，選んでいる文字を読んで単語の登録に渡せる DLL だけが知らせる(古い DLL は新しい操作を読めない)
+            canOpenMenu: wire.canShowMenu ?? false,
+            canReadSelectionForRegistration: wire.canRequestWordRegistration ?? false
         )
     }
 }
@@ -128,15 +131,15 @@ extension WireKeyChord {
 }
 
 extension WireSessionState {
-    /// undoablePrediction は予測の確定を取り消せるか．取り消すキー(入力文字なしの Backspace など)は，取り消せるときだけ送ってもらう
-    /// (いつも送ってもらうと，ふだんの Backspace もエンジンを通る)
+    /// undoablePrediction は予測の確定を，undoableCommit は確定(予測も含む)を取り消せるか．取り消すキー(入力文字なしの Backspace・
+    /// Ctrl+Backspace など)は，取り消せるときだけ送ってもらう(いつも送ってもらうと，ふだんの Backspace もエンジンを通る)
     public init(mode: InputMode, isComposing: Bool, keymap: Keymap, wakeAfterMilliseconds: UInt32?, keyboardLayout: String? = nil,
-                undoablePrediction: Bool = false) {
+                undoablePrediction: Bool = false, undoableCommit: Bool = false) {
         let state: KeymapState = mode == .direct ? .direct : .idle
         var chords: [WireKeyChord] = []
         if !isComposing {
             for entry in keymap.entries where (entry.state == state || entry.state == .anywhere) && entry.command.isAvailable(in: state)
-                && (undoablePrediction || entry.command != .undoPrediction) {
+                && (undoablePrediction || entry.command != .undoPrediction) && (undoableCommit || entry.command != .undoCommit) {
                 guard let chord = WireKeyChord(entry.stroke), !chords.contains(chord) else { continue }
                 chords.append(chord)
             }
@@ -185,7 +188,9 @@ extension WireCandidateList {
                 return WireCandidateEntry(text: entry.text, annotation: entry.annotation,
                                           correctedStart: corrected.map { UInt32(clamping: $0.start) },
                                           correctedLength: corrected.map { UInt32(clamping: $0.length) },
-                                          command: entry.command.map(WireCommandKind.init), detail: entry.detail)
+                                          command: entry.command.map(WireCommandKind.init),
+                                          // コメントでなければ送らない
+                                          hasComment: entry.hasComment ? true : nil, detail: entry.detail)
             },
             selectedEntry: panel.selectedEntry.map(UInt32.init(clamping:)),
             focus: panel.focus == .candidate ? .candidate : .variants,
@@ -202,6 +207,19 @@ extension WireCandidateList {
             // 意味が無ければ送らない
             meaningPlacement: panel.homophone == nil ? nil : WireMeaningPlacement(panel.meaningPlacement)
         )
+    }
+}
+
+extension WireDictionaryEntry {
+    public init(_ entry: UserDictionaryEntry) {
+        self.init(reading: entry.reading, word: entry.word, wordClass: WireWordClass(rawValue: entry.wordClass.rawValue),
+                  comment: entry.comment.isEmpty ? nil : entry.comment)
+    }
+
+    /// 品詞を送らない設定の画面(品詞を選べるようになる前のもの)から来た語は，登録するときの既定の品詞にする
+    public var entry: UserDictionaryEntry {
+        UserDictionaryEntry(reading: reading, word: word,
+                            wordClass: wordClass.flatMap { WordClass(rawValue: $0.rawValue) } ?? DefaultSettings.userWordClass, comment: comment ?? "")
     }
 }
 
@@ -284,6 +302,7 @@ extension WireBranchMap {
                     homophone: column.homophone.map(WireHomophoneNote.init),
                     alternativeNotes: column.alternativeNotes,
                     alternativeCommands: column.alternativeCommands.isEmpty ? nil : column.alternativeCommands.map { $0.map(WireCommandKind.init) },
+                    alternativeComments: column.alternativeComments.isEmpty ? nil : column.alternativeComments,
                     alternativeDetails: column.alternativeDetails.isEmpty ? nil : column.alternativeDetails,
                     sourceName: column.sourceName,
                     split: column.split.map { WireBranchSplit(pieces: $0.pieces) }
@@ -305,6 +324,9 @@ extension WireBranchMap {
 public enum HostAction: Sendable, Equatable {
     case selectInputStyle(InputStyle)
     case openSettings
+    /// 設定のユーザー辞書の画面を開き，語と読みを登録の欄に入れる(空なら入れない)
+    case openWordRegistration(word: String, reading: String)
+    case openUserDictionary
     case toggleLiveConversion
     case showHandwriting
     /// コマンドを動かす(エンジンのプロセスで．DLL には送らない)
@@ -364,6 +386,17 @@ public struct RoutedActions: Sendable, Equatable {
                 edits.append(.requestReconversion(maximumLength: UInt32(DefaultSettings.maximumReconversionLength)))
             case .openSettings:
                 host.append(.openSettings)
+            case .openWordRegistration(let word, let reading):
+                // 入力先の選んでいる文字は DLL が読むので，読んで openWordRegistration で送ってもらう(InputSession は読める DLL のときだけ nil にする)
+                if let word {
+                    host.append(.openWordRegistration(word: word, reading: reading ?? ""))
+                } else {
+                    edits.append(.requestWordRegistration(maximumLength: UInt32(DefaultSettings.maximumUserDictionaryWordLength)))
+                }
+            case .openUserDictionary:
+                host.append(.openUserDictionary)
+            case .openMenu:
+                edits.append(.showMenu)
             case .toggleLiveConversion:
                 host.append(.toggleLiveConversion)
             case .showHandwriting:

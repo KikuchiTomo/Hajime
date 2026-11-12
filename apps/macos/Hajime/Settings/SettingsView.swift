@@ -346,6 +346,13 @@ private struct UsageTab: View {
 
 /// 秒で値を選ぶ項目．今の値を右に出す．動かしている間は保存せず，手を離したときに保存する(1 段ごとに設定のファイルを書き直さない)
 struct SecondsSlider: View {
+    /// 刻みに合わせた値．スライダーは刻みを浮動小数点で足していくので，そのままでは 1.5000000000000002 のように
+    /// 範囲の上の端を少し越えた値や 0.30000000000000004 を保存してしまう．刻みの逆数を掛けて丸め，範囲に収める
+    static func snapped(_ value: Double, step: Double, in range: ClosedRange<Double>) -> Double {
+        let scale = step < 1 ? (1 / step).rounded() : 1 / step
+        return min(max((value * scale).rounded() / scale, range.lowerBound), range.upperBound)
+    }
+
     let title: String
     let value: Binding<Double>
     let range: ClosedRange<Double>
@@ -357,7 +364,7 @@ struct SecondsSlider: View {
             HStack {
                 Slider(value: Binding(get: { editing ?? value.wrappedValue }, set: { editing = $0 }), in: range, step: step) { isEditing in
                     guard !isEditing, let editing else { return }
-                    value.wrappedValue = editing
+                    value.wrappedValue = Self.snapped(editing, step: step, in: range)
                     self.editing = nil
                 }
                 .frame(width: DesignTokens.Size.Settings.secondsSliderWidth)

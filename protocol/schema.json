@@ -201,6 +201,14 @@
         {
           "name": "canReplacePrecedingText",
           "type": "bool?"
+        },
+        {
+          "name": "canShowMenu",
+          "type": "bool?"
+        },
+        {
+          "name": "canRequestWordRegistration",
+          "type": "bool?"
         }
       ]
     },
@@ -310,6 +318,18 @@
               "type": "u32"
             }
           ]
+        },
+        {
+          "name": "requestWordRegistration",
+          "fields": [
+            {
+              "name": "maximumLength",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "showMenu"
         }
       ]
     },
@@ -372,6 +392,9 @@
         },
         {
           "name": "openSettings"
+        },
+        {
+          "name": "openUserDictionary"
         }
       ]
     },
@@ -418,6 +441,15 @@
         },
         {
           "name": "listVariant",
+          "fields": [
+            {
+              "name": "index",
+              "type": "u32"
+            }
+          ]
+        },
+        {
+          "name": "comment",
           "fields": [
             {
               "name": "index",
@@ -704,6 +736,25 @@
       ]
     },
     {
+      "name": "WordClass",
+      "kind": "enum",
+      "cases": [
+        "noun",
+        "properNoun",
+        "personName",
+        "surname",
+        "givenName",
+        "organization",
+        "place",
+        "symbol",
+        "suruNoun",
+        "adjectivalNoun",
+        "adverb",
+        "interjection",
+        "abbreviation"
+      ]
+    },
+    {
       "name": "DictionaryEntry",
       "kind": "struct",
       "fields": [
@@ -714,6 +765,14 @@
         {
           "name": "word",
           "type": "string"
+        },
+        {
+          "name": "wordClass",
+          "type": "WordClass?"
+        },
+        {
+          "name": "comment",
+          "type": "string?"
         }
       ]
     },
@@ -1284,6 +1343,22 @@
               "type": "[DictionaryEntry]"
             }
           ]
+        },
+        {
+          "name": "openWordRegistration",
+          "fields": [
+            {
+              "name": "text",
+              "type": "string"
+            },
+            {
+              "name": "reading",
+              "type": "string?"
+            }
+          ]
+        },
+        {
+          "name": "takeWordRegistration"
         }
       ]
     },
@@ -1521,6 +1596,19 @@
               "type": "ErrorCode"
             }
           ]
+        },
+        {
+          "name": "wordRegistration",
+          "fields": [
+            {
+              "name": "word",
+              "type": "string?"
+            },
+            {
+              "name": "reading",
+              "type": "string?"
+            }
+          ]
         }
       ]
     },
@@ -1585,6 +1673,10 @@
         {
           "name": "command",
           "type": "CommandKind?"
+        },
+        {
+          "name": "hasComment",
+          "type": "bool?"
         },
         {
           "name": "detail",
@@ -1873,6 +1965,10 @@
         {
           "name": "alternativeCommands",
           "type": "[CommandKind?]?"
+        },
+        {
+          "name": "alternativeComments",
+          "type": "[bool]?"
         },
         {
           "name": "alternativeDetails",

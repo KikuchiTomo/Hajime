@@ -19,10 +19,9 @@ struct CorrectionPage: View {
                     Text(UIStrings.Features.correctionKindsNote).font(.caption).foregroundStyle(.secondary)
                 }
                 ResettableToggle(model: model, title: UIStrings.Features.misreadings, keyPath: \.misreadings)
-                ResettableToggle(model: model, title: UIStrings.Extras.looseReadings, keyPath: \.looseReadings)
-                    .help(UIStrings.Extras.looseReadingsNote)
-                ResettableToggle(model: model, title: UIStrings.Extras.phoneticSpelling, keyPath: \.phoneticSpelling)
-                    .help(UIStrings.Extras.phoneticSpellingNote)
+                ResettableToggle(model: model, title: UIStrings.Extras.looseReadings, keyPath: \.looseReadings, help: UIStrings.Extras.looseReadingsNote)
+                ResettableToggle(model: model, title: UIStrings.Extras.phoneticSpelling, keyPath: \.phoneticSpelling,
+                                 help: UIStrings.Extras.phoneticSpellingNote)
             }
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.handShift, keyPath: \.handShiftCorrection)

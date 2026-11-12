@@ -91,6 +91,8 @@ public struct Candidate: Sendable, Equatable {
     public var learnedParts: [Candidate] = []
     /// 確定した履歴(学習)にある語句か．エンジンが学習から引いた語だけでできているとき true．入力中の予測で履歴にあるものを先に出すのに使う
     public var isLearned = false
+    /// ユーザー辞書の語に利用者が付けたコメント．候補の窓で語の横に出し，押すとコメントを入れる．無ければ nil
+    public var comment: String?
 
     public init(text: String, readingCount: Int, origin: CandidateOrigin, score: Double = 0, trailingWord: TrailingWord? = nil, words: [Word] = []) {
         self.text = text

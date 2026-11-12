@@ -59,9 +59,13 @@ enum SnapshotRenderer {
                 render(commandListView(theme: look.theme, appearance: appearance, selected: 0), name: "command-list-\(look.name)", to: output, appearance: appearance)
                 render(commandListView(theme: look.theme, appearance: appearance, selected: 1), name: "command-list-selected-\(look.name)", to: output, appearance: appearance)
                 render(commandBranchView(theme: look.theme, appearance: appearance), name: "command-branch-\(look.name)", to: output, appearance: appearance)
+                render(commentListView(theme: look.theme, appearance: appearance), name: "comment-list-\(look.name)", to: output, appearance: appearance)
+                render(commentBranchView(theme: look.theme, appearance: appearance), name: "comment-branch-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.emoji, theme: look.theme, appearance: appearance), name: "palette-emoji-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.search, theme: look.theme, appearance: appearance), name: "palette-search-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.flag, theme: look.theme, appearance: appearance), name: "palette-flag-\(look.name)", to: output, appearance: appearance)
+                render(paletteView(SamplePalettes.longName, theme: look.theme, appearance: appearance), name: "palette-long-\(look.name)", to: output, appearance: appearance)
+                render(paletteView(SamplePalettes.reduced, theme: look.theme, appearance: appearance), name: "palette-reduced-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.symbol, theme: look.theme, appearance: appearance), name: "palette-symbol-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.kaomoji, theme: look.theme, appearance: appearance), name: "palette-kaomoji-\(look.name)", to: output, appearance: appearance)
                 // 動きの途中のコマ(選択の枠とタブの印が滑る・種類を切り替えて中身を送る・肌の色の帯が浮かび上がる)
@@ -105,6 +109,21 @@ enum SnapshotRenderer {
         exit(0)
     }
 
+    /// ページ(Form)を下の端まで送る．表の中のスクロールは動かさない
+    private static func scrollPageToBottom(_ window: NSWindow) {
+        guard let content = window.contentView else { return }
+        var stack: [NSView] = [content]
+        while let view = stack.popLast() {
+            if view is any FormTableContainer { continue }
+            if let scroll = view as? NSScrollView, let document = scroll.documentView, !(document is NSTableView) {
+                let bottom = document.isFlipped ? max(document.frame.height - scroll.contentView.bounds.height, 0) : 0
+                scroll.contentView.scroll(to: NSPoint(x: 0, y: bottom))
+                scroll.reflectScrolledClipView(scroll.contentView)
+            }
+            stack.append(contentsOf: view.subviews)
+        }
+    }
+
     /// 一時ディレクトリに置いた設定．利用者の設定に触れない
     private static func snapshotStore(_ name: String) -> FileSettingsStore {
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-snapshot-\(name).json")
@@ -121,7 +140,10 @@ enum SnapshotRenderer {
             settings.correction.rules = [CorrectionRule(typed: "teh", word: "the"), CorrectionRule(typed: "recieve", word: "receive"),
                                          CorrectionRule(typed: "adn", word: "and")]
             settings.customRomaji = [RomajiRule(keys: "wyi", kana: "ゐ"), RomajiRule(keys: "wye", kana: "ゑ")]
-            settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "Hajime IME"), UserDictionaryEntry(reading: "かいしゃ", word: "会社")]
+            settings.userDictionary = [UserDictionaryEntry(reading: "えすきゅー", word: "Hajime IME", wordClass: .properNoun),
+                                       UserDictionaryEntry(reading: "かいしゃ", word: "会社", comment: "東京都千代田区千代田1-1"),
+                                       UserDictionaryEntry(reading: "やまだ", word: "山田", wordClass: .surname),
+                                       UserDictionaryEntry(reading: "おつ", word: "お疲れさまでした", wordClass: .abbreviation)]
             settings.symbolRules = [SymbolRule(kind: .sequence, input: "->", output: "⇢"), SymbolRule(kind: .sequence, input: "<<", output: "«"),
                                     SymbolRule(kind: .sequence, input: "=>", output: "⇒", isEnabled: false)]
             settings.profileRules = [ProfileRule(applicationPrefix: "com.apple.Terminal", profile: .imeOff),
@@ -204,6 +226,21 @@ enum SnapshotRenderer {
         }
         NSApp.appearance = NSAppearance(named: .aqua)
         scrolled.close()
+        // ユーザー辞書の一覧(品詞の列)．一覧はページの下にあるので，ページを下まで送って写す
+        let dictionaryNavigation = SettingsNavigation()
+        let dictionaryWindow = SettingsWindowController.makeWindow(model: fixture.model, sync: fixture.sync, navigation: dictionaryNavigation)
+        dictionaryNavigation.page = .dictionary
+        dictionaryWindow.orderFrontRegardless()
+        // 組み直しのあとにページの高さが変わることがあるので，落ち着くまで 2 回送る
+        for _ in 0..<2 {
+            SettingsFixture.settle(dictionaryWindow)
+            scrollPageToBottom(dictionaryWindow)
+        }
+        SettingsFixture.settle(dictionaryWindow)
+        if let frame = dictionaryWindow.contentView?.superview {
+            render(frame, name: "settings-dictionary-words", to: output, appearance: NSAppearance(named: .aqua))
+        }
+        dictionaryWindow.close()
         // 左の一覧は窓の中では写らない(地のぼかしの層を写せない)ので，一覧だけを別に描く
         let sidebar = NSHostingView(rootView: SettingsSidebar(query: "", selection: .constant(.correction)).listStyle(.inset))
         let sidebarWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: DesignTokens.Size.Settings.sidebarWidth, height: SettingsView.size.height),
@@ -213,6 +250,22 @@ enum SnapshotRenderer {
         SettingsFixture.settle(sidebarWindow)
         render(sidebar, name: "settings-sidebar", to: output, appearance: NSAppearance(named: .aqua))
         sidebarWindow.close()
+        // 辞書のページの「専門用語」の中身(R-29．タブは窓の外から切り替えられないので中身だけを描く)．1 つの分野を切り，既定に戻すボタンも写す
+        fixture.model.update { $0.termFields.religion = false }
+        for (appearance, suffix) in [(NSAppearance.Name.aqua, ""), (.darkAqua, "-dark")] {
+            NSApp.appearance = NSAppearance(named: appearance)
+            let terms = NSHostingView(rootView: TermDictionaryView(model: fixture.model))
+            let termsWindow = NSWindow(contentRect: NSRect(x: 0, y: 0, width: SettingsView.size.width - DesignTokens.Size.Settings.sidebarWidth,
+                                                           height: SettingsView.size.height),
+                                       styleMask: [.borderless], backing: .buffered, defer: false)
+            termsWindow.contentView = terms
+            termsWindow.orderFrontRegardless()
+            SettingsFixture.settle(termsWindow)
+            render(terms, name: "settings-dictionary-terms\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+            termsWindow.close()
+        }
+        fixture.model.update { $0.termFields = TermFieldSettings() }
+        NSApp.appearance = NSAppearance(named: .aqua)
         // 読みにくい色を選んだカスタムテーマの編集の画面(知らせが出るか)
         var theme = fixture.model.draftCustomTheme()
         theme.textMuted = HexColor("#B0B0B0")!
@@ -456,35 +509,53 @@ enum SnapshotRenderer {
     }
 
     /// 押した位置から対象を求める処理(候補をマウスで選ぶ)を確かめる．窓を細かく区切って押してみて，
-    /// 見えている幹・枝・行・字種がどれも押せることと，上から下への並びが候補の順と合うことを確かめ，合わなければ知らせる
+    /// 見えている幹・枝・行・字種・コメントの札がどれも押せることと，上から下への並びが候補の順と合うことを確かめ，合わなければ知らせる．
+    /// コメントの札は，札の中を押すとコメントに，札の外の行を押すと候補になることも確かめる
     private static func checkPointerTargets() {
         for (name, theme) in [("glass", ThemeChoice(.automatic)), ("platinum", ThemeChoice(.platinum))] {
-            let branch = BranchView()
-            branch.theme = ResolvedTheme.resolve(theme, appearance: NSAppearance(named: .aqua))
-            branch.panel = SamplePanels.lattice
-            branch.frame = NSRect(origin: .zero, size: branch.fittingSize(for: SamplePanels.lattice))
-            let list = CandidateView()
-            list.theme = branch.theme
-            list.panel = SamplePanels.list
-            list.frame = NSRect(origin: .zero, size: list.fittingSize(for: SamplePanels.list))
-            for (view, find) in [(branch as NSView, branch.target(at:)), (list as NSView, list.target(at:))] {
+            let resolved = ResolvedTheme.resolve(theme, appearance: NSAppearance(named: .aqua))
+            var checks: [(sample: String, view: NSView, find: (NSPoint) -> PointerTarget?, expected: Set<PointerTarget>)] = []
+            for (sample, panel) in [("分岐図", SamplePanels.lattice), ("分岐図・コメント", SamplePanels.commentLattice)] {
+                let branch = BranchView()
+                branch.theme = resolved
+                branch.panel = panel
+                branch.frame = NSRect(origin: .zero, size: branch.fittingSize(for: panel))
+                checks.append((sample, branch, branch.target(at:), expectedTargets(panel)))
+            }
+            for (sample, panel) in [("一覧", SamplePanels.list), ("一覧・コメント", SamplePanels.comment)] {
+                let list = CandidateView()
+                list.theme = resolved
+                list.panel = panel
+                list.frame = NSRect(origin: .zero, size: list.fittingSize(for: panel))
+                checks.append((sample, list, list.target(at:), expectedTargets(panel)))
+            }
+            for check in checks {
                 var found: [PointerTarget] = []
-                for y in stride(from: 0, to: view.bounds.height, by: 2) {
-                    for x in stride(from: 0, to: view.bounds.width, by: 4) {
-                        if let target = find(NSPoint(x: x, y: y)), found.last != target, !found.contains(target) { found.append(target) }
+                for y in stride(from: 0, to: check.view.bounds.height, by: 2) {
+                    for x in stride(from: 0, to: check.view.bounds.width, by: 4) {
+                        if let target = check.find(NSPoint(x: x, y: y)), found.last != target, !found.contains(target) { found.append(target) }
                     }
                 }
-                let focused = SamplePanels.lattice.columns.first(where: \.isFocused)
-                let expected: Set<PointerTarget> = view === branch
-                    ? Set(SamplePanels.lattice.columns.indices.map(PointerTarget.segment) + (focused?.alternatives.indices.map(PointerTarget.alternative) ?? [])
-                          + (focused?.variants.indices.map(PointerTarget.variant) ?? []))
-                    : Set(SamplePanels.list.entries.indices.map(PointerTarget.entry)
-                          + SamplePanels.list.variants.indices.filter { SamplePanels.list.variants[$0].isAvailable }.map(PointerTarget.listVariant))
                 let rows = found.compactMap { if case .alternative(let index) = $0 { index } else if case .entry(let index) = $0 { index } else { nil } }
-                let ok = Set(found) == expected && rows == rows.sorted()
-                print("押した位置の確かめ(\(name)・\(view === branch ? "分岐図" : "一覧")): \(ok ? "ok" : "合わない \(found)")")
+                let ok = Set(found) == check.expected && rows == rows.sorted()
+                print("押した位置の確かめ(\(name)・\(check.sample)): \(ok ? "ok" : "合わない \(found)")")
             }
         }
+    }
+
+    /// 分岐図で押せるはずの対象．幹の文節と，注目している文節の上下の枝と，コメントの札
+    private static func expectedTargets(_ panel: LatticePanel) -> Set<PointerTarget> {
+        let focused = panel.columns.first(where: \.isFocused)
+        let comments = focused.map { column in column.alternatives.indices.filter { column.comment(at: $0) != nil } } ?? []
+        return Set(panel.columns.indices.map(PointerTarget.segment) + (focused?.alternatives.indices.map(PointerTarget.alternative) ?? [])
+                   + (focused?.variants.indices.map(PointerTarget.variant) ?? []) + comments.map(PointerTarget.comment))
+    }
+
+    /// 一覧で押せるはずの対象．候補の行と，使える字種と，コメントの札
+    private static func expectedTargets(_ panel: CandidatePanel) -> Set<PointerTarget> {
+        Set(panel.entries.indices.map(PointerTarget.entry)
+            + panel.variants.indices.filter { panel.variants[$0].isAvailable }.map(PointerTarget.listVariant)
+            + panel.entries.indices.filter { panel.entries[$0].comment != nil }.map(PointerTarget.comment))
     }
 
     private static let longSentence = ["今日は", "朝から", "とても", "良い", "天気だったので", "近所の", "公園まで", "散歩に", "出かけて", "久しぶりに",
@@ -687,6 +758,28 @@ enum SnapshotRenderer {
         column.alternativeNotes = list.entries.map(\.annotation)
         column.alternativeCommands = list.entries.map(\.command)
         let panel = LatticePanel(columns: [column], position: 1, total: list.entries.count, note: list.note)
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// ユーザー辞書の語のコメント(R-21)を札に出した一覧．選んでいる行の札は選択の地の上に描く
+    private static func commentListView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = CandidateView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        let panel = SamplePanels.comment
+        view.panel = panel
+        view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
+        return backdropped(view)
+    }
+
+    /// ユーザー辞書の語のコメントを下の枝に添えた分岐図
+    private static func commentBranchView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+        let view = BranchView()
+        view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
+        view.fillsSurface = true
+        let panel = SamplePanels.commentLattice
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

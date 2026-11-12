@@ -11,6 +11,11 @@ pub const CORRECTED: &str = "修正";
 /// コマンドの候補を読み上げるときの前置き(core の CandidatePanel.commandAnnotation)
 pub const COMMAND: &str = "コマンド";
 
+/// ユーザー辞書の語のコメントを，候補に続けて読み上げる文(macOS の UIStrings.Candidate.commentAnnouncement)
+pub fn comment_announcement(text: &str, comment: &str) -> String {
+    format!("{text}、コメント、{comment}")
+}
+
 pub fn mode(mode: InputMode) -> &'static str {
     match mode {
         InputMode::Japanese => "あ",
@@ -42,9 +47,17 @@ pub const ASSOCIATION_PREFIX: &str = "連想";
 /// 語の意味のカードで，同音語の札の前に置く名前(macOS の UIStrings.Candidate.homophoneOthers)
 pub const HOMOPHONE_OTHERS: &str = "同音語";
 
-/// パレットの説明の欄で，読みの頭に置く札と読みの区切り(core の PaletteStrings.readings・readingSeparator)
+/// パレットの説明の欄の項目名(macOS の UIStrings.Palette の unicodeNameLabel など)．
+/// PALETTE_ENGLISH_NAME は UCD の名前の無い並び(国旗など)で代わりに出す英語の名前
+pub const PALETTE_UNICODE_NAME: &str = "Unicode";
+pub const PALETTE_ENGLISH_NAME: &str = "英語";
 pub const PALETTE_READINGS: &str = "読み";
+pub const PALETTE_SHORTCODES: &str = "ショートコード";
+pub const PALETTE_CODE_POINTS: &str = "コードポイント";
+/// 読みの区切り(core の PaletteStrings.readingSeparator)
 pub const PALETTE_READING_SEPARATOR: &str = "、";
+/// エンジンが Unicode の名前(UCD の名前)を送るときの出どころ(core の PaletteStrings.unicodeSource)．ほかは CLDR の英語の名前
+pub const PALETTE_UNICODE_SOURCE: &str = "Unicode";
 
 /// 語の意味のカードに入らなかった同音語の数(パレットの説明の欄に入らなかった読みと札の数にも使う)
 pub fn more(count: usize) -> String {

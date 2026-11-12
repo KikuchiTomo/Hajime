@@ -35,6 +35,9 @@ final class Harness {
     var runsFollowUps = true
     /// 動かすよう頼まれたコマンド(R-22)
     private(set) var ranCommands: [LauncherCommand] = []
+    /// 頼まれた単語の登録(語と読み)と，入力メニューを出した回数
+    private(set) var registrations: [(word: String?, reading: String?)] = []
+    private(set) var openedMenus = 0
 
     /// wrap は変換器を包むもの(SupplementedConverter を通して確かめるとき)．wrapLexicon は英単語の辞書を包むもの(EnglishTermLexicon)
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
@@ -119,7 +122,10 @@ final class Harness {
             case .replacePrecedingText(let length):
                 // アプリと同じく，入力位置の前の確定した文字を消す(このあとの組み立て中の文字で置き換える)
                 committed = String(decoding: Array(committed.utf16.dropLast(length)), as: UTF16.self)
-            case .showModeIndicator, .selectMode, .selectInputStyle, .openSettings, .toggleLiveConversion, .showHandwriting, .awaitCorrections, .requestReconversion: break
+            case .openWordRegistration(let word, let reading): registrations.append((word, reading))
+            case .openMenu: openedMenus += 1
+            case .showModeIndicator, .selectMode, .selectInputStyle, .openSettings, .openUserDictionary, .toggleLiveConversion, .showHandwriting,
+                 .awaitCorrections, .requestReconversion: break
             }
         }
     }

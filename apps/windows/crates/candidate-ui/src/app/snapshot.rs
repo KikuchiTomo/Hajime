@@ -216,11 +216,13 @@ fn render_all(output: &Path) -> Result<()> {
             let path = output.join(format!("{kind}-{name}.png"));
             write_png(&imaging, &renderer, &scene, &measure, &path)?;
         }
-        // 絵文字と記号のパレット(R-26)．macOS の palette-emoji・palette-search・palette-flag・palette-symbol・palette-kaomoji と同じ見本
+        // 絵文字と記号のパレット(R-26)．macOS の palette-emoji・palette-search・palette-flag・palette-long・palette-reduced・palette-symbol・palette-kaomoji と同じ見本
         for (kind, panel) in [
             ("palette-emoji", palette::sample::emoji()),
             ("palette-search", palette::sample::search()),
             ("palette-flag", palette::sample::flag()),
+            ("palette-long", palette::sample::long_name()),
+            ("palette-reduced", palette::sample::reduced()),
             ("palette-symbol", palette::sample::symbol()),
             ("palette-kaomoji", palette::sample::kaomoji()),
         ] {
@@ -340,6 +342,7 @@ fn entries(texts: &[&str]) -> Vec<CandidateEntry> {
             corrected_start: None,
             corrected_length: None,
             command: None,
+            has_comment: None,
             detail: None,
         })
         .collect()
@@ -653,6 +656,7 @@ fn column(text: &str) -> BranchColumn {
         homophone: None,
         alternative_notes: vec![],
         alternative_commands: None,
+        alternative_comments: None,
         alternative_details: None,
         source_name: None,
         split: None,

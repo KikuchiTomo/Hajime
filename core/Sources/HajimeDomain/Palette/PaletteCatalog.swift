@@ -1,6 +1,7 @@
 /// パレットに並べる文字の一覧．同梱の表(data/palette/palette.tsv)を読み，表の順に持つ．
 ///
-/// 行は「種類<タブ>まとまり<タブ>文字<タブ>絵文字のバージョン<タブ>日本語の名前<タブ>名前の読み<タブ>英語の名前<タブ>読み<タブ>キーワード<タブ>ショートコード<タブ>肌の色の形」．
+/// 行は「種類<タブ>まとまり<タブ>文字<タブ>絵文字のバージョン<タブ>日本語の名前<タブ>名前の読み<タブ>英語の名前<タブ>読み<タブ>キーワード<タブ>ショートコード<タブ>肌の色の形<タブ>名前の出どころ」．
+/// 名前の出どころの列は無くてもよい(前の形の表も読む)．
 /// 読みから後ろの列は | で区切る．# で始まる行は注記．表は tools/palette/update.sh が作る
 public struct PaletteCatalog: Sendable, Equatable {
     public private(set) var items: [PaletteItem]
@@ -24,7 +25,8 @@ public struct PaletteCatalog: Sendable, Equatable {
                 kind: kind, category: category, text: text, version: EmojiVersion(fields[3]),
                 japaneseName: String(fields[4]), nameReading: String(fields[5]), englishName: String(fields[6]),
                 readings: Self.list(fields[7]), keywords: Self.list(fields[8]), shortcodes: Self.list(fields[9]),
-                skinTones: skinTones.count == SkinTone.allTones.count ? skinTones : []))
+                skinTones: skinTones.count == SkinTone.allTones.count ? skinTones : [],
+                nameSource: fields.count > 11 ? PaletteItem.NameSource(rawValue: String(fields[11])) : nil))
         }
         self.items = items
     }

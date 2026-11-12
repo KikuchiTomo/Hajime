@@ -20,7 +20,7 @@ use crate::strings::{
 };
 use ipc::{
     ContrastPair, DictionaryAddResult, DictionaryEntry, FileFailure, RequestBody, SymbolItem,
-    SymbolKind, SymbolOrigin, SymbolSaveResult, SyncStatus,
+    SymbolKind, SymbolOrigin, SymbolSaveResult, SyncStatus, WordClass,
 };
 use std::borrow::Cow;
 
@@ -242,7 +242,14 @@ impl App {
                 if let Ok(entries) = model.store().read_user_dictionary() {
                     self.extras.dictionary = entries
                         .iter()
-                        .map(|entry| vec![entry.reading.clone(), entry.word.clone()])
+                        .map(|entry| {
+                            vec![
+                                entry.reading.clone(),
+                                entry.word.clone(),
+                                word_class_label(entry.word_class).to_string(),
+                                entry.comment.clone().unwrap_or_default(),
+                            ]
+                        })
                         .collect();
                     self.dictionary = entries;
                 }
@@ -418,11 +425,17 @@ impl App {
                 let entry = DictionaryEntry {
                     reading: item.first().cloned().unwrap_or_default(),
                     word: item.get(1).cloned().unwrap_or_default(),
+                    word_class: item.get(2).and_then(|value| word_class(value)),
+                    comment: item
+                        .get(3)
+                        .map(|comment| comment.trim().to_string())
+                        .filter(|comment| !comment.is_empty()),
                 };
-                // 書き換えるときは，新しい単語を登録できてから元の単語を消す(登録できなければ元のまま)
+                // 書き換えるときは，新しい単語を登録できてから元の単語を消す(登録できなければ元のまま)．
+                // 読みと単語が同じなら，エンジンが品詞を書き換えるので消さない
                 let old = replacing
                     .and_then(|index| self.dictionary.get(index).cloned())
-                    .filter(|old| *old != entry);
+                    .filter(|old| old.reading != entry.reading || old.word != entry.word);
                 let result = model.store().add_user_dictionary_entry(entry);
                 if let (Ok(DictionaryAddResult::Added), Some(old)) = (&result, old) {
                     if let Err(error) = model.store().remove_user_dictionary_entry(old) {
@@ -1144,6 +1157,24 @@ fn preset_theme(
 const NO_TIME: &str = "—";
 
 /// 記号の一覧の 1 行(入力・記号・状態)．状態は無効と，既定から変えた・足した印
+/// 品詞の欄の値(設定のファイルに書く名前)を通信の品詞にする．知らない値なら None(エンジンが名詞にする)
+fn word_class(value: &str) -> Option<WordClass> {
+    serde_json::from_value(serde_json::Value::String(value.to_string())).ok()
+}
+
+/// 表に出す品詞の名前．品詞の無い語(古いエンジンが返したもの)は名詞として出す
+fn word_class_label(word_class: Option<WordClass>) -> &'static str {
+    let value = word_class
+        .and_then(|class| serde_json::to_value(class).ok())
+        .and_then(|value| value.as_str().map(str::to_string))
+        .unwrap_or_default();
+    options::WORD_CLASSES
+        .iter()
+        .find(|(raw, _)| *raw == value)
+        .or(options::WORD_CLASSES.first())
+        .map_or("", |(_, label)| label)
+}
+
 fn symbol_row(item: &SymbolItem) -> Vec<String> {
     let origin = match item.origin {
         SymbolOrigin::Standard => None,

@@ -16,8 +16,10 @@
 - emoticon.tsv，categorized.tsv: Mozc の顔文字と読み，まとまり
 
 出力は 1 行に 1 項目で，列はタブで区切る(HajimeDomain の PaletteCatalog が読む)．
-    種類  まとまり  文字  絵文字のバージョン  日本語の名前  名前の読み  英語の名前  読み  キーワード  ショートコード  肌の色の形
+    種類  まとまり  文字  絵文字のバージョン  日本語の名前  名前の読み  英語の名前  読み  キーワード  ショートコード  肌の色の形  名前の出どころ
 - 種類は emoji か symbol か kaomoji．まとまりは PaletteCategory の id
+- 名前の出どころは，日本語の名前を定めたところ．cldr は CLDR の名前，hajime は Hajime IME が付けた名前(names.txt・Unicode の名前の形から作った名前・
+  囲み文字の中の文字)．顔文字と名前の無い項目は空
 - 読み・キーワード・ショートコード・肌の色の形は | で区切る．読みはひらがな．肌の色の形は明るい順に 5 つ
 - 名前の読みは日本語の名前の読み(ひらがな)．探したときに，名前で当たった項目を読みやキーワードで当たった項目より先にするのに使う
 - 絵文字は emoji-test.txt の並び，記号は symbols.txt の並び，顔文字は emoticon.tsv の並びのあとに categorized.tsv にだけある顔文字．
@@ -498,7 +500,7 @@ def build(source, symbols_path, names_path, transcriptions_path, destination):
         english_words = en_keywords.get(k, derived_en_keywords.get(k, [])) + [word for word in azookey.get(k, []) if word.isascii()]
         variants = [tones[k][tone] for tone in SKIN_TONES if tone in tones.get(k, {})] if len(tones.get(k, {})) == len(SKIN_TONES) else []
         lines.append(["emoji", category, text, version, name_ja, name_reading(name_ja, transcriptions), name_en, clean(readings), clean(keywords + [word.lower() for word in english_words]),
-                      clean(shortcodes.get(k, [])), clean(variants)])
+                      clean(shortcodes.get(k, [])), clean(variants), "cldr" if name_ja else ""])
 
     for category, character in read_symbols(symbols_path):
         k = annotated_key(character, ja_names)
@@ -509,6 +511,8 @@ def build(source, symbols_path, names_path, transcriptions_path, destination):
             generated_name, generated_readings = curated_name, []
         generated_readings = curated_readings + generated_readings
         name_ja = ja_names.get(k) or curated_name or generated_name or ""
+        # 名前を定めたところ．CLDR の名前が無ければ，Hajime IME が付けた名前(names.txt か Unicode の名前の形から作った名前か中の文字)
+        name_source = "cldr" if ja_names.get(k) else ("hajime" if name_ja or inner_text(character) else "")
         name_en = en_names.get(k) or unicode_name.lower()
         inner = inner_text(character)
         japanese = [name_ja] + ja_keywords.get(k, []) + ([inner] if inner else [])
@@ -521,7 +525,7 @@ def build(source, symbols_path, names_path, transcriptions_path, destination):
         # 名前の読み．CLDR の名前があればその読み，無ければ names.txt か Unicode の名前の形から作った読みの先頭
         reading = name_reading(name_ja, transcriptions) if ja_names.get(k) else (generated_readings[:1] or [name_reading(name_ja, transcriptions)])[0]
         english_words = en_keywords.get(k, []) + ([unicode_name.lower()] if unicode_name else [])
-        lines.append(["symbol", category, character, "", name_ja, reading, name_en, clean(readings), clean(keywords + english_words), "", ""])
+        lines.append(["symbol", category, character, "", name_ja, reading, name_en, clean(readings), clean(keywords + english_words), "", "", name_source])
 
     kaomoji = read_kaomoji(source)
     categorized = {category: [] for category in KAOMOJI_CATEGORIES}
@@ -529,7 +533,7 @@ def build(source, symbols_path, names_path, transcriptions_path, destination):
         # 名前は最初の読み．「よこおき」(横向きの顔文字)は形の説明なので，ほかの読みがあればそちらにする
         name = next((reading for reading in readings if reading not in KAOMOJI_DESCRIPTIVE_READINGS), readings[0])
         categorized[kaomoji_category(readings, mozc_categories)].append(
-            ["kaomoji", None, text, "", name, name, "", clean(readings), "", "", ""])
+            ["kaomoji", None, text, "", name, name, "", clean(readings), "", "", "", ""])
     for category in KAOMOJI_CATEGORIES:
         for columns in categorized[category]:
             columns[1] = category
@@ -537,7 +541,7 @@ def build(source, symbols_path, names_path, transcriptions_path, destination):
 
     with open(destination, "w", encoding="utf-8", newline="\n") as output:
         output.write("# 絵文字と記号のパレットの表．tools/palette/update.sh が作る．手で書き換えない\n")
-        output.write("# 種類\tまとまり\t文字\t絵文字のバージョン\t日本語の名前\t名前の読み\t英語の名前\t読み\tキーワード\tショートコード\t肌の色の形\n")
+        output.write("# 種類\tまとまり\t文字\t絵文字のバージョン\t日本語の名前\t名前の読み\t英語の名前\t読み\tキーワード\tショートコード\t肌の色の形\t名前の出どころ\n")
         for columns in lines:
             output.write("\t".join(columns) + "\n")
     print(f"絵文字 {len(entries)} 個，記号 {len(lines) - len(entries) - len(kaomoji)} 個，顔文字 {len(kaomoji)} 個", file=sys.stderr)

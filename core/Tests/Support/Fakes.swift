@@ -84,6 +84,7 @@ public final class FakeConverter: KanaKanjiConverting {
     public private(set) var leftContext: String?
     public func setLeftContext(_ text: String?) { leftContext = text }
     public func didCommit(_ candidate: Candidate) {
+        committedAnyInComposition = true
         committed.append(candidate)
         // 本物と同じく，学習を使わない変換で確定した語は学ばない(取り消すものに数えない)
         if !learningSuspended { committedInComposition.append(candidate) }
@@ -94,7 +95,9 @@ public final class FakeConverter: KanaKanjiConverting {
     public func endComposition() {
         endCount += 1
         learningSuspended = false
-        if !committedInComposition.isEmpty { lastCommitted = committedInComposition }
+        // 本物と同じく，学ばなかった入力も最後の確定にする
+        if committedAnyInComposition { lastCommitted = committedInComposition }
+        committedAnyInComposition = false
         committedInComposition = []
     }
 
@@ -105,7 +108,11 @@ public final class FakeConverter: KanaKanjiConverting {
     /// 学習を使わずに変換したことがあるか
     public private(set) var suspendCount = 0
     private var committedInComposition: [Candidate] = []
+    private var committedAnyInComposition = false
     private var lastCommitted: [Candidate] = []
+    /// 確定を取り消して，最後に確定した入力の候補を戻した回数
+    public private(set) var reopenCount = 0
+    public func reopenLastCommit() { reopenCount += 1 }
 
     public func forget(_ candidate: Candidate) { forgotten.append(candidate) }
     /// 読みの一部だけを学習から消したときの，候補と読みの範囲

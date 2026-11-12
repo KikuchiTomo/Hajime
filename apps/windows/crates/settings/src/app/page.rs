@@ -2309,6 +2309,36 @@ impl PageView {
         }
     }
 
+    /// 単語の登録で受け取った語と読みを，登録した単語の一覧の入力欄(読み・単語)に入れる．
+    /// 入力位置を置く読みの欄を返す(登録した単語の一覧が無いページなら None)
+    pub fn fill_registration(&mut self, reading: &str, word: &str) -> Option<Element> {
+        let index = self
+            .rows
+            .iter()
+            .position(|row| matches!(row.row.control, Control::Dictionary(_)))?;
+        let row = self.rows.get_mut(index)?;
+        let spec = row.row.control.list_spec().copied()?;
+        let mut reading_field = None;
+        for (position, (field, input)) in spec.fields.iter().zip(&row.inputs).enumerate() {
+            let text = match field.name {
+                Some("reading") => {
+                    reading_field = Some(position);
+                    reading
+                }
+                Some("word") => word,
+                _ => continue,
+            };
+            if let Input::Edit(window) = input {
+                ffi::set_text(*window, text);
+            }
+        }
+        row.editing = None;
+        Some(Element {
+            row: index,
+            part: Part::Field(reading_field?),
+        })
+    }
+
     /// スライダーを x(ページの中の座標)まで動かす．値を書くのは手を離したとき(slider_release)
     pub fn slider_drag(&mut self, element: Element, x: f32) {
         let Some(row) = self.rows.get_mut(element.row) else {

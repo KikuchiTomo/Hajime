@@ -7,12 +7,12 @@
 set -eu
 root=$(cd "$(dirname "$0")/../.." && pwd)
 destination=${1:-"$root/../models"}
-version="0.4.0"
+version="0.5.0"
 # https://github.com/KikuchiTomo/hajime-dictionary の Releases
 url="https://github.com/KikuchiTomo/hajime-dictionary/releases/download/v$version/hajime-dictionary-$version.tar.gz"
-expected="f11dc1fcf3b88efe5b72a892d85639909262c21118758cc1d7facaa3720329f2"
+expected="e58bf2d527db404e94e8a38917e95be0b9f8ef38491c29d9657da9d8f0c3365f"
 # 展開した Dictionary/SHA256SUMS の SHA-256(BundledDictionary.expectedManifestSHA256 と同じ値)
-manifest="945b7d5efbd0e874d1b1a72aa5cfd1ee3d87c7a529a3e0ccaae793b3652003a5"
+manifest="36dd11e55a4ed21f4f82ca09389d8b36f3d6555c97bd47ef27bad31e202fe0e4"
 
 directory="$destination/hajime-dictionary-$version"
 if [ -f "$directory/Dictionary/SHA256SUMS" ] && echo "$manifest  $directory/Dictionary/SHA256SUMS" | shasum -a 256 -c - >/dev/null 2>&1; then

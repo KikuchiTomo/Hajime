@@ -1,6 +1,7 @@
 /// 予測の確定を取り消すキーを，バージョン 12 までに保存したキー設定の表に足す(SettingsSchema のバージョン 12 → 13)．
 ///
-/// - ひな形のまま保存した表は，今のそのひな形の表にする(標準・Mac 風は入力文字なしの Backspace，Windows 風・ATOK 風は Ctrl+Backspace)
+/// - ひな形のまま保存した表は，バージョン 13 のそのひな形の表にする(標準・Mac 風は入力文字なしの Backspace，Windows 風・ATOK 風は Ctrl+Backspace．
+///   その先はあとの移し替えが今のひな形の表にする)
 /// - 利用者が変えた表は，取り消すキーが無く，入力文字なしで標準のキーが空いていれば足す．利用者の決めたキーは変えない
 enum PredictionUndoKeyUpgrade {
     static func upgrade(_ object: inout [String: JSONValue]) {
@@ -12,7 +13,7 @@ enum PredictionUndoKeyUpgrade {
 
     static func upgraded(_ keymap: Keymap) -> Keymap {
         if let preset = KeymapPreset.allCases.first(where: { previous($0).entries == keymap.entries }) {
-            var current = preset.keymap
+            var current = UndoCommitKeyUpgrade.previous(preset)
             current.unknownEntries = keymap.unknownEntries
             return current
         }
@@ -26,11 +27,11 @@ enum PredictionUndoKeyUpgrade {
 
     /// バージョン 13 でひな形に足した行
     static func added(to preset: KeymapPreset) -> [KeymapEntry] {
-        preset.keymap.entries.filter { $0.command == .undoPrediction }
+        UndoCommitKeyUpgrade.previous(preset).entries.filter { $0.command == .undoPrediction }
     }
 
-    /// バージョン 12 のひな形の表．今のひな形の表から足した行を除いたもの
+    /// バージョン 12 のひな形の表．バージョン 13 のひな形の表から足した行を除いたもの
     static func previous(_ preset: KeymapPreset) -> Keymap {
-        Keymap(preset.keymap.entries.filter { $0.command != .undoPrediction })
+        Keymap(UndoCommitKeyUpgrade.previous(preset).entries.filter { $0.command != .undoPrediction })
     }
 }

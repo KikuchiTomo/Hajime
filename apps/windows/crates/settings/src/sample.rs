@@ -8,7 +8,7 @@ use crate::engine::Engine;
 use crate::store::Fields;
 use ipc::{
     DictionaryAddResult, DictionaryEntry, KeymapReport, PreviewWord, RequestBody, ResponseBody,
-    SymbolItem, SymbolKind, SymbolOrigin, SymbolSaveResult, SyncGroupState, SyncStatus,
+    SymbolItem, SymbolKind, SymbolOrigin, SymbolSaveResult, SyncGroupState, SyncStatus, WordClass,
 };
 use serde_json::Value;
 use std::sync::Mutex;
@@ -195,17 +195,30 @@ impl Engine for SampleEngine {
                     total: u32::try_from(state.dictionary.len()).unwrap_or(u32::MAX),
                 }
             }
-            RequestBody::AddUserDictionaryEntry { entry } => {
-                let result = if state.dictionary.contains(&entry) {
-                    DictionaryAddResult::AlreadyRegistered
-                } else {
-                    state.dictionary.push(entry);
-                    DictionaryAddResult::Added
+            // エンジンと同じく，読みと単語の組で 1 語とみなし，同じ組を別の品詞で足すと品詞を書き換える
+            RequestBody::AddUserDictionaryEntry { mut entry } => {
+                entry.word_class = entry.word_class.or(Some(WordClass::Noun));
+                let same = state.dictionary.iter_mut().find(|existing| {
+                    existing.reading == entry.reading && existing.word == entry.word
+                });
+                let result = match same {
+                    Some(existing) if *existing == entry => DictionaryAddResult::AlreadyRegistered,
+                    Some(existing) => {
+                        existing.word_class = entry.word_class;
+                        existing.comment = entry.comment;
+                        DictionaryAddResult::Added
+                    }
+                    None => {
+                        state.dictionary.push(entry);
+                        DictionaryAddResult::Added
+                    }
                 };
                 ResponseBody::DictionaryAdded { result }
             }
             RequestBody::RemoveUserDictionaryEntry { entry } => {
-                state.dictionary.retain(|existing| *existing != entry);
+                state.dictionary.retain(|existing| {
+                    existing.reading != entry.reading || existing.word != entry.word
+                });
                 ResponseBody::Done
             }
             RequestBody::ReadSymbolItems { kind } => ResponseBody::SymbolItems {
@@ -280,6 +293,11 @@ impl Engine for SampleEngine {
                     status: state.sync.clone(),
                 }
             }
+            // 見本では単語の登録を頼まれない(登録の欄は空のまま開く)
+            RequestBody::TakeWordRegistration => ResponseBody::WordRegistration {
+                word: None,
+                reading: None,
+            },
             // ファイルの読み書きと辞書の取り込みは見本では行わない(何も変えずに済んだことにする)
             RequestBody::ImportRuleList { .. }
             | RequestBody::ImportProfileRules { .. }
@@ -332,6 +350,7 @@ mod tests {
         let defaults = store.read(&["liveConversion".to_string()], true).unwrap();
         assert_eq!(defaults["liveConversion"], Value::Bool(true));
         assert!(!store.read_user_dictionary().unwrap().is_empty());
+        assert_eq!(store.take_word_registration(), Ok(None));
         assert!(!store
             .read_symbol_items(SymbolKind::Reading)
             .unwrap()

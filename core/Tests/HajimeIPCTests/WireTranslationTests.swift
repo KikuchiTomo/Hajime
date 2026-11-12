@@ -170,6 +170,17 @@ struct WireTranslationTests {
             .consumedKeys.contains(backspace))
     }
 
+    @Test("確定を取り消すキー(入力文字なしの Ctrl+Backspace)は，取り消せるときだけ受け取る．予測の確定だけを取り消すキーは確定では受け取らない")
+    func undoCommitKeyOnlyWhenUndoable() {
+        let keymap = KeymapPreset.standard.keymap
+        let backspace = WireKeyChord(key: .backspace, modifiers: noModifiers)
+        let controlBackspace = WireKeyChord(key: .backspace, modifiers: WireModifiers(shift: false, control: true, alt: false))
+        #expect(!WireSessionState(mode: .japanese, isComposing: false, keymap: keymap, wakeAfterMilliseconds: nil).consumedKeys.contains(controlBackspace))
+        let undoable = WireSessionState(mode: .japanese, isComposing: false, keymap: keymap, wakeAfterMilliseconds: nil, undoableCommit: true)
+        #expect(undoable.consumedKeys.contains(controlBackspace))
+        #expect(!undoable.consumedKeys.contains(backspace))
+    }
+
     @Test("入力位置の前を置き換えるときは，次の組み立て中の文字に置き換える長さを添える．置き換えられるかは DLL が知らせたときだけ")
     func replacePrecedingText() {
         let routed = RoutedActions([.replacePrecedingText(5), .setMarkedText(MarkedText([.init("えぴ", style: .reading)])), .hideCandidates], anchor: nil)

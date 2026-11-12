@@ -10,6 +10,14 @@ public struct PaletteItem: Sendable, Equatable, Hashable {
         public var cellShape: PaletteCellShape { self == .kaomoji ? .wide : .square }
     }
 
+    /// 日本語の名前を定めたところ(表の「名前の出どころ」の列)
+    public enum NameSource: String, Sendable, Hashable {
+        /// CLDR の名前
+        case cldr
+        /// Hajime IME が付けた名前(tools/palette/names.txt・Unicode の名前の形から作った名前・囲み文字の中の文字)
+        case hajime
+    }
+
     public var kind: Kind
     public var category: PaletteCategory
     /// 入れる文字．絵文字は肌の色を変えていない形．顔文字は何文字もある
@@ -28,9 +36,12 @@ public struct PaletteItem: Sendable, Equatable, Hashable {
     public var shortcodes: [String]
     /// 肌の色を変えた形．明るい順に SkinTone.allTones と同じ数だけ並ぶ．変えられない絵文字は空
     public var skinTones: [String]
+    /// 日本語の名前を定めたところ．顔文字と名前の無い項目は nil
+    public var nameSource: NameSource?
 
     public init(kind: Kind, category: PaletteCategory, text: String, version: EmojiVersion? = nil, japaneseName: String = "", nameReading: String = "",
-                englishName: String = "", readings: [String] = [], keywords: [String] = [], shortcodes: [String] = [], skinTones: [String] = []) {
+                englishName: String = "", readings: [String] = [], keywords: [String] = [], shortcodes: [String] = [], skinTones: [String] = [],
+                nameSource: NameSource? = nil) {
         self.kind = kind
         self.category = category
         self.text = text
@@ -42,6 +53,7 @@ public struct PaletteItem: Sendable, Equatable, Hashable {
         self.keywords = keywords
         self.shortcodes = shortcodes
         self.skinTones = skinTones
+        self.nameSource = nameSource
     }
 
     /// 肌の色を選んだときに入れる文字．肌の色を変えられない絵文字は text のまま

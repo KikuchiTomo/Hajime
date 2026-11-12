@@ -81,11 +81,22 @@ enum NoteDrawing {
         (text.size(withAttributes: [.font: theme.labelFont(size: Glass.labelFontSize)]).width + Glass.tagPaddingX * 2).rounded(.up)
     }
 
-    /// 候補の横の札(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前)．「修正」は補正の色の地，
+    /// 札の枠．描くときと押した位置を調べるときで同じものを使う
+    static func tagRect(_ text: String, maxX: CGFloat, midY: CGFloat, theme: ResolvedTheme) -> NSRect {
+        let width = tagWidth(text, theme: theme)
+        return NSRect(x: (maxX - width).rounded(), y: (midY - Glass.tagHeight / 2).rounded(), width: width, height: Glass.tagHeight)
+    }
+
+    /// 札を押せる範囲．札の左右の幅で，行(row)の高さいっぱいにする(背の低い札でも押しやすいように)
+    static func tagHitRect(_ text: String, maxX: CGFloat, row: NSRect, theme: ResolvedTheme) -> NSRect {
+        let tag = tagRect(text, maxX: maxX, midY: row.midY, theme: theme)
+        return NSRect(x: tag.minX, y: row.minY, width: tag.width, height: row.height)
+    }
+
+    /// 候補の横の札(「修正」「入力のまま」「コマンド」，取り込んだ辞書の名前，ユーザー辞書の語のコメント)．「修正」は補正の色の地，
     /// コマンドの候補(command)はアクセントの色の地，ほかは控えめな地．selected は選んでいる行の上(アクセント色の地)に描くとき
     static func drawTag(_ text: String, maxX: CGFloat, midY: CGFloat, theme: ResolvedTheme, selected: Bool, command: Bool = false) {
-        let width = tagWidth(text, theme: theme)
-        let rect = NSRect(x: (maxX - width).rounded(), y: (midY - Glass.tagHeight / 2).rounded(), width: width, height: Glass.tagHeight)
+        let rect = tagRect(text, maxX: maxX, midY: midY, theme: theme)
         let corrected = text == CandidatePanel.correctedAnnotation
         let fill: NSColor = selected ? theme.selectionText.withAlphaComponent(DesignTokens.Opacity.Badge.selected)
             : command ? theme.commandTint : corrected ? theme.correctionTint : theme.badge

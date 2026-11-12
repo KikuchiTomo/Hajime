@@ -186,11 +186,23 @@ final class CandidateView: NSView {
         }
     }
 
-    /// point(この view の座標)にある押せる対象．無ければ nil
+    /// 候補の行の札の右端
+    private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - Size.paddingX / 2 }
+
+    /// ユーザー辞書の語のコメントの札を押せる範囲．コメントの札の無い行は nil
+    private func commentRect(_ entry: CandidatePanel.Entry, in row: NSRect) -> NSRect? {
+        entry.comment.map { NoteDrawing.tagHitRect($0, maxX: tagMaxX(in: row), row: row, theme: theme) }
+    }
+
+    /// point(この view の座標)にある押せる対象．無ければ nil．
+    /// コメントの札は行の中にあるので，行より先に調べる(札を押すと候補の代わりにコメントを入れる)
     func target(at point: NSPoint) -> PointerTarget? {
         guard let panel else { return nil }
         let geometry = geometry(for: panel)
-        if let row = geometry.entryRows.firstIndex(where: { $0.contains(point) }) { return .entry(row) }
+        if let row = geometry.entryRows.firstIndex(where: { $0.contains(point) }) {
+            if let comment = commentRect(panel.entries[row], in: geometry.entryRows[row]), comment.contains(point) { return .comment(row) }
+            return .entry(row)
+        }
         if let row = geometry.variantsRow, let cell = variantCells(panel, in: row).firstIndex(where: { $0.contains(point) }),
            panel.variants[cell].isAvailable {
             return .listVariant(cell)
@@ -355,7 +367,7 @@ final class CandidateView: NSView {
             GlassDrawing.drawUnderline(from: from, to: to, y: rect.maxY - offset, color: color, dotted: true, theme: theme)
         }
         if let annotation = entry.annotation {
-            NoteDrawing.drawTag(annotation, maxX: rect.maxX - Size.paddingX / 2, midY: rect.midY, theme: theme, selected: isSelected,
+            NoteDrawing.drawTag(annotation, maxX: tagMaxX(in: rect), midY: rect.midY, theme: theme, selected: isSelected,
                                 command: entry.command != nil)
         }
     }
@@ -436,6 +448,11 @@ final class CandidateView: NSView {
         let y = rect.minY + ((rect.height - size.height) / 2).rounded()
         text.draw(at: NSPoint(x: x.rounded(), y: y), withAttributes: attributes)
     }
+}
+
+extension CandidatePanel.Entry {
+    /// 札に出したユーザー辞書の語のコメント(長ければ先頭だけ)．札がコメントでなければ nil
+    var comment: String? { hasComment ? annotation : nil }
 }
 
 extension ResolvedTheme {

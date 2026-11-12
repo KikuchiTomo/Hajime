@@ -60,7 +60,7 @@ struct EngineServiceCorrectionTests {
         self.settings = settings
         self.service = EngineService(
             makeSession: { InputSession(converter: converter, lexicon: FakeLexicon(), settings: settings, typoService: typo) },
-            settings: settings, ui: { _ in }, openSettings: {}, typoService: typo, now: { clock.now }
+            settings: settings, ui: { _ in }, openSettings: { _ in }, typoService: typo, now: { clock.now }
         )
     }
 

@@ -13,6 +13,23 @@ pub const COMMAND_KINDS: &[Choice] = &[
     ("openFile", "ファイルを開く"),
 ];
 
+/// ユーザー辞書の語の品詞(core の WordClass)．Microsoft IME の単語の登録と同じ順に並べる(macOS の DictionaryPage の品詞のポップアップ)
+pub const WORD_CLASSES: &[Choice] = &[
+    ("noun", "名詞"),
+    ("surname", "人名(姓のみ)"),
+    ("givenName", "人名(名のみ)"),
+    ("personName", "人名(姓と名)"),
+    ("place", "地名"),
+    ("abbreviation", "短縮よみ"),
+    ("symbol", "顔文字・記号"),
+    ("properNoun", "固有名詞"),
+    ("organization", "組織名"),
+    ("suruNoun", "サ変名詞(〜する)"),
+    ("adjectivalNoun", "形容動詞(〜な)"),
+    ("adverb", "副詞"),
+    ("interjection", "感動詞"),
+];
+
 pub const INPUT_STYLES: &[Choice] = &[
     ("romaji", "ローマ字入力"),
     ("kana", "かな入力"),
@@ -196,6 +213,20 @@ pub fn nearest(values: &[f64], value: f64) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn 品詞の選択肢は通信の品詞をすべて一度ずつ持つ() {
+        let classes: Vec<ipc::WordClass> = WORD_CLASSES
+            .iter()
+            .map(|(value, _)| {
+                serde_json::from_value(serde_json::Value::String((*value).to_string())).unwrap()
+            })
+            .collect();
+        let unique: std::collections::HashSet<_> = classes.iter().collect();
+        assert_eq!(unique.len(), WORD_CLASSES.len());
+        // 通信の品詞の数(protocol/schema.json の WordClass)
+        assert_eq!(classes.len(), 13);
+    }
 
     #[test]
     fn 以前の値は標準として選ぶ() {

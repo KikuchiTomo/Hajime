@@ -4,7 +4,7 @@ PYTHON ?= python3 -I
 MODELS_DIR ?= $(abspath $(CURDIR)/../models)
 ZENZAI_MODEL ?= $(MODELS_DIR)/zenz-v3.2-small-Q5_K_M.gguf
 # かな漢字変換の辞書(hajime-dictionary)．tools/dictionary/fetch_dictionary.sh が MODELS_DIR に展開する
-BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.4.0/Dictionary
+BUNDLED_DICTIONARY ?= $(MODELS_DIR)/hajime-dictionary-0.5.0/Dictionary
 # 評価用のデータ(AJIMEE-Bench)の置き場所．リポジトリに入れられないライセンスなので，1 つ上の evaluation/ に置く
 EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 
@@ -25,6 +25,7 @@ check:
 	$(PYTHON) .claude/skills/hajime-architecture/scripts/check_layers.py
 	$(PYTHON) tools/tokens/check_contrast.py
 	$(PYTHON) tools/protocol/generate.py --check
+	$(PYTHON) tools/tokens/generate_swift.py --check
 	$(PYTHON) tools/tokens/generate_rust.py --check
 	$(PYTHON) tools/release/changelog.py check
 	$(PYTHON) -m unittest discover -s tools/evaluation -p 'test_*.py'

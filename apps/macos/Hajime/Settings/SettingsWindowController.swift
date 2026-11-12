@@ -58,7 +58,18 @@ final class SettingsWindowController {
     }
 
     private func makeWindow() -> NSWindow {
-        Self.makeWindow(model: model, sync: sync, navigation: SettingsNavigation())
+        Self.makeWindow(model: model, sync: sync, navigation: navigation)
+    }
+
+    /// 開いているページ．ユーザー辞書を開くときに切り替える
+    private let navigation = SettingsNavigation()
+
+    /// ユーザー辞書の登録した単語のページを開く．word か reading があれば登録の欄に入れる(単語の登録)
+    func showUserDictionary(word: String, reading: String) {
+        navigation.page = .dictionary
+        if !word.isEmpty || !reading.isEmpty { model.userWordDraft = RuleDraft(key: reading, value: word) }
+        model.showsUserWords = true
+        show()
     }
 
     /// 設定の画面の窓を作る．計測と書き出し(デバッグビルド)でも同じ窓を使う
@@ -91,6 +102,10 @@ final class SettingsModel: ObservableObject {
     @Published private(set) var settings: HajimeDomain.Settings
     @Published var message: String?
     @Published private(set) var usageCounts: UsageCounts
+    /// 単語の登録で，ユーザー辞書の登録の欄に入れる読みと語．入れたら消す
+    @Published var userWordDraft: RuleDraft?
+    /// ユーザー辞書のページで登録した単語を出すよう求められたら true にする(取り込んだ辞書を出していても切り替える)．切り替えたら false に戻す
+    @Published var showsUserWords = false
     private let store: any SettingsStoring & SettingsObserving
     private let usage: (any UsageReading)?
     private let resetLearningAction: () -> Void
@@ -224,14 +239,17 @@ final class SettingsModel: ObservableObject {
 
     // MARK: ユーザー辞書
 
-    /// 語を登録する．replacing を渡すとその語を書き換える(同じ位置に置く)．保存できなければ false を返し，打った語を入力欄に残す
-    func saveEntry(replacing old: UserDictionaryEntry?, reading: String, word: String) -> Bool {
+    /// 語を登録する．replacing を渡すとその語を書き換える(同じ位置に置く)．保存できなければ false を返し，打った語を入力欄に残す．
+    /// 同じ読みと語がもうあれば，その語の品詞とコメントを書き換える
+    func saveEntry(replacing old: UserDictionaryEntry?, reading: String, word: String, wordClass: WordClass, comment: String) -> Bool {
         var entries = settings.userDictionary
-        let index = old.flatMap { entries.firstIndex(of: $0) }
+        let index = old.flatMap { old in entries.firstIndex { $0.isSameWord(as: old) } }
         if let index { entries.remove(at: index) }
-        switch UserDictionaryEditing.add(reading: reading, word: word, to: &entries) {
+        let count = entries.count
+        switch UserDictionaryEditing.add(reading: reading, word: word, wordClass: wordClass, comment: comment, to: &entries) {
         case .added:
-            if let index { entries.insert(entries.removeLast(), at: index) }
+            // 足した語(末尾)を元の位置に戻す．ほかの語の品詞やコメントを書き換えただけなら動かさない
+            if let index, entries.count > count { entries.insert(entries.removeLast(), at: index) }
             return update { $0.userDictionary = entries }
         case .alreadyRegistered:
             return true
@@ -243,11 +261,12 @@ final class SettingsModel: ObservableObject {
         return false
     }
 
-    func removeEntries(_ entries: Set<UserDictionaryEntry>) {
-        update { $0.userDictionary.removeAll { entries.contains($0) } }
+    /// 読みと語が同じ語を消す(品詞は問わない)
+    func removeEntries(_ entries: [UserDictionaryEntry]) {
+        update { UserDictionaryEditing.remove(entries, from: &$0.userDictionary) }
     }
 
-    /// 「読み<タブ>語」の行が並んだテキストのファイルから取り込む
+    /// 「読み<タブ>語<タブ>品詞」の行が並んだテキストのファイルから取り込む
     func importDictionary() {
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.plainText, .tabSeparatedText, .commaSeparatedText]

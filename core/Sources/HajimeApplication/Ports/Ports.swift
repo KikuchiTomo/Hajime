@@ -56,8 +56,12 @@ public protocol KanaKanjiConverting: AnyObject {
     /// 候補のうち，読みの range(候補の読みの先頭からの文字数)に当たる語だけを学習から消す
     /// (文全体の候補を切り出した文節で，その文節の語だけを消す)
     func forget(_ candidate: Candidate, readingRange range: Range<Int>)
-    /// 最後に終えた入力で確定した語の学習を取り消す．取り消すものがあれば true
+    /// 最後に終えた入力で確定した語の学習を取り消す．取り消すものがあれば true．
+    /// 最後に確定した入力が学ばなかったとき(学習を使わない変換)は，その前の入力の学習は取り消さない
     func forgetLastCommit() -> Bool
+    /// 最後に確定した入力の候補を，もう一度確定したり学習から消したりできるようにする(確定の取り消し)．
+    /// 確定を取り消した入力は，その候補のまま変換を続ける．学習の取り消しは forgetLastCommit で行う
+    func reopenLastCommit()
     /// 今の入力を終えるまで，学習を使わずに変換し，確定しても学ばない(キー設定の表の「学習を使わずに変換」)
     func suspendLearningUntilEnd()
     /// 取り込んだ辞書から引いた語を渡す(R-16)．エンジンは読みの中の語として使う．同じものが続くときは何もしなくてよい
@@ -125,6 +129,13 @@ public struct AuxiliaryWord: Sendable, Equatable, Hashable {
 public protocol DictionaryLookup: AnyObject {
     /// 読みがちょうど reading の語
     func words(reading: String, in dictionary: ImportedDictionary) -> [DictionaryWord]
+}
+
+/// 同梱の専門用語の辞書を読みで引く(R-29)
+@MainActor
+public protocol TermDictionaryLookup: AnyObject {
+    /// 読みがちょうど reading の語(分野では絞らない)
+    func words(reading: String) -> [TermWord]
 }
 
 /// 確定済みの文字の読み(再変換で使う)．OS の機能で求める(macOS は CFStringTokenizer，Windows は IFELanguage)

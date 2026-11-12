@@ -176,6 +176,12 @@ pub struct FieldContext {
     #[serde(rename = "canReplacePrecedingText")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub can_replace_preceding_text: Option<bool>,
+    #[serde(rename = "canShowMenu")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub can_show_menu: Option<bool>,
+    #[serde(rename = "canRequestWordRegistration")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub can_request_word_registration: Option<bool>,
 }
 
 impl fmt::Debug for FieldContext {
@@ -186,6 +192,8 @@ impl fmt::Debug for FieldContext {
             .field("precedingText", &REDACTED)
             .field("caret", &self.caret)
             .field("canReplacePrecedingText", &self.can_replace_preceding_text)
+            .field("canShowMenu", &self.can_show_menu)
+            .field("canRequestWordRegistration", &self.can_request_word_registration)
             .finish()
     }
 }
@@ -269,6 +277,11 @@ pub enum EditOperation {
         #[serde(rename = "maximumLength")]
         maximum_length: u32,
     },
+    RequestWordRegistration {
+        #[serde(rename = "maximumLength")]
+        maximum_length: u32,
+    },
+    ShowMenu,
 }
 
 impl fmt::Debug for EditOperation {
@@ -293,6 +306,11 @@ impl fmt::Debug for EditOperation {
                 .debug_struct("RequestReconversion")
                 .field("maximumLength", maximum_length)
                 .finish(),
+            Self::RequestWordRegistration { maximum_length, .. } => f
+                .debug_struct("RequestWordRegistration")
+                .field("maximumLength", maximum_length)
+                .finish(),
+            Self::ShowMenu => f.write_str("ShowMenu"),
         }
     }
 }
@@ -346,6 +364,7 @@ impl fmt::Debug for SettingsSnapshot {
 pub enum MenuCommand {
     ToggleLiveConversion,
     OpenSettings,
+    OpenUserDictionary,
 }
 
 impl fmt::Debug for MenuCommand {
@@ -353,6 +372,7 @@ impl fmt::Debug for MenuCommand {
         match self {
             Self::ToggleLiveConversion => f.write_str("ToggleLiveConversion"),
             Self::OpenSettings => f.write_str("OpenSettings"),
+            Self::OpenUserDictionary => f.write_str("OpenUserDictionary"),
         }
     }
 }
@@ -373,6 +393,9 @@ pub enum PointerTarget {
         index: u32,
     },
     ListVariant {
+        index: u32,
+    },
+    Comment {
         index: u32,
     },
 }
@@ -398,6 +421,10 @@ impl fmt::Debug for PointerTarget {
                 .finish(),
             Self::ListVariant { index, .. } => f
                 .debug_struct("ListVariant")
+                .field("index", index)
+                .finish(),
+            Self::Comment { index, .. } => f
+                .debug_struct("Comment")
                 .field("index", index)
                 .finish(),
         }
@@ -669,10 +696,33 @@ impl fmt::Debug for PreviewWord {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum WordClass {
+    Noun,
+    ProperNoun,
+    PersonName,
+    Surname,
+    GivenName,
+    Organization,
+    Place,
+    Symbol,
+    SuruNoun,
+    AdjectivalNoun,
+    Adverb,
+    Interjection,
+    Abbreviation,
+}
+
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct DictionaryEntry {
     pub reading: String,
     pub word: String,
+    #[serde(rename = "wordClass")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub word_class: Option<WordClass>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comment: Option<String>,
 }
 
 impl fmt::Debug for DictionaryEntry {
@@ -680,6 +730,8 @@ impl fmt::Debug for DictionaryEntry {
         f.debug_struct("DictionaryEntry")
             .field("reading", &REDACTED)
             .field("word", &REDACTED)
+            .field("wordClass", &self.word_class)
+            .field("comment", &REDACTED)
             .finish()
     }
 }
@@ -882,6 +934,12 @@ pub enum RequestBody {
     MergeUserDictionary {
         entries: Vec<DictionaryEntry>,
     },
+    OpenWordRegistration {
+        text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reading: Option<String>,
+    },
+    TakeWordRegistration,
 }
 
 impl fmt::Debug for RequestBody {
@@ -1108,6 +1166,12 @@ impl fmt::Debug for RequestBody {
                 .debug_struct("MergeUserDictionary")
                 .field("entries", entries)
                 .finish(),
+            Self::OpenWordRegistration { .. } => f
+                .debug_struct("OpenWordRegistration")
+                .field("text", &REDACTED)
+                .field("reading", &REDACTED)
+                .finish(),
+            Self::TakeWordRegistration => f.write_str("TakeWordRegistration"),
         }
     }
 }
@@ -1202,6 +1266,12 @@ pub enum ResponseBody {
     },
     Error {
         code: ErrorCode,
+    },
+    WordRegistration {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        word: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        reading: Option<String>,
     },
 }
 
@@ -1299,6 +1369,11 @@ impl fmt::Debug for ResponseBody {
                 .debug_struct("Error")
                 .field("code", code)
                 .finish(),
+            Self::WordRegistration { .. } => f
+                .debug_struct("WordRegistration")
+                .field("word", &REDACTED)
+                .field("reading", &REDACTED)
+                .finish(),
         }
     }
 }
@@ -1356,6 +1431,9 @@ pub struct CandidateEntry {
     pub corrected_length: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<CommandKind>,
+    #[serde(rename = "hasComment")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub has_comment: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub detail: Option<String>,
 }
@@ -1368,6 +1446,7 @@ impl fmt::Debug for CandidateEntry {
             .field("correctedStart", &self.corrected_start)
             .field("correctedLength", &self.corrected_length)
             .field("command", &self.command)
+            .field("hasComment", &self.has_comment)
             .field("detail", &REDACTED)
             .finish()
     }
@@ -1606,6 +1685,9 @@ pub struct BranchColumn {
     #[serde(rename = "alternativeCommands")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alternative_commands: Option<Vec<Option<CommandKind>>>,
+    #[serde(rename = "alternativeComments")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alternative_comments: Option<Vec<bool>>,
     #[serde(rename = "alternativeDetails")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alternative_details: Option<Vec<Option<String>>>,
@@ -1635,6 +1717,7 @@ impl fmt::Debug for BranchColumn {
             .field("homophone", &self.homophone)
             .field("alternativeNotes", &REDACTED)
             .field("alternativeCommands", &self.alternative_commands)
+            .field("alternativeComments", &self.alternative_comments)
             .field("alternativeDetails", &REDACTED)
             .field("sourceName", &REDACTED)
             .field("split", &self.split)

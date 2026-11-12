@@ -204,6 +204,10 @@ public struct Settings: Sendable, Equatable {
     public var importedDictionaries: [ImportedDictionary] = []
     /// 取り込んだ連想の辞書(R-18)．並び順が優先度．語は Application Support の associations/ にある索引のファイルに置く
     public var associationDictionaries: [AssociationDictionary] = [DefaultSettings.bundledAssociationDictionary]
+    /// 同梱の専門用語の辞書(R-29)を使うか．通常の辞書にある語は，切っても出る
+    public var termDictionary = DefaultSettings.termDictionary
+    /// 専門用語の辞書の分野ごとのオン・オフ(termDictionary がオンのときだけ効く)
+    public var termFields = TermFieldSettings()
     /// 使い方を記録する(回数だけを端末の中に)
     public var recordsUsage = true
 
@@ -391,7 +395,7 @@ extension Settings: Codable {
         case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking
-        case learning, userDictionary, importedDictionaries, associationDictionaries, recordsUsage
+        case learning, userDictionary, importedDictionaries, associationDictionaries, termDictionary, termFields, recordsUsage
         case theme, candidateFontSize, showsModeIndicator
         case escapeSwitchesToDirect, restrainsLiveConversionInCode, profileRules
         case handShiftCorrection, looseReadings, phoneticSpelling, dynamicDictionary, conversionMacros, macros, macroSkipsSameReading, launcherCommands, commands
@@ -515,6 +519,8 @@ extension Settings: Codable {
         // 同期のファイルから来た設定でもファイルの名前に使うので，形の違う id は捨てる
         settings.importedDictionaries.removeAll { !$0.hasValidIdentity }
         readList(.associationDictionaries, into: \.associationDictionaries)
+        read(.termDictionary, into: \.termDictionary)
+        read(.termFields, into: \.termFields)
         read(.recordsUsage, into: \.recordsUsage)
         read(.theme, into: \.theme)
         read(.candidateFontSize, into: \.candidateFontSize)
@@ -649,6 +655,8 @@ extension Settings: Codable {
         try container.encode(userDictionary, forKey: .userDictionary)
         try container.encode(importedDictionaries, forKey: .importedDictionaries)
         try container.encode(associationDictionaries, forKey: .associationDictionaries)
+        try container.encode(termDictionary, forKey: .termDictionary)
+        try container.encode(termFields, forKey: .termFields)
         try container.encode(recordsUsage, forKey: .recordsUsage)
         try container.encode(theme, forKey: .theme)
         try container.encode(candidateFontSize, forKey: .candidateFontSize)

@@ -236,6 +236,13 @@ pub mod settings_windows {
 }
 
 pub mod size {
+    pub mod space {
+        pub const XXS: f32 = 2.0;
+        pub const XS: f32 = 4.0;
+        pub const SM: f32 = 8.0;
+        pub const MD: f32 = 12.0;
+        pub const LG: f32 = 16.0;
+    }
     pub mod candidate {
         pub const ROW_HEIGHT: f32 = 22.0;
         pub const FONT_SIZE: f32 = 15.0;
@@ -290,6 +297,9 @@ pub mod size {
         pub const PREVIEW_CHIP_GAP: f32 = 6.0;
         pub const RULE_CHECK_COLUMN_WIDTH: f32 = 40.0;
         pub const RULE_KEY_COLUMN_WIDTH: f32 = 160.0;
+        pub const RULE_VALUE_COLUMN_WIDTH: f32 = 150.0;
+        pub const RULE_NOTE_FIELD_GAP: f32 = 8.0;
+        pub const RULE_KIND_COLUMN_WIDTH: f32 = 120.0;
         pub const COMMAND_READING_COLUMN_WIDTH: f32 = 110.0;
         pub const COMMAND_TITLE_COLUMN_WIDTH: f32 = 120.0;
         pub const COMMAND_KIND_COLUMN_WIDTH: f32 = 130.0;
@@ -299,7 +309,7 @@ pub mod size {
         pub const TABLE_POPUP_TEXT_INSET: f32 = 21.0;
         pub const THEME_EDITOR_WIDTH: f32 = 640.0;
         pub const THEME_EDITOR_HEIGHT: f32 = 720.0;
-        pub const USER_DICTIONARY_TABLE_HEIGHT: f32 = 330.0;
+        pub const USER_DICTIONARY_TABLE_HEIGHT: f32 = 280.0;
         pub const PREVIEW_PADDING: f32 = 24.0;
         pub const KEY_FILTER_RADIUS: f32 = 5.0;
         pub const FONT_SLIDER_WIDTH: f32 = 220.0;
@@ -324,6 +334,7 @@ pub mod size {
         pub const SELECTION_RADIUS: f32 = 7.0;
         pub const KEYCAP_RADIUS: f32 = 4.0;
         pub const KEYCAP_PADDING_X: f32 = 5.0;
+        pub const KEYCAP_PADDING_Y: f32 = 3.0;
         pub const KEYCAP_HEIGHT: f32 = 17.0;
         pub const HINT_GAP: f32 = 10.0;
         pub const FOOTER_HEIGHT: f32 = 28.0;
@@ -400,17 +411,19 @@ pub mod size {
         pub const KEY_GAP: f32 = 6.0;
     }
     pub mod palette {
-        pub const PADDING: f32 = 8.0;
-        pub const GAP: f32 = 6.0;
-        pub const SEARCH_HEIGHT: f32 = 30.0;
+        pub const PADDING: f32 = 12.0;
+        pub const SECTION_GAP: f32 = 12.0;
+        pub const GROUP_GAP: f32 = 8.0;
+        pub const ITEM_GAP: f32 = 4.0;
+        pub const INSET: f32 = 2.0;
+        pub const CONTROL_HEIGHT: f32 = 28.0;
+        pub const CONTROL_PADDING_X: f32 = 8.0;
         pub const SEARCH_RADIUS: f32 = 8.0;
         pub const SEARCH_FONT_SIZE: f32 = 14.0;
         pub const SEARCH_ICON_SIZE: f32 = 13.0;
         pub const MODE_FONT_SIZE: f32 = 12.0;
-        pub const MODE_PADDING_X: f32 = 10.0;
-        pub const TAB_HEIGHT: f32 = 28.0;
         pub const TAB_ICON_SIZE: f32 = 14.0;
-        pub const HEADING_HEIGHT: f32 = 20.0;
+        pub const TEXT_ROW_HEIGHT: f32 = 16.0;
         pub const HEADING_FONT_SIZE: f32 = 11.0;
         pub const CELL_RADIUS: f32 = 6.0;
         pub const EMOJI_SCALE: f32 = 0.7;
@@ -420,34 +433,26 @@ pub mod size {
         pub const KAOMOJI_PADDING_X: f32 = 4.0;
         pub const SELECTION_STROKE: f32 = 2.0;
         pub const SCROLLBAR_WIDTH: f32 = 3.0;
-        pub const SCROLLBAR_GUTTER: f32 = 9.0;
         pub const SCROLLBAR_MIN_LENGTH: f32 = 16.0;
+        pub const TILE_SIZE: f32 = 48.0;
+        pub const TILE_PADDING: f32 = 8.0;
         pub const PREVIEW_GLYPH_SIZE: f32 = 40.0;
-        pub const PREVIEW_TILE_PADDING: f32 = 4.0;
-        pub const PREVIEW_PADDING_Y: f32 = 4.0;
         pub const PREVIEW_SYMBOL_BOOST: f32 = 1.2;
         pub const PREVIEW_KAOMOJI_FONT_SIZE: f32 = 18.0;
         pub const PREVIEW_KAOMOJI_WIDTH: f32 = 0.45;
-        pub const PREVIEW_GAP: f32 = 10.0;
-        pub const PREVIEW_LINE_GAP: f32 = 3.0;
-        pub const PREVIEW_HEADING_MAX_LINES: f32 = 2.0;
+        pub const PREVIEW_HEADING_HEIGHT: f32 = 20.0;
+        pub const PREVIEW_LABEL_FONT_SIZE: f32 = 10.0;
         pub const PREVIEW_NAME_LINES: f32 = 2.0;
-        pub const PREVIEW_NAME_MAX_LINES: f32 = 3.0;
-        pub const PREVIEW_CHIP_LINES: f32 = 2.0;
-        pub const PREVIEW_CHIP_PADDING_X: f32 = 4.0;
-        pub const PREVIEW_CHIP_PADDING_Y: f32 = 2.0;
-        pub const PREVIEW_CHIP_GAP: f32 = 4.0;
-        pub const PREVIEW_CHIP_RADIUS: f32 = 4.0;
-        pub const PREVIEW_TAG_FONT_SIZE: f32 = 9.0;
-        pub const PREVIEW_TAG_PADDING_X: f32 = 4.0;
-        pub const PREVIEW_TAG_GAP: f32 = 5.0;
-        pub const PREVIEW_TAG_RADIUS: f32 = 3.0;
+        pub const CHIP_PADDING_X: f32 = 4.0;
+        pub const CHIP_PADDING_Y: f32 = 2.0;
+        pub const CHIP_RADIUS: f32 = 3.0;
         pub const NAME_FONT_SIZE: f32 = 13.0;
         pub const DETAIL_FONT_SIZE: f32 = 11.0;
         pub const CODE_FONT_SIZE: f32 = 10.0;
         pub const PREVIEW_CHIP_SMALL_FONT_SIZE: f32 = 8.0;
-        pub const FOOTER_HEIGHT: f32 = 28.0;
+        pub const SKIN_BUTTON_PADDING: f32 = 3.0;
         pub const PICKER_CELL_SIZE: f32 = 36.0;
+        pub const CELL_PADDING: f32 = 4.0;
         pub const PROBE_FONT_SIZE: f32 = 20.0;
         pub const OPEN_RISE: f32 = 6.0;
         pub const CONTENT_SHIFT: f32 = 18.0;
@@ -476,7 +481,7 @@ pub mod size {
         pub const CARD_GAP: f32 = 4.0;
         pub const CARD_RADIUS: f32 = 4.0;
         pub const CARD_PADDING_X: f32 = 16.0;
-        pub const ROW_HEIGHT: f32 = 52.0;
+        pub const ROW_HEIGHT: f32 = 68.0;
         pub const CONTROL_HEIGHT: f32 = 32.0;
         pub const DROPDOWN_HEIGHT: f32 = 384.0;
         pub const CONTROL_WIDTH: f32 = 240.0;
@@ -544,7 +549,7 @@ pub mod size {
         pub const SLIDER_THUMB_SIZE: f32 = 20.0;
         pub const SLIDER_THUMB_INNER: f32 = 12.0;
         pub const SLIDER_THUMB_INNER_HOVER: f32 = 14.0;
-        pub const CARD_PADDING_Y: f32 = 12.0;
+        pub const CARD_PADDING_Y: f32 = 16.0;
         pub const FOOTER_GAP: f32 = 8.0;
         pub const LABEL_MIN_WIDTH: f32 = 160.0;
         pub const RADIO_SIZE: f32 = 20.0;
@@ -557,6 +562,9 @@ pub mod size {
         pub const THEME_SWATCH_RADIUS: f32 = 6.0;
         pub const THEME_SWATCH_FONT_SIZE: f32 = 11.0;
         pub const ABOUT_ICON: f32 = 64.0;
+        pub const TITLE_BAR_HEIGHT: f32 = 32.0;
+        pub const TITLE_BAR_ICON_SIZE: f32 = 16.0;
+        pub const TITLE_BAR_PADDING_X: f32 = 16.0;
         pub const ABOUT_TITLE_FONT_SIZE: f32 = 20.0;
         pub const PALETTE_PREVIEW_HEIGHT: f32 = 300.0;
         pub const SWITCH_KNOB_OFF: f32 = 12.0;

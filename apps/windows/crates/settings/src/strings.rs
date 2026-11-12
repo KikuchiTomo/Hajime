@@ -97,7 +97,11 @@ pub mod settings {
     pub const RESET_USAGE: &str = "統計を消去";
     /// UIStrings.Settings.fontSize から値を除いたもの
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
-    pub const DICTIONARY_NOTE: &str = "読みと単語をタブで区切ったテキストファイルを読み込めます。";
+    pub const DICTIONARY_NOTE: &str = "読み・単語・品詞・コメントをタブで区切ったテキストファイルを読み込めます。品詞の無い行は名詞として登録します。コメントは候補の横に出て、押すとコメントを入力します。";
+    pub const WORD_CLASS: &str = "品詞";
+    pub const COMMENT: &str = "コメント";
+    pub const ABBREVIATION_NOTE: &str =
+        "短縮よみの単語は、読みだけを変換したときに出ます。文の中では出ません。";
 
     /// 絵文字の位置の値(macOS の UIStrings.Settings.emojiCandidatePositionValue)
     pub fn emoji_candidate_position(value: f64) -> String {
@@ -498,6 +502,7 @@ pub mod keys {
         ("resumeEditing", "読みに戻して末尾から編集"),
         ("undoConversionEdit", "直前の変更を取り消し"),
         ("undoPrediction", "予測の確定を取り消し"),
+        ("undoCommit", "確定を取り消し"),
         ("forgetCandidate", "候補を学習から削除"),
         ("forgetLastCommit", "最後の学習を取り消し"),
         ("hidePrediction", "予測に表示しない"),
@@ -507,6 +512,9 @@ pub mod keys {
         ("emojiPalette", "絵文字のパレット"),
         ("symbolPalette", "記号のパレット"),
         ("kaomojiPalette", "顔文字のパレット"),
+        ("registerWord", "単語の登録"),
+        ("openUserDictionary", "ユーザー辞書を開く"),
+        ("openMenu", "入力メニューを開く"),
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
     ];
@@ -535,6 +543,7 @@ pub mod keys {
         ("resumeEditing", "変換をやめて読みに戻り、末尾から入力を続けます"),
         ("undoConversionEdit", "直前に変更した候補や文節の区切りを元に戻します。続けて押すと全文を読みに戻します"),
         ("undoPrediction", "予測を確定した直後に押すと、確定した語句を削除して予測で補う前の読みに戻します。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"),
+        ("undoCommit", "確定した直後に押すと、確定した文字を削除して確定する前の変換に戻します。文節の区切りと選んだ候補も戻るので、そのまま選び直せます。確定した語句の学習も取り消します。直後でなければ、キーはそのままアプリに渡します"),
         ("segmentToHiragana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
         ("segmentToKatakana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
         ("segmentToHalfwidthKatakana", "変換中に、選択中の文節だけを変換します。ほかの文節はそのままです"),
@@ -545,8 +554,10 @@ pub mod keys {
         ("emojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
         ("symbolPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
         ("kaomojiPalette", "「絵文字と記号のパレット」の設定がオンのときに使えます。開いているときに押すと閉じます"),
-        ("reconvert", "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します"),
+        ("reconvert", "選択中の確定済みの文字を読みに戻して変換し直します。Esc で元の文字に戻します。確定した直後に押すと、確定を取り消して確定する前の変換に戻します"),
         ("associate", "選択中の文節を、似た意味や関連のある単語の一覧に切り替えます。入力中は変換してから切り替えます"),
+        ("registerWord", "ユーザー辞書の画面を開き、入力中の語句か、選択中の文字を単語の欄に入れます"),
+        ("openMenu", "入力メニューの項目を入力位置に表示します"),
     ];
 }
 
@@ -558,10 +569,46 @@ pub mod rule_list {
     pub const ALREADY_REGISTERED: &str = "すでに登録されています。";
 }
 
+/// UIStrings.Terms
+pub mod terms {
+    pub const ENABLED: &str = "専門用語の辞書を使う";
+    pub const FIELDS: &str = "使う分野";
+    pub const NOTE: &str = "医学・法律・情報技術などの専門用語のうち、通常の辞書に無い語を候補に足します。通常の辞書にある語は、ここで切っても出ます。語は JMdict と Wikidata から集めています。";
+
+    /// 分野の id と名前(core の TermField と同じ並びと名前．tools/check/check_strings.py が確かめる)
+    pub const FIELD_NAMES: &[(&str, &str)] = &[
+        ("computing", "情報技術"),
+        ("medicine", "医学"),
+        ("biology", "生物学"),
+        ("chemistry", "化学"),
+        ("physics", "物理学"),
+        ("mathematics", "数学"),
+        ("earth", "地学・天文学"),
+        ("engineering", "工学"),
+        ("architecture", "建築"),
+        ("law", "法律・政治"),
+        ("economics", "経済・金融"),
+        ("business", "ビジネス"),
+        ("linguistics", "言語学"),
+        ("philosophy", "哲学・思想"),
+        ("religion", "宗教・神話"),
+        ("music", "音楽"),
+        ("design", "美術・デザイン"),
+        ("food", "料理・食品"),
+        ("sports", "スポーツ"),
+        ("games", "囲碁・将棋・ゲーム"),
+        ("military", "軍事"),
+        ("agriculture", "農林水産"),
+        ("performingArts", "芸能・映像"),
+        ("history", "歴史・考古学"),
+    ];
+}
+
 /// UIStrings.Dictionaries
 pub mod dictionaries {
     pub const USER_WORDS: &str = "登録した単語";
     pub const IMPORTED: &str = "取り込んだ辞書";
+    pub const TERMS: &str = "専門用語";
     pub const EMPTY: &str = "取り込んだ辞書はありません";
     pub const IMPORT_FILE: &str = "辞書をインポート…";
     pub const REIMPORT: &str = "再読み込み…";
@@ -786,6 +833,8 @@ pub mod sync {
         ("userDictionary", "ユーザー辞書"),
         ("importedDictionaries", "取り込んだ辞書"),
         ("associationDictionaries", "連想の辞書"),
+        ("termDictionary", "専門用語の辞書を使う"),
+        ("termFields", "専門用語の辞書の分野"),
         (
             "macroSkipsSameReading",
             "かなの語には読みを添える形を出さない",

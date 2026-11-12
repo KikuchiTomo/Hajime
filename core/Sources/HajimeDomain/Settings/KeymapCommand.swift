@@ -54,7 +54,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case insertBoundary
     /// 「もしかして」と示した読みに直す
     case acceptSuggestion
-    /// 再変換．入力先で選んでいる確定済みの文字を読みに戻し，変換し直す．Esc で元の文字に戻す
+    /// 再変換．入力先で選んでいる確定済みの文字を読みに戻し，変換し直す．Esc で元の文字に戻す．
+    /// 確定した直後(文字を選んでいない)は，確定を取り消して確定する前の変換に戻す(undoCommit と同じ．読みのまま確定したものは変換する)
     case reconvert
 
     // 字種
@@ -119,6 +120,9 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     /// 予測の窓の予測を確定した直後に，確定した語句を消して補う前の読み(組み立て中の文字)に戻す．確定した語句の学習も取り消す．
     /// 直後でなければ(取り消すものが無い・入力位置の前が確定した語句でない)キーをアプリに渡す
     case undoPrediction
+    /// 確定した直後に，確定した文字を消して確定する前に戻す．変換は文節の区切りと選んだ候補まで戻し，読みは読みに，予測は補う前の読みに戻す．
+    /// 確定した語の学習も取り消す．直後でなければ(取り消すものが無い・入力位置の前が確定した文字でない)キーをアプリに渡す
+    case undoCommit
 
     // 学習
     /// 選んでいる候補を学習から消す
@@ -140,6 +144,12 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     case symbolPalette
     /// 顔文字のパレットを開く．開いているときは閉じる
     case kaomojiPalette
+    /// 単語を登録する(設定のユーザー辞書の画面を開き，入力中の語か入力先で選んでいる語を単語の欄に入れる)
+    case registerWord
+    /// 設定のユーザー辞書の画面を開く
+    case openUserDictionary
+    /// 入力メニュー(macOS のメニューバー・Windows のタスクバーの入力メニューと同じ項目)を入力位置に出す
+    case openMenu
 
     /// 設定の画面でコマンドを並べるまとまり
     public enum Group: String, Sendable, CaseIterable {
@@ -165,9 +175,10 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate: .candidates
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
-        case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit, .undoPrediction: .commit
+        case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit, .undoPrediction, .undoCommit: .commit
         case .forgetCandidate, .forgetLastCommit, .hidePrediction: .learning
-        case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette: .tools
+        case .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette, .registerWord, .openUserDictionary,
+             .openMenu: .tools
         }
     }
 
@@ -177,7 +188,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         // 設定を開く・ライブ変換・手書きは英数のときも効かせる．ターミナル(cmux など)では英数で打っていることが多く，
         // 入力メニューの操作も取り次がないので，キーが唯一の開き方になる
         case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle,
-             .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette:
+             .openSettings, .toggleLiveConversion, .handwriting, .emojiPalette, .symbolPalette, .kaomojiPalette, .registerWord, .openUserDictionary,
+             .openMenu:
             [.direct, .idle, .composing, .converting]
         case .cancelAndDirectMode, .insertSpace, .insertAlternateSpace, .insertHalfwidthSpace, .insertFullwidthSpace: [.idle, .composing, .converting]
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion, .hidePrediction: [.composing]
@@ -188,7 +200,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment, .commitFirstSegment, .backToReading,
              .resumeEditing, .undoConversionEdit, .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana,
              .forgetCandidate: [.converting]
-        case .forgetLastCommit, .reconvert, .undoPrediction: [.idle]
+        case .forgetLastCommit, .reconvert, .undoPrediction, .undoCommit: [.idle]
         }
     }
 
