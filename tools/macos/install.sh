@@ -42,6 +42,9 @@ if [ "$identity" != "-" ]; then
   codesign --force --options runtime --timestamp=none --entitlements "$entitlements" --sign "$identity" "$built"
 fi
 
+# ビルドしたアプリを LaunchServices の登録から外し，入れたものだけを入力ソースとして登録する
+"$root/tools/macos/unregister_builds.sh"
+
 # 動いている古いバージョンを止めてから入れ替える．次にキーを打ったとき OS が新しいバージョンを起こす
 pkill -x "$app_name" 2>/dev/null || true
 # 置き場所は管理者の権限が要るので sudo を使う(パスワードを聞かれる)
