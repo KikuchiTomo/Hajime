@@ -152,7 +152,8 @@ struct SettingsEffectScenarioTests {
                                                   lexicon: lexicon)
             return converter.listCandidates(for: "ふぉと").map(\.text)
         }
-        #expect(!list { _ in }.contains("photo"))
+        #expect(!list { $0.phoneticSpelling = false }.contains("photo"))
         #expect(list { $0.phoneticSpelling = true }.contains("photo"))
+        #expect(list { _ in }.contains("photo"))
     }
 }

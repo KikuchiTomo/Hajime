@@ -872,8 +872,7 @@ enum UIStrings {
 
         // g. 機能の紹介
         static let featuresTitle = "便利な機能"
-        static let extrasTitle = "試験的な機能"
-        static let extrasDetail = "既定ではオフの機能です。"
+        static let extrasTitle = "そのほかの機能"
         static let macros = "変換マクロ"
         static let macrosDetail = "連想変換と同じ Shift + Space で、選択中の単語を「」で囲む・ルビを付けるなどして表示します。"
         static let dynamicDictionary = "書式の展開"

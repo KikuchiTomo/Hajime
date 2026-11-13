@@ -1369,8 +1369,7 @@ pub mod wizard {
     pub const INITIAL_FOCUS: &str = "最初に選択する文節";
     pub const CHARACTERS_TITLE: &str = "入力する文字";
     pub const FEATURES_TITLE: &str = "便利な機能";
-    pub const EXTRAS_TITLE: &str = "試験的な機能";
-    pub const EXTRAS_DETAIL: &str = "既定ではオフの機能です。";
+    pub const EXTRAS_TITLE: &str = "そのほかの機能";
     pub const MACROS: &str = "変換マクロ";
     pub const MACROS_DETAIL: &str =
         "連想変換と同じ Shift + Space で、選択中の単語を「」で囲む・ルビを付けるなどして表示します。";

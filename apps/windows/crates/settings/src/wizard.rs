@@ -78,8 +78,8 @@ impl Step {
         match self {
             Step::AppModes => Some(text::APP_MODES_DETAIL),
             Step::Theme => Some(text::THEME_DETAIL),
-            Step::Extras => Some(text::EXTRAS_DETAIL),
             Step::ModeSwitch
+            | Step::Extras
             | Step::Correction
             | Step::LiveConversion
             | Step::Presentation

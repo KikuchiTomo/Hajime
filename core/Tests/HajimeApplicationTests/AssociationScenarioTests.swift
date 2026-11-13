@@ -15,6 +15,8 @@ struct AssociationScenarioTests {
     private func makeSettings(_ change: (inout Settings) -> Void = { _ in }) -> Settings {
         var settings = DefaultSettings.settings
         settings.associationDictionaries = [Self.dictionary]
+        // 連想の語だけを確かめる．変換マクロ(既定でオン)を入れると，どの語にも「整形」のまとまりが足される
+        settings.conversionMacros = false
         change(&settings)
         return settings
     }
