@@ -596,6 +596,10 @@ fn variants(painter: &mut Painter, list: &CandidateList, section: Frame, inset: 
         let selected =
             list.focus == CandidateFocus::Variants && list.selected_variant == Some(index as u32);
         let color = match (selected, variant.is_available) {
+            // 文節を打ち直しているあいだ(⇧⌫)の文字種は打ち直す前の語のものなので，候補と同じ濃さに薄くする
+            _ if list.is_editing == Some(true) => {
+                theme.text.faded(tokens::opacity::candidate::EDITING_STALE)
+            }
             (true, _) => theme.selection_text,
             (false, true) => theme.text_muted,
             (false, false) => theme.text_muted.faded(opacity::variant::UNAVAILABLE),
