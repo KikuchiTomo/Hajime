@@ -99,6 +99,7 @@ public enum LayoutTokens {
         public static let meaningIndent: Double = 8
         public static let meaningWidth: Double = 240
         public static let gripSize: Double = 3
+        public static let stubLength: Double = 24
         public static let fadeWidth: Double = 48
     }
     public enum Settings {

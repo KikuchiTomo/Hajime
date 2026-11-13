@@ -139,6 +139,9 @@ public struct Settings: Sendable, Equatable {
     public var showsVariantRow = true
     /// 候補ウィンドウの足元にキーの案内を出す(分岐図の候補・文節・文節の長さ・区切り，一覧の文字種，入力中の候補の窓の選び始めるキー)
     public var showsKeyHints = true
+    /// 分岐図の表示項目を減らす．文字種の枝は文字種を選んでいるあいだだけ，候補の先の枝(語の意味・連想)は連想変換のキーで開いたあとだけ出す．
+    /// 畳んでいる枝には，続きがある印だけを出す
+    public var showsFewerItems = false
     /// 番号キーで候補を選ぶ
     public var numberKeySelection = true
     /// 「きょう」「いま」などを日付や時刻に変換する候補を出す
@@ -420,7 +423,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, candidateGridColumns, expandsGridOnPaging, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, showsFewerItems, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking,
              jinenModel
@@ -515,6 +518,7 @@ extension Settings: Codable {
         readList(.hiddenPredictions, into: \.hiddenPredictions)
         read(.showsVariantRow, into: \.showsVariantRow)
         read(.showsKeyHints, into: \.showsKeyHints)
+        read(.showsFewerItems, into: \.showsFewerItems)
         read(.numberKeySelection, into: \.numberKeySelection)
         read(.dateConversion, into: \.dateConversion)
         read(.homophoneNotes, into: \.homophoneNotes)
@@ -656,6 +660,7 @@ extension Settings: Codable {
         try container.encode(hiddenPredictions, forKey: .hiddenPredictions)
         try container.encode(showsVariantRow, forKey: .showsVariantRow)
         try container.encode(showsKeyHints, forKey: .showsKeyHints)
+        try container.encode(showsFewerItems, forKey: .showsFewerItems)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)
         try container.encode(dateConversion, forKey: .dateConversion)
         try container.encode(homophoneNotes, forKey: .homophoneNotes)

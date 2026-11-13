@@ -356,6 +356,7 @@ pub mod size {
         pub const MEANING_INDENT: f32 = 8.0;
         pub const MEANING_WIDTH: f32 = 240.0;
         pub const GRIP_SIZE: f32 = 3.0;
+        pub const STUB_LENGTH: f32 = 24.0;
         pub const FADE_WIDTH: f32 = 48.0;
     }
     pub mod settings {
