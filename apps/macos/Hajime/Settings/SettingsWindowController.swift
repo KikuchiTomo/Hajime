@@ -104,7 +104,8 @@ final class SettingsWindowController {
 /// 設定の画面と保存先のあいだを取り持つ．画面で変えた値はすぐに保存する
 @MainActor
 final class SettingsModel: ObservableObject {
-    @Published private(set) var settings: HajimeDomain.Settings
+    /// 画面に出す設定．読んだ項目が変わったときだけ，読んだ画面を描き直す(ObservedSettings)
+    let settings: ObservedSettings
     @Published var message: String?
     @Published private(set) var usageCounts: UsageCounts
     /// 単語の登録で，ユーザー辞書の登録の欄に入れる読みと語．入れたら消す
@@ -148,15 +149,15 @@ final class SettingsModel: ObservableObject {
         self.usage = usage
         self.files = files
         self.associations = associations
-        self.settings = store.current
+        self.settings = ObservedSettings(store.current)
         self.usageCounts = usage?.counts ?? UsageCounts()
         self.resetLearningAction = resetLearning
         // 入力メニューから変えたときも画面に映す
-        store.observe { [weak self] in self?.settings = $0 }
+        store.observe { [weak self] in self?.settings.replace(with: $0) }
     }
 
-    func binding<Value>(_ keyPath: WritableKeyPath<HajimeDomain.Settings, Value>) -> Binding<Value> {
-        Binding(get: { self.settings[keyPath: keyPath] }, set: { value in self.update { $0[keyPath: keyPath] = value } })
+    func binding<Value: Equatable>(_ keyPath: WritableKeyPath<HajimeDomain.Settings, Value>) -> Binding<Value> {
+        Binding(get: { self.settings[keyPath] }, set: { value in self.update { $0[keyPath: keyPath] = value } })
     }
 
     /// 設定を変えて保存する．保存できなければ知らせて false を返す
@@ -400,7 +401,7 @@ final class SettingsModel: ObservableObject {
 
     /// カスタムテーマを保存して使う．同じ id のテーマがあれば置き換え，無ければ足す．保存できたら true
     func saveCustomTheme(_ theme: CustomTheme) -> Bool {
-        var checked = settings
+        var checked = settings.all
         do throws(HajimeDomain.Settings.CustomThemeRejection) {
             try checked.saveCustomTheme(theme)
         } catch {

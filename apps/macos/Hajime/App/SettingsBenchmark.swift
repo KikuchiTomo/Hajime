@@ -10,7 +10,10 @@ import HajimePersistence
 ///
 /// 使い方: Debug でビルドした "Hajime Debug.app/Contents/MacOS/Hajime Debug" --measure-settings
 /// 設定はサンドボックスの一時ディレクトリに置き，利用者の設定に触れない．
-/// 環境変数 HAJIME_MEASURE_PAGES・HAJIME_MEASURE_ROUNDS・HAJIME_MEASURE_CHANGES で，測るページ・回数・設定を変える回数を選べる(docs/dev/DESIGN-SYSTEM.md)
+/// 環境変数 HAJIME_MEASURE_PAGES・HAJIME_MEASURE_ROUNDS・HAJIME_MEASURE_CHANGES で，測るページ・回数・設定を変える回数を選べる(docs/dev/DESIGN-SYSTEM.md)．
+/// HAJIME_MEASURE_INTERACTIONS=1 を付けると，ページの中の操作(スクロール・設定の変更・文字の入力)の時間もページごとに出す．
+/// HAJIME_MEASURE_OPENS に回数を渡すと，ページを初めて開く時間を新しい窓でその回数ずつ測る．
+/// HAJIME_MEASURE_CLOCK=cpu を付けると，経った時間の代わりにメインスレッドが使った CPU の時間を出す(ほかの処理で混んでいても比べられる)
 @MainActor
 enum SettingsBenchmark {
     static let argument = "--measure-settings"
@@ -25,6 +28,12 @@ enum SettingsBenchmark {
             return SettingsView.Page.allCases
         }
         return SettingsView.Page.allCases.filter { names.contains($0.title) }
+    }
+
+    /// 今の時刻(秒)．HAJIME_MEASURE_CLOCK=cpu ならメインスレッドが使った CPU の時間
+    static func now() -> Double {
+        guard ProcessInfo.processInfo.environment["HAJIME_MEASURE_CLOCK"] == "cpu" else { return CACurrentMediaTime() }
+        return Double(clock_gettime_nsec_np(CLOCK_THREAD_CPUTIME_ID)) / 1_000_000_000
     }
 
     static func runIfRequested() {
@@ -42,10 +51,10 @@ enum SettingsBenchmark {
         for round in 0..<rounds {
             for page in pages {
                 // 前のページから切り替える時間を測るため，毎回ちがうページから来るようにする
-                let start = CACurrentMediaTime()
+                let start = now()
                 navigation.page = page
                 SettingsFixture.settle(window)
-                let elapsed = (CACurrentMediaTime() - start) * 1000
+                let elapsed = (now() - start) * 1000
                 if round == 0 { first[page] = elapsed } else { later[page, default: []].append(elapsed) }
             }
         }
@@ -62,14 +71,147 @@ enum SettingsBenchmark {
         var changes: [Double] = []
         let changeCount = Int(ProcessInfo.processInfo.environment["HAJIME_MEASURE_CHANGES"] ?? "") ?? 10
         for _ in 0..<changeCount {
-            let start = CACurrentMediaTime()
+            let start = now()
             fixture.model.update { $0.liveConversion.toggle() }
             SettingsFixture.settle(window)
-            changes.append((CACurrentMediaTime() - start) * 1000)
+            changes.append((now() - start) * 1000)
         }
         changes.sort()
         print(String(format: "設定を 1 つ変える\t-\t%.1f\t%.1f", changes[changes.count / 2], changes.last ?? 0))
+        // 何も変えずに画面を映し終わるまで回す時間．どの数字にもこの分が入っている
+        let idle = (0..<10).map { _ in
+            let start = now()
+            SettingsFixture.settle(window)
+            return (now() - start) * 1000
+        }.sorted()
+        print(String(format: "何もしない\t-\t%.1f\t%.1f", idle[idle.count / 2], idle.last ?? 0))
+        if let opens = Int(ProcessInfo.processInfo.environment["HAJIME_MEASURE_OPENS"] ?? "") {
+            window.close()
+            measureFirstOpens(pages: pages, count: opens)
+        }
+        if ProcessInfo.processInfo.environment["HAJIME_MEASURE_INTERACTIONS"] != nil {
+            window.close()
+            measureInteractions(pages: pages)
+        }
         exit(0)
+    }
+}
+
+// MARK: ページの中の操作
+
+extension SettingsBenchmark {
+    /// ページの中の操作(スクロール・設定の変更・文字の入力)にかかる時間を，ページごとに出す．
+    /// 1 回の操作を画面に映し終わるまでの時間で，16.7 ms を超えると 1 こま(60 Hz)に収まらない
+    static func measureInteractions(pages: [SettingsView.Page]) {
+        print("ページ\tスクロール中央値(ms)\tスクロール最大(ms)\t設定の変更(ms)\t入力中央値(ms)\t入力最大(ms)")
+        for page in pages {
+            // そのページだけを開いた窓で測る(ほかのページの描き直しを混ぜない)
+            let fixture = SettingsFixture.make(name: "benchmark-page")
+            let window = SettingsWindowController.makeWindow(model: fixture.model, sync: fixture.sync, navigation: SettingsNavigation(page: page))
+            window.isReleasedWhenClosed = false
+            window.orderFrontRegardless()
+            SettingsFixture.settle(window)
+            SettingsFixture.settle(window)
+            let scroll = scrollTimes(window)
+            let change = median((0..<10).map { _ in
+                timed(window) { fixture.model.update { $0.liveConversion.toggle() } }
+            })
+            let typing = typingTimes(window)
+            print(String(format: "%@\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f", page.title, median(scroll), scroll.max() ?? 0, change, median(typing), typing.max() ?? 0))
+            window.close()
+        }
+    }
+
+    /// ページを初めて開く時間を，新しい窓で count 回ずつ測る(1 つの窓では 1 回しか測れないため)
+    static func measureFirstOpens(pages: [SettingsView.Page], count: Int) {
+        print("ページ\t初めて開く中央値(ms)\t最大(ms)")
+        for page in pages {
+            let times = (0..<count).map { _ in
+                // いちばん軽いページを開いた窓から切り替える
+                let fixture = SettingsFixture.make(name: "benchmark-open")
+                let navigation = SettingsNavigation(page: page == .backup ? .usage : .backup)
+                let window = SettingsWindowController.makeWindow(model: fixture.model, sync: fixture.sync, navigation: navigation)
+                window.isReleasedWhenClosed = false
+                window.orderFrontRegardless()
+                SettingsFixture.settle(window)
+                SettingsFixture.settle(window)
+                let time = timed(window) { navigation.page = page }
+                window.close()
+                return time
+            }
+            print(String(format: "%@\t%.1f\t%.1f", page.title, median(times), times.max() ?? 0))
+        }
+    }
+
+    private static func median(_ values: [Double]) -> Double {
+        values.isEmpty ? 0 : values.sorted()[values.count / 2]
+    }
+
+    /// work を行い，画面に映し終わるまでの時間(ms)
+    private static func timed(_ window: NSWindow, _ work: () -> Void) -> Double {
+        let start = now()
+        work()
+        SettingsFixture.settle(window)
+        return (now() - start) * 1000
+    }
+
+    /// 開いているページの中の部品(見せていないページと左の一覧は除く)
+    private static func pageViews(_ window: NSWindow) -> [NSView] {
+        guard let content = window.contentView else { return [] }
+        var stack: [NSView] = [content]
+        var root: NSView?
+        while let view = stack.popLast(), root == nil {
+            if view is SettingsPageStack.PageStackView { root = view }
+            stack.append(contentsOf: view.subviews)
+        }
+        var found: [NSView] = []
+        stack = root.map { [$0] } ?? []
+        while let view = stack.popLast() {
+            if view.isHidden { continue }
+            found.append(view)
+            stack.append(contentsOf: view.subviews)
+        }
+        return found
+    }
+
+    /// ページを上から下まで少しずつ送り，1 段ごとの時間を返す．送れないページは空
+    private static func scrollTimes(_ window: NSWindow) -> [Double] {
+        let scrolls = pageViews(window).compactMap { $0 as? NSScrollView }
+        // ページ全体を送るスクロールビュー(いちばん長く送れるもの)
+        guard let scroll = scrolls.max(by: { range($0) < range($1) }), range(scroll) > 0 else { return [] }
+        let clip = scroll.contentView
+        let step: CGFloat = 40
+        var times: [Double] = []
+        var y: CGFloat = 0
+        while y < range(scroll) {
+            y = min(y + step, range(scroll))
+            times.append(timed(window) {
+                clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: y))
+                scroll.reflectScrolledClipView(clip)
+            })
+        }
+        clip.scroll(to: NSPoint(x: clip.bounds.origin.x, y: 0))
+        scroll.reflectScrolledClipView(clip)
+        SettingsFixture.settle(window)
+        return times
+    }
+
+    private static func range(_ scroll: NSScrollView) -> CGFloat {
+        max(0, (scroll.documentView?.frame.height ?? 0) - scroll.contentView.bounds.height)
+    }
+
+    /// ページの最初の入力欄に 1 字ずつ打ち，1 字ごとの時間を返す．入力欄の無いページは空
+    private static func typingTimes(_ window: NSWindow) -> [Double] {
+        let fields = pageViews(window).compactMap { $0 as? NSTextField }.filter { $0.isEditable && $0.isEnabled }
+        // 画面の上にある欄から使う
+        guard let field = fields.min(by: { $0.convert(NSPoint.zero, to: nil).y > $1.convert(NSPoint.zero, to: nil).y }),
+              window.makeFirstResponder(field), let editor = window.firstResponder as? NSTextView else { return [] }
+        let end = NSRange(location: NSNotFound, length: 0)
+        let times = (0..<12).map { _ in timed(window) { editor.insertText("a", replacementRange: end) } }
+        editor.selectAll(nil)
+        editor.insertText("", replacementRange: editor.selectedRange())
+        SettingsFixture.settle(window)
+        return times
     }
 }
 
@@ -88,7 +230,10 @@ struct SettingsFixture {
         let synchronizer = SettingsSynchronizer(settings: store, stateStore: FileSyncStateStore(fileURL: directory.appendingPathComponent("sync-state.json")))
         let dictionaries = ImportedDictionaryStore(directory: directory.appendingPathComponent("dictionaries", isDirectory: true))
         let sync = SyncCoordinator(synchronizer: synchronizer, runner: FolderSyncRunner(synchronizer: synchronizer, settings: store, dictionaries: dictionaries), settings: store)
-        let model = SettingsModel(store: store, usage: nil, files: SettingsFiles(settings: store, dictionaries: dictionaries), resetLearning: {})
+        // 変換マクロの「試す」は本番と同じものを付ける(コマンドのページを描くたびに呼ばれる)
+        let macroPreview = ConversionMacroPreview(settings: store, calendar: SystemCalendar(clock: Date.init))
+        let model = SettingsModel(store: store, usage: nil, files: SettingsFiles(settings: store, dictionaries: dictionaries), resetLearning: {},
+                                  previewMacros: { macroPreview.preview(text: $0, reading: $1, pattern: $2) })
         return SettingsFixture(model: model, sync: sync, store: store)
     }
 

@@ -25,7 +25,8 @@ struct EmojiSection: View {
                 // 同じ行に入れて区切りの線を引かず，項目との間は section の余白にする
                 VStack(alignment: .leading, spacing: DesignTokens.Size.Space.section) {
                     ResettableToggle(model: model, title: UIStrings.Settings.showsEmojiNames, keyPath: \.showsEmojiNames)
-                    if let panel = SamplePanels.emojiPlacement(model.settings) {
+                    if let panel = SamplePanels.emojiPlacement(model.settings.emojiPlacement, convertsWholeReading: model.settings.emojiConversion,
+                                                               candidatesPerPage: model.settings.listCandidatesPerPage, showsNames: model.settings.showsEmojiNames) {
                         CandidatePreview(choice: ThemeChoice(model.settings), fontSize: model.settings.candidateFontSize, panel: panel)
                     }
                 }

@@ -12,7 +12,7 @@ struct ResettableRow<Value: Equatable, Content: View>: View {
         // 部品と「既定に戻す」は押し間違えないようにまとまりの間だけ離す
         HStack(spacing: DesignTokens.Size.Space.group) {
             content()
-            if model.settings[keyPath: keyPath] != DefaultSettings.settings[keyPath: keyPath] {
+            if model.settings[keyPath] != DefaultSettings.settings[keyPath: keyPath] {
                 Button {
                     model.update { $0[keyPath: keyPath] = DefaultSettings.settings[keyPath: keyPath] }
                 } label: {

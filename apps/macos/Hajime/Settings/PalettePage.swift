@@ -17,7 +17,7 @@ struct PalettePage: View {
     var body: some View {
         Form {
             Section {
-                PalettePreview(choice: ThemeChoice(model.settings), settings: model.settings, cellSize: cellSize ?? model.settings.paletteCellSize)
+                PalettePreview(choice: ThemeChoice(model.settings), panel: previewPanel, cellSize: cellSize ?? model.settings.paletteCellSize)
                     .padding(DesignTokens.Size.Settings.previewPadding)
                     .frame(maxWidth: .infinity)
             }
@@ -74,6 +74,16 @@ struct PalettePage: View {
         .formStyle(.grouped)
     }
 
+    /// 設定のとおりの列数・行数・説明の項目で並べた見本
+    private var previewPanel: PalettePanel {
+        let settings = model.settings
+        return SamplePalettes.preview(columns: settings.paletteColumns, rows: settings.paletteRows,
+                                      frequentRows: settings.paletteRecordsHistory ? settings.paletteFrequentRows : 0,
+                                      showsPreview: settings.paletteShowsPreview,
+                                      previewFields: PalettePanel.PreviewFields(unicodeName: settings.paletteShowsUnicodeName, readings: settings.paletteShowsReadings,
+                                                                                shortcodes: settings.paletteShowsShortcodes, codePoints: settings.paletteShowsCodePoints))
+    }
+
     /// コマンドに割り当てたキー(キー設定の表から引く)．割り当てていなければ「なし」
     private func keys(for command: KeymapCommand) -> String {
         let strokes = model.settings.keymap.strokes(for: command, in: .idle)
@@ -84,15 +94,8 @@ struct PalettePage: View {
 /// 設定のとおりの列数・行数・マスの大きさで，パレットの見本をテーマに合わせて描く．欄より広いときは見本ごと縮める
 struct PalettePreview: NSViewRepresentable {
     let choice: ThemeChoice
-    let settings: HajimeDomain.Settings
+    let panel: PalettePanel
     let cellSize: Double
-
-    private var panel: PalettePanel {
-        SamplePalettes.preview(columns: settings.paletteColumns, rows: settings.paletteRows, frequentRows: settings.paletteRecordsHistory ? settings.paletteFrequentRows : 0,
-                               showsPreview: settings.paletteShowsPreview,
-                               previewFields: PalettePanel.PreviewFields(unicodeName: settings.paletteShowsUnicodeName, readings: settings.paletteShowsReadings,
-                                                                         shortcodes: settings.paletteShowsShortcodes, codePoints: settings.paletteShowsCodePoints))
-    }
 
     func makeNSView(context: Context) -> ScaledPalette {
         ScaledPalette()
