@@ -1147,6 +1147,9 @@ mod tests {
             collapses_variants: None,
             collapses_detail: None,
             placed_hints: None,
+            trunk_focused: None,
+            page_size: None,
+            hints_on_hold: None,
         }
     }
 
@@ -1553,6 +1556,9 @@ mod tests {
                 collapses_variants: None,
                 collapses_detail: None,
                 placed_hints: None,
+                trunk_focused: None,
+                page_size: None,
+                hints_on_hold: None,
             };
             let scene = branch_map(&split, &Look::new(&theme, 15.0), &Fixed);
             let texts = texts(&scene);

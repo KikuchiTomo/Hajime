@@ -331,7 +331,11 @@ extension WireBranchMap {
             // 畳んでいなければ送らない
             collapsesVariants: panel.collapsesVariants ? true : nil,
             collapsesDetail: panel.collapsesDetail ? true : nil,
-            placedHints: placedHints
+            placedHints: placedHints,
+            // 幹の上にいなければ・1 ページの数が分からなければ・常に出す設定なら送らない
+            trunkFocused: panel.trunkFocused ? true : nil,
+            pageSize: panel.pageSize > 0 ? UInt32(clamping: panel.pageSize) : nil,
+            hintsOnHold: panel.hintsOnHold ? true : nil
         )
     }
 }

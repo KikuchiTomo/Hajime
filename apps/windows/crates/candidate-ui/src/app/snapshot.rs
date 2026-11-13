@@ -622,6 +622,9 @@ fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
     }
 }
 
@@ -718,6 +721,9 @@ fn emoji_branch() -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
     }
 }
 
@@ -852,6 +858,9 @@ fn preview() -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
     }
 }
 
@@ -880,5 +889,8 @@ fn split() -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
     }
 }

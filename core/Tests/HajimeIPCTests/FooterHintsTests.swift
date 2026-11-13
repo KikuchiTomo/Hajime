@@ -114,18 +114,23 @@ struct FooterHintsTests {
         let plain = WireBranchMap(panel, hints: [])
         #expect(plain.columns[0].jumpKey == nil && plain.columns[0].variantKeys == nil)
         #expect(plain.collapsesVariants == nil && plain.collapsesDetail == nil && plain.placedHints == nil)
+        #expect(plain.trunkFocused == nil && plain.pageSize == nil && plain.hintsOnHold == nil)
 
         var keyed = panel
         keyed.columns[0].jumpKey = "Alt+A"
         keyed.columns[0].variants = ["きょうは", "キョウハ"]
         keyed.columns[0].variantKeys = ["F6", nil]
         keyed.collapsesDetail = true
+        keyed.trunkFocused = true
+        keyed.pageSize = 4
+        keyed.hintsOnHold = true
         let placed = WireBranchHints(boundary: [], candidates: [WireKeyHint(keys: "Shift+Backspace", label: "再入力")])
         let map = WireBranchMap(keyed, hints: [], placedHints: placed)
         #expect(map.columns[0].jumpKey == "Alt+A")
         #expect(map.columns[0].variantKeys == ["F6", nil])
         #expect(map.collapsesDetail == true && map.collapsesVariants == nil)
         #expect(map.placedHints == placed)
+        #expect(map.trunkFocused == true && map.pageSize == 4 && map.hintsOnHold == true)
     }
 
     @Test("文節を区切っているときは区切る操作だけを案内する")

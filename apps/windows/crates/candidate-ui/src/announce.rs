@@ -291,6 +291,9 @@ mod tests {
             collapses_variants: None,
             collapses_detail: None,
             placed_hints: None,
+            trunk_focused: None,
+            page_size: None,
+            hints_on_hold: None,
         };
         assert_eq!(branch_map(&map).as_deref(), Some("晴れ"));
 
@@ -371,6 +374,9 @@ mod tests {
             collapses_variants: None,
             collapses_detail: None,
             placed_hints: None,
+            trunk_focused: None,
+            page_size: None,
+            hints_on_hold: None,
         };
         assert_eq!(
             branch_map(&map(column.clone())).as_deref(),

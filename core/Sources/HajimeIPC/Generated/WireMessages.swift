@@ -2018,8 +2018,11 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
     public var collapsesVariants: Bool?
     public var collapsesDetail: Bool?
     public var placedHints: WireBranchHints?
+    public var trunkFocused: Bool?
+    public var pageSize: UInt32?
+    public var hintsOnHold: Bool?
 
-    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, meaningPlacement: WireMeaningPlacement? = nil, collapsesVariants: Bool? = nil, collapsesDetail: Bool? = nil, placedHints: WireBranchHints? = nil) {
+    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, meaningPlacement: WireMeaningPlacement? = nil, collapsesVariants: Bool? = nil, collapsesDetail: Bool? = nil, placedHints: WireBranchHints? = nil, trunkFocused: Bool? = nil, pageSize: UInt32? = nil, hintsOnHold: Bool? = nil) {
         self.columns = columns
         self.position = position
         self.total = total
@@ -2032,6 +2035,9 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
         self.collapsesVariants = collapsesVariants
         self.collapsesDetail = collapsesDetail
         self.placedHints = placedHints
+        self.trunkFocused = trunkFocused
+        self.pageSize = pageSize
+        self.hintsOnHold = hintsOnHold
     }
 }
 
