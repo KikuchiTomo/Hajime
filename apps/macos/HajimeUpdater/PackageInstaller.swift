@@ -4,7 +4,7 @@ import os
 
 /// 確かめた配布物を OS のインストーラー(/usr/sbin/installer)で入れる．
 /// 入れる場所(/Library/Input Methods)は管理者の権限が要るので，OS の管理者のパスワードの窓を出して頼む．
-/// 入れ替えたあとは配布物の postinstall が古い本体を止め，次にキーを打ったときに新しいバージョンが動く(ログアウトは要らない)
+/// 新しいバージョンはログアウトしてログインし直したあとに動く(配布物はログアウトを求める．このコマンドで入れたときは知らせの文で伝える)
 @MainActor
 struct PackageInstaller {
     private let logger = Logger(subsystem: UpdaterIdentity.subsystem, category: "update")

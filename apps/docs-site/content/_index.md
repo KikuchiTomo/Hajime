@@ -191,7 +191,7 @@ layout: hextra-home
     {{< hajime/catalog-item title="キー設定" link="docs/settings/#キー設定" >}}すべてのキーを変更でき，標準・Windows 風・Mac 風・ATOK 風・Emacs 風・Vim 風のひな形から始められます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="同期とバックアップ" link="docs/settings/#同期とバックアップ" >}}Dropbox・Google Drive・iCloud Drive などのフォルダを指定すると，複数のパソコンで設定と辞書を同期できます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="初期設定" >}}初めて使うときに，英数とかなの切り替え・ライブ変換・外観などを順に選べます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="更新を確認" link="docs/install/" >}}新しいバージョンの変更点を確認して，そのまま更新できます．ログアウトや再起動は不要です．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="更新を確認" link="docs/install/" >}}新しいバージョンの変更点を確認して，そのまま更新できます．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
 {{< /hajime/catalog >}}
 

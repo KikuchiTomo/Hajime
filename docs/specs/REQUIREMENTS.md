@@ -212,7 +212,7 @@ JIS キーボードの ¥ キーで何を入れるかを，設定ひとつで変
 - 設定の画面の「情報」(Hajime IME のアイコン・名前・バージョンの横)と，入力メニューに「更新を確認」を置く．どちらから選んでも同じ確認になる(Windows の入力メニューは設定の画面を「情報」のページで開き，そこの「更新を確認」と同じ確認を始める)
 - 押したときだけ https://haji.men/download/latest.json(`DefaultSettings.updateManifestURL`)を取り，今のバージョンより新しければ，飛ばしたバージョンも含めた変更点(CHANGELOG.md の節)を見せて更新するかを聞く．新しくなければ最新であることを知らせる
 - 「更新する」を選ぶと，配布物を https://haji.men/download/ の下からだけ取り，latest.json の SHA-256 と合うかを確かめてから入れる．大きさと待ち時間に上限を設ける(`DefaultSettings` の update で始まる値)
-  - macOS: IME の本体はサンドボックスの中で通信の権限を持たないまま，Contents/Helpers の更新用のアプリ(Hajime IME Updater)が通信とインストールを行う．.pkg が Apple の公証を通り，本体と同じチームの Developer ID で署名されているかを `spctl` で確かめ，管理者のパスワードを聞いて OS のインストーラーで入れる．入れたあとはログアウトを求めず，postinstall が古い本体を止めて次の入力から新しいバージョンで動く
+  - macOS: IME の本体はサンドボックスの中で通信の権限を持たないまま，Contents/Helpers の更新用のアプリ(Hajime IME Updater)が通信とインストールを行う．.pkg が Apple の公証を通り，本体と同じチームの Developer ID で署名されているかを `spctl` で確かめ，管理者のパスワードを聞いて OS のインストーラーで入れる．入れたあとはログアウトを求め，ログインし直すと新しいバージョンで動く
   - Windows: 設定の画面のアプリが通信し，`msiexec` で .msi を入れる．TSF の DLL をバージョンごとのフォルダに置き，上書きのときは再起動を求めない
 - 送るのは GET の要求(User-Agent に名前とバージョンと OS)だけで，入力の中身・設定・識別子は送らない．自動では確かめない
 - 確かめられないとき(通信の失敗，形の違う知らせ，ハッシュや署名の不一致，署名の無い開発版)は入れずに理由を出し，最新のリリースのページ(`DefaultSettings.latestReleaseURL`)を開けるようにする

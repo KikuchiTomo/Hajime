@@ -21,7 +21,7 @@ enum UIStrings {
     static func noteHeading(_ note: ReleaseNote) -> String { "v\(note.version) (\(note.date))" }
 
     static func updated(_ version: ReleaseVersion) -> String { "Hajime IME v\(version) に更新しました" }
-    static let updatedDetail = "次の入力から有効になります。"
+    static let updatedDetail = "ログアウト後に有効になります。"
 
     static let failed = "更新できませんでした"
     static let openDownloadPage = "ダウンロードページを開く"
