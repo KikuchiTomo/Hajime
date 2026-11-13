@@ -478,7 +478,8 @@ impl Drawing<'_> {
     fn cells(&mut self, panel: &PalettePanel, layout: &Layout, sliding: Option<Frame>) {
         let theme = self.theme;
         let last_row = panel.first_row.saturating_add(panel.visible_rows);
-        let selected = panel.selection.as_ref().map(|position| {
+        // 選択の枠は，選んでいる行が見えているときだけ描く
+        let selected = super::layout::visible_selection(panel).map(|position| {
             sliding.unwrap_or_else(|| layout.cell_frame(position.row, position.column))
         });
         if let Some(frame) = selected {
@@ -799,6 +800,7 @@ mod tests {
     use super::*;
     use crate::scene::testing::{count, flattened, text_frame, texts, theme, Fixed, Uneven};
     use crate::theme::Role;
+    use ipc::PalettePosition;
 
     /// アイコンの書体が入っているとして測る
     struct WithIcons;
@@ -1038,6 +1040,28 @@ mod tests {
             count(&scene, |draw| matches!(draw, Draw::RoundRect { .. })),
             0
         );
+    }
+
+    #[test]
+    fn スクロールして選んでいる行が見えなくなったら選択の枠を描かない() {
+        let rounded = theme("automatic");
+        let selection_strokes = |scene: &Scene| {
+            count(
+                scene,
+                |draw| matches!(draw, Draw::RoundRect { stroke: Some((color, _)), .. } if *color == rounded.selection),
+            )
+        };
+        let panel = sample::emoji();
+        let (_, scene) = draw(&panel, "automatic", &Fixed);
+        assert_eq!(selection_strokes(&scene), 1);
+        // 上へ外れた(先頭の行のマスに枠を描かない)・下へ外れた(説明の欄に枠を描かない)
+        for (first_row, row) in [(1, 0), (0, panel.visible_rows)] {
+            let mut scrolled = panel.clone();
+            scrolled.first_row = first_row;
+            scrolled.selection = Some(PalettePosition { row, column: 2 });
+            let (_, scene) = draw(&scrolled, "automatic", &Fixed);
+            assert_eq!(selection_strokes(&scene), 0, "選んでいる行: {row}");
+        }
     }
 
     #[test]
