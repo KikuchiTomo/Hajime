@@ -6,7 +6,6 @@
 
 mod association;
 mod branch;
-mod branch_lines;
 pub mod bubble;
 mod card_layout;
 pub(crate) mod fitting;
@@ -14,6 +13,7 @@ mod list;
 mod list_layout;
 mod meaning;
 pub(crate) mod paint;
+mod route;
 pub mod sample;
 mod small;
 #[cfg(test)]

@@ -1,59 +1,63 @@
 #![forbid(unsafe_code)]
 
-//! 分岐図(ADR 0007．macOS の BranchView)．文を 1 本の幹として文節を横に並べ，注目している文節から枝を伸ばす．
+//! 分岐図(ADR 0007．macOS の BranchView)．文を 1 本の線(幹)に並べ，選んでいる文節から枝を出す．できることは，すべて線でつながった枝として見せる．
 //!
-//! - 下の枝: 変換の候補．上の枝: 文字種
-//! - 確信の低い文節は幹の文字に点線を引き，注目していなければ次の候補を 1 つだけ薄く添える
-//! - 選び直した文節は実線を引く
-//! - 文節を区切っているときは，注目している文節の幹を切れ目で分け，切れ目に小さな番号の丸を挟む．枝は出さない
-//! - 語の意味のカードは，候補の枝の先に置いて選んでいる候補から線でつなぐか，枝と足元のあいだに窓の幅いっぱいに出す
+//! - 幹: 文節を横に並べ，その下の線に文節ごとの丸を置く．選んでいる文節の丸は選択の色で塗る．確信の低い文節は，下の線を点線にする．
+//!   丸は，短い文節は真ん中，長い文節は左から決まった距離(1 字と余白)に置く(候補を移って字の数が変わっても枝が動かない)
+//! - 下の枝: 変換の候補．選んでいる文節の丸から縦の線を下ろし，候補ごとに丸・番号(キーキャップの形)・文字を並べる．選んだ候補までの線は選択の色で太く描く
+//! - 上の枝: 文字種(ひらがな・カタカナ・半角カタカナ)．文節の上から横へ伸ばす
+//! - 先の枝: 選んでいる候補の行の先に小さな幹を伸ばし，連想(R-18)の丸を並べる．語の意味は今までどおり吹き出しか候補の下のカードに出す
+//! - キーの案内: 足元には並べず，操作する場所に置く(区切り・分割は文節の境目の上，文字種は上の枝の先，再入力・表形式は候補の下，展開は先の枝の先)．
+//!   候補の中身と見分けられるよう，背景と反転した色の面で囲む．文節の丸の上には，その文節へ移るキーを重ねる
+//! - 表示項目を減らす設定では，畳んだ枝に端へ向けて透かした短い線を出す
+//! - 文節を区切っているとき(⇧↓)は，幹を意味のある切れ目(「問題｜が｜ある」)で分け，切れ目に番号を挟む．枝は出さない
 //!
-//! 枝は幹の文節から 1 本の幹を伸ばし，候補ごとに同じ形の曲がり角と水平の線を出す(branch_lines)．
-//! 曲線の枝のテーマは 4 分の 1 の円で，直線の枝のテーマは直角に曲がる．platinum と desk は 1 ドットの線で描く
+//! 窓の幅に上限があるので，枝が右に入らないときは枝を左右に反転して左へ出す．どちらにも入らないときは，入る位置まで寄せて，角を曲げた線で文節とつなぐ．
+//! 幹が窓より長いときは，選んでいる文節が見える位置まで幹を送り，はみ出した側を端へ向けて透かす．
+//! 角丸のテーマは丸と丸い角の線，platinum と desk は四角と 1 ドットの線で描く(route)
 
-use super::branch_lines::{BranchLines, Turn};
 use super::card_layout::{self, Placement};
 use super::meaning::{self, Slot};
 use super::paint::{Painter, TagStyle};
-use super::{Color, Draw, Figure, Frame, Look, Measure, Point, Scene, Segment};
+use super::route::{self, Line, State, Stop};
+use super::{Draw, Frame, Look, Measure, Point, Scene};
 use crate::strings;
 use crate::theme::Font;
-use ipc::{BranchColumn, BranchMap, BranchSplit, CommandKind, KeyHint, MeaningPlacement};
+use ipc::{
+    BranchColumn, BranchHints, BranchMap, BranchSplit, CommandKind, KeyHint, MeaningPlacement,
+};
+use tokens::opacity::candidate as stale_opacity;
 use tokens::size::meaning as card_size;
-use tokens::size::{branch, candidate, glass, part, space};
+use tokens::size::{branch, branch_map as map, candidate, glass, part, space};
 
-/// テーマごとの寸法．角丸のテーマは余白と行を広く取る
+/// テーマごとの寸法
 struct Metrics {
+    /// 窓の端から中身まで
     inset: f32,
     row_height: f32,
-    trunk_gap: f32,
-    branch_indent: f32,
-    stem_x: f32,
-    /// 候補の文字の前に置く番号の幅
-    lead: f32,
-    footer_height: f32,
-    /// 候補の行の背景の上下を縮める量(角丸のテーマ)．行の背景の見える上の端は行の上の端からこの分だけ下
+    /// 候補の行の背景の上下を縮める量(角丸のテーマ)
     row_inset: f32,
-    shadow: f32,
+    /// 注釈・知らせ・見出しの行の高さ
+    note_height: f32,
     line_width: f32,
     line_width_selected: f32,
-    /// 幹の根元を文節の枠の端からずらす量(角丸のテーマは文節の背景が上下に細いので，その端から伸ばす)
-    root_inset: f32,
-    /// 枝の曲がり角の半径．直線の枝は 0(直角)
+    /// 線の曲がり角の半径．直線の枝のテーマと platinum・desk は 0
     turn_radius: f32,
+    shadow: f32,
+    /// 候補の文字の大きさ(文節の丸の位置を決める)
+    font_size: f32,
     /// 1 ドットあたりのデバイスのピクセル数
     pixel_scale: f32,
 }
 
-/// 区切りの線の上と下，カードと枝・区切りの線のあいだの空き
+/// 区切りの線の上と下，カードと枝のあいだの空き
 const GAP: f32 = glass::SEPARATOR_GAP;
+/// 縦の線から番号までの距離
+const BADGE_OFFSET: f32 = map::STOP_SIZE_SELECTED / 2.0 + map::STEM_GAP;
+/// 候補の番号と，そのあとの空き
+const LEAD: f32 = glass::BADGE_SIZE + glass::BADGE_GAP;
 
 impl Metrics {
-    /// 見出し・注釈・知らせ・足元の文字の左右の端．幹の文節の文字の左の端(文節の背景の左から PADDING_X)にそろえる
-    fn text_inset(&self) -> f32 {
-        self.inset + part::ROW_PADDING_X
-    }
-
     fn new(look: &Look, measure: &dyn Measure) -> Self {
         let scale = look.font_size / candidate::FONT_SIZE;
         let shadow = if look.theme.has_drop_shadow() {
@@ -61,64 +65,147 @@ impl Metrics {
         } else {
             0.0
         };
-        // 足元の行(と注釈・知らせの行)は，キーキャップ・案内のアイコン・文字の行の箱のいちばん高いもの
-        let footer_height = glass::KEYCAP_HEIGHT
+        let note_height = glass::KEYCAP_HEIGHT
             .max(glass::NOTE_ICON_SIZE)
             .max(measure.height(Font::Label).ceil());
         if look.theme.is_rounded() {
             return Self {
                 inset: candidate::FRAME_WIDTH + glass::WINDOW_PADDING,
                 row_height: (glass::ROW_HEIGHT * scale).round(),
-                trunk_gap: glass::TRUNK_GAP,
-                branch_indent: glass::BRANCH_INDENT,
-                stem_x: glass::BRANCH_STEM_X,
-                lead: glass::BADGE_SIZE + glass::BADGE_GAP,
-                footer_height,
                 row_inset: glass::SELECTION_INSET_Y,
-                shadow,
+                note_height,
                 line_width: glass::LINE_WIDTH,
                 line_width_selected: glass::LINE_WIDTH_SELECTED,
-                root_inset: glass::SELECTION_INSET_Y,
                 turn_radius: if look.theme.curved_branches() {
                     glass::BRANCH_TURN_RADIUS
                 } else {
                     0.0
                 },
+                shadow,
+                font_size: look.font_size,
                 pixel_scale: look.pixel_scale,
             };
         }
         Self {
             inset: candidate::FRAME_WIDTH + candidate::BEVEL_WIDTH + glass::WINDOW_PADDING,
             row_height: (candidate::ROW_HEIGHT * scale).round(),
-            trunk_gap: branch::TRUNK_GAP,
-            branch_indent: branch::BRANCH_INDENT,
-            stem_x: branch::BRANCH_STEM_X,
-            lead: candidate::INDEX_WIDTH,
-            footer_height,
             row_inset: 0.0,
-            shadow,
+            note_height,
             line_width: branch::LINE_WIDTH,
             line_width_selected: branch::LINE_WIDTH_SELECTED,
-            root_inset: 0.0,
             turn_radius: 0.0,
+            shadow,
+            font_size: look.font_size,
             pixel_scale: look.pixel_scale,
+        }
+    }
+
+    /// 見出し・注釈・知らせの文字の左右の端
+    fn text_inset(&self) -> f32 {
+        self.inset + part::ROW_PADDING_X
+    }
+
+    /// 文節の左の端から，その文節の丸(と，そこから出る枝)までの距離．短い文節は真ん中，長い文節は左から決まった距離(1 字と余白)
+    fn stop_offset(&self, width: f32) -> f32 {
+        (width / 2.0)
+            .min(self.font_size + part::ROW_PADDING_X)
+            .round()
+    }
+}
+
+/// 操作する場所ごとの案内(エンジンが置き場所ごとに送る．BranchHints)．案内を出さない設定では空
+fn hints(map: &BranchMap) -> BranchHints {
+    map.placed_hints.clone().unwrap_or(BranchHints {
+        boundary: Vec::new(),
+        variant: None,
+        candidates: Vec::new(),
+        expand: None,
+    })
+}
+
+/// キーの案内を出すか(案内を出さない設定では，エンジンが置き場所ごとの案内を送らない)
+fn shows_hints(map: &BranchMap) -> bool {
+    map.placed_hints.is_some()
+}
+
+/// 注目している文節の位置と文節
+pub(super) fn focused(map: &BranchMap) -> Option<(usize, &BranchColumn)> {
+    map.columns
+        .iter()
+        .enumerate()
+        .find(|(_, column)| column.is_focused)
+}
+
+/// ページの数と今のページ(0 から)．1 ページか，1 ページの数が分からなければ None
+fn pages(map: &BranchMap) -> Option<(u32, u32)> {
+    let size = map.page_size.filter(|size| *size > 0)?;
+    (map.total > size).then(|| {
+        (
+            map.total.div_ceil(size),
+            map.position.saturating_sub(1) / size,
+        )
+    })
+}
+
+/// 候補の下の行に出す位置の文字．ページの位置は縦の線の下の点で示すので，点で示せないほどページが多いときだけ「3 / 12」と出す．
+/// 1 ページの数を知らせない前の版のエンジンでは，今までどおり「1–4 / 8」と出す
+fn position_text(map: &BranchMap) -> String {
+    if map.page_size.is_none() {
+        return position(map);
+    }
+    match pages(map) {
+        Some((count, current)) if count as f32 > map::PAGE_DOT_LIMIT => {
+            strings::group_position(current + 1, count)
+        }
+        _ => String::new(),
+    }
+}
+
+/// ページの位置を示す点の並び．縦の線の下に，ページの数だけ縦に並べる
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PageDots {
+    x: f32,
+    top: f32,
+    count: u32,
+    current: u32,
+}
+
+/// 何番目の候補か．区切っているときは候補を出さないので出さない
+fn position(map: &BranchMap) -> String {
+    match focused(map) {
+        Some((_, column)) if column.split.is_some() => String::new(),
+        focused => {
+            let count = focused.map_or(0, |(_, column)| column.alternatives.len() as u32);
+            strings::position(map.position, map.position + count.max(1) - 1, map.total)
         }
     }
 }
 
-/// 幹・枝・足元の位置．描くときと大きさを求めるときで同じものを使う
-struct Layout {
-    trunk_x: Vec<f32>,
-    trunk_width: Vec<f32>,
-    trunk_y: f32,
-    branch_width: f32,
-    /// 下の枝の高さ(候補の枝と，候補の右に出すカードの高い方)
-    lower_height: f32,
-    /// 語の意味のカードと，その枠．カードを出さなければ None
-    slot: Option<Slot>,
-    card: Option<Frame>,
-    width: f32,
-    height: f32,
+/// 候補の下の語の意味の置き方
+fn below_position(painter: &Painter) -> Placement {
+    Placement {
+        left: part::ROW_PADDING_X,
+        header_mid_y: card_layout::header_height(painter.theme) / 2.0,
+    }
+}
+
+/// 注目している文節で，候補の下に出す幅 width(窓の中身の幅)の語の意味．区切っているあいだと，吹き出しに出す設定では None
+fn meaning_slot(map: &BranchMap, painter: &Painter, width: f32) -> Option<Slot> {
+    let (_, column) = focused(map)?;
+    if column.split.is_some() || map.meaning_placement != Some(MeaningPlacement::Below) {
+        return None;
+    }
+    let note = column.homophone.as_ref()?;
+    Some(meaning::below_slot(
+        meaning::Card::new(
+            painter,
+            note,
+            meaning::branch_others(note, column),
+            width,
+            below_position(painter),
+        ),
+        0.0,
+    ))
 }
 
 /// 区切る位置の番号を挟んだ文節の並び．runs は番号のあいだの字と左端，badges は番号と丸の中心(幹の文字の左端から)
@@ -148,430 +235,6 @@ fn split_pieces(split: &BranchSplit, painter: &Painter) -> SplitPieces {
     pieces
 }
 
-/// 注目している文節の位置と文節
-pub(super) fn focused(map: &BranchMap) -> Option<(usize, &BranchColumn)> {
-    map.columns
-        .iter()
-        .enumerate()
-        .find(|(_, column)| column.is_focused)
-}
-
-/// 足元の右に何番目の候補かを出すか．区切っているときは候補を出さないので出さない
-fn position(map: &BranchMap) -> String {
-    match focused(map) {
-        Some((_, column)) if column.split.is_some() => String::new(),
-        focused => {
-            let count = focused.map_or(0, |(_, column)| column.alternatives.len() as u32);
-            strings::position(map.position, map.position + count.max(1) - 1, map.total)
-        }
-    }
-}
-
-/// 候補の下の語の意味の置き方．目印の列を幹の文字と足元の左の端にそろえる
-fn below_position(painter: &Painter) -> Placement {
-    Placement {
-        left: part::ROW_PADDING_X,
-        header_mid_y: card_layout::header_height(painter.theme) / 2.0,
-    }
-}
-
-/// 注目している文節で，候補の下に出す幅 width(窓の中身の幅)の語の意味．区切っているあいだと，
-/// 候補の右(吹き出し)に出す設定では None
-fn meaning_slot(map: &BranchMap, painter: &Painter, width: f32) -> Option<Slot> {
-    let (_, column) = focused(map)?;
-    if column.split.is_some() || map.meaning_placement != Some(MeaningPlacement::Below) {
-        return None;
-    }
-    let note = column.homophone.as_ref()?;
-    let position = below_position(painter);
-    Some(meaning::below_slot(
-        meaning::Card::new(
-            painter,
-            note,
-            meaning::branch_others(note, column),
-            width,
-            position,
-        ),
-        0.0,
-    ))
-}
-
-fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
-    let padding = candidate::PADDING_X;
-    // 幹の文節の背景の内側と，見出し・注釈・足元の文字の左右の余白(一覧の行と同じ)
-    let edge = part::ROW_PADDING_X;
-    let mut x = metrics.inset;
-    let mut trunk_x = Vec::new();
-    let mut trunk_width = Vec::new();
-    for column in &map.columns {
-        let mut text = column.split.as_ref().map_or_else(
-            || match trunk_command(column) {
-                Some((_, title)) => Painter::command_width() + painter.width(title, Font::Trunk),
-                None => painter.width(&column.text, Font::Trunk),
-            },
-            |split| split_pieces(split, painter).width,
-        );
-        // 打ち直している文節は，読みのあとの入力位置の線の分を足し，読みが空でも場所が分かる幅を残す
-        if editing(column) {
-            text = (text + glass::EDITING_CARET_WIDTH).max(glass::EDITING_MIN_WIDTH);
-        }
-        let width = text + edge * 2.0 + corrected_label_width(column, painter);
-        trunk_x.push(x);
-        trunk_width.push(width);
-        x += width + metrics.trunk_gap;
-    }
-    let trunk_right = x - metrics.trunk_gap;
-    let focused = focused(map);
-    let column = focused.map(|(_, column)| column);
-    // コマンドの候補は文字の前に種類のアイコンを置くので，その幅も足す
-    let label_width = column
-        .map(|column| {
-            lower_rows(column, 1.0)
-                .into_iter()
-                .map(|row| {
-                    painter.width(&row.text, Font::Candidate)
-                        + row.command.map_or(0.0, |_| Painter::command_width())
-                        + painter.detail_width(row.detail.as_deref())
-                })
-                .chain(
-                    column
-                        .variants
-                        .iter()
-                        .map(|label| painter.width(label, Font::Candidate)),
-                )
-                .collect::<Vec<_>>()
-        })
-        .into_iter()
-        .flatten()
-        .fold(0.0, f32::max);
-    // 打ったまま・修正・コマンドの添え書きの幅も足す
-    let note_width = column
-        .and_then(|column| {
-            column
-                .alternative_notes
-                .iter()
-                .flatten()
-                .map(|note| painter.tag_width(note))
-                .reduce(f32::max)
-        })
-        .map_or(0.0, |width| width + padding * 2.0);
-    let branch_width = metrics.stem_x
-        + metrics.branch_indent
-        + metrics.lead
-        + label_width
-        + note_width
-        + padding * 2.0;
-    let branch_right = focused.map_or(metrics.inset, |(index, _)| trunk_x[index]) + branch_width;
-    let preview_rows = usize::from(map.columns.iter().any(|column| column.preview.is_some()));
-    let upper_rows = column.map_or(0, |column| column.variants.len());
-    let lower_rows = column
-        .map_or(0, |column| column.alternatives.len())
-        .max(preview_rows);
-    let footer = footer_width(map, painter)
-        + painter.width(&position(map), Font::Label)
-        + edge * 2.0
-        + glass::HINT_GAP;
-    // 使い分けや誤用の注釈と，IME からの知らせは，枝と足元のあいだに 1 行ずつ出す．候補の下のカードは窓の幅をカードの幅まで広げる
-    let below = map.meaning_placement == Some(MeaningPlacement::Below)
-        && column.is_some_and(|column| column.homophone.is_some() && column.split.is_none());
-    let note = [
-        column
-            .and_then(|column| column.usage_note.as_deref())
-            .map(|text| painter.width(text, Font::Label)),
-        map.note.as_ref().map(|note| painter.note_width(note)),
-        below.then_some(card_size::LIST_WIDTH),
-    ]
-    .into_iter()
-    .flatten()
-    .map(|width| width + edge * 2.0)
-    .fold(0.0, f32::max);
-    let heading = map
-        .association
-        .as_ref()
-        .map_or(0.0, |heading| super::association::width(painter, heading));
-    let width = candidate::MIN_WIDTH
-        .max(trunk_right + metrics.inset)
-        .max(branch_right + metrics.inset)
-        .max(footer + metrics.inset * 2.0)
-        .max(note + metrics.inset * 2.0)
-        .max(heading + metrics.text_inset() * 2.0);
-    // いちばん上の行の背景(角丸のテーマは行の上下を縮めて描く)の上の端を，枠線の内側の余白の端にそろえる
-    let trunk_y = metrics.inset - metrics.row_inset
-        + heading_height(map, metrics)
-        + upper_rows as f32 * metrics.row_height;
-    let width = width.ceil();
-    let content_right = width - metrics.inset;
-    // 下の枝の見える下の端(候補の行の背景の下の端)
-    let lower_top = trunk_y + metrics.row_height;
-    let mut bottom = lower_top + metrics.row_height * lower_rows as f32
-        - if lower_rows > 0 {
-            metrics.row_inset
-        } else {
-            0.0
-        };
-    // 候補の下: 窓の中身の幅いっぱい．枝とのあいだも区切りの線と同じ空き
-    let slot = meaning_slot(map, painter, content_right - metrics.inset);
-    let card = slot.as_ref().map(|slot| {
-        let frame = Frame::new(metrics.inset, bottom + GAP, slot.width, slot.height);
-        bottom = frame.max_y();
-        frame
-    });
-    let extra_rows = usize::from(column.is_some_and(|column| column.usage_note.is_some()))
-        + usize::from(map.note.is_some());
-    let height = bottom
-        + (GAP + metrics.footer_height) * extra_rows as f32
-        + GAP
-        + candidate::FRAME_WIDTH
-        + GAP
-        + metrics.footer_height
-        + metrics.inset;
-    Layout {
-        trunk_x,
-        trunk_width,
-        trunk_y,
-        branch_width,
-        lower_height: bottom - lower_top,
-        slot,
-        card,
-        width,
-        height: height.ceil(),
-    }
-}
-
-fn footer_width(map: &BranchMap, painter: &Painter) -> f32 {
-    let source = focused(map)
-        .and_then(|(_, column)| column.source_name.as_deref())
-        .map_or(0.0, |name| {
-            painter.width(&strings::dictionary_source(name), Font::Label) + candidate::PADDING_X
-        });
-    let association = map.association_hint.as_deref().map_or(0.0, |hint| {
-        let width = association_key_hint(map).map_or_else(
-            || painter.width(hint, Font::Label),
-            |key_hint| painter.hints_width(&[key_hint]),
-        );
-        width + glass::HINT_GAP
-    });
-    painter.hints_width(&map.hints) + source + association
-}
-
-/// 連想の知らせ(R-18)のキーキャップ．キーが割り当てられていなければ None(語だけを文字で出す)
-fn association_key_hint(map: &BranchMap) -> Option<KeyHint> {
-    let label = map.association_hint.as_ref()?;
-    map.association_key.as_ref().map(|key| KeyHint {
-        keys: key.clone(),
-        label: label.clone(),
-    })
-}
-
-/// 連想の一覧の見出しの行の高さ(区切りの線とその上下の空きを含む)．連想でなければ 0
-fn heading_height(map: &BranchMap, metrics: &Metrics) -> f32 {
-    if map.association.is_some() {
-        metrics.footer_height + GAP * 2.0 + candidate::FRAME_WIDTH
-    } else {
-        0.0
-    }
-}
-
-pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene {
-    let metrics = Metrics::new(look, measure);
-    let mut painter = Painter::new(look, measure);
-    let theme = look.theme;
-    let layout = layout(map, &metrics, &painter);
-    let (width, height) = look.sized(
-        layout.width + metrics.shadow,
-        layout.height + metrics.shadow,
-    );
-    let body = Frame::new(0.0, 0.0, width - metrics.shadow, height - metrics.shadow);
-    painter.panel(body);
-    if let Some(heading) = &map.association {
-        let row = Frame::new(
-            metrics.text_inset(),
-            metrics.inset,
-            body.width - metrics.text_inset() * 2.0,
-            metrics.footer_height,
-        );
-        super::association::draw(&mut painter, heading, row);
-        painter.separator(row.max_y() + GAP, metrics.inset, body.width - metrics.inset);
-    }
-    let focused_index = focused(map).map(|(index, _)| index);
-    // 注目している文節の枝が重なる範囲には，ほかの文節の添え書きを描かない
-    let branch_range = focused_index.map(|index| {
-        (
-            layout.trunk_x[index],
-            layout.trunk_x[index] + layout.branch_width,
-        )
-    });
-    for (index, column) in map.columns.iter().enumerate() {
-        let node = Frame::new(
-            layout.trunk_x[index],
-            layout.trunk_y,
-            layout.trunk_width[index],
-            metrics.row_height,
-        );
-        trunk_node(&mut painter, column, node);
-        // 語の意味の吹き出しは幹の文節を覆わない
-        painter.keep_clear.push(node);
-        painter.hit(
-            node,
-            ipc::PointerTarget::Segment {
-                index: index as u32,
-            },
-        );
-        if !theme.is_rounded() {
-            if let Some(next) = layout.trunk_x.get(index + 1) {
-                // 角丸のテーマは文節の間を空けるだけにし，文として読めるようにする
-                painter.rect(
-                    Frame::new(
-                        node.max_x(),
-                        node.mid_y().round(),
-                        next - node.max_x(),
-                        branch::LINE_WIDTH,
-                    ),
-                    theme.line,
-                );
-            }
-        }
-        if column.is_focused {
-            // 吹き出しは選んでいない枝の行を覆わない
-            let lower = lower_rows(column, look.rest_opacity).len();
-            let upper = upper_rows(column, look.rest_opacity).len();
-            for index in
-                (0..lower).filter(|index| column.selected_alternative != Some(*index as u32))
-            {
-                painter.keep_clear.push(branch_row(
-                    node,
-                    layout.branch_width,
-                    index,
-                    true,
-                    &metrics,
-                ));
-            }
-            for index in 0..upper {
-                painter.keep_clear.push(branch_row(
-                    node,
-                    layout.branch_width,
-                    index,
-                    false,
-                    &metrics,
-                ));
-            }
-            // 区切っているあいだ(⇧↓)は番号キーで区切る位置を選ぶので，枝は押せない
-            let pressable = column.split.is_none();
-            // 打ち直しているあいだの枝は打ち直す前の候補なので，線も文字も薄くする(候補は変換したときに出し直す)
-            let line_opacity = if editing(column) {
-                tokens::opacity::candidate::EDITING_STALE
-            } else {
-                1.0
-            };
-            branches(
-                &mut painter,
-                &lower_rows(column, look.rest_opacity),
-                node,
-                layout.branch_width,
-                true,
-                line_opacity,
-                &metrics,
-            );
-            branches(
-                &mut painter,
-                &upper_rows(column, look.rest_opacity),
-                node,
-                layout.branch_width,
-                false,
-                line_opacity,
-                &metrics,
-            );
-            if pressable {
-                for index in 0..column.alternatives.len() {
-                    // コメントのタグは枝の行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
-                    // タグを押すと候補の代わりにコメントを入れる
-                    if let Some(comment) = super::alternative_comment(column, index) {
-                        let row = branch_row(node, layout.branch_width, index, true, &metrics);
-                        let frame = painter.tag_hit_frame(comment, tag_max_x(row), row);
-                        painter.hit(
-                            frame,
-                            ipc::PointerTarget::Comment {
-                                index: index as u32,
-                            },
-                        );
-                    }
-                    let y = node.max_y() + index as f32 * metrics.row_height;
-                    painter.hit(
-                        Frame::new(node.x, y, layout.branch_width, metrics.row_height),
-                        ipc::PointerTarget::Alternative {
-                            index: index as u32,
-                        },
-                    );
-                }
-                for index in 0..column.variants.len() {
-                    let y = node.y - (index + 1) as f32 * metrics.row_height;
-                    painter.hit(
-                        Frame::new(node.x, y, layout.branch_width, metrics.row_height),
-                        ipc::PointerTarget::Variant {
-                            index: index as u32,
-                        },
-                    );
-                }
-            }
-        } else if let Some(preview) = column.preview.as_deref() {
-            let overlaps =
-                branch_range.is_some_and(|(from, to)| node.x <= to && node.max_x() >= from);
-            if !overlaps {
-                // 添える候補は次の文節の手前までに収め，はみ出す分は省く
-                let limit = layout
-                    .trunk_x
-                    .get(index + 1)
-                    .copied()
-                    .unwrap_or(body.max_x() - metrics.inset);
-                draw_preview(
-                    &mut painter,
-                    preview,
-                    node,
-                    limit,
-                    look.rest_opacity,
-                    &metrics,
-                );
-            }
-        }
-    }
-    let mut footer_y = layout.trunk_y + metrics.row_height + layout.lower_height;
-    // 吹き出しは枝の下の注釈・候補の下の語の意味・足元を覆わない．どれも枝から GAP だけ空けた所から始まる
-    painter.keep_clear.push(Frame::new(
-        body.x,
-        footer_y + GAP,
-        body.width,
-        body.max_y() - footer_y - GAP,
-    ));
-    let content_width = body.width - metrics.text_inset() * 2.0;
-    if let (Some(slot), Some(card)) = (&layout.slot, layout.card) {
-        // 候補の下: 枝と足元のあいだに，窓の幅いっぱいに出す
-        meaning::draw(&mut painter, &slot.card, card);
-    }
-    if let Some(note) = focused(map).and_then(|(_, column)| column.usage_note.as_deref()) {
-        let row = Frame::new(
-            metrics.text_inset(),
-            footer_y + GAP,
-            content_width,
-            metrics.footer_height,
-        );
-        painter.text(note, Font::Label, theme.text_muted, row.x, row);
-        footer_y = row.max_y();
-    }
-    if let Some(note) = map.note.as_ref() {
-        // 打ち間違いを直したことなど，IME が変えたことを知らせる
-        let row = Frame::new(
-            metrics.text_inset(),
-            footer_y + GAP,
-            content_width,
-            metrics.footer_height,
-        );
-        painter.note(note, row.x, row.mid_y());
-        footer_y = row.max_y();
-    }
-    footer(&mut painter, map, footer_y + GAP, body.width, &metrics);
-    painter.finish(width, height)
-}
-
 /// 打ち間違いを直した文節の幹で，文字のあとに添える「修正」のタグの幅(前の空きを含む)．直していなければ 0
 fn corrected_label_width(column: &BranchColumn, painter: &Painter) -> f32 {
     if column.is_corrected == Some(true) {
@@ -593,8 +256,1097 @@ fn editing(column: &BranchColumn) -> bool {
     column.is_editing == Some(true)
 }
 
-/// 打ち直している文節の幹(macOS の BranchView.drawEditingNode)．塗らずに選択の色の枠線で囲み，
-/// 打っている読みのあとに入力位置の線を置く．読みが空のあいだも枠を残し，どこを打ち直しているかを見せる
+/// 幹の文節の幅(文字と左右の余白)
+fn trunk_width(column: &BranchColumn, painter: &Painter) -> f32 {
+    let mut text = column.split.as_ref().map_or_else(
+        || match trunk_command(column) {
+            Some((_, title)) => Painter::command_width() + painter.width(title, Font::Trunk),
+            None => painter.width(&column.text, Font::Trunk),
+        },
+        |split| split_pieces(split, painter).width,
+    );
+    // 打ち直している文節は，読みのあとの入力位置の線の分を足し，読みが空でも場所が分かる幅を残す
+    if editing(column) && column.split.is_none() {
+        text = (text + glass::EDITING_CARET_WIDTH).max(glass::EDITING_MIN_WIDTH);
+    }
+    text + part::ROW_PADDING_X * 2.0 + corrected_label_width(column, painter)
+}
+
+/// 候補の行
+struct Row {
+    text: String,
+    badge: String,
+    selected: bool,
+    opacity: f32,
+    /// 打ったまま・修正・コマンドの添え書きか，ユーザー辞書の語のコメント
+    note: Option<String>,
+    /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色のタグにする)
+    command: Option<CommandKind>,
+    /// 文字のすぐあとに控えめに添える説明(絵文字の名前)
+    detail: Option<String>,
+}
+
+/// 下の枝(変換の候補)．第 1 候補はすぐに濃く出す
+fn lower_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
+    column
+        .alternatives
+        .iter()
+        .enumerate()
+        .map(|(index, text)| Row {
+            text: text.clone(),
+            badge: (index + 1).to_string(),
+            selected: column.selected_alternative == Some(index as u32),
+            opacity: if editing(column) {
+                stale_opacity::EDITING_STALE
+            } else if index == 0 {
+                1.0
+            } else {
+                rest
+            },
+            note: column.alternative_notes.get(index).cloned().flatten(),
+            command: column
+                .alternative_commands
+                .as_ref()
+                .and_then(|kinds| kinds.get(index).copied().flatten()),
+            detail: column
+                .alternative_details
+                .as_ref()
+                .and_then(|details| details.get(index).cloned().flatten()),
+        })
+        .collect()
+}
+
+/// 候補の行の文字の幅(コマンドのアイコンと，文字のあとに添える説明を含む)
+fn lower_row_width(row: &Row, painter: &Painter) -> f32 {
+    painter.width(&row.text, Font::Candidate)
+        + row.command.map_or(0.0, |_| Painter::command_width())
+        + painter.detail_width(row.detail.as_deref())
+}
+
+/// 上の枝の文字種ごとの，その文字種にするキー(variants と同じ数)．案内を出さない設定と，キーの無い文字種は None
+fn variant_keys(map: &BranchMap, column: Option<&BranchColumn>) -> Vec<Option<String>> {
+    let Some(column) = column else {
+        return Vec::new();
+    };
+    let keys = column.variant_keys.as_deref().unwrap_or_default();
+    (0..column.variants.len())
+        .map(|index| {
+            if shows_hints(map) {
+                keys.get(index).cloned().flatten()
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
+/// 文字種の 1 つ．線の上の丸と，文字の枠
+struct Kind {
+    stop: Point,
+    label: Frame,
+}
+
+/// 先の枝の丸と見出し
+struct Station {
+    title: String,
+    stop: Point,
+    title_x: f32,
+    title_mid_y: f32,
+}
+
+/// 幹・枝・案内の位置．描くとき・大きさを求めるとき・押した位置を調べるときで同じものを使う
+#[derive(Default)]
+struct Layout {
+    width: f32,
+    height: f32,
+    /// 幹の文節の枠(送ったあとの位置)
+    nodes: Vec<Frame>,
+    /// 幹の線の y と，左右の端
+    rail_y: f32,
+    rail_start: f32,
+    rail_end: f32,
+    /// 幹が窓からはみ出している側
+    fades_left: bool,
+    fades_right: bool,
+    focus: Option<usize>,
+    /// 選んでいる文節の丸の x と，候補の枝の縦の線の x(枝を寄せていなければ同じ)
+    focus_x: f32,
+    stem_x: f32,
+    /// 枝の向き．1 は右，-1 は左(左右に反転)
+    direction: f32,
+    /// 候補の行(選択の背景の枠)
+    rows: Vec<Frame>,
+    kinds: Vec<Kind>,
+    twig_direction: f32,
+    twig_y: f32,
+    /// 文字種の線の，文節から遠い側の端
+    twig_end_x: f32,
+    variant_hint_x: Option<f32>,
+    /// 文節の境目の上の案内の行
+    boundary_mid_y: Option<f32>,
+    boundary_x: f32,
+    stations: Vec<Station>,
+    expand_x: Option<f32>,
+    expand_mid_y: f32,
+    /// 畳んでいる枝の，続きがある印の線(表示項目を減らす設定)．文字種は文節の上へ，先の枝は選んでいる候補の行の先へ
+    variant_stub: Option<(Point, Point)>,
+    detail_stub: Option<(Point, Point)>,
+    /// 候補の下の行(案内・位置・辞書の名前)
+    bottom_mid_y: Option<f32>,
+    bottom_hints_x: f32,
+    position_x: f32,
+    source_x: f32,
+    /// ページの位置を示す点
+    page_dots: Option<PageDots>,
+    /// 候補の下に出す語の意味のカード
+    slot: Option<Slot>,
+    card: Option<Frame>,
+    /// 注釈・知らせの行を置き始める y
+    notes_top: f32,
+    heading: Option<Frame>,
+}
+
+// 配置を 1 か所で決める(macOS の BranchView.makeLayout)．幹・枝の向き・縦の並びの順に決めるので長い
+#[allow(clippy::too_many_lines)]
+fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> Layout {
+    let hints = hints(map);
+    let mut result = Layout::default();
+    let tag = glass::TAG_HEIGHT;
+
+    // 幹(送る前)．文節のあいだには，境目のつまみの両側の空きを取る
+    let node_gap = map::SEGMENT_GAP * 2.0;
+    let mut x = metrics.inset;
+    let mut node_x = Vec::new();
+    let mut node_widths = Vec::new();
+    for column in &map.columns {
+        let width = trunk_width(column, painter);
+        node_x.push(x);
+        node_widths.push(width);
+        x += width + node_gap;
+    }
+    let trunk_right = if map.columns.is_empty() {
+        metrics.inset
+    } else {
+        x - node_gap
+    };
+    let focus = focused(map).map(|(index, _)| index);
+    let column = focus.map(|index| &map.columns[index]);
+    let lower = column.map_or_else(Vec::new, |column| lower_rows(column, rest));
+    let selected_row = lower.iter().position(|row| row.selected);
+
+    // 候補の枝．縦の線から外へ向かう距離で決める(枝を左右に反転しても同じ距離を使う)
+    let text_offset = BADGE_OFFSET + LEAD;
+    let note_width = lower
+        .iter()
+        .filter_map(|row| row.note.as_deref().map(|note| painter.tag_width(note)))
+        .fold(0.0, f32::max);
+    let row_start = BADGE_OFFSET - part::ROW_PADDING_X;
+    // 候補の下の行(案内・辞書の名前・位置)．候補の行の幅に収め，先の枝と重ねない
+    let shows_pages = !lower.is_empty() && column.is_some_and(|column| column.split.is_none());
+    let position_text = if shows_pages {
+        position_text(map)
+    } else {
+        String::new()
+    };
+    let position_width = if position_text.is_empty() {
+        0.0
+    } else {
+        painter.width(&position_text, Font::Label)
+    };
+    let source_width = column
+        .and_then(|column| column.source_name.as_deref())
+        .map_or(0.0, |name| {
+            painter.width(&strings::dictionary_source(name), Font::Label) + candidate::PADDING_X
+        });
+    let far_width = position_width + source_width;
+    let bottom_hints_width = if lower.is_empty() {
+        0.0
+    } else {
+        painter.placed_hints_width(&hints.candidates)
+    };
+    let has_bottom = bottom_hints_width > 0.0 || far_width > 0.0;
+    let bottom_end = BADGE_OFFSET
+        + bottom_hints_width
+        + if bottom_hints_width > 0.0 && far_width > 0.0 {
+            space::GROUP
+        } else {
+            0.0
+        }
+        + far_width;
+    let widest = lower
+        .iter()
+        .map(|row| lower_row_width(row, painter))
+        .fold(0.0, f32::max);
+    let row_end = (text_offset
+        + widest
+        + if note_width > 0.0 {
+            space::GROUP + note_width
+        } else {
+            0.0
+        }
+        + part::ROW_PADDING_X * 2.0)
+        .max(if has_bottom { bottom_end } else { 0.0 });
+    let far_start = row_end - far_width;
+    let mut reach = if lower.is_empty() { 0.0 } else { row_end };
+
+    // 先の枝(連想)．候補を選んでいるときだけ出す
+    let mut titles: Vec<String> = Vec::new();
+    if column.is_some_and(|column| !editing(column))
+        && selected_row.is_some()
+        && map.association.is_none()
+    {
+        if let Some(label) = map.association_hint.clone() {
+            titles.push(label);
+        }
+    }
+    let mut station_offsets = Vec::new();
+    let mut cursor = row_end + map::STATION_GAP;
+    for title in &titles {
+        let width = painter.width(title, Font::Label);
+        station_offsets.push(cursor + width / 2.0);
+        cursor += width + map::STATION_GAP;
+    }
+    let mut expand_offset = None;
+    if !titles.is_empty() {
+        reach = cursor - map::STATION_GAP;
+        if let Some(expand) = hints.expand.as_ref() {
+            expand_offset = Some(reach + space::GROUP);
+            reach += space::GROUP + painter.placed_hint_width(expand);
+        }
+    }
+    // 先の枝を畳んでいるとき: 候補の行の先に，続きがある印の線と開くキーの案内
+    let shows_detail_stub = map.collapses_detail == Some(true)
+        && selected_row.is_some()
+        && column.is_some_and(|column| !editing(column));
+    if shows_detail_stub {
+        reach = row_end + map::STUB_LENGTH;
+        if let Some(expand) = hints.expand.as_ref() {
+            expand_offset = Some(reach + space::INSET);
+            reach += space::INSET + painter.placed_hint_width(expand);
+        }
+    }
+
+    // 文字種の枝．文節の上から横へ伸ばす．並びは反転しない．文字の前に，その文字種にするキーを置く
+    let kind_keys = variant_keys(map, column);
+    let kind_widths: Vec<f32> = column
+        .map(|column| column.variants.as_slice())
+        .unwrap_or_default()
+        .iter()
+        .enumerate()
+        .map(|(index, text)| {
+            painter.width(text, Font::Label)
+                + part::ROW_PADDING_X * 2.0
+                + kind_keys
+                    .get(index)
+                    .cloned()
+                    .flatten()
+                    .map_or(0.0, |key| painter.key_mark_width(&key) + space::INLINE)
+        })
+        .collect();
+    // 文字種の文字・境目の案内・候補の番号・候補の下の案内の左の端を，縦の線から同じ距離にそろえる
+    let kind_start = BADGE_OFFSET - part::ROW_PADDING_X;
+    let variant_hint_width = if kind_widths.is_empty() {
+        0.0
+    } else {
+        hints
+            .variant
+            .as_ref()
+            .map_or(0.0, |hint| painter.placed_hint_width(hint))
+    };
+    let kinds_reach = if kind_widths.is_empty() {
+        0.0
+    } else {
+        kind_start
+            + kind_widths.iter().sum::<f32>()
+            + map::STATION_GAP * (kind_widths.len() - 1) as f32
+            + if variant_hint_width > 0.0 {
+                space::GROUP + variant_hint_width
+            } else {
+                0.0
+            }
+    };
+
+    // 窓の幅．上限を超える文は，幹を送る
+    let focus_center = focus.map_or(metrics.inset, |index| {
+        node_x[index] + metrics.stop_offset(node_widths[index])
+    });
+    let boundary_width = painter.placed_hints_width(&hints.boundary);
+    let below = map.meaning_placement == Some(MeaningPlacement::Below)
+        && column.is_some_and(|column| column.homophone.is_some() && column.split.is_none());
+    let notes_width = [
+        column
+            .and_then(|column| column.usage_note.as_deref())
+            .map(|text| painter.width(text, Font::Label)),
+        map.note.as_ref().map(|note| painter.note_width(note)),
+        below.then_some(card_size::LIST_WIDTH),
+    ]
+    .into_iter()
+    .flatten()
+    .map(|width| width + part::ROW_PADDING_X * 2.0)
+    .fold(0.0, f32::max);
+    let heading_width = map.association.as_ref().map_or(0.0, |heading| {
+        super::association::width(painter, heading) + metrics.text_inset() * 2.0
+    });
+    // 境目の案内は，文節から上へ伸びる線の右に置く
+    let boundary_start = BADGE_OFFSET;
+    let mut width = candidate::MIN_WIDTH
+        .max(trunk_right + metrics.inset)
+        .max(focus_center + reach.max(kinds_reach) + metrics.inset)
+        .max(focus_center + boundary_start + boundary_width + metrics.inset)
+        .max(notes_width + metrics.inset * 2.0)
+        .max(heading_width);
+    let limit = candidate::MAX_WIDTH.max(candidate::MIN_WIDTH);
+    let mut shift = 0.0;
+    let mut overflows = false;
+    if width > limit {
+        width = limit;
+        overflows = true;
+        // 選んでいる文節(とその右の境目のつまみ)が窓の内側に入るだけ送る
+        if let Some(index) = focus {
+            let (low, high) = (node_x[index], node_x[index] + node_widths[index] + node_gap);
+            let visible = limit - metrics.inset * 2.0;
+            let mut offset: f32 = 0.0;
+            if high - offset > metrics.inset + visible {
+                offset = high - metrics.inset - visible;
+            }
+            if low - offset < metrics.inset {
+                offset = low - metrics.inset;
+            }
+            shift = offset.clamp(
+                0.0,
+                (trunk_right + node_gap + metrics.inset - limit).max(0.0),
+            );
+        }
+    }
+    let width = width.ceil();
+    let left = metrics.inset;
+    let right = width - metrics.inset;
+    let focus_x = (focus_center - shift).round();
+
+    // 枝の向き．右に入れば右，入らなければ左右に反転して左．どちらにも入らなければ，広い側へ出して入る位置まで寄せる
+    let mut direction: f32 = 1.0;
+    if focus_x + reach > right && (focus_x - reach >= left || focus_x > width / 2.0) {
+        direction = -1.0;
+    }
+    let edge = map::STOP_SIZE_SELECTED / 2.0;
+    let stem_x = if direction > 0.0 {
+        focus_x.min(right - reach).max(left + edge)
+    } else {
+        focus_x.max(left + reach).min(right - edge)
+    }
+    .round();
+    let twig_direction = if focus_x + kinds_reach <= right || focus_x - kinds_reach < left {
+        1.0
+    } else {
+        -1.0
+    };
+    // 縦の線から外へ start の距離に置く，幅 width の物の左の端
+    let min_x = |start: f32, width: f32| {
+        if direction > 0.0 {
+            stem_x + start
+        } else {
+            stem_x - start - width
+        }
+    };
+
+    // 縦の並び．上から，見出し(連想)・文字種・境目の案内・幹の文節・幹の線・候補・候補の下の行
+    let mut y = metrics.inset;
+    if map.association.is_some() {
+        result.heading = Some(Frame::new(
+            metrics.text_inset(),
+            y,
+            width - metrics.text_inset() * 2.0,
+            metrics.note_height,
+        ));
+        y += metrics.note_height + GAP * 2.0 + candidate::FRAME_WIDTH;
+    }
+    if !kind_widths.is_empty() {
+        let label_y = y;
+        y += tag + space::INSET;
+        result.twig_y = (y + map::STOP_SIZE / 2.0).round();
+        y += map::STOP_SIZE + space::INSET;
+        let mut kind_x = if twig_direction > 0.0 {
+            focus_x + kind_start
+        } else {
+            focus_x - kinds_reach
+                + if variant_hint_width > 0.0 {
+                    variant_hint_width + space::GROUP
+                } else {
+                    0.0
+                }
+        };
+        for kind_width in &kind_widths {
+            let label = Frame::new(kind_x.round(), label_y, *kind_width, tag);
+            result.kinds.push(Kind {
+                stop: Point::new(
+                    label.x + part::ROW_PADDING_X + map::STOP_SIZE / 2.0,
+                    result.twig_y,
+                ),
+                label,
+            });
+            kind_x += kind_width + map::STATION_GAP;
+        }
+        let labels_end = kind_x - map::STATION_GAP;
+        result.twig_end_x = if twig_direction > 0.0 {
+            labels_end
+        } else {
+            result.kinds.first().map_or(focus_x, |kind| kind.label.x)
+        };
+        if variant_hint_width > 0.0 {
+            result.variant_hint_x = Some(if twig_direction > 0.0 {
+                labels_end + space::GROUP
+            } else {
+                focus_x - kinds_reach
+            });
+        }
+    }
+    if focus.is_some() && map.association.is_none() {
+        result.boundary_mid_y = Some(y + tag / 2.0);
+        y += tag + space::INSET;
+    }
+    let node_top = y;
+    y += metrics.row_height;
+    result.rail_y = (y + map::RAIL_HEIGHT / 2.0).round();
+    y += map::RAIL_HEIGHT;
+    if !lower.is_empty() {
+        y += map::ROW_GAP;
+        for index in 0..lower.len() {
+            result.rows.push(Frame::new(
+                min_x(row_start, row_end - row_start),
+                y + index as f32 * metrics.row_height,
+                row_end - row_start,
+                metrics.row_height,
+            ));
+        }
+        y += lower.len() as f32 * metrics.row_height;
+    }
+    let mut bottom = y;
+    if let Some((count, current)) = pages(map).filter(|_| shows_pages) {
+        if count as f32 <= map::PAGE_DOT_LIMIT {
+            let dots = PageDots {
+                x: stem_x,
+                top: y + space::INSET,
+                count,
+                current,
+            };
+            bottom = bottom.max(dots.top + count as f32 * map::PAGE_DOT_PITCH);
+            result.page_dots = Some(dots);
+        }
+    }
+    if has_bottom {
+        result.bottom_mid_y = Some(y + space::INSET + tag / 2.0);
+        result.bottom_hints_x = min_x(BADGE_OFFSET, bottom_hints_width);
+        let far_x = min_x(far_start, far_width);
+        // 位置は枝の外の端に，辞書の名前はその内側に置く
+        result.position_x = if direction > 0.0 {
+            far_x + source_width
+        } else {
+            far_x
+        };
+        result.source_x = if direction > 0.0 {
+            far_x
+        } else {
+            far_x + position_width + candidate::PADDING_X
+        };
+        bottom = bottom.max(y + space::INSET + tag);
+    }
+    if let Some(row) = selected_row.and_then(|index| result.rows.get(index)) {
+        let mid_y = row.mid_y().round();
+        for (title, offset) in titles.iter().zip(&station_offsets) {
+            let title_width = painter.width(title, Font::Label);
+            let stop_x = if direction > 0.0 {
+                stem_x + offset
+            } else {
+                stem_x - offset
+            }
+            .round();
+            result.stations.push(Station {
+                title: title.clone(),
+                stop: Point::new(stop_x, mid_y),
+                title_x: stop_x - title_width / 2.0,
+                title_mid_y: mid_y - map::STOP_SIZE / 2.0 - space::INSET - tag / 2.0,
+            });
+        }
+        if let (Some(offset), Some(expand)) = (expand_offset, hints.expand.as_ref()) {
+            result.expand_x = Some(min_x(offset, painter.placed_hint_width(expand)));
+            result.expand_mid_y = mid_y;
+        }
+        if shows_detail_stub {
+            let from = if direction > 0.0 {
+                stem_x + row_end
+            } else {
+                stem_x - row_end
+            };
+            result.detail_stub = Some((
+                Point::new(from, mid_y),
+                Point::new(from + direction * map::STUB_LENGTH, mid_y),
+            ));
+        }
+    }
+    // 候補の下の語の意味: 窓の中身の幅いっぱい
+    if focus.is_some() {
+        if let Some(slot) = meaning_slot(map, painter, right - left) {
+            let frame = Frame::new(left, bottom + GAP, slot.width, slot.height);
+            bottom = frame.max_y();
+            result.slot = Some(slot);
+            result.card = Some(frame);
+        }
+    }
+    result.notes_top = bottom;
+    let notes = usize::from(column.is_some_and(|column| column.usage_note.is_some()))
+        + usize::from(map.note.is_some());
+    let height = bottom + (GAP + metrics.note_height) * notes as f32 + metrics.inset;
+
+    result.nodes = (0..map.columns.len())
+        .map(|index| {
+            Frame::new(
+                (node_x[index] - shift).round(),
+                node_top,
+                node_widths[index],
+                metrics.row_height,
+            )
+        })
+        .collect();
+    result.fades_left = overflows && shift > 0.0;
+    result.fades_right = overflows && trunk_right - shift > right;
+    let stop_x = |node: &Frame| node.x + metrics.stop_offset(node.width);
+    result.rail_start = if result.fades_left {
+        0.0
+    } else {
+        result.nodes.first().map_or(left, stop_x)
+    };
+    result.rail_end = if result.fades_right {
+        width
+    } else {
+        result.nodes.last().map_or(left, stop_x)
+    };
+    result.focus = focus;
+    result.focus_x = focus_x;
+    result.stem_x = stem_x;
+    result.direction = direction;
+    result.twig_direction = twig_direction;
+    result.boundary_x = (focus_x + boundary_start)
+        .min(right - boundary_width)
+        .max(left);
+    // 文字種の枝を畳んでいるとき: 文節の上へ，続きがある印の線を境目の案内の行の高さだけ伸ばす
+    if map.collapses_variants == Some(true) && column.is_some_and(|column| column.split.is_none()) {
+        if let Some(mid_y) = result.boundary_mid_y {
+            result.variant_stub = Some((
+                Point::new(focus_x, node_top + metrics.row_inset),
+                Point::new(focus_x, mid_y - tag / 2.0),
+            ));
+        }
+    }
+    result.width = width;
+    result.height = height.ceil();
+    result
+}
+
+/// 選んでいる文節の丸から，候補の縦の線を y まで下ろす道すじ．枝を寄せているときは，幹の線と最初の候補のあいだで横へ曲げる
+fn stem_points(y: f32, layout: &Layout, first_row: Frame) -> Vec<Point> {
+    let start = Point::new(layout.focus_x, layout.rail_y);
+    if layout.stem_x == layout.focus_x {
+        return vec![start, Point::new(layout.stem_x, y)];
+    }
+    let bend_y = ((layout.rail_y + map::RAIL_HEIGHT / 2.0 + first_row.y) / 2.0).round();
+    vec![
+        start,
+        Point::new(layout.focus_x, bend_y),
+        Point::new(layout.stem_x, bend_y),
+        Point::new(layout.stem_x, y),
+    ]
+}
+
+/// 寄せた枝の曲がり角の半径．横と縦の線の長さに収まるようにする
+fn bend_radius(layout: &Layout, first_row: Frame, metrics: &Metrics) -> f32 {
+    let vertical = (first_row.y - layout.rail_y - map::RAIL_HEIGHT / 2.0) / 2.0;
+    metrics
+        .turn_radius
+        .min((layout.stem_x - layout.focus_x).abs() / 2.0)
+        .min(vertical)
+        .max(0.0)
+}
+
+/// 候補の行の押せる範囲．縦の線の上の丸から行の端まで
+fn row_area(row: Frame, layout: &Layout) -> Frame {
+    let edge = map::STOP_SIZE_SELECTED / 2.0;
+    let min_x = row.x.min(layout.stem_x - edge);
+    Frame::new(
+        min_x,
+        row.y,
+        row.max_x().max(layout.stem_x + edge) - min_x,
+        row.height,
+    )
+}
+
+/// 文字種の押せる範囲．文字と，その下の線の上の丸
+fn kind_area(kind: &Kind) -> Frame {
+    Frame::new(
+        kind.label.x,
+        kind.label.y,
+        kind.label.width,
+        kind.stop.y + map::STOP_SIZE / 2.0 - kind.label.y,
+    )
+}
+
+/// 候補の行の添え書きのタグの右端．タグは，縦の線から遠い側の端に置く
+fn tag_max_x(painter: &Painter, note: &str, row: Frame, direction: f32) -> f32 {
+    if direction > 0.0 {
+        row.max_x() - part::ROW_PADDING_X
+    } else {
+        row.x + part::ROW_PADDING_X + painter.tag_width(note)
+    }
+}
+
+// 線・丸・文字・案内の順に重ねる．1 か所で順を決めるので長い
+#[allow(clippy::too_many_lines)]
+pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene {
+    let metrics = Metrics::new(look, measure);
+    let mut painter = Painter::new(look, measure);
+    let theme = look.theme;
+    let hints = hints(map);
+    let layout = layout(map, &metrics, &painter, look.rest_opacity);
+    let (width, height) = look.sized(
+        layout.width + metrics.shadow,
+        layout.height + metrics.shadow,
+    );
+    let body = Frame::new(0.0, 0.0, width - metrics.shadow, height - metrics.shadow);
+    painter.panel(body);
+    if let (Some(heading), Some(row)) = (&map.association, layout.heading) {
+        super::association::draw(&mut painter, heading, row);
+        painter.separator(row.max_y() + GAP, metrics.inset, body.width - metrics.inset);
+    }
+    let column = layout.focus.map(|index| &map.columns[index]);
+    let on_trunk = map.trunk_focused == Some(true);
+    let rows = column.map_or_else(Vec::new, |column| lower_rows(column, look.rest_opacity));
+    let selected_row = rows.iter().position(|row| row.selected);
+    let stale = if column.is_some_and(editing) {
+        stale_opacity::EDITING_STALE
+    } else {
+        1.0
+    };
+    let splitting = map.columns.iter().any(|column| column.split.is_some());
+
+    // 丸．線は丸の内側を通さない
+    let trunk_stops: Vec<Stop> = layout
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(index, node)| {
+            Stop::new(
+                Point::new(node.x + metrics.stop_offset(node.width), layout.rail_y),
+                if Some(index) == layout.focus {
+                    State::Selected
+                } else {
+                    State::Plain
+                },
+            )
+        })
+        .collect();
+    let mut branch_stops: Vec<Stop> = Vec::new();
+    for (index, row) in layout.rows.iter().enumerate().take(rows.len()) {
+        let state = if Some(index) == selected_row {
+            State::Selected
+        } else if selected_row.is_some_and(|selected| index < selected) {
+            State::Passed
+        } else {
+            State::Plain
+        };
+        branch_stops.push(Stop {
+            center: Point::new(layout.stem_x, row.mid_y().round()),
+            state,
+            opacity: rows[index].opacity,
+        });
+    }
+    let selected_variant = column
+        .and_then(|column| column.selected_variant)
+        .map(|index| index as usize);
+    for (index, kind) in layout.kinds.iter().enumerate() {
+        // 文節に近い側の丸ほど，選んだ道すじの途中になる
+        let passed = selected_variant.is_some_and(|selected| {
+            if layout.twig_direction > 0.0 {
+                index < selected
+            } else {
+                index > selected
+            }
+        });
+        let state = if Some(index) == selected_variant {
+            State::Selected
+        } else if passed {
+            State::Passed
+        } else {
+            State::Plain
+        };
+        branch_stops.push(Stop {
+            center: kind.stop,
+            state,
+            opacity: stale,
+        });
+    }
+    branch_stops.extend(
+        layout
+            .stations
+            .iter()
+            .map(|station| Stop::new(station.stop, State::Plain)),
+    );
+    let mut avoided = branch_stops.clone();
+    if let Some(index) = layout.focus {
+        avoided.push(trunk_stops[index]);
+    }
+
+    // 幹．窓からはみ出す側は，端へ向けて透かす
+    let start = painter.draws.len();
+    {
+        let mut solid = Vec::new();
+        let mut dotted = Vec::new();
+        let mut cursor = layout.rail_start;
+        for (index, node) in layout.nodes.iter().enumerate() {
+            if !map.columns[index].is_uncertain {
+                continue;
+            }
+            // 確信の低い文節の下は点線．幹の線は最初と最後の丸で止めるので，点線もその内側に収める
+            let from = (node.x + part::ROW_PADDING_X).max(layout.rail_start);
+            let to = (node.max_x() - part::ROW_PADDING_X).min(layout.rail_end);
+            if to <= from {
+                continue;
+            }
+            if from > cursor {
+                solid.push(Line::new(vec![
+                    Point::new(cursor, layout.rail_y),
+                    Point::new(from, layout.rail_y),
+                ]));
+            }
+            dotted.push(Line {
+                dotted: true,
+                ..Line::new(vec![
+                    Point::new(from, layout.rail_y),
+                    Point::new(to, layout.rail_y),
+                ])
+            });
+            cursor = to;
+        }
+        if layout.rail_end > cursor {
+            solid.push(Line::new(vec![
+                Point::new(cursor, layout.rail_y),
+                Point::new(layout.rail_end, layout.rail_y),
+            ]));
+        }
+        route::stroke(
+            &mut painter,
+            &solid,
+            theme.line,
+            metrics.line_width,
+            &trunk_stops,
+            metrics.pixel_scale,
+        );
+        route::stroke(
+            &mut painter,
+            &dotted,
+            theme.text_muted,
+            metrics.line_width_selected,
+            &trunk_stops,
+            metrics.pixel_scale,
+        );
+        route::draw_stops(&mut painter, &trunk_stops, metrics.line_width);
+        for (index, column) in map.columns.iter().enumerate() {
+            let node = layout.nodes[index];
+            if node.max_x() >= 0.0 && node.x <= body.max_x() {
+                trunk_node(&mut painter, column, node, on_trunk);
+            }
+        }
+        // 文節へ移るキーを，文節の丸の上に重ねる(区切っているあいだは，番号キーが別の意味になるので出さない)
+        if shows_hints(map) && !splitting {
+            for (index, column) in map.columns.iter().enumerate() {
+                let Some(key) = column.jump_key.as_deref() else {
+                    continue;
+                };
+                let hint = KeyHint {
+                    keys: key.to_string(),
+                    label: String::new(),
+                };
+                let stop = trunk_stops[index];
+                painter.placed_hint(
+                    &hint,
+                    stop.center.x - painter.placed_hint_width(&hint) / 2.0,
+                    stop.center.y,
+                    Some(index) == layout.focus,
+                );
+            }
+        }
+    }
+    let trunk = painter.draws.split_off(start);
+    painter.draws.extend(route::fading(
+        trunk,
+        layout.fades_left,
+        layout.fades_right,
+        body,
+    ));
+
+    // 枝の線．選んでいない線をまとめて描き，選んだ道すじを選択の色と太さで上に重ねる
+    let mut lines = Vec::new();
+    let mut path = Vec::new();
+    if let Some(focus) = layout.focus {
+        let node = layout.nodes[focus];
+        if let (Some(first), Some(last)) = (layout.rows.first(), layout.rows.last()) {
+            let radius = bend_radius(&layout, *first, &metrics);
+            lines.push(Line::rounded(
+                stem_points(last.mid_y().round(), &layout, *first),
+                radius,
+            ));
+            if let Some(row) = selected_row.and_then(|index| layout.rows.get(index)) {
+                path.push(Line::rounded(
+                    stem_points(row.mid_y().round(), &layout, *first),
+                    radius,
+                ));
+            }
+        }
+        if !layout.kinds.is_empty() {
+            let top = Point::new(layout.focus_x, node.y + metrics.row_inset);
+            let corner = Point::new(layout.focus_x, layout.twig_y);
+            lines.push(Line::rounded(
+                vec![top, corner, Point::new(layout.twig_end_x, layout.twig_y)],
+                metrics.turn_radius,
+            ));
+            if let Some(kind) = selected_variant.and_then(|index| layout.kinds.get(index)) {
+                path.push(Line::rounded(
+                    vec![top, corner, Point::new(kind.stop.x, layout.twig_y)],
+                    metrics.turn_radius,
+                ));
+            }
+        }
+    }
+    if let (Some(row), Some(last)) = (
+        selected_row.and_then(|index| layout.rows.get(index)),
+        layout.stations.last(),
+    ) {
+        let edge = if layout.direction > 0.0 {
+            row.max_x()
+        } else {
+            row.x
+        };
+        lines.push(Line::new(vec![Point::new(edge, last.stop.y), last.stop]));
+    }
+    route::stroke(
+        &mut painter,
+        &lines,
+        theme.line.faded(stale),
+        metrics.line_width,
+        &avoided,
+        metrics.pixel_scale,
+    );
+    route::stroke(
+        &mut painter,
+        &path,
+        theme.selection,
+        metrics.line_width_selected,
+        &avoided,
+        metrics.pixel_scale,
+    );
+    route::draw_stops(&mut painter, &branch_stops, metrics.line_width);
+    if let Some(dots) = layout.page_dots {
+        route::page_dots(&mut painter, dots.x, dots.top, dots.count, dots.current);
+    }
+    // 畳んでいる枝の，続きがある印．線の色のままだと透かした先が見えないので，控えめな文字の色から透かす
+    for (from, to) in [layout.variant_stub, layout.detail_stub]
+        .into_iter()
+        .flatten()
+    {
+        route::fading_line(
+            &mut painter,
+            from,
+            to,
+            theme.text_muted.faded(stale),
+            metrics.line_width,
+        );
+    }
+
+    // 候補・文字種・先の枝の見出し
+    for (index, row) in layout.rows.iter().enumerate().take(rows.len()) {
+        draw_row(&mut painter, &rows[index], *row, layout.direction, on_trunk);
+    }
+    if let Some(column) = column {
+        let keys = variant_keys(map, Some(column));
+        for (index, kind) in layout.kinds.iter().enumerate() {
+            let Some(text) = column.variants.get(index) else {
+                continue;
+            };
+            draw_kind(
+                &mut painter,
+                text,
+                keys.get(index).cloned().flatten().as_deref(),
+                kind.label,
+                Some(index) == selected_variant,
+                stale,
+            );
+        }
+    }
+    for station in &layout.stations {
+        let row = Frame::new(
+            station.title_x,
+            station.title_mid_y - glass::TAG_HEIGHT / 2.0,
+            0.0,
+            glass::TAG_HEIGHT,
+        );
+        painter.text(
+            &station.title,
+            Font::Label,
+            theme.text_muted,
+            station.title_x,
+            row,
+        );
+    }
+
+    // キーの案内と，文節の境目のつまみ
+    if let Some(mid_y) = layout.boundary_mid_y.filter(|_| !hints.boundary.is_empty()) {
+        painter.placed_hints(&hints.boundary, layout.boundary_x, mid_y);
+        if let (Some(focus), Some(column)) = (layout.focus, column) {
+            if column.split.is_none() && !editing(column) {
+                let node = layout.nodes[focus];
+                let height = painter.measure.height(Font::Trunk).round();
+                route::grip(
+                    &mut painter,
+                    node.max_x() + map::SEGMENT_GAP,
+                    node.mid_y(),
+                    height,
+                );
+            }
+        }
+    }
+    if let (Some(x), Some(hint), Some(kind)) = (
+        layout.variant_hint_x,
+        hints.variant.as_ref(),
+        layout.kinds.first(),
+    ) {
+        painter.placed_hint(hint, x, kind.label.mid_y(), false);
+    }
+    if let (Some(x), Some(hint)) = (layout.expand_x, hints.expand.as_ref()) {
+        painter.placed_hint(hint, x, layout.expand_mid_y, false);
+    }
+    if let Some(mid_y) = layout.bottom_mid_y {
+        painter.placed_hints(&hints.candidates, layout.bottom_hints_x, mid_y);
+        let row = Frame::new(0.0, mid_y - glass::TAG_HEIGHT / 2.0, 0.0, glass::TAG_HEIGHT);
+        if !rows.is_empty() {
+            painter.text(
+                &position_text(map),
+                Font::Label,
+                theme.text_muted,
+                layout.position_x,
+                row,
+            );
+        }
+        if let Some(source) = column.and_then(|column| column.source_name.as_deref()) {
+            // 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前を小さく出す(R-16)
+            painter.text(
+                &strings::dictionary_source(source),
+                Font::Label,
+                theme.correction,
+                layout.source_x,
+                row,
+            );
+        }
+    }
+
+    // 候補の下の語の意味，注釈，知らせ
+    if let (Some(slot), Some(card)) = (&layout.slot, layout.card) {
+        meaning::draw(&mut painter, &slot.card, card);
+    }
+    let mut note_y = layout.notes_top;
+    let content_width = body.width - metrics.text_inset() * 2.0;
+    if let Some(note) = column.and_then(|column| column.usage_note.as_deref()) {
+        let row = Frame::new(
+            metrics.text_inset(),
+            note_y + GAP,
+            content_width,
+            metrics.note_height,
+        );
+        painter.text(note, Font::Label, theme.text_muted, row.x, row);
+        note_y = row.max_y();
+    }
+    if let Some(note) = map.note.as_ref() {
+        // 打ち間違いを直したことなど，IME が変えたことを知らせる
+        let row = Frame::new(
+            metrics.text_inset(),
+            note_y + GAP,
+            content_width,
+            metrics.note_height,
+        );
+        painter.note(note, row.x, row.mid_y());
+    }
+
+    // 押せる範囲と，語の意味の吹き出しに覆わせない範囲
+    for (index, node) in layout.nodes.iter().enumerate() {
+        // 文節は，文字と，その下の線の上の丸を押せる
+        painter.hit(
+            Frame::new(node.x, node.y, node.width, node.height + map::RAIL_HEIGHT),
+            ipc::PointerTarget::Segment {
+                index: index as u32,
+            },
+        );
+        painter.keep_clear.push(*node);
+    }
+    // 区切っているあいだ(⇧↓)は番号キーで区切る位置を選ぶので，枝は押せない
+    if let Some(column) = column.filter(|column| column.split.is_none()) {
+        for (index, row) in layout.rows.iter().enumerate().take(rows.len()) {
+            // コメントのタグは行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
+            // タグを押すと候補の代わりにコメントを入れる
+            if let Some(comment) = super::alternative_comment(column, index) {
+                let frame = painter.tag_hit_frame(
+                    comment,
+                    tag_max_x(&painter, comment, *row, layout.direction),
+                    *row,
+                );
+                painter.hit(
+                    frame,
+                    ipc::PointerTarget::Comment {
+                        index: index as u32,
+                    },
+                );
+            }
+            painter.hit(
+                row_area(*row, &layout),
+                ipc::PointerTarget::Alternative {
+                    index: index as u32,
+                },
+            );
+            // 吹き出しは選んでいない候補の行を覆わない
+            if Some(index) != selected_row {
+                painter.keep_clear.push(*row);
+            }
+        }
+        for (index, kind) in layout.kinds.iter().enumerate() {
+            painter.hit(
+                kind_area(kind),
+                ipc::PointerTarget::Variant {
+                    index: index as u32,
+                },
+            );
+            painter.keep_clear.push(kind.label);
+        }
+    }
+    if let Some(mid_y) = layout.boundary_mid_y {
+        painter.keep_clear.push(Frame::new(
+            body.x,
+            mid_y - glass::TAG_HEIGHT / 2.0,
+            body.width,
+            glass::TAG_HEIGHT,
+        ));
+    }
+    // 候補の下の行・候補の下の語の意味・注釈・知らせ
+    let rows_bottom = layout
+        .rows
+        .last()
+        .map_or(layout.rail_y + map::RAIL_HEIGHT / 2.0, |row| row.max_y());
+    painter.keep_clear.push(Frame::new(
+        body.x,
+        rows_bottom,
+        body.width,
+        (body.max_y() - rows_bottom).max(0.0),
+    ));
+    painter.finish(width, height)
+}
+
+/// その場で打ち直している文節(⇧⌫)の幹．塗らずに選択の色の枠線で囲み，打っている読みのあとに入力位置の線を置く．
+/// 読みが空のあいだも枠を残し，どこを打ち直しているかを見せる
 fn editing_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
     let theme = painter.theme;
     let stroke = part::STROKE;
@@ -627,21 +1379,28 @@ fn editing_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
     );
 }
 
-fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
-    if editing(column) {
+/// on_trunk は，矢印で木をたどっていて幹の上(文節)にいるか．そのときは文節を候補と同じ強い選択で見せる(今いる場所)
+fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame, on_trunk: bool) {
+    if editing(column) && column.split.is_none() {
         editing_node(painter, column, node);
         return;
     }
     let theme = painter.theme;
     let rounded = theme.is_rounded();
+    let strong = column.is_focused && (on_trunk || !rounded);
     if column.is_focused {
         if rounded {
-            painter.capsule(node.inset(0.0, glass::SELECTION_INSET_Y), theme.focus_tint);
+            let fill = if on_trunk {
+                theme.selection
+            } else {
+                theme.focus_tint
+            };
+            painter.capsule(node.inset(0.0, glass::SELECTION_INSET_Y), fill);
         } else {
             painter.rect(node, theme.selection);
         }
     }
-    let color = if !rounded && column.is_focused {
+    let color = if strong {
         theme.selection_text
     } else {
         theme.text
@@ -668,15 +1427,6 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
             node,
         ),
     }
-    // 下線: 選び直した文節は実線，確信の低い文節は点線．線の種類でも区別し，色だけに頼らない
-    let offset = if rounded {
-        glass::UNDERLINE_OFFSET
-    } else {
-        branch::UNDERLINE_OFFSET
-    };
-    let y = node.max_y() - offset;
-    let from = node.x + part::ROW_PADDING_X;
-    let to = node.max_x() - part::ROW_PADDING_X - corrected_label_width(column, painter);
     if column.is_corrected == Some(true) {
         // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
         painter.tag(
@@ -687,25 +1437,9 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
             TagStyle::Corrected,
         );
     }
-    if column.is_decided {
-        painter.underline(
-            from,
-            to,
-            y,
-            if rounded { theme.text_muted } else { color },
-            false,
-        );
-    } else if column.is_uncertain {
-        let dots = if !rounded && column.is_focused {
-            theme.selection_text
-        } else {
-            theme.correction
-        };
-        painter.underline(from, to, y, dots, true);
-    }
 }
 
-/// 区切っている文節の幹．切れ目(「問題｜が｜ある」)に，候補の番号と同じ形の小さな丸で番号を描く
+/// 区切っている文節の幹．切れ目(「問題｜が｜ある」)に，小さな丸で番号を描く
 fn draw_split(painter: &mut Painter, split: &BranchSplit, node: Frame, color: crate::theme::Color) {
     let pieces = split_pieces(split, painter);
     let left = node.x + part::ROW_PADDING_X;
@@ -726,269 +1460,64 @@ fn draw_split(painter: &mut Painter, split: &BranchSplit, node: Frame, color: cr
     }
 }
 
-struct Row {
-    text: String,
-    badge: String,
-    selected: bool,
-    opacity: f32,
-    /// 打ったまま・修正・コマンドの添え書きか，ユーザー辞書の語のコメント
-    note: Option<String>,
-    /// コマンドの候補なら，その種類(文字の前にアイコンを置き，添え書きをアクセントの色のタグにする)
-    command: Option<CommandKind>,
-    /// 文字のすぐあとに控えめに添える説明(絵文字の名前)
-    detail: Option<String>,
-}
-
-/// 下の枝(変換の候補)．第 1 候補はすぐに濃く出す
-fn lower_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
-    column
-        .alternatives
-        .iter()
-        .enumerate()
-        .map(|(index, text)| Row {
-            text: text.clone(),
-            badge: (index + 1).to_string(),
-            selected: column.selected_alternative == Some(index as u32),
-            opacity: if editing(column) {
-                tokens::opacity::candidate::EDITING_STALE
-            } else if index == 0 {
-                1.0
-            } else {
-                rest
-            },
-            note: column.alternative_notes.get(index).cloned().flatten(),
-            command: column
-                .alternative_commands
-                .as_ref()
-                .and_then(|kinds| kinds.get(index).copied().flatten()),
-            detail: column
-                .alternative_details
-                .as_ref()
-                .and_then(|details| details.get(index).cloned().flatten()),
-        })
-        .collect()
-}
-
-/// 上の枝(文字種)．幹に近いものから上へ積む
-fn upper_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
-    column
-        .variants
-        .iter()
-        .enumerate()
-        .map(|(index, text)| Row {
-            text: text.clone(),
-            badge: strings::VARIANT_BADGE.to_string(),
-            selected: column.selected_variant == Some(index as u32),
-            opacity: if editing(column) {
-                tokens::opacity::candidate::EDITING_STALE
-            } else {
-                rest
-            },
-            note: None,
-            command: None,
-            detail: None,
-        })
-        .collect()
-}
-
-/// 枝の index 番目の行(番号・文字・タグを描く枠)．描くときと押した位置を調べるときで同じものを使う
-fn branch_row(node: Frame, width: f32, index: usize, downward: bool, metrics: &Metrics) -> Frame {
-    let stem_x = (node.x + metrics.stem_x).round();
-    let y = if downward {
-        node.max_y() + index as f32 * metrics.row_height
-    } else {
-        node.y - (index + 1) as f32 * metrics.row_height
-    };
-    Frame::new(
-        stem_x + metrics.branch_indent,
-        y,
-        width - metrics.stem_x - metrics.branch_indent,
-        metrics.row_height,
-    )
-}
-
-/// 枝の行のタグの右端
-fn tag_max_x(row: Frame) -> f32 {
-    row.max_x() - part::ROW_PADDING_X
-}
-
-fn branches(
-    painter: &mut Painter,
-    rows: &[Row],
-    node: Frame,
-    width: f32,
-    downward: bool,
-    line_opacity: f32,
-    metrics: &Metrics,
-) {
-    if rows.is_empty() {
-        return;
-    }
-    let row_frame = |index: usize| branch_row(node, width, index, downward, metrics);
-    let mids: Vec<f32> = (0..rows.len())
-        .map(|index| row_frame(index).mid_y())
-        .collect();
-    let color = painter.theme.line.faded(line_opacity);
-    lines(
-        painter,
-        Point::new(node.x + metrics.stem_x, root_y(node, downward, metrics)),
-        &mids,
-        lead_min_x(row_frame(0)) - space::INLINE,
-        rows.iter().position(|row| row.selected),
-        color,
-        metrics,
-    );
-    for (index, row) in rows.iter().enumerate() {
-        draw_row(painter, row, row_frame(index), metrics);
-    }
-}
-
-/// 枝の行の番号(丸)の左の端．枝の水平の線は，ここから inline の空きを残して終える
-fn lead_min_x(row: Frame) -> f32 {
-    row.x + part::ROW_PADDING_X
-}
-
-/// 幹の根元: 下の枝は文節のタグの下の端，上の枝は上の端
-fn root_y(node: Frame, downward: bool, metrics: &Metrics) -> f32 {
-    if downward {
-        node.max_y() - metrics.root_inset
-    } else {
-        node.y + metrics.root_inset
-    }
-}
-
-/// 幹と枝の線(macOS の BranchLineDrawing)．root は幹の x と根元の y，mids は候補の行の縦の中心(幹に近い順)．
-/// 選んでいない線(幹と，候補ごとの曲がり角と水平の線)は 1 つの部品にまとめて 1 回でなぞり，重なったところを濃くしない．
-/// 選んでいる候補への道(幹の根元からその候補の曲がり角まで，曲がり角，水平の線)は，最後に選択の色と太さで上に重ねる
-fn lines(
-    painter: &mut Painter,
-    root: Point,
-    mids: &[f32],
-    tip_x: f32,
-    selected: Option<usize>,
-    color: Color,
-    metrics: &Metrics,
-) {
-    let layout = |width: f32| {
-        BranchLines::new(
-            root.x,
-            root.y,
-            mids,
-            tip_x,
-            metrics.turn_radius,
-            width,
-            metrics.pixel_scale,
-        )
-    };
-    let base = layout(metrics.line_width);
-    let last = base.turns.len().saturating_sub(1);
-    let mut figures = Vec::new();
-    for (index, turn) in base.turns.iter().enumerate() {
-        if Some(index) == selected {
-            continue;
-        }
-        // 幹はいちばん遠い候補の曲がり角とひと続きにし，角に切れ目を作らない(選んでいる候補より先の部分だけを描く)
-        let mut figure = match base.stem_after(selected).filter(|_| index == last) {
-            Some((from, to)) => Figure {
-                start: from,
-                segments: vec![Segment::Line(to)],
-            },
-            None => Figure {
-                start: turn.start,
-                segments: Vec::new(),
-            },
-        };
-        figure.segments.extend(turn_segments(turn));
-        figures.push(figure);
-    }
-    if !figures.is_empty() {
-        painter.draws.push(Draw::Path {
-            figures,
-            color,
-            width: metrics.line_width,
-        });
-    }
-    let Some(selected) = selected.filter(|&index| index < base.turns.len()) else {
-        return;
-    };
-    let route = layout(metrics.line_width_selected);
-    let turn = &route.turns[selected];
-    let mut segments = vec![Segment::Line(turn.start)];
-    segments.extend(turn_segments(turn));
-    painter.draws.push(Draw::Path {
-        figures: vec![Figure {
-            start: route.root,
-            segments,
-        }],
-        color: painter.theme.selection,
-        width: metrics.line_width_selected,
-    });
-}
-
-/// 曲がり角(半径が 0 なら直角)と水平の線．曲がり角の始まりから描き始めること．
-/// 下へ進んで右へ曲がる角は，y が下へ増える画面では反時計回り，上へ進んで右へ曲がる角は時計回り
-fn turn_segments(turn: &Turn) -> Vec<Segment> {
-    let radius = turn.end.x - turn.start.x;
-    let corner = if radius > 0.0 {
-        Segment::Arc {
-            to: turn.end,
-            radius,
-            clockwise: turn.end.y < turn.start.y,
-        }
-    } else {
-        Segment::Line(turn.end)
-    };
-    vec![corner, Segment::Line(turn.tip)]
-}
-
-fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
+/// 候補の行．縦の線に近い側から，番号・文字・添え書きの順に並べる(枝を左右に反転したときは右から)．
+/// soft なら(幹の上にいる)，選んでいる候補を文節と同じ薄い背景にして，文字はふつうの色のままにする
+fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, direction: f32, soft: bool) {
     let theme = painter.theme;
+    let rounded = theme.is_rounded();
+    let solid = row.selected && !soft;
     let opacity = if row.selected { 1.0 } else { row.opacity };
-    let text_color = if row.selected {
+    let text_color = if solid {
         theme.selection_text
     } else {
         theme.text
     }
     .faded(opacity);
-    let muted_color = if row.selected {
+    let muted_color = if solid {
         theme.selection_text
     } else {
         theme.text_muted
     }
     .faded(opacity);
-    if theme.is_rounded() {
-        if row.selected {
-            painter.capsule(frame.inset(0.0, glass::SELECTION_INSET_Y), theme.selection);
+    if row.selected {
+        let fill = if solid {
+            theme.selection
+        } else {
+            theme.focus_tint
+        };
+        if rounded {
+            painter.capsule(frame.inset(0.0, glass::SELECTION_INSET_Y), fill);
+        } else {
+            painter.rect(frame, fill);
         }
-        let center = Point::new(lead_min_x(frame) + glass::BADGE_SIZE / 2.0, frame.mid_y());
-        painter.badge(
-            &row.badge,
-            center,
-            row.selected,
-            row.opacity,
-            glass::BADGE_SIZE,
-            Font::Key,
-        );
-    } else {
-        if row.selected {
-            painter.rect(frame, theme.selection);
-        }
-        painter.label(
-            &row.badge,
-            muted_color,
-            Frame::new(
-                lead_min_x(frame),
-                frame.y,
-                metrics.lead - part::ROW_PADDING_X,
-                frame.height,
-            ),
-            Font::Key,
-        );
     }
-    let mut text_x = frame.x + part::ROW_PADDING_X + metrics.lead;
+    // 番号は番号キーで選べるので，キーキャップの形にする
+    let badge_x = if direction > 0.0 {
+        frame.x + part::ROW_PADDING_X
+    } else {
+        frame.max_x() - part::ROW_PADDING_X - glass::BADGE_SIZE
+    };
+    let badge = Frame::new(
+        badge_x.round(),
+        (frame.mid_y() - glass::BADGE_SIZE / 2.0).round(),
+        glass::BADGE_SIZE,
+        glass::BADGE_SIZE,
+    );
+    if rounded {
+        painter.badge_box(badge, solid);
+    }
+    painter.label(&row.badge, muted_color, badge, Font::Key);
+    let content_width = row.command.map_or(0.0, |_| Painter::command_width())
+        + painter.width(&row.text, Font::Candidate)
+        + painter.detail_width(row.detail.as_deref());
+    let mut text_x = if direction > 0.0 {
+        badge.max_x() + glass::BADGE_GAP
+    } else {
+        badge.x - glass::BADGE_GAP - content_width
+    };
     if let Some(kind) = row.command {
         // コマンドの候補は，文字の前に種類のアイコンを置く
-        painter.command(kind, text_x, frame.mid_y(), row.selected, opacity);
+        painter.command(kind, text_x, frame.mid_y(), solid, opacity);
         text_x += Painter::command_width();
     }
     painter.text(&row.text, Font::Candidate, text_color, text_x, frame);
@@ -1006,86 +1535,49 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, metrics: &Metrics) {
     if let Some(note) = row.note.as_deref() {
         painter.tag(
             note,
-            tag_max_x(frame),
+            tag_max_x(painter, note, frame, direction),
             frame.mid_y(),
-            row.selected,
+            solid,
             TagStyle::of(note, row.command.is_some()),
         );
     }
 }
 
-/// 注目していない確信の低い文節の下に，次の候補を 1 つだけ薄く添える
-fn draw_preview(
+/// 文字種．選んでいるものは選択の背景で囲む．key があれば，文字の前にその文字種にするキーを置く
+fn draw_kind(
     painter: &mut Painter,
     text: &str,
-    node: Frame,
-    max_x: f32,
-    rest: f32,
-    metrics: &Metrics,
+    key: Option<&str>,
+    label: Frame,
+    selected: bool,
+    opacity: f32,
 ) {
     let theme = painter.theme;
-    let stem_x = node.x + metrics.stem_x;
-    let row = Frame::new(stem_x, node.max_y(), node.width, metrics.row_height);
-    let color = theme.text_muted.faded(rest);
-    // 枝と同じ形で，幹から短く曲がる．枝の行の左の端までの真ん中で止める
-    let branch_min_x = stem_x + metrics.branch_indent;
-    let tip_x = ((stem_x + branch_min_x) / 2.0).round();
-    lines(
-        painter,
-        Point::new(stem_x, root_y(node, true, metrics)),
-        &[row.mid_y()],
-        tip_x,
-        None,
-        theme.line.faded(rest),
-        metrics,
-    );
-    let text_x = tip_x + space::INLINE;
-    let shown = painter.truncated(text, Font::Candidate, max_x - text_x);
-    painter.text(&shown, Font::Candidate, color, text_x, row);
-}
-
-/// 足元．y は区切りの線の上の端．線は窓の中身の左右の端から端まで(語の意味のカードの端と同じ)．
-/// 線の下に区切りの線の上と同じ空きを空けて案内を出す
-fn footer(painter: &mut Painter, map: &BranchMap, y: f32, width: f32, metrics: &Metrics) {
-    let theme = painter.theme;
-    painter.separator(y, metrics.inset, width - metrics.inset);
-    let footer = Frame::new(
-        metrics.text_inset(),
-        y + candidate::FRAME_WIDTH + GAP,
-        width - metrics.text_inset() * 2.0,
-        metrics.footer_height,
-    );
-    painter.hints(&map.hints, footer.x, footer.mid_y());
-    if let Some(hint) = map.association_hint.as_deref() {
-        // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)．キーは文字ではなくキーキャップで描く
-        let x = footer.x + painter.hints_width(&map.hints) + glass::HINT_GAP;
-        match association_key_hint(map) {
-            Some(key_hint) => painter.hints(&[key_hint], x, footer.mid_y()),
-            None => painter.text(hint, Font::Label, theme.text_muted, x, footer),
+    if selected {
+        if theme.is_rounded() {
+            painter.capsule(label, theme.selection);
+        } else {
+            painter.rect(label, theme.selection);
         }
     }
-    let position = position(map);
-    let position_width = painter.width(&position, Font::Label);
-    painter.text_right(
-        &position,
-        Font::Label,
-        theme.text_muted,
-        footer.max_x(),
-        footer,
-    );
-    if let Some(source) = focused(map).and_then(|(_, column)| column.source_name.as_deref()) {
-        // 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前を位置の左に小さく出す(R-16)
-        let label = strings::dictionary_source(source);
-        let right = footer.max_x() - position_width - candidate::PADDING_X;
-        painter.text_right(&label, Font::Label, theme.correction, right, footer);
+    let color = if selected {
+        theme.selection_text
+    } else {
+        theme.text.faded(opacity)
+    };
+    let mut text_x = label.x + part::ROW_PADDING_X;
+    if let Some(key) = key {
+        painter.key_mark(key, text_x, label.mid_y(), selected);
+        text_x += painter.key_mark_width(key) + space::INLINE;
     }
+    painter.text(text, Font::Label, color, text_x, label);
 }
 
 #[cfg(test)]
 mod tests {
     use super::super::testing::*;
     use super::*;
-    use crate::theme::{ResolvedTheme, SystemLook};
+    use crate::theme::ResolvedTheme;
 
     fn column(text: &str, focused: bool) -> BranchColumn {
         BranchColumn {
@@ -1206,12 +1698,13 @@ mod tests {
                 .draws
                 .iter()
                 .find_map(|draw| match draw {
+                    // 線の上の丸の輪より大きい枠
                     Draw::RoundRect {
                         frame,
                         fill: None,
                         stroke: Some(_),
                         ..
-                    } => Some(*frame),
+                    } if frame.height > map::STOP_SIZE_SELECTED => Some(*frame),
                     _ => None,
                 })
                 .expect("枠線");
@@ -1305,9 +1798,10 @@ mod tests {
                 Some(ipc::PointerTarget::Variant { index: 0 })
             );
             assert_eq!(at("晴れ"), Some(ipc::PointerTarget::Segment { index: 1 }));
-            // 足元の案内は押せない
-            let hint = text_frame(&scene, "候補").expect("案内がある");
-            assert_eq!(scene.target_at(hint.x + 1.0, hint.mid_y()), None);
+            // 案内は押せない
+            let keyed = branch_map(&keyed(map()), &Look::new(&theme, 15.0), &Fixed);
+            let hint = text_frame(&keyed, "再入力").expect("案内がある");
+            assert_eq!(keyed.target_at(hint.x + 1.0, hint.mid_y()), None);
         }
     }
 
@@ -1396,140 +1890,9 @@ mod tests {
             // ほかの知らせは控えめな色で出す
             assert!(texts.contains(&("学習から削除しました".into(), theme.text_muted)));
             assert!(texts.contains(&("1–2 / 2".into(), theme.text_muted)));
-            // 注目している文節の枝と重なる文節には，次の候補を添えない
+            // 注目していない文節には，次の候補を添えない(線で選べる候補だけを出す)
             assert!(!texts.iter().any(|(text, _)| text == "腫れ"));
         }
-    }
-
-    /// 枝の線の部品(図形・色・太さ)を描く順に
-    fn paths(scene: &Scene) -> Vec<(Vec<Figure>, Color, f32)> {
-        scene
-            .draws
-            .iter()
-            .filter_map(|draw| match draw {
-                Draw::Path {
-                    figures,
-                    color,
-                    width,
-                } => Some((figures.clone(), *color, *width)),
-                _ => None,
-            })
-            .collect()
-    }
-
-    fn arcs(figures: &[Figure]) -> Vec<(f32, bool)> {
-        figures
-            .iter()
-            .flat_map(|figure| figure.segments.iter())
-            .filter_map(|segment| match segment {
-                Segment::Arc {
-                    radius, clockwise, ..
-                } => Some((*radius, *clockwise)),
-                Segment::Line(_) => None,
-            })
-            .collect()
-    }
-
-    /// 図形の終わり(水平の線の終わり)
-    fn tip(figure: &Figure) -> Point {
-        match figure.segments.last() {
-            Some(Segment::Line(to)) | Some(Segment::Arc { to, .. }) => *to,
-            None => figure.start,
-        }
-    }
-
-    #[test]
-    fn 曲線の枝は1本の幹と同じ半径の曲がり角で描き_選んだ道を最後に選択の色で重ねる() {
-        let theme = theme("nordic");
-        let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
-        let paths = paths(&scene);
-        // 下の枝の選んでいない線・下の枝の選んだ道・上の枝の選んでいない線．線は向きごとに 1 つの部品にまとめる
-        assert_eq!(paths.len(), 3);
-        assert_eq!(
-            paths.iter().map(|path| path.1).collect::<Vec<_>>(),
-            vec![theme.line, theme.selection, theme.line]
-        );
-        assert_eq!(paths[0].2, glass::LINE_WIDTH);
-        assert_eq!(paths[1].2, glass::LINE_WIDTH_SELECTED);
-        // 曲がり角はどれも同じ半径．下へ曲がる角は反時計回り，上へ曲がる角は時計回り
-        assert_eq!(arcs(&paths[0].0), vec![(glass::BRANCH_TURN_RADIUS, false)]);
-        assert_eq!(arcs(&paths[1].0), vec![(glass::BRANCH_TURN_RADIUS, false)]);
-        assert_eq!(arcs(&paths[2].0), vec![(glass::BRANCH_TURN_RADIUS, true)]);
-        // 選んだ道は文節の背景の下の端から始まり，どの枝も行の左の手前の同じ x で終わる．
-        // いちばん上の行の背景の上の端が枠線の内側の余白の端にそろうよう，行は背景を縮めた分だけ上から始まる
-        let inset = candidate::FRAME_WIDTH + glass::WINDOW_PADDING;
-        let node_bottom = inset - glass::SELECTION_INSET_Y + glass::ROW_HEIGHT * 2.0;
-        assert_eq!(
-            paths[1].0[0].start.y,
-            node_bottom - glass::SELECTION_INSET_Y
-        );
-        // 番号の丸の左の端から inline だけ手前
-        let tip_x =
-            (inset + glass::BRANCH_STEM_X).round() + glass::BRANCH_INDENT + part::ROW_PADDING_X
-                - space::INLINE;
-        for (figures, _, _) in &paths {
-            assert!(figures.iter().all(|figure| tip(figure).x == tip_x));
-        }
-        // 選んだのは下の枝のいちばん遠い候補なので，選んでいない線に幹は無く，手前の候補の曲がり角だけ
-        assert_eq!(paths[0].0.len(), 1);
-        assert_eq!(paths[0].0[0].segments.len(), 2);
-        // 上の枝は幹といちばん遠い候補の曲がり角をひと続きに描く
-        assert_eq!(paths[2].0.len(), 1);
-        assert_eq!(paths[2].0[0].segments.len(), 3);
-        assert_eq!(paths[2].0[0].start.y, inset + glass::ROW_HEIGHT);
-        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
-        // 確信の低い文節の点線は丸い点
-        assert!(scene.draws.iter().any(|draw| matches!(draw,
-            Draw::Line { dot_pitch: Some(pitch), color, .. } if *pitch == glass::DOT_PITCH && *color == theme.correction)));
-    }
-
-    #[test]
-    fn 線はデバイスのピクセルにそろえる() {
-        let theme = theme("washi");
-        let look = Look {
-            pixel_scale: 2.0,
-            ..Look::new(&theme, 15.0)
-        };
-        let scene = branch_map(&map(), &look, &Fixed);
-        for (figures, _, width) in paths(&scene) {
-            for figure in &figures {
-                // 幹の線の端と水平の線の端が，デバイスのピクセルの境に来る
-                let edge = figure.start.x * 2.0 - width;
-                let end = tip(figure);
-                assert_eq!(end.x * 2.0, (end.x * 2.0).round());
-                assert_eq!((end.y * 2.0 - width), (end.y * 2.0 - width).round());
-                if figure.segments.len() == 3 {
-                    assert_eq!(edge, edge.round());
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn platinum_は直線の枝と文節をつなぐ線() {
-        let theme = theme("platinum");
-        let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
-        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
-        let paths = paths(&scene);
-        // 直角に曲がる．選んだ道は 2 ドットで選択の色
-        assert!(paths.iter().all(|path| arcs(&path.0).is_empty()));
-        assert!(paths
-            .iter()
-            .any(|path| path.1 == theme.selection && path.2 == branch::LINE_WIDTH_SELECTED));
-        assert!(paths
-            .iter()
-            .any(|path| path.1 == theme.line && path.2 == branch::LINE_WIDTH));
-    }
-
-    #[test]
-    fn カスタムテーマの直線の枝() {
-        let mut theme = theme("nordic");
-        theme.straight_branches = true;
-        let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
-        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
-        let paths = paths(&scene);
-        assert_eq!(paths.len(), 3);
-        assert!(paths.iter().all(|path| arcs(&path.0).is_empty()));
     }
 
     #[test]
@@ -1573,7 +1936,9 @@ mod tests {
                 .draws
                 .iter()
                 .filter_map(|draw| match draw {
-                    Draw::Ellipse { frame, .. } => Some(*frame),
+                    Draw::Ellipse { frame, .. } if frame.width == branch::SPLIT_BADGE_SIZE => {
+                        Some(*frame)
+                    }
                     _ => None,
                 })
                 .collect();
@@ -1647,18 +2012,15 @@ mod tests {
     }
 
     #[test]
-    fn 分岐図で候補の下に出す設定では枝と足元のあいだに窓の幅いっぱいのカードを出す() {
+    fn 分岐図で候補の下に出す設定では候補の下に窓の幅いっぱいのカードを出す() {
         for name in ["washi", "platinum"] {
             let theme = theme(name);
             let look = Look::new(&theme, 15.0);
             let scene = branch_map(&meaning_map(ipc::MeaningPlacement::Below), &look, &Fixed);
             let meaning = text_frame(&scene, "写真や動画を写す").expect("意味を描く");
             let last = text_frame(&scene, "とる").expect("最後の枝");
-            let footer = text_frame(&scene, "候補").expect("足元の案内");
-            assert!(
-                meaning.y > last.max_y() && meaning.max_y() < footer.y,
-                "{name}"
-            );
+            assert!(meaning.y > last.max_y(), "{name}");
+            assert!(meaning.x < last.x, "{name}");
             // 吹き出しには出さない
             let map = meaning_map(ipc::MeaningPlacement::Below);
             assert!(
@@ -1680,42 +2042,241 @@ mod tests {
         assert!(super::super::bubble::for_branch(&splitting, &scene).is_none());
     }
 
-    #[test]
-    fn 足元の案内はキーキャップに入れる() {
-        let theme = ResolvedTheme::resolve("automatic", None, &SystemLook::default());
-        let mut hinted = map();
-        hinted.hints = vec![KeyHint {
-            keys: "Shift+←".into(),
-            label: "今日".into(),
-        }];
-        let scene = branch_map(&hinted, &Look::new(&theme, 15.0), &Fixed);
-        let icons = count(&scene, |draw| matches!(draw, Draw::Icon { .. }));
-        // Shift と ← のアイコン，上の枝の ↑
-        assert_eq!(icons, 3);
-        assert!(scene.draws.iter().any(|draw| matches!(draw,
-            Draw::RoundRect { radius, .. } if *radius == glass::KEYCAP_RADIUS)));
+    /// 標準のキー設定の表のキーと置き場所ごとの案内を入れた分岐図
+    fn keyed(map: BranchMap) -> BranchMap {
+        super::super::sample::with_keys(map)
+    }
+
+    fn metrics_and_layout(map: &BranchMap, theme: &ResolvedTheme) -> Layout {
+        let look = Look::new(theme, 15.0);
+        let metrics = Metrics::new(&look, &Fixed);
+        let painter = Painter::new(&look, &Fixed);
+        layout(map, &metrics, &painter, 1.0)
     }
 
     #[test]
-    fn 添える候補は次の文節の手前で省く() {
+    fn 幹の文節の下の線に丸を置き_選んでいる文節の丸を選択の色で塗る() {
+        for name in ["automatic", "platinum"] {
+            let theme = theme(name);
+            let scene = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
+            // 角丸のテーマは丸，platinum は四角
+            let filled = scene.draws.iter().any(|draw| match draw {
+                Draw::Ellipse { frame, color } | Draw::Rect { frame, color } => {
+                    *color == theme.selection && frame.width == map::STOP_SIZE_SELECTED
+                }
+                _ => false,
+            });
+            assert!(filled, "{name}");
+            // 選んでいない丸は輪
+            assert!(
+                scene.draws.iter().any(|draw| matches!(draw,
+                Draw::RoundRect { fill: None, stroke: Some((color, _)), frame, .. }
+                    if *color == theme.line && frame.width < map::STOP_SIZE)),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn 長い文節の丸は左から決まった距離_短い文節は真ん中() {
         let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let metrics = Metrics::new(&look, &Fixed);
+        // 短い文節は真ん中
+        assert_eq!(metrics.stop_offset(20.0), 10.0);
+        // 長い文節は 1 字と余白
+        assert_eq!(metrics.stop_offset(200.0), 15.0 + part::ROW_PADDING_X);
+        // 選んでいる文節から下ろす縦の線も同じ位置
         let mut long = map();
-        // 次の文節までに，省いた候補が 1 字以上入る幅の文節
-        long.columns = vec![
-            column("今日の空は", false),
-            BranchColumn {
-                preview: None,
-                ..column("いい天気", false)
-            },
-        ];
-        long.columns[0].preview = Some("とてもとても長い候補".into());
-        let scene = branch_map(&long, &Look::new(&theme, 15.0), &Fixed);
-        let shown = texts(&scene)
-            .into_iter()
-            .find(|(text, _)| text.ends_with('…'));
-        assert_eq!(shown.map(|(_, color)| color), Some(theme.text_muted));
-        // 添える候補の枝は 1 本だけ(注目している文節が無いので)
-        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Path { .. })), 1);
-        assert_eq!(count(&scene, |draw| matches!(draw, Draw::Curve { .. })), 0);
+        long.columns[0].text = "とてもとても長い文節".into();
+        let layout = metrics_and_layout(&long, &theme);
+        assert_eq!(
+            layout.focus_x,
+            layout.nodes[0].x + 15.0 + part::ROW_PADDING_X
+        );
+    }
+
+    #[test]
+    fn 文節へ移るキーを丸に重ね_選んでいる文節のキーは選択の色の面にする() {
+        let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let scene = branch_map(&keyed(map()), &look, &Fixed);
+        let faces = |scene: &Scene, color| {
+            scene
+                .draws
+                .iter()
+                .filter(|draw| {
+                    matches!(draw, Draw::RoundRect { fill: Some(fill), radius, .. }
+                    if *fill == color && *radius == map::BADGE_RADIUS)
+                })
+                .count()
+        };
+        assert_eq!(faces(&scene, theme.selection), 1);
+        assert!(faces(&scene, theme.hint_fill()) >= 2);
+        // 案内を出さない設定(置き場所ごとの案内を送らない)では出さない
+        let mut silent = keyed(map());
+        silent.placed_hints = None;
+        let quiet = branch_map(&silent, &look, &Fixed);
+        assert_eq!(faces(&quiet, theme.selection), 0);
+        assert!(text_frame(&quiet, "再入力").is_none());
+        // 区切っているあいだは，番号キーが別の意味になるので出さない
+        let mut splitting = keyed(map());
+        splitting.columns[0].split = Some(BranchSplit {
+            pieces: vec!["今日".into(), "は".into()],
+        });
+        let split = branch_map(&splitting, &look, &Fixed);
+        assert_eq!(faces(&split, theme.selection), 0);
+    }
+
+    #[test]
+    fn キーの案内は操作する場所に置く() {
+        let theme = theme("automatic");
+        let scene = branch_map(&keyed(map()), &Look::new(&theme, 15.0), &Fixed);
+        let frame = |text: &str| text_frame(&scene, text).expect(text);
+        let node = frame("今日は");
+        // 区切り・分割は文節の上
+        assert!(frame("区切り").max_y() <= node.y);
+        assert!(frame("分割").max_y() <= node.y);
+        // 文字種は上の枝の先(文字種の文字の右)
+        assert!(frame("文字種").x > frame("きょうは").max_x());
+        // 再入力・表形式は候補の下
+        let last = frame("京は");
+        assert!(frame("再入力").y >= last.max_y());
+        assert!(frame("表形式").y >= last.max_y());
+        // 文字種にするキー(F6)を文字種の前に置く
+        assert!(frame("F6").max_x() <= frame("きょうは").x);
+    }
+
+    #[test]
+    fn 枝が右に入らなければ左右に反転して左へ出す() {
+        let theme = theme("automatic");
+        let last = super::super::sample::long_branch(13);
+        let layout = metrics_and_layout(&last, &theme);
+        assert_eq!(layout.direction, -1.0);
+        assert!(layout.rows.iter().all(|row| row.max_x() <= layout.stem_x));
+        let first = super::super::sample::long_branch(0);
+        assert_eq!(metrics_and_layout(&first, &theme).direction, 1.0);
+    }
+
+    #[test]
+    fn 長い文は選んでいる文節が見えるまで幹を送り_はみ出した側を透かす() {
+        let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let last = super::super::sample::long_branch(13);
+        let layout = metrics_and_layout(&last, &theme);
+        assert!(layout.width <= candidate::MAX_WIDTH);
+        assert!(layout.fades_left && !layout.fades_right);
+        assert!(layout.nodes[13].max_x() <= layout.width);
+        let first = metrics_and_layout(&super::super::sample::long_branch(0), &theme);
+        assert!(!first.fades_left && first.fades_right);
+        // 透かす側は濃さを変えた帯で描く
+        let scene = branch_map(&last, &look, &Fixed);
+        assert!(
+            count(
+                &scene,
+                |draw| matches!(draw, Draw::Group { opacity, .. } if *opacity < 1.0)
+            ) > 0
+        );
+        // 収まる文は透かさない
+        let short = branch_map(&map(), &look, &Fixed);
+        assert_eq!(count(&short, |draw| matches!(draw, Draw::Group { .. })), 0);
+    }
+
+    #[test]
+    fn 表示項目を減らす設定では畳んだ枝に続きがある印を出し_開くキーを案内する() {
+        let theme = theme("automatic");
+        let fewer = super::super::sample::fewer_branch();
+        let layout = metrics_and_layout(&fewer, &theme);
+        let (from, to) = layout.variant_stub.expect("文字種の印");
+        assert!(to.y < from.y && from.x == to.x);
+        let (from, to) = layout.detail_stub.expect("先の枝の印");
+        assert_eq!(from.y, to.y);
+        assert!(layout.expand_x.is_some());
+        let scene = branch_map(&fewer, &Look::new(&theme, 15.0), &Fixed);
+        assert!(text_frame(&scene, "展開").is_some());
+        // 畳まない設定では出さない
+        let plain = metrics_and_layout(&keyed(map()), &theme);
+        assert!(plain.variant_stub.is_none() && plain.detail_stub.is_none());
+    }
+
+    #[test]
+    fn 曲線の枝のテーマは角を丸め_platinum_とカスタムテーマの直線の枝は直角() {
+        let arcs = |scene: &Scene| {
+            scene
+                .draws
+                .iter()
+                .filter_map(|draw| match draw {
+                    Draw::Path { figures, .. } => Some(figures.clone()),
+                    _ => None,
+                })
+                .flatten()
+                .flat_map(|figure| figure.segments)
+                .filter(|segment| matches!(segment, super::super::Segment::Arc { .. }))
+                .count()
+        };
+        let nordic = theme("nordic");
+        assert!(arcs(&branch_map(&map(), &Look::new(&nordic, 15.0), &Fixed)) > 0);
+        let platinum = theme("platinum");
+        assert_eq!(
+            arcs(&branch_map(&map(), &Look::new(&platinum, 15.0), &Fixed)),
+            0
+        );
+        let mut straight = theme("nordic");
+        straight.straight_branches = true;
+        assert_eq!(
+            arcs(&branch_map(&map(), &Look::new(&straight, 15.0), &Fixed)),
+            0
+        );
+        // 選んだ道すじは選択の色の太い線
+        let scene = branch_map(&map(), &Look::new(&nordic, 15.0), &Fixed);
+        assert!(scene.draws.iter().any(|draw| matches!(draw,
+            Draw::Path { color, width, .. } if *color == nordic.selection && *width == glass::LINE_WIDTH_SELECTED)));
+        // 確信の低い文節の下の幹は点線
+        assert!(scene.draws.iter().any(|draw| matches!(draw,
+            Draw::Line { dot_pitch: Some(pitch), .. } if *pitch == glass::DOT_PITCH)));
+    }
+
+    #[test]
+    fn ページの位置は縦の線の下の点で示し_多すぎれば数字_1_ページなら出さない() {
+        let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let mut paged = keyed(map());
+        paged.page_size = Some(2);
+        paged.total = 6;
+        paged.position = 3;
+        let layout = metrics_and_layout(&paged, &theme);
+        let dots = layout.page_dots.expect("ページの点");
+        assert_eq!((dots.count, dots.current), (3, 1));
+        assert_eq!(dots.x, layout.stem_x);
+        let scene = branch_map(&paged, &look, &Fixed);
+        assert!(!texts(&scene).iter().any(|(text, _)| text.contains('/')));
+        // 点で示せないほど多いときは数字
+        paged.total = 20;
+        let many = branch_map(&paged, &look, &Fixed);
+        assert!(texts(&many).iter().any(|(text, _)| text == "2 / 10"));
+        assert!(metrics_and_layout(&paged, &theme).page_dots.is_none());
+        // 1 ページなら出さない
+        paged.total = 2;
+        paged.position = 1;
+        assert!(metrics_and_layout(&paged, &theme).page_dots.is_none());
+        let single = branch_map(&paged, &look, &Fixed);
+        assert!(!texts(&single).iter().any(|(text, _)| text.contains('/')));
+    }
+
+    #[test]
+    fn 幹の上にいるときは文節を強い選択にし_選んでいる候補を薄い背景にする() {
+        let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let mut trunk = keyed(map());
+        trunk.trunk_focused = Some(true);
+        let scene = branch_map(&trunk, &look, &Fixed);
+        let texts = texts(&scene);
+        assert!(texts.contains(&("今日は".into(), theme.selection_text)));
+        assert!(texts.contains(&("京は".into(), theme.text)));
+        // ふだんは候補が強い選択
+        let plain = branch_map(&keyed(map()), &look, &Fixed);
+        assert!(
+            super::super::testing::texts(&plain).contains(&("京は".into(), theme.selection_text))
+        );
     }
 }

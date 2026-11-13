@@ -3,7 +3,9 @@
 //! 見本の分岐図．設定の画面の外観の見本と，見た目を見比べる PNG の書き出し(デバッグビルド)で同じものを使う．
 //! 設定の画面の絵文字の見本(候補の一覧)もここで作る
 
-use ipc::{BranchColumn, BranchMap, CandidateEntry, CandidateFocus, CandidateList, KeyHint};
+use ipc::{
+    BranchColumn, BranchHints, BranchMap, CandidateEntry, CandidateFocus, CandidateList, KeyHint,
+};
 
 /// 枝を出していない文節
 pub fn column(text: &str) -> BranchColumn {
@@ -45,9 +47,48 @@ fn hint(keys: &str, label: &str) -> KeyHint {
     }
 }
 
+/// 標準のキー設定の表で，文節へ移るキー(1〜8 番目)
+const JUMP_KEYS: [&str; 8] = [
+    "Alt+A", "Alt+S", "Alt+D", "Alt+F", "Alt+J", "Alt+K", "Alt+L", "Alt+;",
+];
+/// 標準のキー設定の表で，ひらがな・カタカナ・半角カタカナにするキー
+const VARIANT_KEYS: [&str; 3] = ["F6", "F7", "F8"];
+
+/// 分岐図の見本に，標準のキー設定の表の文節へ移るキー・文字種にするキー・置き場所ごとの案内を入れる(macOS の SamplePanels.withKeys)
+pub fn with_keys(mut map: BranchMap) -> BranchMap {
+    for (index, column) in map.columns.iter_mut().enumerate() {
+        column.jump_key = JUMP_KEYS.get(index).map(|key| (*key).to_string());
+        if column.is_focused {
+            column.variant_keys = Some(
+                (0..column.variants.len())
+                    .map(|index| VARIANT_KEYS.get(index).map(|key| (*key).to_string()))
+                    .collect(),
+            );
+        }
+    }
+    // 1 ページの数は，注目している文節の候補の数(候補が無ければ知らせない)
+    map.page_size = map
+        .columns
+        .iter()
+        .find(|column| column.is_focused)
+        .map(|column| column.alternatives.len() as u32)
+        .filter(|count| *count > 0);
+    map.placed_hints = Some(BranchHints {
+        boundary: vec![hint("Shift+←→", "区切り"), hint("Shift+↓", "分割")],
+        variant: Some(hint("Shift+Space", "文字種")),
+        candidates: vec![hint("Shift+BS", "再入力"), hint("Alt+↓", "表形式")],
+        expand: map
+            .association_key
+            .as_ref()
+            .map(|key| hint(key, "展開"))
+            .or_else(|| (map.collapses_detail == Some(true)).then(|| hint("Alt+↑", "展開"))),
+    });
+    map
+}
+
 /// 3 つの文節のうち最後の文節で候補の枝を開いた分岐図
 pub fn branch() -> BranchMap {
-    BranchMap {
+    with_keys(BranchMap {
         association: None,
         association_hint: None,
         association_key: None,
@@ -85,7 +126,89 @@ pub fn branch() -> BranchMap {
         trunk_focused: None,
         page_size: None,
         hints_on_hold: None,
+    })
+}
+
+/// 矢印で木をたどっていて，幹の上(文節)にいる分岐図(macOS の branch-trunk)
+pub fn trunk_branch() -> BranchMap {
+    BranchMap {
+        trunk_focused: Some(true),
+        ..branch()
     }
+}
+
+/// 表示項目を減らす設定の分岐図．文字種と先の枝を畳み，続きがある印の線を出す(macOS の fewerItemsLattice)
+pub fn fewer_branch() -> BranchMap {
+    let mut map = branch();
+    for column in &mut map.columns {
+        if column.is_focused {
+            column.variants = Vec::new();
+            column.variant_keys = None;
+            column.homophone = None;
+        }
+    }
+    map.association_hint = None;
+    map.association_key = None;
+    map.collapses_variants = Some(true);
+    map.collapses_detail = Some(true);
+    with_keys(map)
+}
+
+/// 窓の幅の上限を超える長い文の分岐図．focus の文節に注目する(macOS の longLatticeView)
+pub fn long_branch(focus: usize) -> BranchMap {
+    const SENTENCE: [&str; 14] = [
+        "今日は",
+        "朝から",
+        "とても",
+        "良い",
+        "天気だったので",
+        "近所の",
+        "公園まで",
+        "散歩に",
+        "出かけて",
+        "久しぶりに",
+        "友達と",
+        "ゆっくり",
+        "話を",
+        "しました",
+    ];
+    let columns = SENTENCE
+        .iter()
+        .enumerate()
+        .map(|(index, text)| {
+            if index == focus {
+                BranchColumn {
+                    alternatives: vec![
+                        (*text).to_string(),
+                        format!("{text}候補"),
+                        format!("ひらがなの{text}"),
+                    ],
+                    selected_alternative: Some(0),
+                    is_focused: true,
+                    ..column(text)
+                }
+            } else {
+                column(text)
+            }
+        })
+        .collect();
+    with_keys(BranchMap {
+        association: None,
+        association_hint: None,
+        association_key: None,
+        columns,
+        position: 1,
+        total: 3,
+        note: None,
+        hints: Vec::new(),
+        meaning_placement: None,
+        collapses_variants: None,
+        collapses_detail: None,
+        placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
+    })
 }
 
 /// 絵文字の見本を作る設定(変換のページの「絵文字」)
