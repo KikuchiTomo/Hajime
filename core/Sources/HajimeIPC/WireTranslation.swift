@@ -288,10 +288,12 @@ extension WireAssociationHeading {
 extension WireBranchMap {
     /// hints は足元の案内(前の版の候補ウィンドウが使う)．placedHints は操作する場所に置く案内(新しい分岐図)．
     /// 足した項目(文節へ移るキー・文字種にするキー・畳んだ枝・置き場所ごとの案内)は省ける項目にしてあり，前の版の DLL とも話せる
-    public init(_ whole: LatticePanel, hints: [WireKeyHint], placedHints: WireBranchHints? = nil) {
-        // 長い文をまとまりに区切って出すときは，出すまとまりの文節だけを送り，その先頭が文の全体で何番目かを添える
-        // (候補ウィンドウが押した文節を文の全体の位置で返せるように)
-        let (panel, offset) = whole.shownGroup()
+    public init(_ panel: LatticePanel, hints: [WireKeyHint], placedHints: WireBranchHints? = nil) {
+        // 長い文をまとまりに区切って出すときも，文節は文の全体を送り，出すまとまりの範囲(groupStart..<groupEnd)を添える．
+        // 新しい候補ウィンドウは範囲だけを出し，押した文節は文の全体の位置で返す．まとまりを知らない前の版の候補ウィンドウは，
+        // 範囲を読まずに今までどおり文の全体を出すので，押した文節の位置もずれない
+        let shown = panel.shownGroup()
+        let range = shown.panel.columns.count < panel.columns.count ? shown.offset..<(shown.offset + shown.panel.columns.count) : nil
         self.init(
             columns: panel.columns.map { column in
                 WireBranchColumn(
@@ -340,9 +342,10 @@ extension WireBranchMap {
             pageSize: panel.pageSize > 0 ? UInt32(clamping: panel.pageSize) : nil,
             hintsOnHold: panel.hintsOnHold ? true : nil,
             // まとまりに区切っていなければ・続いていなければ・中身に合わせる設定なら送らない
-            groupStart: offset > 0 ? UInt32(clamping: offset) : nil,
-            continuesBefore: panel.continuesBefore ? true : nil,
-            continuesAfter: panel.continuesAfter ? true : nil,
+            groupStart: range.map { UInt32(clamping: $0.lowerBound) },
+            groupEnd: range.map { UInt32(clamping: $0.upperBound) },
+            continuesBefore: shown.panel.continuesBefore ? true : nil,
+            continuesAfter: shown.panel.continuesAfter ? true : nil,
             keepsWidth: panel.keepsWidth ? true : nil
         )
     }

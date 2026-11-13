@@ -2022,11 +2022,12 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
     public var pageSize: UInt32?
     public var hintsOnHold: Bool?
     public var groupStart: UInt32?
+    public var groupEnd: UInt32?
     public var continuesBefore: Bool?
     public var continuesAfter: Bool?
     public var keepsWidth: Bool?
 
-    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, meaningPlacement: WireMeaningPlacement? = nil, collapsesVariants: Bool? = nil, collapsesDetail: Bool? = nil, placedHints: WireBranchHints? = nil, trunkFocused: Bool? = nil, pageSize: UInt32? = nil, hintsOnHold: Bool? = nil, groupStart: UInt32? = nil, continuesBefore: Bool? = nil, continuesAfter: Bool? = nil, keepsWidth: Bool? = nil) {
+    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, meaningPlacement: WireMeaningPlacement? = nil, collapsesVariants: Bool? = nil, collapsesDetail: Bool? = nil, placedHints: WireBranchHints? = nil, trunkFocused: Bool? = nil, pageSize: UInt32? = nil, hintsOnHold: Bool? = nil, groupStart: UInt32? = nil, groupEnd: UInt32? = nil, continuesBefore: Bool? = nil, continuesAfter: Bool? = nil, keepsWidth: Bool? = nil) {
         self.columns = columns
         self.position = position
         self.total = total
@@ -2043,6 +2044,7 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
         self.pageSize = pageSize
         self.hintsOnHold = hintsOnHold
         self.groupStart = groupStart
+        self.groupEnd = groupEnd
         self.continuesBefore = continuesBefore
         self.continuesAfter = continuesAfter
         self.keepsWidth = keepsWidth

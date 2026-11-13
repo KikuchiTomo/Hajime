@@ -128,6 +128,24 @@ fn shows_hints(map: &BranchMap) -> bool {
     map.placed_hints.is_some()
 }
 
+/// 出すまとまり(groupStart..<groupEnd)の文節だけにした分岐図と，その先頭が文の全体で何番目か(macOS の LatticePanel.shownGroup)．
+/// エンジンは文の全体を送り，範囲を添える(まとまりを知らない前の版の候補ウィンドウは全体を出す)．範囲が無いか，正しくなければそのまま
+fn shown_group(map: &BranchMap) -> (std::borrow::Cow<'_, BranchMap>, u32) {
+    let (Some(start), Some(end)) = (map.group_start, map.group_end) else {
+        return (std::borrow::Cow::Borrowed(map), 0);
+    };
+    let (start_index, end_index) = (start as usize, end as usize);
+    if start_index >= end_index
+        || end_index > map.columns.len()
+        || end_index - start_index == map.columns.len()
+    {
+        return (std::borrow::Cow::Borrowed(map), 0);
+    }
+    let mut shown = map.clone();
+    shown.columns = map.columns[start_index..end_index].to_vec();
+    (std::borrow::Cow::Owned(shown), start)
+}
+
 /// 注目している文節の位置と文節
 pub(super) fn focused(map: &BranchMap) -> Option<(usize, &BranchColumn)> {
     map.columns
@@ -932,7 +950,10 @@ fn tag_max_x(painter: &Painter, note: &str, row: Frame, direction: f32) -> f32 {
 
 // 線・丸・文字・案内の順に重ねる．1 か所で順を決めるので長い
 #[allow(clippy::too_many_lines)]
-pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene {
+pub fn branch_map(whole: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene {
+    // 長い文はまとまりの文節だけを描く．押した文節は文の全体の位置で返す
+    let (shown, offset) = shown_group(whole);
+    let map: &BranchMap = &shown;
     let metrics = Metrics::new(look, measure);
     let mut painter = Painter::new(look, measure);
     let theme = look.theme;
@@ -1313,7 +1334,6 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
     }
 
     // 押せる範囲と，語の意味の吹き出しに覆わせない範囲．文節の位置は文の全体で数える(長い文をまとまりに区切って出すとき)
-    let offset = map.group_start.unwrap_or(0);
     for (index, node) in layout.nodes.iter().enumerate() {
         // 文節は，文字と，その下の線の上の丸を押せる
         painter.hit(
@@ -1707,6 +1727,7 @@ mod tests {
             page_size: None,
             hints_on_hold: None,
             group_start: None,
+            group_end: None,
             continues_before: None,
             continues_after: None,
             keeps_width: None,
@@ -1991,6 +2012,7 @@ mod tests {
                 page_size: None,
                 hints_on_hold: None,
                 group_start: None,
+                group_end: None,
                 continues_before: None,
                 continues_after: None,
                 keeps_width: None,
@@ -2123,7 +2145,8 @@ mod tests {
         let look = Look::new(theme, 15.0);
         let metrics = Metrics::new(&look, &Fixed);
         let painter = Painter::new(&look, &Fixed);
-        layout(map, &metrics, &painter, 1.0)
+        let (shown, _) = shown_group(map);
+        layout(&shown, &metrics, &painter, 1.0)
     }
 
     #[test]
@@ -2376,6 +2399,16 @@ mod tests {
         let head = metrics_and_layout(&super::super::sample::group_branch(0), &theme);
         assert!(head.more_before_x.is_none() && head.more_after_x.is_some());
         assert_eq!(head.rail_end, head.width);
+        // まとまりを知らない前の版の候補ウィンドウと同じく範囲を読まなければ，文の全体を出し，押した文節の位置もそのまま
+        let mut whole = middle.clone();
+        whole.group_start = None;
+        whole.group_end = None;
+        let all = branch_map(&whole, &look, &Fixed);
+        let last = text_frame(&all, "しました").expect("文の最後の文節");
+        assert_eq!(
+            all.target_at(last.x + 1.0, last.mid_y()),
+            Some(ipc::PointerTarget::Segment { index: 13 })
+        );
     }
 
     #[test]

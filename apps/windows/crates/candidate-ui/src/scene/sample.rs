@@ -127,6 +127,7 @@ pub fn branch() -> BranchMap {
         page_size: None,
         hints_on_hold: None,
         group_start: None,
+        group_end: None,
         continues_before: None,
         continues_after: None,
         keeps_width: None,
@@ -213,6 +214,7 @@ pub fn long_branch(focus: usize) -> BranchMap {
         page_size: None,
         hints_on_hold: None,
         group_start: None,
+        group_end: None,
         continues_before: None,
         continues_after: None,
         keeps_width: None,
@@ -226,11 +228,20 @@ pub fn group_branch(focus: usize) -> BranchMap {
     let total = map.columns.len();
     let start = focus / PER_GROUP * PER_GROUP;
     let end = (start + PER_GROUP).min(total);
-    map.columns = map.columns[start..end].to_vec();
-    map.group_start = (start > 0).then_some(start as u32);
+    // エンジンと同じく，文節は文の全体のまま送り，出す範囲を添える．文節へ移るキーは，まとまりの中で左から数える
+    map.group_start = Some(start as u32);
+    map.group_end = Some(end as u32);
     map.continues_before = (start > 0).then_some(true);
     map.continues_after = (end < total).then_some(true);
-    with_keys(map)
+    let mut map = with_keys(map);
+    for (index, column) in map.columns.iter_mut().enumerate() {
+        column.jump_key = index
+            .checked_sub(start)
+            .filter(|_| index < end)
+            .and_then(|position| JUMP_KEYS.get(position))
+            .map(|key| (*key).to_string());
+    }
+    map
 }
 
 /// 絵文字の見本を作る設定(変換のページの「絵文字」)

@@ -2229,6 +2229,10 @@
           "type": "u32?"
         },
         {
+          "name": "groupEnd",
+          "type": "u32?"
+        },
+        {
           "name": "continuesBefore",
           "type": "bool?"
         },

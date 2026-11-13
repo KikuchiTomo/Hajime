@@ -1926,6 +1926,9 @@ pub struct BranchMap {
     #[serde(rename = "groupStart")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group_start: Option<u32>,
+    #[serde(rename = "groupEnd")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_end: Option<u32>,
     #[serde(rename = "continuesBefore")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub continues_before: Option<bool>,
@@ -1956,6 +1959,7 @@ impl fmt::Debug for BranchMap {
             .field("pageSize", &self.page_size)
             .field("hintsOnHold", &self.hints_on_hold)
             .field("groupStart", &self.group_start)
+            .field("groupEnd", &self.group_end)
             .field("continuesBefore", &self.continues_before)
             .field("continuesAfter", &self.continues_after)
             .field("keepsWidth", &self.keeps_width)

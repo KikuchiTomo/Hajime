@@ -184,6 +184,9 @@ public final class InputSession {
     /// 分岐図で，選んでいる候補の先の枝(語の意味・連想・変換マクロ)を別々の丸として出し，矢印キーでたどれるようにするか．
     /// 候補の窓がその形を描けるアプリ(macOS)だけ true にする．false なら，連想変換のキーで連想と変換マクロを 1 つの一覧に出す
     private let branchStations: Bool
+    /// 分岐図で，長い文をまとまりに区切って 1 つずつ出し，文節へ移るキーを出しているまとまり(区切らないときは選んでいる文節のまわり)に付けるか．
+    /// 候補の窓がまとまりを描けるアプリ(macOS と Windows)だけ true にする．先の枝の丸(branchStations)とは別に決める
+    private let groupsBranchSegments: Bool
     /// 絵文字と記号のパレットに使うもの(R-26)．パレットを描けないアプリでは nil で，パレットのキーは何もしない
     private let paletteServices: PaletteServices?
     /// 開いているパレット．開いているあいだのキーはパレットが受ける
@@ -200,7 +203,7 @@ public final class InputSession {
     ///   - fusing: 別のモデルでも変換して合わせるもの(合議．ADR 0016 の案 2)．nil か設定の jinenModel が「使わない」なら合わせない
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
-                branchStations: Bool = false,
+                branchStations: Bool = false, groupsBranchSegments: Bool = false,
                 rejections: (any CorrectionRejectionRecording)? = nil, predictionHiding: (any PredictionHiding)? = nil,
                 usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil, calendar: (any CalendarReading)? = nil,
                 scorer: (any CandidateScoring)? = nil, fusing: (any CandidateFusing)? = nil) {
@@ -211,6 +214,7 @@ public final class InputSession {
         self.usageDictionary = usageDictionary
         self.keyNames = keyNames
         self.branchStations = branchStations
+        self.groupsBranchSegments = groupsBranchSegments
         self.rejections = rejections
         self.converter = converter
         self.lexicon = lexicon
@@ -2366,10 +2370,10 @@ public final class InputSession {
     }
 
     /// 選んでいる文節が入っているまとまり(長い文を区切って 1 つずつ出す)．区切らない設定のとき，文節がまとまり 1 つに収まるとき，
-    /// 路線図の形で描かない作り(Windows)では nil
+    /// まとまりを描けない候補の窓(groupsBranchSegments が false)では nil
     private func segmentGroup(of lattice: SegmentLattice) -> Range<Int>? {
         let size = settings.current.branchSegmentsPerGroup
-        guard branchStations, size > 0, lattice.segments.count > size else { return nil }
+        guard groupsBranchSegments, size > 0, lattice.segments.count > size else { return nil }
         return SegmentGrouping.group(containing: lattice.focusedIndex, texts: lattice.segments.map(\.selected.text), size: size)
     }
 
@@ -2379,7 +2383,7 @@ public final class InputSession {
     private func jumpRange(of lattice: SegmentLattice) -> Range<Int> {
         if let group = segmentGroup(of: lattice) { return group }
         let keys = KeymapCommand.segmentJumps.count
-        guard branchStations, keys > 0, lattice.segments.count > keys else { return lattice.segments.indices }
+        guard groupsBranchSegments, keys > 0, lattice.segments.count > keys else { return lattice.segments.indices }
         let start = lattice.focusedIndex / keys * keys
         return start..<min(start + keys, lattice.segments.count)
     }

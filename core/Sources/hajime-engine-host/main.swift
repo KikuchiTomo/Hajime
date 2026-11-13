@@ -253,7 +253,7 @@ func run() -> Int32 {
             return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
                                                                  terms: terms, emoji: emoji, lexicon: lexicon, englishTerms: englishTerms),
                                 lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                                keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
+                                keyNames: .windows, groupsBranchSegments: true, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
                                 palette: palette, calendar: calendar, scorer: engineSession, fusing: engineSession)
         },
         settings: settings,
