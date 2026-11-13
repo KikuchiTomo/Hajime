@@ -436,6 +436,9 @@ mod tests {
             note: None,
             hints: vec![],
             meaning_placement: Some(MeaningPlacement::Side),
+            collapses_variants: None,
+            collapses_detail: None,
+            placed_hints: None,
         }
     }
 

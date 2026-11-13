@@ -77,6 +77,57 @@ struct FooterHintsTests {
         #expect(FooterHints.make(for: list, settings: DefaultSettings.settings).map(\.label) == ["選択", "意味の切り替え", "戻る"])
     }
 
+    @Test("分岐図の操作する場所ごとの案内は，境目の上・文字種の先・候補の下・先の枝の先に分け，出さない設定なら送らない")
+    func placed() throws {
+        var settings = DefaultSettings.settings
+        let hints = try #require(FooterHints.placed(for: panel, settings: settings))
+        #expect(hints.boundary.map(\.label) == ["区切り", "分割"])
+        #expect(hints.variant?.label == "文字種")
+        #expect(hints.candidates.map(\.label) == ["再入力", "表形式"])
+        #expect(hints.expand == nil)
+
+        // 連想があれば，連想変換のキーで先の枝を展開する
+        var associated = panel
+        associated.associationHint = AssociationHint(key: "Alt+↑", label: "連想")
+        #expect(FooterHints.placed(for: associated, settings: settings)?.expand == WireKeyHint(keys: "Alt+↑", label: "展開"))
+        // 先の枝を畳んでいるときも，開くキーを案内する
+        var collapsed = panel
+        collapsed.collapsesDetail = true
+        #expect(FooterHints.placed(for: collapsed, settings: settings)?.expand?.label == "展開")
+
+        // 区切っているあいだは境目の上に区切る操作だけ．連想の一覧は候補の下に連想の操作だけ
+        var column = LatticePanel.Column(text: "問題がある", isFocused: true, isUncertain: true)
+        column.split = .init(pieces: ["問題", "が", "ある"])
+        let split = try #require(FooterHints.placed(for: LatticePanel(columns: [column]), settings: settings))
+        #expect(split.boundary == [WireKeyHint(keys: "1–2", label: "分割"), WireKeyHint(keys: "Esc", label: "キャンセル")])
+        #expect(split.candidates.isEmpty && split.variant == nil)
+        var association = panel
+        association.association = AssociationHeading(headword: "速い", label: "速度", group: 1, groupCount: 3)
+        #expect(FooterHints.placed(for: association, settings: settings)?.candidates.map(\.label) == ["選択", "意味の切り替え", "戻る"])
+
+        settings.showsKeyHints = false
+        #expect(FooterHints.placed(for: panel, settings: settings) == nil)
+    }
+
+    @Test("分岐図で足した項目(文節へ移るキー・文字種にするキー・畳んだ枝・置き場所ごとの案内)は，無ければ送らない")
+    func optionalFields() {
+        let plain = WireBranchMap(panel, hints: [])
+        #expect(plain.columns[0].jumpKey == nil && plain.columns[0].variantKeys == nil)
+        #expect(plain.collapsesVariants == nil && plain.collapsesDetail == nil && plain.placedHints == nil)
+
+        var keyed = panel
+        keyed.columns[0].jumpKey = "Alt+A"
+        keyed.columns[0].variants = ["きょうは", "キョウハ"]
+        keyed.columns[0].variantKeys = ["F6", nil]
+        keyed.collapsesDetail = true
+        let placed = WireBranchHints(boundary: [], candidates: [WireKeyHint(keys: "Shift+Backspace", label: "再入力")])
+        let map = WireBranchMap(keyed, hints: [], placedHints: placed)
+        #expect(map.columns[0].jumpKey == "Alt+A")
+        #expect(map.columns[0].variantKeys == ["F6", nil])
+        #expect(map.collapsesDetail == true && map.collapsesVariants == nil)
+        #expect(map.placedHints == placed)
+    }
+
     @Test("文節を区切っているときは区切る操作だけを案内する")
     func split() {
         var column = LatticePanel.Column(text: "問題がある", isFocused: true, isUncertain: true)

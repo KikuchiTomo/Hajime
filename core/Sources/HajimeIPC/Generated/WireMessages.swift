@@ -1923,8 +1923,10 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
     public var sourceName: String?
     public var split: WireBranchSplit?
     public var isEditing: Bool?
+    public var jumpKey: String?
+    public var variantKeys: [String?]?
 
-    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, isCorrected: Bool? = nil, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, homophone: WireHomophoneNote? = nil, alternativeNotes: [String?], alternativeCommands: [WireCommandKind?]? = nil, alternativeComments: [Bool]? = nil, alternativeDetails: [String?]? = nil, sourceName: String? = nil, split: WireBranchSplit? = nil, isEditing: Bool? = nil) {
+    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, isCorrected: Bool? = nil, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, homophone: WireHomophoneNote? = nil, alternativeNotes: [String?], alternativeCommands: [WireCommandKind?]? = nil, alternativeComments: [Bool]? = nil, alternativeDetails: [String?]? = nil, sourceName: String? = nil, split: WireBranchSplit? = nil, isEditing: Bool? = nil, jumpKey: String? = nil, variantKeys: [String?]? = nil) {
         self.text = text
         self.alternatives = alternatives
         self.selectedAlternative = selectedAlternative
@@ -1946,6 +1948,8 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
         self.sourceName = sourceName
         self.split = split
         self.isEditing = isEditing
+        self.jumpKey = jumpKey
+        self.variantKeys = variantKeys
     }
 }
 
@@ -1982,6 +1986,25 @@ extension WireKeyHint: CustomStringConvertible, CustomDebugStringConvertible {
     public var debugDescription: String { description }
 }
 
+public struct WireBranchHints: Sendable, Equatable, Codable {
+    public var boundary: [WireKeyHint]
+    public var variant: WireKeyHint?
+    public var candidates: [WireKeyHint]
+    public var expand: WireKeyHint?
+
+    public init(boundary: [WireKeyHint], variant: WireKeyHint? = nil, candidates: [WireKeyHint], expand: WireKeyHint? = nil) {
+        self.boundary = boundary
+        self.variant = variant
+        self.candidates = candidates
+        self.expand = expand
+    }
+}
+
+extension WireBranchHints: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireBranchHints" }
+    public var debugDescription: String { description }
+}
+
 public struct WireBranchMap: Sendable, Equatable, Codable {
     public var columns: [WireBranchColumn]
     public var position: UInt32
@@ -1992,8 +2015,11 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
     public var associationHint: String?
     public var associationKey: String?
     public var meaningPlacement: WireMeaningPlacement?
+    public var collapsesVariants: Bool?
+    public var collapsesDetail: Bool?
+    public var placedHints: WireBranchHints?
 
-    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, meaningPlacement: WireMeaningPlacement? = nil) {
+    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, meaningPlacement: WireMeaningPlacement? = nil, collapsesVariants: Bool? = nil, collapsesDetail: Bool? = nil, placedHints: WireBranchHints? = nil) {
         self.columns = columns
         self.position = position
         self.total = total
@@ -2003,6 +2029,9 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
         self.associationHint = associationHint
         self.associationKey = associationKey
         self.meaningPlacement = meaningPlacement
+        self.collapsesVariants = collapsesVariants
+        self.collapsesDetail = collapsesDetail
+        self.placedHints = placedHints
     }
 }
 

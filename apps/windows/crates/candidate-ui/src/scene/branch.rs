@@ -1118,6 +1118,8 @@ mod tests {
             alternative_details: None,
             source_name: None,
             split: None,
+            jump_key: None,
+            variant_keys: None,
         }
     }
 
@@ -1142,6 +1144,9 @@ mod tests {
                 label: "候補".into(),
             }],
             meaning_placement: None,
+            collapses_variants: None,
+            collapses_detail: None,
+            placed_hints: None,
         }
     }
 
@@ -1545,6 +1550,9 @@ mod tests {
                 note: None,
                 hints: vec![],
                 meaning_placement: None,
+                collapses_variants: None,
+                collapses_detail: None,
+                placed_hints: None,
             };
             let scene = branch_map(&split, &Look::new(&theme, 15.0), &Fixed);
             let texts = texts(&scene);

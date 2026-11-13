@@ -29,6 +29,8 @@ pub fn column(text: &str) -> BranchColumn {
         alternative_details: None,
         source_name: None,
         split: None,
+        jump_key: None,
+        variant_keys: None,
     }
 }
 
@@ -77,6 +79,9 @@ pub fn branch() -> BranchMap {
             hint("Shift+←→", "区切り調整"),
         ],
         meaning_placement: None,
+        collapses_variants: None,
+        collapses_detail: None,
+        placed_hints: None,
     }
 }
 

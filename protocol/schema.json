@@ -2103,6 +2103,14 @@
         {
           "name": "isEditing",
           "type": "bool?"
+        },
+        {
+          "name": "jumpKey",
+          "type": "string?"
+        },
+        {
+          "name": "variantKeys",
+          "type": "[string?]?"
         }
       ]
     },
@@ -2127,6 +2135,28 @@
         {
           "name": "label",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "BranchHints",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "boundary",
+          "type": "[KeyHint]"
+        },
+        {
+          "name": "variant",
+          "type": "KeyHint?"
+        },
+        {
+          "name": "candidates",
+          "type": "[KeyHint]"
+        },
+        {
+          "name": "expand",
+          "type": "KeyHint?"
         }
       ]
     },
@@ -2169,6 +2199,18 @@
         {
           "name": "meaningPlacement",
           "type": "MeaningPlacement?"
+        },
+        {
+          "name": "collapsesVariants",
+          "type": "bool?"
+        },
+        {
+          "name": "collapsesDetail",
+          "type": "bool?"
+        },
+        {
+          "name": "placedHints",
+          "type": "BranchHints?"
         }
       ]
     },

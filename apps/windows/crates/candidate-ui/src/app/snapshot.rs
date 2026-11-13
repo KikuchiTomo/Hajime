@@ -617,6 +617,9 @@ fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
         note: None,
         hints: vec![],
         meaning_placement: has_meaning.then_some(placement),
+        collapses_variants: None,
+        collapses_detail: None,
+        placed_hints: None,
     }
 }
 
@@ -710,6 +713,9 @@ fn emoji_branch() -> BranchMap {
         note: None,
         hints: vec![],
         meaning_placement: None,
+        collapses_variants: None,
+        collapses_detail: None,
+        placed_hints: None,
     }
 }
 
@@ -796,6 +802,8 @@ fn column(text: &str) -> BranchColumn {
         alternative_details: None,
         source_name: None,
         split: None,
+        jump_key: None,
+        variant_keys: None,
     }
 }
 
@@ -839,6 +847,9 @@ fn preview() -> BranchMap {
             hint("Shift+←→", "区切り調整"),
         ],
         meaning_placement: None,
+        collapses_variants: None,
+        collapses_detail: None,
+        placed_hints: None,
     }
 }
 
@@ -864,5 +875,8 @@ fn split() -> BranchMap {
         note: None,
         hints: vec![hint("1–2", "分割"), hint("Esc", "キャンセル")],
         meaning_placement: None,
+        collapses_variants: None,
+        collapses_detail: None,
+        placed_hints: None,
     }
 }
