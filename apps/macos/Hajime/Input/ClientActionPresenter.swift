@@ -63,8 +63,9 @@ final class ClientActionPresenter {
                 let attributed = Self.attributedString(for: marked)
                 markedLength = (marked.text as NSString).length
                 client.setMarkedText(attributed, selectionRange: NSRange(location: (marked.textBeforeCaret as NSString).length, length: 0), replacementRange: takeReplacement())
-                // 予測の窓は組み立て中の文字の右端に付いていく
-                prediction.move(end: compositionEnd(of: client))
+                // 予測の窓は組み立て中の文字の右端に付いていく．位置はアプリに問い合わせる(アプリが組み立て中の文字を並べ終えるまで待つ)ので，
+                // 窓を出していないときは問い合わせない(1 キーごとの待ちを増やさない)
+                if prediction.isVisible { prediction.move(end: compositionEnd(of: client)) }
             case .showCandidates(let panel):
                 note.hide()
                 candidatePanel.show(panel, caret: panelAnchor(of: client, at: panel.anchor), theme: ThemeChoice(settings.current), fontSize: settings.current.candidateFontSize,
