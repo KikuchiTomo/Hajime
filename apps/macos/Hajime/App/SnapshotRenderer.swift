@@ -48,6 +48,11 @@ enum SnapshotRenderer {
                     render(latticeView(panel, theme: look.theme, appearance: appearance), name: "branch-station\(suffix)-\(look.name)", to: output,
                            appearance: appearance)
                 }
+                // 先の枝を，キーの案内を押し続けているあいだだけ出す設定(既定)で．公式サイトのトップの画像に使う
+                var quietStations = stationLattice(current: nil, inside: false)
+                quietStations.hintsOnHold = true
+                render(latticeView(quietStations, theme: look.theme, appearance: appearance), name: "branch-station-hold-\(look.name)", to: output,
+                       appearance: appearance)
                 // 矢印キーで木をたどっていて，幹の上(文節)にいるところ．ページの位置は縦の線の下の点
                 render(latticeView(trunkLattice(), theme: look.theme, appearance: appearance), name: "branch-trunk-\(look.name)", to: output,
                        appearance: appearance)
