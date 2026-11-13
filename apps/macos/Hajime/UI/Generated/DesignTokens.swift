@@ -278,6 +278,7 @@ enum DesignTokens {
             static let hintGap: CGFloat = 8
             static let editingCaretWidth: CGFloat = 2
             static let editingMinWidth: CGFloat = 16
+            static let hintLineGap: CGFloat = 4
             static let footerHeight: CGFloat = 28
             static let trunkGap: CGFloat = 8
             static let branchIndent: CGFloat = 28

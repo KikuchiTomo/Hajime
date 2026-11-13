@@ -159,6 +159,7 @@ public enum LayoutTokens {
         public static let hintGap: Double = 8
         public static let editingCaretWidth: Double = 2
         public static let editingMinWidth: Double = 16
+        public static let hintLineGap: Double = 4
         public static let footerHeight: Double = 28
         public static let trunkGap: Double = 8
         public static let branchIndent: Double = 28

@@ -416,6 +416,7 @@ pub mod size {
         pub const HINT_GAP: f32 = 8.0;
         pub const EDITING_CARET_WIDTH: f32 = 2.0;
         pub const EDITING_MIN_WIDTH: f32 = 16.0;
+        pub const HINT_LINE_GAP: f32 = 4.0;
         pub const FOOTER_HEIGHT: f32 = 28.0;
         pub const TRUNK_GAP: f32 = 8.0;
         pub const BRANCH_INDENT: f32 = 28.0;

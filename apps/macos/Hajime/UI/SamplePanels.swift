@@ -268,6 +268,24 @@ enum SamplePalettes {
             showsPreview: true, skinTone: .none, skinTonePicker: nil, message: nil, hints: hints)
     }()
 
+    /// 絵文字のパレットをホイールでスクロールし，選んでいる文字の行(1 行目)が見えなくなったところ(3 行目から見えている)
+    static let scrolledUp: PalettePanel = {
+        var panel = emoji
+        panel.rows = rows(emojiRows, titles: Array(repeating: PaletteCategory.smileys.title, count: emojiRows.count), starts: []).map {
+            PalettePanel.Row(index: $0.index + 3, cells: $0.cells, startsSection: false, sectionTitle: $0.sectionTitle)
+        }
+        panel.heading = PaletteCategory.smileys.title
+        panel.firstRow = 3
+        return panel
+    }()
+
+    /// 選んでいる文字の行(8 行目)が見えている行(0〜5 行目)より下にあるところ(上へスクロールした)
+    static let scrolledDown: PalettePanel = {
+        var panel = emoji
+        panel.selection = .init(row: 8, column: 4)
+        return panel
+    }()
+
     /// 「ojigi」と打って探したところ．肌の色の帯を開いている
     static let search: PalettePanel = {
         let options = SkinTone.allCases.map { bowing.text(skinTone: $0) }
@@ -354,5 +372,15 @@ enum SamplePalettes {
         let before = { var panel = search; panel.skinTonePicker = nil; return panel }()
         picking.motion = .init(opensPicker: true)
         return [(emoji, moved, Duration.indicator / 1000 / 2), (emoji, switched, Duration.content / 1000 / 2), (before, picking, Duration.pop / 1000 / 3)]
+    }
+
+    /// 選択の枠が滑っている途中でホイールでスクロールしたところの見本(SnapshotRenderer)．滑り始めの内容・滑らせる内容・スクロールした内容と描く時刻
+    static var scrollWhileSliding: (from: PalettePanel, sliding: PalettePanel, scrolled: PalettePanel, time: Double) {
+        var sliding = emoji
+        sliding.selection = .init(row: 4, column: 6)
+        sliding.motion = .init(selectionFrom: emoji.selection)
+        var scrolled = scrolledUp
+        scrolled.selection = sliding.selection
+        return (emoji, sliding, scrolled, DesignTokens.Motion.Palette.selection / 1000 / 2)
     }
 }
