@@ -170,25 +170,27 @@ enum GlassDrawing {
         }
     }
 
-    private static func symbolImage(_ name: String, theme: ResolvedTheme) -> NSImage? {
-        SymbolImageCache.image(name, pointSize: Glass.keyFontSize, weight: .semibold, color: theme.text)
+    private static func symbolImage(_ name: String, theme: ResolvedTheme, color: NSColor? = nil) -> NSImage? {
+        SymbolImageCache.image(name, pointSize: Glass.keyFontSize, weight: .semibold, color: color ?? theme.text)
     }
 
-    private static func partWidth(_ part: KeyHint.Part, theme: ResolvedTheme) -> CGFloat {
+    /// キーキャップの中の部品(アイコンか文字)の幅
+    static func partWidth(_ part: KeyHint.Part, theme: ResolvedTheme) -> CGFloat {
         switch part {
         case .symbol(let name): (symbolImage(name, theme: theme)?.size.width ?? Glass.keyFontSize).rounded(.up)
         case .text(let text): text.size(withAttributes: [.font: theme.keyFont(size: Glass.keyFontSize)]).width.rounded(.up)
         }
     }
 
-    private static func drawPart(_ part: KeyHint.Part, in rect: NSRect, theme: ResolvedTheme) {
+    /// キーキャップの中の部品を rect の真ん中に描く．color を渡さなければ文字の色
+    static func drawPart(_ part: KeyHint.Part, in rect: NSRect, theme: ResolvedTheme, color: NSColor? = nil) {
         switch part {
         case .symbol(let name):
-            guard let image = symbolImage(name, theme: theme) else { return }
+            guard let image = symbolImage(name, theme: theme, color: color) else { return }
             let size = image.size
             image.draw(in: NSRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height))
         case .text(let text):
-            drawLineCentered(text, attributes: [.font: theme.keyFont(size: Glass.keyFontSize), .foregroundColor: theme.text], in: rect)
+            drawLineCentered(text, attributes: [.font: theme.keyFont(size: Glass.keyFontSize), .foregroundColor: color ?? theme.text], in: rect)
         }
     }
 

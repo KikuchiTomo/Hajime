@@ -207,6 +207,19 @@ enum DesignTokens {
             static let splitBadgeFontSize: CGFloat = 9
             static let splitBadgeGap: CGFloat = 2
         }
+        enum BranchMap {
+            static let stopSize: CGFloat = 8
+            static let stopSizeSelected: CGFloat = 10
+            static let railHeight: CGFloat = 16
+            static let segmentGap: CGFloat = 8
+            static let stemGap: CGFloat = 8
+            static let stationGap: CGFloat = 12
+            static let rowGap: CGFloat = 12
+            static let meaningIndent: CGFloat = 8
+            static let meaningWidth: CGFloat = 240
+            static let gripSize: CGFloat = 3
+            static let fadeWidth: CGFloat = 48
+        }
         enum Settings {
             static let windowWidth: CGFloat = 820
             static let windowHeight: CGFloat = 580

@@ -209,6 +209,10 @@ struct ResolvedTheme {
         return selection.withAlphaComponent(increased ? DesignTokens.Opacity.Glass.commandTagContrast : DesignTokens.Opacity.Glass.commandTag)
     }
 
+    /// 分岐図のキーの案内の面と文字．候補の中身と見分けられるよう，文字の色の面に背景の色の文字で描く(背景と反転した色)
+    var hintFill: NSColor { text }
+    var hintInk: NSColor { usesBackdrop ? .windowBackgroundColor : surface.withAlphaComponent(1) }
+
     /// 番号の丸とキーキャップの中の文字．数字の幅をそろえる
     func keyFont(size: CGFloat) -> NSFont {
         typeface == .system ? .monospacedDigitSystemFont(ofSize: size, weight: .semibold) : font(size: size, weight: .semibold)

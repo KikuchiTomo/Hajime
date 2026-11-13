@@ -65,6 +65,29 @@ public enum IndicatorLabels {
         Hint(.expandCandidates, "表形式"),
     ]
 
+    // 分岐図で，操作する場所に置く案内(macOS．足元には並べない)．矢印で移る操作(候補・文節)は，線のつながりで分かるので案内しない
+
+    /// 選んでいる文節の境目の上に置く案内．文節の長さを変える操作と，区切る操作
+    public static let branchBoundaryHints: [Hint] = [
+        Hint(.shrinkSegment, .extendSegment, "区切り"),
+        Hint(.splitSegment, "分割"),
+    ]
+
+    /// 文字種の枝の先に置く案内
+    public static let branchVariantHint = Hint(.previousCandidate, "文字種")
+
+    /// 候補の下に置く案内．どの候補も違ったときの操作
+    public static let branchCandidateHints: [Hint] = [
+        Hint(.editSegment, "再入力"),
+        Hint(.expandCandidates, "表形式"),
+    ]
+
+    /// 候補の先の小さな幹(意味・連想)の先に置く案内の言葉．キーは連想変換のキー
+    public static let branchExpandLabel = "展開"
+
+    /// 候補の先の小さな幹の，語の意味の見出し
+    public static let branchMeaningTitle = "意味"
+
     /// 連想の一覧の足元の案内
     public static let associationHints: [Hint] = [
         Hint(.nextCandidate, "選択"),
