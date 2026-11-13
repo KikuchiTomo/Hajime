@@ -460,6 +460,8 @@ mod tests {
             "terminal",
             "nordic",
             "contrast",
+            "indigo",
+            "indigoNight",
         ] {
             let theme = theme(name);
             // 文字が明るいテーマは暗い背景に置く

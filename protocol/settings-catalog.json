@@ -15,6 +15,7 @@
   "fields" : [
     "alphabetWidth",
     "alphanumericHyphen",
+    "alwaysShowsBranchHints",
     "association",
     "associationDictionaries",
     "associationLimit",
@@ -201,6 +202,9 @@
       "composing",
       "converting",
       "direct"
+    ],
+    "enterBranch" : [
+      "converting"
     ],
     "expandCandidates" : [
       "converting"

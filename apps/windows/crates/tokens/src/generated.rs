@@ -116,6 +116,30 @@ pub const THEMES: &[(&str, Palette)] = &[
         text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
         text_muted: Rgb { red: 0xE6, green: 0xE6, blue: 0xE6 },
     }),
+    ("indigo", Palette {
+        bevel_light: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+        bevel_shadow: Rgb { red: 0xE8, green: 0xEB, blue: 0xF0 },
+        correction: Rgb { red: 0xC2, green: 0x45, blue: 0x2D },
+        frame: Rgb { red: 0xCD, green: 0xD2, blue: 0xD8 },
+        prediction: Rgb { red: 0x53, green: 0x5A, blue: 0x61 },
+        selection: Rgb { red: 0x4B, green: 0x57, blue: 0xF2 },
+        selection_text: Rgb { red: 0xFF, green: 0xFF, blue: 0xFF },
+        surface: Rgb { red: 0xFD, green: 0xFD, blue: 0xFE },
+        text: Rgb { red: 0x16, green: 0x18, blue: 0x1C },
+        text_muted: Rgb { red: 0x53, green: 0x5A, blue: 0x61 },
+    }),
+    ("indigo-night", Palette {
+        bevel_light: Rgb { red: 0x3A, green: 0x3E, blue: 0x46 },
+        bevel_shadow: Rgb { red: 0x1F, green: 0x21, blue: 0x26 },
+        correction: Rgb { red: 0xFF, green: 0x9E, blue: 0x85 },
+        frame: Rgb { red: 0x4B, green: 0x50, blue: 0x58 },
+        prediction: Rgb { red: 0xB6, green: 0xBC, blue: 0xC3 },
+        selection: Rgb { red: 0x98, green: 0xA2, blue: 0xFF },
+        selection_text: Rgb { red: 0x16, green: 0x18, blue: 0x1C },
+        surface: Rgb { red: 0x2A, green: 0x2D, blue: 0x34 },
+        text: Rgb { red: 0xF1, green: 0xF3, blue: 0xF5 },
+        text_muted: Rgb { red: 0xB6, green: 0xBC, blue: 0xC3 },
+    }),
 ];
 
 pub const GLASS_LIGHT: Palette = Palette {
@@ -356,6 +380,10 @@ pub mod size {
         pub const MEANING_INDENT: f32 = 8.0;
         pub const MEANING_WIDTH: f32 = 240.0;
         pub const GRIP_SIZE: f32 = 3.0;
+        pub const BADGE_RADIUS: f32 = 5.0;
+        pub const PAGE_DOT_SIZE: f32 = 4.0;
+        pub const PAGE_DOT_PITCH: f32 = 8.0;
+        pub const PAGE_DOT_LIMIT: f32 = 6.0;
         pub const STUB_LENGTH: f32 = 24.0;
         pub const FADE_WIDTH: f32 = 48.0;
     }
@@ -733,6 +761,10 @@ pub mod motion {
     }
     pub mod correction_underline {
         pub const APPEAR: f32 = 80.0;
+    }
+    pub mod branch_map {
+        pub const HINT_HOLD: f32 = 100.0;
+        pub const HINT_FADE: f32 = 50.0;
     }
     pub mod candidate_rest {
         pub const FADE_IN: f32 = 250.0;
