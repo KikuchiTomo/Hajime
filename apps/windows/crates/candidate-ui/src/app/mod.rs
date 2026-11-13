@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod bench;
 pub mod fonts;
+mod hold;
 pub mod preview;
 pub(crate) mod render;
 #[cfg(debug_assertions)]
@@ -83,6 +84,11 @@ struct App {
     engine: Option<EngineClient>,
     /// エンジンに最後に知らせた，分岐図の候補と先の枝を左へ出しているか(BranchLayout)
     reported_mirrored: bool,
+    /// 押し続けて出すキーの案内と，修飾キーを読む時計が動いているか
+    hint_hold: hold::HintHold,
+    hold_polling: bool,
+    /// 前のコマで案内を濃くしている途中だったか
+    hint_fading: bool,
     scene: Option<Scene>,
     theme: Option<ResolvedTheme>,
     rest_opacity: f32,
@@ -181,6 +187,9 @@ pub fn run() {
             on_glass: false,
             engine: None,
             reported_mirrored: false,
+            hint_hold: hold::HintHold::default(),
+            hold_polling: false,
+            hint_fading: false,
             scene: None,
             theme: None,
             rest_opacity: 1.0,
@@ -268,6 +277,7 @@ fn on_timer(timer: Timer) {
         Timer::Mode => app.mode_elapsed(),
         Timer::Fade => app.step_fade(),
         Timer::Motion => app.step_motion(),
+        Timer::Hold => app.step_hold(),
     });
 }
 
@@ -377,6 +387,10 @@ impl App {
                 self.anchor = anchor.or(self.anchor.take());
             }
             UiCommand::ShowBranchMap { map, anchor } => {
+                // 修飾キーを押しているあいだに分岐図が変わったら，ほかのキーと組み合わせて押した(⇧→ など)．離すまで案内は出さない
+                if !matches!(&self.content, Content::BranchMap(shown) if **shown == map) {
+                    self.hint_hold.other_key();
+                }
                 self.arrived = matches!(&self.content, Content::BranchMap(shown) if motion::arrived_branch(shown, &map));
                 self.content = Content::BranchMap(Box::new(map));
                 self.anchor = anchor.or(self.anchor.take());
@@ -814,6 +828,7 @@ impl App {
         self.refresh_prediction(&theme, look.dark, &measure);
         let mut style = Look::new(&theme, font_size);
         style.rest_opacity = self.rest_opacity;
+        (style.held, style.hint_opacity) = self.hint_hold.shown(Instant::now());
         style.pixel_scale = self.window().scale();
         let build = |content: &Content, style: &Look| match content {
             Content::Hidden => None,
@@ -874,6 +889,8 @@ impl App {
             self.drawn = None;
             self.window().stop_timer(Timer::Fade);
             self.window().stop_timer(Timer::Mode);
+            self.window().stop_timer(Timer::Hold);
+            self.hold_polling = false;
             self.on_glass = on_glass;
             if !matches!(self.fade, Fade::None) {
                 self.window().start_timer(Timer::Fade, FRAME_MILLISECONDS);
@@ -938,5 +955,35 @@ impl App {
         self.scene = scene;
         self.theme = Some(theme);
         self.report_layout();
+        self.sync_hold();
+    }
+
+    /// 案内を押し続けて出す分岐図を出しているあいだだけ，修飾キーを読む時計を動かす(出していないときは何も読まない)
+    fn sync_hold(&mut self) {
+        let needs = self.scene.is_some()
+            && self.anchor.is_some()
+            && matches!(&self.content, Content::BranchMap(map) if map.hints_on_hold == Some(true));
+        if needs && !self.hold_polling {
+            self.window().start_timer(Timer::Hold, FRAME_MILLISECONDS);
+        } else if !needs && self.hold_polling {
+            self.window().stop_timer(Timer::Hold);
+            self.hint_hold.reset();
+        }
+        self.hold_polling = needs;
+    }
+
+    /// 修飾キーを読み，出す案内が変わるか，濃くしている途中なら描き直す
+    fn step_hold(&mut self) {
+        if !self.hold_polling {
+            self.window().stop_timer(Timer::Hold);
+            return;
+        }
+        let now = Instant::now();
+        let changed = self.hint_hold.update(window::held_modifiers(), now);
+        // 濃くしている途中は毎コマ描き，濃くし終えたコマも 1 回描く(最後のコマを途中の濃さのまま残さない)
+        let fading = self.hint_hold.is_fading(now);
+        if changed || fading || std::mem::replace(&mut self.hint_fading, fading) {
+            self.refresh();
+        }
     }
 }

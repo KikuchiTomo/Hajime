@@ -140,6 +140,16 @@ pub fn branch() -> BranchMap {
 pub fn trunk_branch() -> BranchMap {
     BranchMap {
         trunk_focused: Some(true),
+        // 案内は押し続けて出す設定(既定．macOS の trunkLattice と同じ)
+        hints_on_hold: Some(true),
+        ..branch()
+    }
+}
+
+/// キーの案内を，修飾キーを押し続けているあいだだけ出す設定(既定)の分岐図(macOS の heldHintsLattice)
+pub fn held_branch() -> BranchMap {
+    BranchMap {
+        hints_on_hold: Some(true),
         ..branch()
     }
 }

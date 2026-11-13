@@ -460,9 +460,11 @@ fn variant_keys(map: &BranchMap, column: Option<&BranchColumn>) -> Vec<Option<St
         return Vec::new();
     };
     let keys = column.variant_keys.as_deref().unwrap_or_default();
+    // 押し続けて出す設定では，文字種にするキー(修飾キーの無いキー)は出さない．押し続けて出す手がかりが無いので，場所も空けない
+    let shows = shows_hints(map) && map.hints_on_hold != Some(true);
     (0..column.variants.len())
         .map(|index| {
-            if shows_hints(map) {
+            if shows {
                 keys.get(index).cloned().flatten()
             } else {
                 None
@@ -1234,6 +1236,10 @@ pub fn branch_map(whole: &BranchMap, look: &Look, measure: &dyn Measure) -> Scen
     let map: &BranchMap = &shown;
     let metrics = Metrics::new(look, measure);
     let mut painter = Painter::new(look, measure);
+    // 案内を押し続けて出す設定(既定)では，押し続けている修飾キーを使うキーの案内だけを出す．場所はいつも空けておく
+    if map.hints_on_hold == Some(true) {
+        painter.hold = Some((look.held, look.hint_opacity));
+    }
     let theme = look.theme;
     let hints = hints(map);
     let layout = layout(map, &metrics, &painter, look.rest_opacity);
@@ -1640,7 +1646,9 @@ pub fn branch_map(whole: &BranchMap, look: &Look, measure: &dyn Measure) -> Scen
     // キーの案内と，文節の境目のつまみ
     if let Some(mid_y) = layout.boundary_mid_y.filter(|_| !hints.boundary.is_empty()) {
         painter.placed_hints(&hints.boundary, layout.boundary_x, mid_y);
-        if let (Some(focus), Some(column)) = (layout.focus, column) {
+        // 境目のつまみは，境目を動かすキーの案内と一緒に出す
+        let shows_grip = painter.shows_hint(&hints.boundary[0].keys);
+        if let (Some(focus), Some(column), true) = (layout.focus, column, shows_grip) {
             if column.split.is_none() && !editing(column) {
                 let node = layout.nodes[focus];
                 let height = painter.measure.height(Font::Trunk).round();
@@ -2918,5 +2926,59 @@ mod tests {
         let look = Look::new(&theme, 15.0);
         assert!(branch_map(&super::super::sample::long_branch(13), &look, &Fixed).mirrored);
         assert!(!branch_map(&keyed(map()), &look, &Fixed).mirrored);
+    }
+
+    #[test]
+    fn 押し続けて出す設定では_押している修飾キーを使う案内だけを出し_場所は空けたままにする() {
+        let theme = theme("automatic");
+        let map = super::super::sample::held_branch();
+        let none = branch_map(&map, &Look::new(&theme, 15.0), &Fixed);
+        let shift = branch_map(
+            &map,
+            &Look {
+                held: super::super::Held {
+                    shift: true,
+                    ..Default::default()
+                },
+                ..Look::new(&theme, 15.0)
+            },
+            &Fixed,
+        );
+        let alt = branch_map(
+            &map,
+            &Look {
+                held: super::super::Held {
+                    alt: true,
+                    ..Default::default()
+                },
+                ..Look::new(&theme, 15.0)
+            },
+            &Fixed,
+        );
+        let has = |scene: &Scene, text: &str| text_frame(scene, text).is_some();
+        assert!(!has(&none, "区切り") && !has(&none, "表形式"));
+        assert!(has(&shift, "区切り") && has(&shift, "再入力") && !has(&shift, "表形式"));
+        assert!(has(&alt, "表形式") && !has(&alt, "区切り"));
+        // 出しても消しても窓の大きさと候補の位置は変わらない
+        assert_eq!((none.width, none.height), (shift.width, shift.height));
+        assert_eq!(
+            text_frame(&none, "那珂のです"),
+            text_frame(&shift, "那珂のです")
+        );
+    }
+
+    #[test]
+    fn 修飾キーの名前で_押している修飾キーを使う案内かを決める() {
+        let shift = super::super::Held {
+            shift: true,
+            ..Default::default()
+        };
+        assert!(
+            shift.uses("Shift+↑")
+                && shift.uses("Shift+Alt+A")
+                && !shift.uses("Alt+S")
+                && !shift.uses("F6")
+        );
+        assert!(!super::super::Held::default().uses("Shift+↑"));
     }
 }

@@ -42,6 +42,8 @@ pub(crate) struct Painter<'a> {
     pub keep_clear: Vec<Frame>,
     /// 語の意味の吹き出しを窓の中の行の文字のすぐ右に置くときの範囲(一覧だけ)
     pub inside: Option<super::bubble::Inside>,
+    /// 案内を押し続けているあいだだけ出すときの，押している修飾キーと案内の濃さ．None ならいつも出す
+    pub hold: Option<(super::Held, f32)>,
 }
 
 impl<'a> Painter<'a> {
@@ -53,7 +55,13 @@ impl<'a> Painter<'a> {
             hits: Vec::new(),
             keep_clear: Vec::new(),
             inside: None,
+            hold: None,
         }
+    }
+
+    /// 今，この案内を出すか．押し続けて出すときは，押している修飾キーを使うキーの案内だけを出す
+    pub fn shows_hint(&self, keys: &str) -> bool {
+        self.hold.is_none_or(|(held, _)| held.uses(keys))
     }
 
     pub fn finish(self, width: f32, height: f32) -> Scene {
@@ -718,7 +726,12 @@ impl<'a> Painter<'a> {
 
     /// 案内を x から描く．候補の中身と見分けられるよう，文字の色の面に背景の色の文字(背景と反転した色)．
     /// selected なら選択の色の面(選んでいる文節へ移るキー)
+    /// 押し続けて出す設定で，押している修飾キーを使わない案内は描かない(場所は呼ぶ側で空けたままにする)
     pub fn placed_hint(&mut self, hint: &KeyHint, x: f32, mid_y: f32, selected: bool) {
+        if !self.shows_hint(&hint.keys) {
+            return;
+        }
+        let opacity = self.hold.map_or(1.0, |(_, opacity)| opacity);
         let theme = self.theme;
         let width = self.placed_hint_width(hint);
         let rect = Frame::new(
@@ -732,6 +745,7 @@ impl<'a> Painter<'a> {
         } else {
             (theme.hint_fill(), theme.hint_ink())
         };
+        let (fill, ink) = (fill.faded(opacity), ink.faded(opacity));
         self.draws.push(Draw::RoundRect {
             frame: rect,
             radius: if theme.is_rounded() {
