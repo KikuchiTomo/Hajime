@@ -72,6 +72,15 @@ struct LatticeBuilder {
         return result
     }
 
+    /// 上の枝(字種)と同じ表記の候補を除く(第 1 候補は残す)．前後の文脈での並べ替えをあとに回すときも，候補はすぐこの形で見せる
+    static func withoutVariantDuplicates(_ segment: SegmentLattice.Segment) -> SegmentLattice.Segment {
+        let variantTexts = Set(segment.variants.map(\.text))
+        var result = segment
+        result.candidates = segment.candidates.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
+        result.choice = choice(of: segment, in: result.candidates)
+        return result
+    }
+
     /// 点数での並べ替えを，その場で求めるか(now)，前もって求めた点数があるときだけにして無ければあとに回すか(later)
     enum ScoringTiming {
         case now
@@ -89,7 +98,10 @@ struct LatticeBuilder {
         guard contextRanker != nil || scorer != nil, !segment.isPending, !segment.isContextRanked else { return segment }
         var result = segment
         let variantTexts = Set(segment.variants.map(\.text))
-        let ranked = contextRanker?.ranked(segment.candidates, start: segment.readingStart, length: segment.readingLength, reading: reading, fixed: 1)
+        // 利用者が候補を動かしたあとなら，選んでいる候補とそれより前は動かさない(あとから並べ替えるとき)
+        var fixed = 1
+        if case .candidate(let selected) = segment.choice { fixed = max(1, selected + 1) }
+        let ranked = contextRanker?.ranked(segment.candidates, start: segment.readingStart, length: segment.readingLength, reading: reading, fixed: fixed)
             ?? segment.candidates
         // 上の枝(字種)と同じ表記は除いてから採点する(あとから採点するときと同じ問いにし，打鍵の合間に求めた点数を使えるようにする)
         result.candidates = ranked.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
