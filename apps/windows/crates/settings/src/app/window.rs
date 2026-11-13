@@ -899,6 +899,12 @@ impl App {
                 self.extras.macro_preview = super::actions::macro_preview(model, &text, &reading);
                 self.extras.macro_results = super::actions::macro_results(model, &text, &reading);
             }
+            // いつも英語・いつも日本語にする単語などが変わったら，英語と日本語の試した結果のタグも出し直す(macOS と同じ)
+            if let Some((text, preceding)) = self.view.language_preview_inputs() {
+                let shown = super::actions::language_preview(model, &text, &preceding);
+                self.view
+                    .show_preview(crate::pages::TryKind::Language, &shown);
+            }
             if self.view.page == Page::Appearance && self.extras.fonts.is_empty() {
                 self.extras.fonts = candidate_ui::app::fonts::installed();
             }
@@ -2490,6 +2496,23 @@ impl App {
         self.open_flyout_at(element, None);
     }
 
+    /// 部品の左下の画面の座標(キーボードで開いたメニューを部品の下に出すため)．部品が無ければ None
+    pub(super) fn screen_below(&self, element: Element) -> Option<(i32, i32)> {
+        let rect = self.view.rect(element)?;
+        let (left, top) = self.window_point(rect.x, rect.max_y());
+        let (x, y) = self.client_px(left, top);
+        Some(ffi::to_screen(self.window, x, y))
+    }
+
+    /// ページの中の点を窓の中の点(DIP)にする
+    fn window_point(&self, x: f32, y: f32) -> (f32, f32) {
+        let (width, _) = self.size();
+        (
+            nav_width(width) + x,
+            y - self.scroll.offset(self.now()) + self.page_frame().shift,
+        )
+    }
+
     /// 表の行のメニューを (x, y)(窓の中の DIP)に出す(macOS の表の contextMenu)
     fn open_row_menu(&mut self, row: usize, x: f32, y: f32) {
         let element = Element {
@@ -2521,15 +2544,9 @@ impl App {
             let Some(rect) = self.view.rect(element) else {
                 return;
             };
-            let (width, _) = self.size();
             // ページの中の位置を窓の中の位置にする
-            (
-                items,
-                selected,
-                nav_width(width) + rect.x,
-                rect.y - self.scroll.offset(now) + self.page_frame().shift,
-                rect,
-            )
+            let (left, top) = self.window_point(rect.x, rect.y);
+            (items, selected, left, top, rect)
         };
         if items.is_empty() {
             return;

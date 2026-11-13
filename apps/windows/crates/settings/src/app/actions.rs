@@ -67,8 +67,12 @@ pub enum After {
     File(FileTask),
     /// フォルダを選ぶ窓を出してから，同期のフォルダにする
     ChooseSyncFolder,
-    /// 試した語をどちらの一覧に足すかを選ぶメニューを出してから，その一覧に足す
-    ChooseWordList(String),
+    /// 試した語をどちらの一覧に足すかを選ぶメニューを出してから，その一覧に足す．
+    /// anchor はメニューの左上(画面の座標．キーボードで開いたときのタグの左下)．None ならポインターの位置に出す
+    ChooseWordList {
+        word: String,
+        anchor: Option<(i32, i32)>,
+    },
     /// 色を選ぶ窓を出してから，path の色を変える
     ChooseColor {
         path: &'static str,
@@ -177,10 +181,10 @@ pub fn run_after(window: Window, after: Option<After>) {
             .flatten();
             run_after(window, after);
         }
-        Some(After::ChooseWordList(word)) => {
-            // ポインターの位置にメニューを出す(macOS は結果のタグの下に出す)
+        Some(After::ChooseWordList { word, anchor }) => {
+            // 押したときはポインターの位置に，キーボードで開いたときはタグの下にメニューを出す
             let items = [features::ENGLISH_WORDS, features::JAPANESE_WORDS];
-            let Some(chosen) = ffi::choose_menu(window, &items) else {
+            let Some(chosen) = ffi::choose_menu(window, &items, anchor) else {
                 return;
             };
             let after = with_app(|app| {
@@ -410,7 +414,13 @@ impl App {
                 self.theme_list(ThemeAction::DuplicateCurrent, None)
             }
             Event::ChooseColor { path, current } => Some(After::ChooseColor { path, current }),
-            Event::ChooseWordList(word) => Some(After::ChooseWordList(word)),
+            Event::ChooseWordList { word, chip } => Some(After::ChooseWordList {
+                word,
+                anchor: self
+                    .focus_visible()
+                    .then(|| self.screen_below(chip))
+                    .flatten(),
+            }),
             other => self.handle_other(other),
         }
     }
@@ -481,7 +491,7 @@ impl App {
             | Event::ThemeList { .. }
             | Event::ThemeEditor(_)
             | Event::ChooseColor { .. }
-            | Event::ChooseWordList(_)
+            | Event::ChooseWordList { .. }
             | Event::ChooseApp { .. }
             | Event::OpenUrl(_)
             | Event::EditCommand(_)
@@ -611,15 +621,7 @@ impl App {
                 preceding,
                 ..
             } => {
-                let shown = if text.trim().is_empty() {
-                    crate::engine::PreviewShown::default()
-                } else {
-                    model
-                        .store()
-                        .preview_language(&text, &preceding)
-                        .map(|words| crate::engine::preview_text(&words))
-                        .unwrap_or_default()
-                };
+                let shown = language_preview(model, &text, &preceding);
                 self.view.show_preview(TryKind::Language, &shown);
                 // 結果のタグを押せるよう，置き場所を測り直す
                 self.arrange();
@@ -1365,6 +1367,22 @@ impl App {
         self.refresh();
         after
     }
+}
+
+/// 英字で打った文の語ごとに，英語のまま入るか日本語になるかを試した結果．文が空か，つながらなければ空
+pub fn language_preview(
+    model: &SettingsModel<Store>,
+    text: &str,
+    preceding: &str,
+) -> crate::engine::PreviewShown {
+    if text.trim().is_empty() {
+        return crate::engine::PreviewShown::default();
+    }
+    model
+        .store()
+        .preview_language(text, preceding)
+        .map(|words| crate::engine::preview_text(&words))
+        .unwrap_or_default()
 }
 
 /// 試す語と読みに変換マクロを当てた結果．つながらなければ空

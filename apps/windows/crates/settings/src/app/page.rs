@@ -111,8 +111,12 @@ pub enum Event {
     ChooseApp {
         path: &'static str,
     },
-    /// 英語と日本語の試した語(word)を，いつも英語・いつも日本語にする単語のどちらに足すかを選ぶメニューを出す(macOS の resultChip)
-    ChooseWordList(String),
+    /// 英語と日本語の試した語(word)を，いつも英語・いつも日本語にする単語のどちらに足すかを選ぶメニューを出す(macOS の resultChip)．
+    /// chip は押したタグ(キーボードで開いたときは，メニューをこのタグの下に出す)
+    ChooseWordList {
+        word: String,
+        chip: Element,
+    },
     /// 色を選ぶ窓を出す(path の値を変える．current は今の色)
     ChooseColor {
         path: &'static str,
@@ -2809,7 +2813,10 @@ impl PageView {
             }
             (Control::Preview(TryKind::Language), Part::PreviewChip(index)) => {
                 let word = row.preview_result.typed.get(index)?.trim().to_lowercase();
-                return (!word.is_empty()).then_some(Event::ChooseWordList(word));
+                return (!word.is_empty()).then_some(Event::ChooseWordList {
+                    word,
+                    chip: element,
+                });
             }
             (_, Part::TemplateSegment(index)) => {
                 row.template_group = index;
@@ -3111,6 +3118,21 @@ impl PageView {
             texts.get(1).cloned().unwrap_or_default(),
             draft,
         ))
+    }
+
+    /// 英語と日本語の試す欄の文と前の文字列．試す欄が無いページか，文が空なら None
+    pub fn language_preview_inputs(&self) -> Option<(String, String)> {
+        let preview = self
+            .rows
+            .iter()
+            .find(|row| row.row.control == Control::Preview(TryKind::Language))?;
+        let texts: Vec<String> = preview
+            .preview_fields
+            .iter()
+            .map(|window| ffi::window_text(*window))
+            .collect();
+        let text = texts.first().cloned().unwrap_or_default();
+        (!text.trim().is_empty()).then(|| (text, texts.get(1).cloned().unwrap_or_default()))
     }
 
     /// 打つ欄で Enter を押した(一覧なら追加・更新のボタンを押す)
