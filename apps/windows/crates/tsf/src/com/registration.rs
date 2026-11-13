@@ -147,11 +147,11 @@ pub fn remove_old_versions() -> Result<()> {
     let mut moved = false;
     for name in crate::install::stale_versions(&names, &current) {
         let folder = tsf.join(name);
-        if std::fs::remove_dir_all(&folder).is_err() {
-            // 前に退けたファイルのフォルダは，その場で再起動を待つ(もう一度退けない)
-            let target = (!name.eq_ignore_ascii_case(crate::install::RETIRED_FOLDER))
-                .then_some(retired.as_path());
-            moved |= remove_at_reboot(&folder, target);
+        // 退けたファイルのフォルダは，消せなければそのまま再起動を待つ(退けたときに再起動で消えるよう頼んである．頼み直すと同じ行が重なる)
+        if std::fs::remove_dir_all(&folder).is_err()
+            && !name.eq_ignore_ascii_case(crate::install::RETIRED_FOLDER)
+        {
+            moved |= remove_at_reboot(&folder, &retired);
         }
     }
     if moved {
@@ -161,10 +161,10 @@ pub fn remove_old_versions() -> Result<()> {
 }
 
 /// folder の中のファイルとフォルダを，消せるものは今消し，消せないもの(アプリが読み込んでいる DLL)は次の再起動で消えるよう頼む(中から順に)．
-/// retired があれば，消せないファイルを retired(同じドライブ)へ名前を変えて退けてから頼む．読み込まれている DLL でも名前は変えられる．
+/// 消せないファイルは retired(同じドライブ)へ名前を変えて退けてから頼む(退けられなければその場で頼む)．読み込まれている DLL でも名前は変えられる．
 /// 退けておくと，このあと古い版を消す Windows Installer(RemoveExistingProducts)がそのファイルを見つけず，「アプリを終了する必要があります」の窓を出さない．
 /// ファイルを retired へ退けたら true
-fn remove_at_reboot(folder: &std::path::Path, retired: Option<&std::path::Path>) -> bool {
+fn remove_at_reboot(folder: &std::path::Path, retired: &std::path::Path) -> bool {
     let Ok(entries) = std::fs::read_dir(folder) else {
         return false;
     };
@@ -178,7 +178,7 @@ fn remove_at_reboot(folder: &std::path::Path, retired: Option<&std::path::Path>)
         if kind.is_dir() && !kind.is_symlink() {
             moved |= remove_at_reboot(&path, retired);
         } else if std::fs::remove_file(&path).is_err() {
-            match retired.and_then(|retired| retire(&path, retired)) {
+            match retire(&path, retired) {
                 Some(target) => {
                     delete_at_reboot(&target);
                     moved = true;
