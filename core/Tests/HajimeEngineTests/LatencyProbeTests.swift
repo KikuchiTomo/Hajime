@@ -169,8 +169,10 @@ struct LatencyProbeTests {
                 }
             }
             space = min(space, clock.measure { _ = session.handle(KeyEvent(.space), context: InputContext()) })
-            // Space のあとで最初に動く続く処理(注目した文節の採点と並べ替え)．Space から並べ替えた候補が届くまでは space ＋ これ
-            rescored = min(rescored, clock.measure { if let step = session.followUps(context: InputContext()).first { _ = step() } })
+            // Space のあとの続く処理を，表示を変える(並べ替えた候補を出し直す)ところまで動かす．Space から並べ替えた候補が届くまでは space ＋ これ
+            rescored = min(rescored, clock.measure {
+                for step in session.followUps(context: InputContext()) where !step().isEmpty { break }
+            })
             // 変換中の文節の移動と，文節の長さを変える操作(区切り直しと下見)
             right = min(right, clock.measure { _ = session.handle(KeyEvent(.right), context: InputContext()) })
             resize = min(resize, clock.measure { _ = session.handle(KeyEvent(.right, modifiers: [.shift]), context: InputContext()) })

@@ -133,7 +133,9 @@ struct EngineServiceCorrectionTests {
         let (id, session) = try test.open()
         test.type("youdesu", session, id)
         #expect(Self.composition(test.press(.space, session, id)) == "様です")
-        let early = test.wake(session, id)
+        // 変換を出したあとの並べ替えや下見(followUps)を先に済ませる
+        var early = test.wake(session, id)
+        while Self.wakeAfter(early) == EngineService.followUpPollMilliseconds { early = test.wake(session, id) }
         #expect(Self.composition(early) == nil)
         #expect(Self.wakeAfter(early) == EngineService.correctionPollMilliseconds)
         test.clock.now = test.clock.now + .seconds(DefaultSettings.lateCorrectionTimeout + 1)
@@ -152,8 +154,10 @@ struct EngineServiceCorrectionTests {
         let (id, session) = try test.open()
         test.type("youdesu", session, id)
         _ = test.press(.space, session, id)
-        // 変換を出したあとの下見などを先に済ませる(その wake では期限を見ない)
-        #expect(Self.wakeAfter(test.wake(session, id)) == EngineService.correctionPollMilliseconds)
+        // 変換を出したあとの並べ替えや下見などを先に済ませる(その wake では期限を見ない)
+        var followed = test.wake(session, id)
+        while Self.wakeAfter(followed) == EngineService.followUpPollMilliseconds { followed = test.wake(session, id) }
+        #expect(Self.wakeAfter(followed) == EngineService.correctionPollMilliseconds)
         // 既定の上限と設定の上限のあいだの時刻．短い設定ならあきらめ，長い設定ならまだ求めている
         test.clock.now = test.clock.now + .seconds((DefaultSettings.lateCorrectionTimeout + timeout) / 2)
         #expect((Self.wakeAfter(test.wake(session, id)) != EngineService.correctionPollMilliseconds) == givesUp)
