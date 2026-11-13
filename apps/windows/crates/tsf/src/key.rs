@@ -31,6 +31,7 @@ pub const VK_DIVIDE: u16 = 0x6F;
 pub const VK_F1: u16 = 0x70;
 pub const VK_F24: u16 = 0x87;
 pub const VK_LSHIFT: u16 = 0xA0;
+pub const VK_LMENU: u16 = 0xA4;
 pub const VK_RMENU: u16 = 0xA5;
 pub const VK_OEM_5: u16 = 0xDC;
 pub const VK_DBE_ALPHANUMERIC: u16 = 0xF0;
@@ -133,6 +134,11 @@ pub fn jis_label(scan: u16, extended: bool) -> Option<char> {
         .iter()
         .find(|(code, _)| *code == scan)
         .map(|(_, label)| *label)
+}
+
+/// Alt のキー(左右を区別するものも含む)
+pub fn is_alt(vk: u16) -> bool {
+    matches!(vk, VK_MENU | VK_LMENU | VK_RMENU)
 }
 
 pub fn is_modifier_only(vk: u16) -> bool {
@@ -353,6 +359,8 @@ mod tests {
         assert!(translate(&raw(0x13, None)).is_none());
         assert!(translate(&raw(0x41, Some('\u{1}'))).is_none());
         assert!(is_modifier_only(VK_SHIFT));
+        assert!(is_alt(VK_MENU) && is_alt(VK_LMENU) && is_alt(VK_RMENU));
+        assert!(!is_alt(VK_CONTROL));
         assert!(is_modifier_only(VK_RMENU));
         assert!(!is_modifier_only(VK_SPACE));
     }

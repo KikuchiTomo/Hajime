@@ -12,8 +12,8 @@ use crate::key::{self, RawKey};
 use crate::plan::{CompositionPlan, PanelAnchor};
 use ipc::windows::{pipe_name, EngineClient, Outcome, Pending};
 use ipc::{
-    EditOperation, ErrorCode, FieldContext, InputMode, Key, Rect, RequestBody, ResponseBody,
-    SessionState, TextStyle,
+    EditOperation, ErrorCode, FieldContext, InputMode, Key, KeyChord, Rect, RequestBody,
+    ResponseBody, SessionState, TextStyle,
 };
 use std::cell::RefCell;
 use std::mem::ManuallyDrop;
@@ -105,6 +105,8 @@ struct Inner {
     preserved: Vec<Preserved>,
     /// 予約したキーで受け取った打鍵(仮想キー・受け取った時刻)．同じ打鍵がキーのシンクにも届く欄で 2 回扱わないため
     preserved_echo: Option<(u16, Instant)>,
+    /// 入力していないときに予約する表のキー(エンジンは組み立て中に表のキーを返さないので，組み立て中はこれを使う)
+    idle_chords: Vec<KeyChord>,
 }
 
 impl ITfTextInputProcessor_Impl for TextService_Impl {
@@ -277,12 +279,15 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             if self.is_preserved_echo(wparam, false) {
                 return Ok(true.into());
             }
+            if self.holds_alt(wparam) {
+                return Ok(true.into());
+            }
             Ok(self.wants(wparam, lparam).is_some().into())
         })
     }
 
-    fn OnTestKeyUp(&self, _pic: Ref<ITfContext>, _wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
-        Ok(false.into())
+    fn OnTestKeyUp(&self, _pic: Ref<ITfContext>, wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
+        Ok(self.holds_alt(wparam).into())
     }
 
     fn OnKeyDown(&self, pic: Ref<ITfContext>, wparam: WPARAM, lparam: LPARAM) -> Result<BOOL> {
@@ -294,6 +299,9 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             if self.is_preserved_echo(wparam, true) {
                 return Ok(true.into());
             }
+            if self.holds_alt(wparam) {
+                return Ok(true.into());
+            }
             let Some(input) = self.wants(wparam, lparam) else {
                 return Ok(false.into());
             };
@@ -301,8 +309,8 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
         })
     }
 
-    fn OnKeyUp(&self, _pic: Ref<ITfContext>, _wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
-        Ok(false.into())
+    fn OnKeyUp(&self, _pic: Ref<ITfContext>, wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
+        Ok(self.holds_alt(wparam).into())
     }
 
     fn OnPreservedKey(&self, pic: Ref<ITfContext>, rguid: *const GUID) -> Result<BOOL> {
@@ -390,15 +398,19 @@ impl TextService_Impl {
         }
     }
 
-    /// エンジンの返した状態を覚え，Alt の付いた表のキーを予約し直す
+    /// エンジンの返した状態を覚え，Alt の付いたキーを予約し直す．入力していないときは表のキー，
+    /// 組み立て中はそれに Alt+英字・数字・記号・矢印を足す(filter::composing_chords)
     fn set_state(&self, state: SessionState) {
-        let chords = filter::preserved_chords(&state);
-        let (thread_mgr, client_id) = {
+        let (thread_mgr, client_id, chords) = {
             let mut inner = self.inner.borrow_mut();
+            if let Some(idle) = filter::preserved_chords(&state) {
+                inner.idle_chords = idle;
+            }
+            let chords = filter::chords_while(state.is_composing, &inner.idle_chords);
             inner.state = Some(state);
-            (inner.thread_mgr.clone(), inner.client_id)
+            (inner.thread_mgr.clone(), inner.client_id, chords)
         };
-        let (Some(chords), Some(thread_mgr)) = (chords, thread_mgr) else {
+        let Some(thread_mgr) = thread_mgr else {
             return;
         };
         let Ok(keystrokes) = thread_mgr.cast::<ITfKeystrokeMgr>() else {
@@ -407,6 +419,19 @@ impl TextService_Impl {
         let mut current = std::mem::take(&mut self.inner.borrow_mut().preserved);
         preserved::replace(&keystrokes, client_id, &mut current, &chords);
         self.inner.borrow_mut().preserved = current;
+    }
+
+    /// 組み立て中(入力中・変換中)の Alt だけの打鍵か．アプリ(メモ帳・RichEdit など)は Alt の押下で組み立てを終え，
+    /// 離上でメニューに入るので，組み立て中は押下も離上も受け取ってアプリに渡さない(Alt+→ などを変換の操作として使えるように)．
+    /// 組み立てが終わっていれば渡し，Alt でアプリのメニューに入れる
+    fn holds_alt(&self, wparam: WPARAM) -> bool {
+        key::is_alt(wparam.0 as u16)
+            && self
+                .inner
+                .borrow()
+                .state
+                .as_ref()
+                .is_some_and(|state| state.is_composing)
     }
 
     /// この打鍵は，予約したキーでもう受け取ったものか(take なら覚えを消す)
