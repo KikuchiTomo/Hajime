@@ -536,6 +536,18 @@ https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf(リビジョン c67e03e)
 https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf(リビジョン 4f5423f)
 Apache License 2.0(全文は zenz-v3.2-small の節)
 
+## Zenzai(zenz-v3.2-small・zenz-v3.2-xsmall)
+
+https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf
+https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf
+作成: Miwa-Keita．CC BY-SA 4.0
+
+```
+zenz-v3.2-small (GGUF) / zenz-v3.2-xsmall (GGUF) by Miwa-Keita
+Licensed under the Creative Commons Attribution-ShareAlike 4.0 International License (CC BY-SA 4.0)
+https://creativecommons.org/licenses/by-sa/4.0/legalcode
+```
+
 ## jinen(jinen-v2-small・jinen-v2-xsmall)
 
 https://huggingface.co/togatogah/jinen-v2-small.gguf
