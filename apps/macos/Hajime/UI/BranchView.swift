@@ -155,6 +155,8 @@ final class BranchView: NSView {
         var card: NSRect? = nil
         /// 下の枝の高さ(候補の枝と，候補の右に出すカードの高い方)
         var lowerHeight: CGFloat = 0
+        /// 足元のキーの案内の行(hints の添え字)．1 行に入らなければ折り返す
+        var footerLines: [Range<Int>] = [0..<0]
     }
 
     /// 下の枝の候補の行の幅(コマンドのアイコンと，文字のあとに添える説明を含む)
@@ -223,6 +225,8 @@ final class BranchView: NSView {
         }
         width = width.rounded(.up)
         let contentRight = width - metrics.inset
+        // 窓の幅に入らない足元の案内は省かずに折り返す
+        let footerLines = footerLines(panel, width: width - textInset * 2)
         // いちばん上の行の背景(角丸のテーマは行の上下を縮めて描く)の上の端を，枠線の内側の余白の端にそろえる
         let trunkY = metrics.inset - metrics.rowInset + headingHeight(panel) + CGFloat(upperRows) * metrics.rowHeight
         // 下の枝の見える下の端(候補の行の背景の下の端)
@@ -238,11 +242,13 @@ final class BranchView: NSView {
             bottom = frame.maxY
         }
         let notes = (column?.usageNote == nil ? 0 : 1) + (panel.note == nil ? 0 : 1)
-        let height = bottom + (gap + metrics.footerHeight) * CGFloat(notes) + gap + Size.frameWidth + gap + metrics.footerHeight + metrics.inset
+        let height = bottom + (gap + metrics.footerHeight) * CGFloat(notes) + gap + Size.frameWidth + gap + footerHeight(lines: footerLines.count)
+            + metrics.inset
         let lowerHeight = bottom - lowerTop
         return Layout(trunkX: shiftedX, trunkWidths: trunkWidths, lowerRows: lowerRows, trunkY: trunkY,
                       branchWidth: shownBranchWidth, size: NSSize(width: width, height: height.rounded(.up)),
-                      clip: clip, trunkRight: trunkRight, focusSpan: focusSpan, slot: slot, card: card, lowerHeight: lowerHeight)
+                      clip: clip, trunkRight: trunkRight, focusSpan: focusSpan, slot: slot, card: card, lowerHeight: lowerHeight,
+                      footerLines: footerLines)
     }
 
     /// 注目している文節(枝を含む)が窓の内側に入るよう，幹をずらす量を決め直す．入っていれば前の量のまま
@@ -406,7 +412,7 @@ final class BranchView: NSView {
             NoteDrawing.draw(note, x: row.minX, midY: row.midY, theme: theme)
             footerY = row.maxY
         }
-        drawFooter(panel, y: footerY + gap, width: body.width)
+        drawFooter(panel, y: footerY + gap, width: body.width, lines: layout.footerLines)
     }
 
     // MARK: - 幹
@@ -626,6 +632,22 @@ final class BranchView: NSView {
         return UIStrings.Branch.position(first: panel.position, last: panel.position + max(count, 1) - 1, total: panel.total)
     }
 
+    /// 足元のキーの案内を行に分ける(FooterHintLines)．1 行目は右の位置・辞書の名前・連想の知らせの分を除いた幅，
+    /// 2 行目からは足元の幅 width に入れる
+    private func footerLines(_ panel: LatticePanel, width: CGFloat) -> [Range<Int>] {
+        let shown = showsHints ? hints : []
+        let position = showsPosition(panel) ? textWidth(position(of: panel), font: labelFont) + Glass.hintGap : 0
+        let reserved = footerWidth(panel) - GlassDrawing.hintsWidth(shown, theme: theme) + position
+        return FooterHintLines.split(widths: shown.map { Double(GlassDrawing.hintWidth($0, theme: theme)) }, gap: Double(Glass.hintGap),
+                                     first: Double(width - reserved), rest: Double(width))
+    }
+
+    /// 足元の高さ．lines 行の案内と，行と行のあいだ
+    private func footerHeight(lines: Int) -> CGFloat {
+        let lines = CGFloat(max(lines, 1))
+        return metrics.footerHeight * lines + Glass.hintLineGap * (lines - 1)
+    }
+
     private func footerWidth(_ panel: LatticePanel) -> CGFloat {
         let source = panel.columns.first(where: \.isFocused)?.sourceName
             .map { textWidth(UIStrings.Branch.dictionarySource($0), font: labelFont) + Size.paddingX } ?? 0
@@ -649,21 +671,21 @@ final class BranchView: NSView {
         NSRect(x: metrics.inset, y: y, width: width - metrics.inset * 2, height: Size.frameWidth).fill()
     }
 
-    /// 足元．y は区切りの線の上の端．線の下に区切りの線の上と同じ空きを空けて案内を出す
-    private func drawFooter(_ panel: LatticePanel, y: CGFloat, width: CGFloat) {
+    /// 足元．y は区切りの線の上の端．線の下に区切りの線の上と同じ空きを空けて案内を出す．
+    /// 1 行に入らない案内は lines のとおり 2 行目から折り返す．連想の知らせ・位置・辞書の名前は 1 行目
+    private func drawFooter(_ panel: LatticePanel, y: CGFloat, width: CGFloat, lines: [Range<Int>]) {
         let metrics = metrics
         drawSeparator(y: y, width: width)
         let footer = NSRect(x: textInset, y: y + Size.frameWidth + gap, width: width - textInset * 2, height: metrics.footerHeight)
         let muted: [NSAttributedString.Key: Any] = [.font: labelFont, .foregroundColor: theme.textMuted]
         let position = showsPosition(panel) ? position(of: panel) : ""
-        // 右の位置と辞書の名前，連想の知らせを先に取り，残りの幅に入るキーの案内だけを出す
-        let reserved = footerWidth(panel) - (showsHints ? GlassDrawing.hintsWidth(hints, theme: theme) : 0)
-            + (position.isEmpty ? 0 : textWidth(position, font: labelFont) + Glass.hintGap)
         var hintsEnd = footer.minX
-        if showsHints {
-            let shown = GlassDrawing.hints(hints, fitting: footer.width - reserved, theme: theme)
-            GlassDrawing.drawHints(shown, x: footer.minX, midY: footer.midY, theme: theme)
-            if !shown.isEmpty { hintsEnd += GlassDrawing.hintsWidth(shown, theme: theme) + Glass.hintGap }
+        let shown = showsHints ? hints : []
+        for (index, line) in lines.enumerated() where line.upperBound <= shown.count && !line.isEmpty {
+            let lineHints = Array(shown[line])
+            let midY = footer.midY + CGFloat(index) * (metrics.footerHeight + Glass.hintLineGap)
+            GlassDrawing.drawHints(lineHints, x: footer.minX, midY: midY, theme: theme)
+            if index == 0 { hintsEnd += GlassDrawing.hintsWidth(lineHints, theme: theme) + Glass.hintGap }
         }
         if let hint = panel.associationHint {
             // 選んでいる候補に連想があることを，キーの案内のあとに小さく出す(R-18)．キーは文字ではなくキーキャップで描く
