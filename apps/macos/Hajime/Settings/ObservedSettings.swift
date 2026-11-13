@@ -4,7 +4,7 @@ import Observation
 /// 設定の画面に出す設定．読んだ項目が変わったときだけ，読んだ画面を描き直す．
 ///
 /// 設定の全体を 1 つの値として知らせると，項目を 1 つ変えるたびに，設定を読むすべての行を描き直す．一度開いたページは
-/// 作ったまま残すので(SettingsPageStack)，16 ページを開いたあとは 1 回の変更に 140〜160 ms かかっていた．
+/// 作ったまま残すので(SettingsPageStack)，16 ページを開いたあとは 1 回の変更に 140 ms ほどかかっていた(メインスレッドの CPU の時間)．
 /// 項目(キーパス)ごとに印を持ち，画面は読んだ項目の印だけを見張る(Observation)．設定が変わったら，値の変わった項目の印だけを進める．
 /// `model.settings.liveConversion` のように読めば，その項目だけを見張る．中に項目を持つ値(correction・wordLanguage)は，その値ごと見張る
 @MainActor @dynamicMemberLookup
