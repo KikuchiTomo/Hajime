@@ -6,8 +6,6 @@
     <!-- 上書きのときに，TSF の DLL を読み込んでいるアプリ(ほぼすべてのアプリ)を閉じさせない．
          古い DLL は読み込まれたまま残り，次の再起動で消える(下の TSFVERSIONFOLDER の説明) -->
     <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
-    <!-- 上書きでは，前のバージョンの DLL を消すのが次の再起動まで待ちになっても，再起動を求めない(新しい DLL はもう使える) -->
-    <SetProperty Id="REBOOT" Value="ReallySuppress" After="FindRelatedProducts" Sequence="execute" Condition="WIX_UPGRADE_DETECTED" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Hajime">
@@ -74,10 +72,9 @@
       <Custom Action="Register64" After="InstallFiles" Condition="NOT REMOVE" />
       <Custom Action="Register32" After="Register64" Condition="NOT REMOVE" />
       <Custom Action="StartEngine" After="InstallFinalize" Condition="NOT REMOVE" />
-      <!-- 初めて入れたときは，文字入力のサービスが起動中のアプリに読み込まれないので，Windows Installer の標準の確認で再起動を求める．
-           上書き(アップデート)では求めない．新しい DLL は別のフォルダに登録するので，これから起動するアプリは新しい DLL を読み込み，
-           動いているアプリは起動し直すまで前の DLL を使う -->
-      <ScheduleReboot After="StartEngine" Condition="NOT Installed AND NOT WIX_UPGRADE_DETECTED" />
+      <!-- 入れたあと(初めて入れたときも上書きのときも)，Windows Installer の標準の確認で再起動を求める．
+           起動中のアプリには新しい文字入力のサービスが読み込まれないので，再起動してから使う -->
+      <ScheduleReboot After="StartEngine" Condition="NOT REMOVE" />
     </InstallExecuteSequence>
   </Package>
 </Wix>

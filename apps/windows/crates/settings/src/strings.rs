@@ -1436,7 +1436,7 @@ pub mod update {
     /// 新しいバージョンがあるときの問い．変更点があれば後ろに付ける
     pub fn available(latest: &str, current: &str, notes: &str) -> String {
         let question = format!(
-            "Hajime IME v{latest} が利用可能です。現在のバージョン: v{current}\n更新しますか？\n\nインストールには管理者権限が必要です。"
+            "Hajime IME v{latest} が利用可能です。現在のバージョン: v{current}\n更新しますか？\n\nインストールには管理者権限と再起動が必要です。"
         );
         if notes.is_empty() {
             question
