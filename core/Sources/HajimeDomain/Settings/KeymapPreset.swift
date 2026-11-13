@@ -21,12 +21,12 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// ひな形の行(「状態<タブ>キー<タブ>コマンド」の形)
     public var source: String {
         switch self {
-        case .standard: Self.common + "\n" + Self.standardRows
-        case .windows: Self.common + "\n" + Self.windowsRows
-        case .mac: Self.common + "\n" + Self.macRows
-        case .emacs: Self.common + "\n" + Self.standardRows + "\n" + Self.emacsRows
-        case .vim: Self.common + "\n" + Self.standardRows + "\n" + Self.vimRows
-        case .atok: Self.common + "\n" + Self.atokRows
+        case .standard: Self.common + "\n" + Self.standardRows + "\n" + Self.segmentJumpRows
+        case .windows: Self.common + "\n" + Self.windowsRows + "\n" + Self.segmentJumpRows
+        case .mac: Self.common + "\n" + Self.macRows + "\n" + Self.macSegmentJumpRows
+        case .emacs: Self.common + "\n" + Self.standardRows + "\n" + Self.segmentJumpRows + "\n" + Self.emacsRows
+        case .vim: Self.common + "\n" + Self.standardRows + "\n" + Self.segmentJumpRows + "\n" + Self.vimRows
+        case .atok: Self.common + "\n" + Self.atokRows + "\n" + Self.segmentJumpRows
         }
     }
 
@@ -34,6 +34,31 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     public static func matching(_ keymap: Keymap) -> KeymapPreset? {
         allCases.first { $0.keymap.entries == keymap.entries }
     }
+
+    /// 分岐図の 1〜8 番目の文節へ移るキー．変換中の Option とホームポジションの 8 つのキー(A・S・D・F・J・K・L・;)．Mac 風のほかのすべてのひな形に入れる
+    static let segmentJumpRows = """
+        converting\tOption a\tjumpToSegment1
+        converting\tOption s\tjumpToSegment2
+        converting\tOption d\tjumpToSegment3
+        converting\tOption f\tjumpToSegment4
+        converting\tOption j\tjumpToSegment5
+        converting\tOption k\tjumpToSegment6
+        converting\tOption l\tjumpToSegment7
+        converting\tOption ;\tjumpToSegment8
+        """
+
+    /// Mac 風の，文節へ移るキー．Mac 風は変換中の Option+A・S・K をほかの操作(半角カタカナ・半角英数・次の候補)に使うので，Shift を足す．
+    /// Shift を押すと「;」は別の字になるので，中段の左から 8 つの英字(A・S・D・F・G・H・J・K)にする
+    static let macSegmentJumpRows = """
+        converting\tShift Option a\tjumpToSegment1
+        converting\tShift Option s\tjumpToSegment2
+        converting\tShift Option d\tjumpToSegment3
+        converting\tShift Option f\tjumpToSegment4
+        converting\tShift Option g\tjumpToSegment5
+        converting\tShift Option h\tjumpToSegment6
+        converting\tShift Option j\tjumpToSegment7
+        converting\tShift Option k\tjumpToSegment8
+        """
 
     /// どのひな形にも入れる行．日本語と英数の切り替えと，入力の状態によらない IME の機能
     static let common = """
@@ -58,8 +83,6 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// 入力中の Shift+Space と，変換中の Shift+↑ で連想変換(R-18)．
     /// 変換中の F6〜F8 は選んでいる文節だけの字種(F9・F10 は全文)，Esc は直前の変更の取り消し(続けて押すと全文を読みに戻す)，
     /// Backspace は全文を読みに戻し，Delete は読みに戻して末尾から打ち続ける．
-    /// 変換中の Option とホームポジションの 8 つのキー(A・S・D・F・J・K・L・;)は，分岐図の 1〜8 番目の文節へ移る
-    /// (Windows 風・Mac 風・ATOK 風は Option と英字のキーをほかの操作に使うので，入れていない．キー設定で割り当てられる)．
     /// 変換中の ⌃⌫ で候補を学習から消し，入力中の ⌃⌫ で予測の窓の語句を予測に表示しない(Windows 風・Mac 風・ATOK 風は Ctrl+Delete)．
     /// 予測を確定した直後の Backspace で補う前の読みに戻す(Windows 風・ATOK 風は確定の取り消しの Ctrl+Backspace で戻す)．
     /// 確定した直後の ⌃⌫ で確定する前の変換に戻す(ひな形すべて．確定した直後の変換のキーも同じ)．
@@ -120,14 +143,6 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tF8\tsegmentToHalfwidthKatakana
         converting\tEscape\tundoConversionEdit
         converting\tDelete\tresumeEditing
-        converting\tOption a\tjumpToSegment1
-        converting\tOption s\tjumpToSegment2
-        converting\tOption d\tjumpToSegment3
-        converting\tOption f\tjumpToSegment4
-        converting\tOption j\tjumpToSegment5
-        converting\tOption k\tjumpToSegment6
-        converting\tOption l\tjumpToSegment7
-        converting\tOption ;\tjumpToSegment8
         """
 
     /// Emacs 風．標準に加えて Control+N・P で候補，Control+F・B で文節，Control+G で取り消す
