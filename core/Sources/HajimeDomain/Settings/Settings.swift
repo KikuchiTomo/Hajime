@@ -116,22 +116,22 @@ public struct Settings: Sendable, Equatable {
     /// 手の置き場所が横にずれたまま打った並びを直す(HandShift．試験的)
     public var handShiftCorrection = false
     /// うろ覚えで読みを少し違えた外来語(しゅみれーしょん → シミュレーション)を候補に出す(LooseReadings)
-    public var looseReadings = false
+    public var looseReadings = true
     /// 発音どおりに綴った英単語(foto → photo)を候補に出す(PhoneticSpelling)
-    public var phoneticSpelling = false
+    public var phoneticSpelling = true
     /// 英語の語の辞書(R-24)の語を，決まった書き方(api → API，openai → OpenAI)で候補に出す
     public var englishTermCandidates = true
     /// 利用者が足した英語の語(同梱の辞書に無い語)．決まった書き方で書く
     public var englishTerms: [String] = []
     /// ユーザー辞書の語の `{datetime:...}` などを，入れるときの値に置き換える(TextTemplate)
-    public var dynamicDictionary = false
+    public var dynamicDictionary = true
     /// 連想変換のキーで出す一覧に，選んでいる語を整えた形(変換マクロ)を並べる
-    public var conversionMacros = false
+    public var conversionMacros = true
     public var macros: [ConversionMacro] = DefaultSettings.conversionMacros
     /// かなの語(語が読みと同じ)には，語と読みを並べる変換マクロ(ルビ・読みを添える形)を出さない
     public var macroSkipsSameReading = true
     /// 読みで呼び出すコマンド(ランチャー)を使う．同期しない(SyncGroup.commands)
-    public var launcherCommands = false
+    public var launcherCommands = true
     public var commands: [LauncherCommand] = []
     /// かなで打った外来語は，英語のつづり(「Live変換」)よりカタカナ(「ライブ変換」)を先に出す
     public var prefersKatakana = true
