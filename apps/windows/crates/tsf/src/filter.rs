@@ -21,6 +21,26 @@ pub fn consumes(state: Option<&SessionState>, input: &KeyInput) -> bool {
         && !input.modifiers.alt
 }
 
+/// TSF に「予約したキー」(PreserveKey)として登録するキー．Alt の付いたキー(Ctrl+Alt+E など)は，Windows 11 のメモ帳などの
+/// XAML の入力欄では AltGr の文字入力として扱われ，キーのシンク(OnTestKeyDown・OnKeyDown)を通らないので，予約して受け取る．
+/// 組み立て中はエンジンが表のキーを返さない(すべてのキーを受け取る)ので None を返し，前の登録をそのまま使う
+pub fn preserved_chords(state: &SessionState) -> Option<Vec<KeyChord>> {
+    if state.is_composing {
+        return None;
+    }
+    let mut chords: Vec<KeyChord> = Vec::new();
+    for bound in &state.consumed_keys {
+        if !bound.modifiers.alt {
+            continue;
+        }
+        let chord = normalized(&bound.key, &bound.modifiers);
+        if !chords.contains(&chord) {
+            chords.push(chord);
+        }
+    }
+    Some(chords)
+}
+
 fn normalized(key: &Key, modifiers: &Modifiers) -> KeyChord {
     let (key, shift) = match key {
         Key::Character { text } => {
@@ -74,6 +94,55 @@ mod tests {
             preceding_text_length: None,
             keyboard_layout: None,
         }
+    }
+
+    #[test]
+    fn 予約するのは_alt_の付いた表のキーだけ() {
+        let alt = |control| Modifiers {
+            shift: false,
+            control,
+            alt: true,
+        };
+        let idle = state(
+            InputMode::Japanese,
+            false,
+            vec![
+                KeyChord {
+                    key: Key::Character { text: "E".into() },
+                    modifiers: alt(true),
+                },
+                KeyChord {
+                    key: Key::Character { text: "e".into() },
+                    modifiers: alt(true),
+                },
+                KeyChord {
+                    key: Key::Function { number: 10 },
+                    modifiers: Modifiers {
+                        control: true,
+                        ..plain()
+                    },
+                },
+                KeyChord {
+                    key: Key::Kana,
+                    modifiers: alt(false),
+                },
+            ],
+        );
+        assert!(
+            preserved_chords(&idle)
+                == Some(vec![
+                    KeyChord {
+                        key: Key::Character { text: "e".into() },
+                        modifiers: alt(true),
+                    },
+                    KeyChord {
+                        key: Key::Kana,
+                        modifiers: alt(false),
+                    },
+                ])
+        );
+        let composing = state(InputMode::Japanese, true, vec![]);
+        assert!(preserved_chords(&composing).is_none());
     }
 
     #[test]

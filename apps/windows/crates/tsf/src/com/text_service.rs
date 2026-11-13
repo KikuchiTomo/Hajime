@@ -5,6 +5,7 @@ use super::keyboard;
 use super::langbar::{self, Anchor, InputModeItem};
 use super::launch;
 use super::phonetic;
+use super::preserved::{self, Preserved};
 use super::timer;
 use crate::filter;
 use crate::key::{self, RawKey};
@@ -52,6 +53,8 @@ const STALL_LIMIT: Duration = Duration::from_millis(ipc::timing::ENGINE_STALL_MI
 /// メニューからは渡されないので，登録できる単語の長さの上限(core の DefaultSettings.maximumUserDictionaryWordLength)と同じにする．
 /// 登録できない長さの文字を読んで送らないため
 const MENU_REGISTRATION_LENGTH: u32 = 64;
+/// 予約したキーで受け取った打鍵が，続けてキーのシンクにも届くのを待つ長さ
+const PRESERVED_ECHO_WINDOW: Duration = Duration::from_millis(500);
 
 thread_local! {
     static ACTIVE: RefCell<Option<ComObject<TextService>>> = const { RefCell::new(None) };
@@ -95,6 +98,10 @@ struct Inner {
     timer: usize,
     application_id: Option<String>,
     mode_item: Option<ComObject<InputModeItem>>,
+    /// 予約したキー(Alt の付いた表のキー．preserved)
+    preserved: Vec<Preserved>,
+    /// 予約したキーで受け取った打鍵(仮想キー・受け取った時刻)．同じ打鍵がキーのシンクにも届く欄で 2 回扱わないため
+    preserved_echo: Option<(u16, Instant)>,
 }
 
 impl ITfTextInputProcessor_Impl for TextService_Impl {
@@ -132,6 +139,8 @@ impl ITfTextInputProcessor_Impl for TextService_Impl {
                     langbar::remove(&thread_mgr, &item.to_interface());
                 }
                 if let Ok(keystrokes) = thread_mgr.cast::<ITfKeystrokeMgr>() {
+                    let mut current = std::mem::take(&mut self.inner.borrow_mut().preserved);
+                    preserved::clear(&keystrokes, &mut current);
                     let _ = unsafe { keystrokes.UnadviseKeyEventSink(client_id) };
                 }
                 if let Ok(source) = thread_mgr.cast::<ITfSource>() {
@@ -262,6 +271,9 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             if key_target(&pic).is_none() {
                 return Ok(false.into());
             }
+            if self.is_preserved_echo(wparam, false) {
+                return Ok(true.into());
+            }
             Ok(self.wants(wparam, lparam).is_some().into())
         })
     }
@@ -275,9 +287,60 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
             let Some(context) = key_target(&pic) else {
                 return Ok(false.into());
             };
+            // 予約したキーで受け取った打鍵が，キーのシンクにも届いた．もう送ったので，送らずに受け取る
+            if self.is_preserved_echo(wparam, true) {
+                return Ok(true.into());
+            }
             let Some(input) = self.wants(wparam, lparam) else {
                 return Ok(false.into());
             };
+            self.send_key(context, input)
+        })
+    }
+
+    fn OnKeyUp(&self, _pic: Ref<ITfContext>, _wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
+        Ok(false.into())
+    }
+
+    fn OnPreservedKey(&self, pic: Ref<ITfContext>, rguid: *const GUID) -> Result<BOOL> {
+        guard(|| {
+            let Some(context) = key_target(&pic) else {
+                return Ok(false.into());
+            };
+            if rguid.is_null() {
+                return Ok(false.into());
+            }
+            // SAFETY: TSF が渡す識別子．null でないことは上で確かめた
+            let guid = unsafe { *rguid };
+            let found = self.inner.borrow().preserved.iter().find_map(|preserved| {
+                (preserved.guid == guid).then(|| (preserved.chord.clone(), preserved.vk()))
+            });
+            let Some((chord, vk)) = found else {
+                return Ok(false.into());
+            };
+            // エンジンにつながっていないときはアプリに渡す
+            if self.inner.borrow().state.is_none() {
+                return Ok(false.into());
+            }
+            let input = ipc::KeyInput {
+                key: chord.key,
+                modifiers: chord.modifiers,
+                key_label: None,
+                is_keypad: false,
+            };
+            let eaten = self.send_key(context, input)?;
+            if eaten.as_bool() {
+                self.inner.borrow_mut().preserved_echo = Some((vk, Instant::now()));
+            }
+            Ok(eaten)
+        })
+    }
+}
+
+impl TextService_Impl {
+    /// キーをエンジンに送り，返事を反映する．受け取った(アプリに渡さない)なら true
+    fn send_key(&self, context: &ITfContext, input: ipc::KeyInput) -> Result<BOOL> {
+        {
             // コマンドの候補を確定すると，エンジンがアプリやページを開く．エンジンは裏のプロセスで窓を前に出せないので，
             // 前にいる入力先のアプリから，つないでいるエンジンにだけ前に出ることを許す(許さないと開いたアプリが後ろに出る)
             if input.key == Key::Enter {
@@ -321,19 +384,45 @@ impl ITfKeyEventSink_Impl for TextService_Impl {
                     Ok(false.into())
                 }
             }
-        })
+        }
     }
 
-    fn OnKeyUp(&self, _pic: Ref<ITfContext>, _wparam: WPARAM, _lparam: LPARAM) -> Result<BOOL> {
-        Ok(false.into())
+    /// エンジンの返した状態を覚え，Alt の付いた表のキーを予約し直す
+    fn set_state(&self, state: SessionState) {
+        let chords = filter::preserved_chords(&state);
+        let (thread_mgr, client_id) = {
+            let mut inner = self.inner.borrow_mut();
+            inner.state = Some(state);
+            (inner.thread_mgr.clone(), inner.client_id)
+        };
+        let (Some(chords), Some(thread_mgr)) = (chords, thread_mgr) else {
+            return;
+        };
+        let Ok(keystrokes) = thread_mgr.cast::<ITfKeystrokeMgr>() else {
+            return;
+        };
+        let mut current = std::mem::take(&mut self.inner.borrow_mut().preserved);
+        preserved::replace(&keystrokes, client_id, &mut current, &chords);
+        self.inner.borrow_mut().preserved = current;
     }
 
-    fn OnPreservedKey(&self, _pic: Ref<ITfContext>, _rguid: *const GUID) -> Result<BOOL> {
-        Ok(false.into())
+    /// この打鍵は，予約したキーでもう受け取ったものか(take なら覚えを消す)
+    fn is_preserved_echo(&self, wparam: WPARAM, take: bool) -> bool {
+        let mut inner = self.inner.borrow_mut();
+        let Some((vk, at)) = inner.preserved_echo else {
+            return false;
+        };
+        if at.elapsed() > PRESERVED_ECHO_WINDOW {
+            inner.preserved_echo = None;
+            return false;
+        }
+        let echo = wparam.0 == usize::from(vk);
+        if echo && take {
+            inner.preserved_echo = None;
+        }
+        echo
     }
-}
 
-impl TextService_Impl {
     fn wants(&self, wparam: WPARAM, lparam: LPARAM) -> Option<ipc::KeyInput> {
         let layout = self
             .inner
@@ -417,8 +506,8 @@ impl TextService_Impl {
             {
                 let mut inner = self.inner.borrow_mut();
                 inner.session = Some(session);
-                inner.state = Some(state);
             }
+            self.set_state(state);
             self.show_mode(mode);
             self.activate();
         }
@@ -476,7 +565,7 @@ impl TextService_Impl {
                 }
                 (ResponseBody::Edit { state, .. }, None) => {
                     let mode = state.mode;
-                    self.inner.borrow_mut().state = Some(state);
+                    self.set_state(state);
                     self.show_mode(mode);
                 }
                 _ => {}
@@ -536,7 +625,7 @@ impl TextService_Impl {
             } => {
                 let wake = state.wake_after_milliseconds;
                 let mode = state.mode;
-                self.inner.borrow_mut().state = Some(state);
+                self.set_state(state);
                 self.show_mode(mode);
                 let applied = self.apply_operations(context, operations);
                 self.schedule_timer(wake);
@@ -787,9 +876,7 @@ impl TextService_Impl {
             (Some(body), Some(target)) => {
                 self.apply_response(&target, body);
             }
-            (Some(ResponseBody::Edit { state, .. }), None) => {
-                self.inner.borrow_mut().state = Some(state)
-            }
+            (Some(ResponseBody::Edit { state, .. }), None) => self.set_state(state),
             _ => {}
         }
     }
@@ -1287,7 +1374,7 @@ impl ITfCompositionSink_Impl for TextService_Impl {
                     .send(RequestBody::Deactivate { session })
                     .wait(RESPONSE_TIMEOUT)
                 {
-                    self.inner.borrow_mut().state = Some(state);
+                    self.set_state(state);
                 }
             }
             Ok(())
