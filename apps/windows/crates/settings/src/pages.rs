@@ -1497,6 +1497,7 @@ fn conversion() -> Vec<Section> {
                 .enabled_when(IsNot("predictionDisplay", "off")),
                 Row::toggle(choice::VARIANT_ROW, "showsVariantRow"),
                 Row::toggle(choice::KEY_HINTS, "showsKeyHints"),
+                Row::toggle(choice::BRANCH_HINTS_ALWAYS, "alwaysShowsBranchHints"),
                 Row::toggle(choice::FEWER_ITEMS, "showsFewerItems"),
                 Row::seconds(
                     more::LIVE_CONVERSION_DELAY,

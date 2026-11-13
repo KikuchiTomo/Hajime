@@ -154,6 +154,7 @@ enum SamplePanels {
     /// 標準のキー設定の，文節へ移るキーと文字種にするキーを入れた見本(core の InputSession が入れるものと同じ)
     static func withKeys(_ panel: LatticePanel) -> LatticePanel {
         var panel = panel
+        panel.pageSize = DefaultSettings.latticeCandidatesPerSegment
         let keymap = KeymapPreset.standard.keymap
         for (index, command) in KeymapCommand.segmentJumps.enumerated() where panel.columns.indices.contains(index) {
             panel.columns[index].jumpKey = keymap.strokes(for: command, in: .converting).first.map(UIStrings.Keys.name(of:))

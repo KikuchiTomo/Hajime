@@ -44,7 +44,12 @@ public enum IndicatorLabels {
 
         /// 変換中に first(キーが無ければ fallback)と second に割り当てた最初のキー
         public func strokes(in keymap: Keymap) -> (first: KeyStroke?, second: KeyStroke?) {
-            func stroke(_ command: KeymapCommand?) -> KeyStroke? { command.flatMap { keymap.strokes(for: $0, in: .converting).first } }
+            func stroke(_ command: KeymapCommand?) -> KeyStroke? {
+                guard let command else { return nil }
+                // 次の文節へのキーは，候補の先の枝へ移るキー(標準は →)があればそれを案内する．先の枝が無い所(一覧・表・文字種の行)では，そのキーで次へ移る
+                if command == .nextSegment, let branch = keymap.strokes(for: .enterBranch, in: .converting).first { return branch }
+                return keymap.strokes(for: command, in: .converting).first
+            }
             return (stroke(first) ?? stroke(fallback), stroke(second))
         }
     }
@@ -85,11 +90,13 @@ public enum IndicatorLabels {
     /// 候補の先の小さな幹(意味・連想)の先に置く案内の言葉．キーは連想変換のキー
     public static let branchExpandLabel = "展開"
 
-    /// 畳んでいる先の枝(表示項目を減らす設定)を開く案内
-    public static let branchExpandHint = Hint(.associate, branchExpandLabel)
+    /// 候補から先の枝へ入る案内(畳んでいる先の枝を開く案内も同じ)．先の枝へ移るキーが無ければ，連想変換のキー
+    public static let branchExpandHint = Hint(.enterBranch, branchExpandLabel, fallback: .associate)
 
-    /// 候補の先の小さな幹の，語の意味の見出し
+    /// 候補の先の小さな幹の，語の意味・連想・変換マクロの見出し
     public static let branchMeaningTitle = "意味"
+    public static let branchAssociationTitle = "連想"
+    public static let branchMacroTitle = "マクロ"
 
     /// 連想の一覧の足元の案内
     public static let associationHints: [Hint] = [
