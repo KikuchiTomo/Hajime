@@ -1120,6 +1120,20 @@ struct BranchMapControlTests {
         #expect(harness.lattice?.columns.first?.variantKeys.prefix(3) == ["F6", "F7", "F8"])
     }
 
+    @Test("R-17: 分岐図のキーの案内は，既定では修飾キーを押し続けているあいだだけ出す．常に表示する設定なら，いつも出す")
+    func hintsOnHold() {
+        let harness = Harness(converter: converter())
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.hintsOnHold == true)
+        var settings = DefaultSettings.settings
+        settings.alwaysShowsBranchHints = true
+        let always = Harness(converter: converter(), settings: settings)
+        always.type("kyouhaii")
+        always.press(.space)
+        #expect(always.lattice?.hintsOnHold == false)
+    }
+
     @Test("R-08: 選んでいる候補に同音異義語があれば使い分けを添え，設定で切れる")
     func homophoneNote() {
         let converter = FakeConverter(["とった": [("撮った", nil), ("取った", nil)]])

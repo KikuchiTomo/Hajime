@@ -190,15 +190,6 @@ enum BranchMapDrawing {
         TextFitting.draw(hint.label, attributes: labelAttributes(theme, color: ink), x: partX - Glass.keycapPartGap + Space.inline, midY: rect.midY)
     }
 
-    /// 案内を左から並べて描く
-    static func drawHints(_ hints: [KeyHint], x: CGFloat, midY: CGFloat, theme: ResolvedTheme) {
-        var x = x
-        for hint in hints {
-            drawHint(hint, x: x, midY: midY, theme: theme)
-            x += hintWidth(hint, theme: theme) + Glass.hintGap
-        }
-    }
-
     // MARK: - キーだけの印
 
     /// 文字種の前に置く，キーだけの印の幅．候補の番号と同じキーキャップの形

@@ -15,6 +15,7 @@
   "fields" : [
     "alphabetWidth",
     "alphanumericHyphen",
+    "alwaysShowsBranchHints",
     "association",
     "associationDictionaries",
     "associationLimit",

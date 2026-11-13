@@ -2330,6 +2330,7 @@ public final class InputSession {
                 panel = PanelBuilder.splitting(panel, pieces: focusedSplit(lattice).pieces)
             }
             if let pendingNote { panel.note = pendingNote }
+            panel.hintsOnHold = !settings.current.alwaysShowsBranchHints
             return [.setMarkedText(marked), .showLattice(panel)]
         }
     }
@@ -2857,6 +2858,7 @@ public final class InputSession {
             column.split = nil
             panel.columns[edit.index] = column
         }
+        panel.hintsOnHold = !settings.current.alwaysShowsBranchHints
         return [.setMarkedText(MarkedText(segments, caret: caret)), .showLattice(panel)]
     }
 
@@ -2985,7 +2987,8 @@ public final class InputSession {
             if isSegmentList {
                 return [.setMarkedText(marked), .showCandidates(PanelBuilder.associationListPanel(for: list, perPage: latticePerPage))]
             }
-            let panel = PanelBuilder.associationLatticePanel(for: lattice, list: list, perPage: settings.current.branchCandidatesPerPage)
+            var panel = PanelBuilder.associationLatticePanel(for: lattice, list: list, perPage: settings.current.branchCandidatesPerPage)
+            panel.hintsOnHold = !settings.current.alwaysShowsBranchHints
             return [.setMarkedText(marked), .showLattice(panel)]
         case .selecting(let selection):
             let candidate = candidate(in: .selecting(selection))

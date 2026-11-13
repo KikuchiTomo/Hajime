@@ -2,6 +2,7 @@
   "defaults": {
     "alphabetWidth": "halfwidth",
     "alphanumericHyphen": true,
+    "alwaysShowsBranchHints": false,
     "association": true,
     "associationDictionaries": [
       {

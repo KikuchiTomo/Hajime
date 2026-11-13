@@ -595,6 +595,10 @@ enum DesignTokens {
         enum CorrectionUnderline {
             static let appear: Double = 80
         }
+        enum BranchMap {
+            static let hintHold: Double = 250
+            static let hintFade: Double = 100
+        }
         enum CandidateRest {
             static let fadeIn: Double = 250
         }

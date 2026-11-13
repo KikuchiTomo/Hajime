@@ -931,6 +931,7 @@ enum UIStrings {
         static let variantRow = "候補の上に文字種の行を表示"
         static let keyHints = "キーの案内を表示"
         static let fewerItems = "表示項目を減らす"
+        static let branchHintsAlways = "分岐図のキーの案内を常に表示"
         static let typoCorrection = "タイプミスの修正"
         static let yenKey = "¥ キーで入力する文字"
         static let theme = "テーマ"
@@ -1304,7 +1305,7 @@ extension UIStrings {
             "showsPartOfSpeech": UIStrings.Settings.showsPartOfSpeech, "showsUsageExamples": UIStrings.Settings.showsUsageExamples,
             "showsHomophones": UIStrings.Settings.showsHomophones,
             "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
-            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "showsFewerItems": Choice.fewerItems, "numberKeySelection": UIStrings.Settings.numberKeySelection,
+            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "showsFewerItems": Choice.fewerItems, "alwaysShowsBranchHints": Choice.branchHintsAlways, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
             "emojiConversion": UIStrings.Settings.emojiConversion, "emojiWordConversion": UIStrings.Settings.emojiWordConversion,
             "emojiCandidatePosition": UIStrings.Settings.emojiCandidatePosition,

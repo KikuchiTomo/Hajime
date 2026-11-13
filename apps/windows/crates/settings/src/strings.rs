@@ -138,6 +138,7 @@ pub mod choice {
     pub const VARIANT_ROW: &str = "候補の上に文字種の行を表示";
     pub const KEY_HINTS: &str = "キーの案内を表示";
     pub const FEWER_ITEMS: &str = "表示項目を減らす";
+    pub const BRANCH_HINTS_ALWAYS: &str = "分岐図のキーの案内を常に表示";
     pub const TYPO_CORRECTION: &str = "タイプミスの修正";
     pub const YEN_KEY: &str = "¥ キーで入力する文字";
     pub const THEME: &str = "テーマ";
@@ -1188,6 +1189,7 @@ pub mod sync {
         ("showsVariantRow", "候補の上に文字種の行を表示"),
         ("showsKeyHints", "キーの案内を表示"),
         ("showsFewerItems", "表示項目を減らす"),
+        ("alwaysShowsBranchHints", "分岐図のキーの案内を常に表示"),
         ("numberKeySelection", "数字キーで候補を選択"),
         ("dateConversion", "日付と時刻に変換"),
         ("symbolConversion", "記号に変換"),

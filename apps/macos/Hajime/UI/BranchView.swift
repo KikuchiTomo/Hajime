@@ -51,6 +51,11 @@ final class BranchView: NSView {
     var keys = KeymapPreset.standard.keymap { didSet { invalidate() } }
     /// キーの案内を出すか(設定の「キーの案内を表示」)
     var showsHints = true { didSet { invalidate() } }
+    /// 押し続けている修飾キー(CandidatePanelController が入れる)．案内を押し続けているあいだだけ出す設定(LatticePanel.hintsOnHold)では，
+    /// この修飾キーを使うキーの案内だけを出す．案内の場所はいつも空けてあるので，出しても候補は動かない
+    var heldModifiers: NSEvent.ModifierFlags = [] { didSet { if heldModifiers != oldValue { needsDisplay = true } } }
+    /// 押し続けて出す案内の濃さ(出し始めに 0 から 1 へ)
+    var hintOpacity: CGFloat = 1 { didSet { if hintOpacity != oldValue { needsDisplay = true } } }
     var theme = ResolvedTheme.resolveStatic { didSet { invalidate() } }
     var fontSize: CGFloat = Size.fontSize { didSet { invalidate() } }
     var restOpacity: CGFloat = 1 { didSet { needsDisplay = true } }
@@ -138,6 +143,34 @@ final class BranchView: NSView {
         let expand = panel.collapsesDetail ? UIStrings.Branch.expandHint(for: keys) : panel.associationHint?.key.map(UIStrings.Branch.expandHint(key:))
         return Hints(boundary: UIStrings.Branch.boundaryHints(for: keys), variant: UIStrings.Branch.variantHint(for: keys),
                      candidates: UIStrings.Branch.candidateHints(for: keys), expand: expand)
+    }
+
+    /// 今，この案内を出すか．常に出す設定ならすべて出し，押し続けて出す設定なら，押し続けている修飾キーを使うキーの案内だけを出す
+    private func isShown(_ hint: KeyHint, in panel: LatticePanel) -> Bool {
+        guard panel.hintsOnHold else { return true }
+        let symbols: [(NSEvent.ModifierFlags, Character)] = [(.shift, "⇧"), (.option, "⌥"), (.control, "⌃"), (.command, "⌘")]
+        return symbols.contains { heldModifiers.contains($0.0) && hint.key.contains($0.1) }
+    }
+
+    /// 案内を左から並べた位置に描く．出さない案内の場所は空けたままにする(出したり消したりしても，ほかの案内は動かない)
+    private func drawHints(_ hints: [KeyHint], x: CGFloat, midY: CGFloat, in panel: LatticePanel) {
+        var x = x
+        for hint in hints {
+            if isShown(hint, in: panel) { BranchMapDrawing.drawHint(hint, x: x, midY: midY, theme: theme) }
+            x += BranchMapDrawing.hintWidth(hint, theme: theme) + Glass.hintGap
+        }
+    }
+
+    /// 押し続けて出す案内を，出し始めの濃さ(hintOpacity)で描く
+    private func withHintOpacity(in panel: LatticePanel, _ body: () -> Void) {
+        guard panel.hintsOnHold, hintOpacity < 1, let context = NSGraphicsContext.current?.cgContext else {
+            body()
+            return
+        }
+        context.saveGState()
+        context.setAlpha(hintOpacity)
+        body()
+        context.restoreGState()
     }
 
     // MARK: - 語の意味
@@ -285,7 +318,15 @@ final class BranchView: NSView {
     /// 上の枝の文字種ごとの，その文字種にするキー(variants と同じ数)．案内を出さない設定と，キーの無い文字種は nil
     private func variantKeys(of column: LatticePanel.Column?) -> [String?] {
         guard let column else { return [] }
-        return column.variants.indices.map { showsHints && column.variantKeys.indices.contains($0) ? column.variantKeys[$0] : nil }
+        // 押し続けて出す設定では出さない(修飾キーの無いキーなので，押し続けて出す手がかりが無い．場所も空けない)
+        let shows = showsHints && panel?.hintsOnHold == false
+        return column.variants.indices.map { shows && column.variantKeys.indices.contains($0) ? column.variantKeys[$0] : nil }
+    }
+
+    /// 文節の左の端から，その文節の丸(と，そこから出る枝)までの距離．短い文節は真ん中，長い文節は左から決まった距離(1 字と余白)にする．
+    /// 候補を移って文節の字の数が変わっても，丸と枝の位置が動かないようにするため(真ん中に置くと，字の数が変わるたびに枝が左右に動く)
+    private func stopOffset(width: CGFloat) -> CGFloat {
+        min(width / 2, fontSize + Part.rowPaddingX).rounded()
     }
 
     /// 幹の文節の幅(文字と左右の余白)
@@ -407,7 +448,7 @@ final class BranchView: NSView {
         }
 
         // 窓の幅．上限を超える文は，幹を送る
-        let focusCenter = focus.map { nodeX[$0] + nodeWidths[$0] / 2 } ?? metrics.inset
+        let focusCenter = focus.map { nodeX[$0] + stopOffset(width: nodeWidths[$0]) } ?? metrics.inset
         let boundaryWidth = BranchMapDrawing.hintsWidth(hints.boundary, theme: theme)
         let notesWidth = [column?.usageNote.map { textWidth($0, font: labelFont) }, panel.note.map { NoteDrawing.width($0, theme: theme) },
                           panel.meaningPlacement == .below && column?.homophone != nil ? Meaning.listWidth : nil]
@@ -524,8 +565,8 @@ final class BranchView: NSView {
         result.nodes = panel.columns.indices.map { NSRect(x: (nodeX[$0] - shift).rounded(), y: nodeTop, width: nodeWidths[$0], height: metrics.rowHeight) }
         result.fadesLeft = result.overflows && shift > 0
         result.fadesRight = result.overflows && trunkRight - shift > right
-        result.railStart = result.fadesLeft ? 0 : (result.nodes.first?.midX ?? left)
-        result.railEnd = result.fadesRight ? width : (result.nodes.last?.midX ?? left)
+        result.railStart = result.fadesLeft ? 0 : (result.nodes.first.map { $0.minX + stopOffset(width: $0.width) } ?? left)
+        result.railEnd = result.fadesRight ? width : (result.nodes.last.map { $0.minX + stopOffset(width: $0.width) } ?? left)
         result.focus = focus
         result.focusX = focusX
         result.stemX = stemX
@@ -646,7 +687,7 @@ final class BranchView: NSView {
 
         // 丸．線は丸の内側を通さない
         let trunkStops = layout.nodes.enumerated().map { index, node in
-            Stop(center: NSPoint(x: node.midX.rounded(), y: layout.railY), state: index == layout.focus ? .selected : .plain)
+            Stop(center: NSPoint(x: node.minX + stopOffset(width: node.width), y: layout.railY), state: index == layout.focus ? .selected : .plain)
         }
         var branchStops: [Stop] = []
         for (index, row) in layout.rows.enumerated() where rows.indices.contains(index) {
@@ -694,12 +735,15 @@ final class BranchView: NSView {
             }
             // 文節へ移るキーを，文節の丸の上に重ねる(区切っているあいだは，番号キーが別の意味になるので出さない)
             if showsHints, !panel.columns.contains(where: { $0.split != nil }) {
-                for (index, column) in panel.columns.enumerated() {
-                    guard let key = column.jumpKey else { continue }
-                    let hint = KeyHint(key: key, label: "")
-                    let stop = trunkStops[index]
-                    BranchMapDrawing.drawHint(hint, x: stop.center.x - BranchMapDrawing.hintWidth(hint, theme: theme) / 2, midY: stop.center.y, theme: theme,
-                                              selected: index == layout.focus)
+                withHintOpacity(in: panel) {
+                    for (index, column) in panel.columns.enumerated() {
+                        guard let key = column.jumpKey else { continue }
+                        let hint = KeyHint(key: key, label: "")
+                        guard isShown(hint, in: panel) else { continue }
+                        let stop = trunkStops[index]
+                        BranchMapDrawing.drawHint(hint, x: stop.center.x - BranchMapDrawing.hintWidth(hint, theme: theme) / 2, midY: stop.center.y,
+                                                  theme: theme, selected: index == layout.focus)
+                    }
                 }
             }
         }
@@ -760,21 +804,25 @@ final class BranchView: NSView {
         if let meaning = layout.meaning { drawMeaning(meaning, direction: layout.direction) }
 
         // キーの案内と，文節の境目のつまみ
-        if let midY = layout.boundaryMidY, !hints.boundary.isEmpty {
-            BranchMapDrawing.drawHints(hints.boundary, x: layout.boundaryX, midY: midY, theme: theme)
-            if let focus = layout.focus, column?.split == nil, column?.isEditing == false {
-                let node = layout.nodes[focus]
-                BranchMapDrawing.drawGrip(x: node.maxX + Map.segmentGap, midY: node.midY, height: (trunkFont.ascender - trunkFont.descender).rounded(), theme: theme)
+        withHintOpacity(in: panel) {
+            if let midY = layout.boundaryMidY, !hints.boundary.isEmpty {
+                drawHints(hints.boundary, x: layout.boundaryX, midY: midY, in: panel)
+                // 境目のつまみは，境目を動かすキーの案内と一緒に出す
+                if let focus = layout.focus, column?.split == nil, column?.isEditing == false, hints.boundary.first.map({ isShown($0, in: panel) }) == true {
+                    let node = layout.nodes[focus]
+                    BranchMapDrawing.drawGrip(x: node.maxX + Map.segmentGap, midY: node.midY, height: (trunkFont.ascender - trunkFont.descender).rounded(),
+                                              theme: theme)
+                }
             }
-        }
-        if let x = layout.variantHintX, let hint = hints.variant, let label = layout.kinds.first?.label {
-            BranchMapDrawing.drawHint(hint, x: x, midY: label.midY, theme: theme)
-        }
-        if let x = layout.expandX, let hint = hints.expand {
-            BranchMapDrawing.drawHint(hint, x: x, midY: layout.expandMidY, theme: theme)
+            if let x = layout.variantHintX, let hint = hints.variant, let label = layout.kinds.first?.label, isShown(hint, in: panel) {
+                BranchMapDrawing.drawHint(hint, x: x, midY: label.midY, theme: theme)
+            }
+            if let x = layout.expandX, let hint = hints.expand, isShown(hint, in: panel) {
+                BranchMapDrawing.drawHint(hint, x: x, midY: layout.expandMidY, theme: theme)
+            }
+            if let midY = layout.bottomMidY { drawHints(hints.candidates, x: layout.bottomHintsX, midY: midY, in: panel) }
         }
         if let midY = layout.bottomMidY {
-            BranchMapDrawing.drawHints(hints.candidates, x: layout.bottomHintsX, midY: midY, theme: theme)
             if showsPosition(panel), !rows.isEmpty {
                 TextFitting.draw(position(of: panel), attributes: [.font: labelFont, .foregroundColor: theme.textMuted], x: layout.positionX, midY: midY)
             }

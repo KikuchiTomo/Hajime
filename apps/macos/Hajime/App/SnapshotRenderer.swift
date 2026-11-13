@@ -42,6 +42,11 @@ enum SnapshotRenderer {
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
                 render(latticeView(fewerItemsLattice(), theme: look.theme, appearance: appearance), name: "branch-fewer-\(look.name)", to: output,
                        appearance: appearance)
+                // キーの案内を，修飾キーを押し続けているあいだだけ出す設定(既定)．押していないとき・Shift・Option
+                for (suffix, modifiers) in [("", NSEvent.ModifierFlags()), ("-shift", .shift), ("-option", .option)] {
+                    render(latticeView(heldHintsLattice(), theme: look.theme, appearance: appearance, heldModifiers: modifiers),
+                           name: "branch-hold\(suffix)-\(look.name)", to: output, appearance: appearance)
+                }
                 render(splitView(theme: look.theme, appearance: appearance), name: "branch-split-\(look.name)", to: output, appearance: appearance)
                 // 文節をその場で打ち直しているところ(⇧⌫)．読みを打っている途中と，まだ何も打っていないところ
                 render(latticeView(editingLattice(typed: "なかの"), theme: look.theme, appearance: appearance), name: "branch-editing-\(look.name)",
@@ -843,10 +848,19 @@ enum SnapshotRenderer {
         return panel
     }
 
-    private static func latticeView(_ panel: LatticePanel = SamplePanels.lattice, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+    /// キーの案内を押し続けているあいだだけ出す設定の分岐図(core の InputSession が入れるものと同じ)
+    private static func heldHintsLattice() -> LatticePanel {
+        var panel = SamplePanels.lattice
+        panel.hintsOnHold = true
+        return panel
+    }
+
+    private static func latticeView(_ panel: LatticePanel = SamplePanels.lattice, theme: ThemeChoice, appearance: NSAppearance?,
+                                    heldModifiers: NSEvent.ModifierFlags = []) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
+        view.heldModifiers = heldModifiers
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

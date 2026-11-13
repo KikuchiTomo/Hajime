@@ -310,6 +310,9 @@ public struct LatticePanel: Sendable, Equatable {
     public var associationHint: AssociationHint?
     /// 語の意味(Column.homophone)を候補の枝の右に出すか，下に出すか(設定)
     public var meaningPlacement = MeaningPlacement.side
+    /// キーの案内を，修飾キーを押し続けているあいだだけ出すか(設定の「分岐図のキーの案内を常に表示」がオフ)．
+    /// 描く側は，案内の場所を空けておき，押し続けている修飾キーを使うキーの案内だけを出す．false なら常に出す
+    public var hintsOnHold = false
     /// 表示項目を減らす設定で，注目している文節の文字種の枝を畳んでいるか．畳んでいる枝は中身(Column.variants)を入れない．
     /// 描く側は，続きがある印(端へ向けて透かした線)だけを出す
     public var collapsesVariants = false
