@@ -473,6 +473,10 @@ fn lattice(columns: &[(&str, &[&str])], focus: usize, uncertain: Option<usize>) 
         trunk_focused: None,
         page_size: None,
         hints_on_hold: None,
+        group_start: None,
+        continues_before: None,
+        continues_after: None,
+        keeps_width: None,
     }
 }
 

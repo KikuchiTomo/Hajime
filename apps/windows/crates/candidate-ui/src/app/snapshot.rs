@@ -185,7 +185,7 @@ fn render_all(output: &Path) -> Result<()> {
                 None => window,
             }
         };
-        let scenes: [(&str, Scene); 23] = [
+        let scenes: [(&str, Scene); 26] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "list-grid",
@@ -250,6 +250,18 @@ fn render_all(output: &Path) -> Result<()> {
                 scene::branch_map(&preview(), &look, &measure),
             ),
             ("branch-split", scene::branch_map(&split(), &look, &measure)),
+            (
+                "branch-group-0",
+                scene::branch_map(&scene::sample::group_branch(0), &look, &measure),
+            ),
+            (
+                "branch-group-6",
+                scene::branch_map(&scene::sample::group_branch(6), &look, &measure),
+            ),
+            (
+                "branch-group-13",
+                scene::branch_map(&scene::sample::group_branch(13), &look, &measure),
+            ),
             (
                 "branch-trunk",
                 scene::branch_map(&scene::sample::trunk_branch(), &look, &measure),
@@ -641,6 +653,10 @@ fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
         trunk_focused: None,
         page_size: None,
         hints_on_hold: None,
+        group_start: None,
+        continues_before: None,
+        continues_after: None,
+        keeps_width: None,
     })
 }
 
@@ -740,6 +756,10 @@ fn emoji_branch() -> BranchMap {
         trunk_focused: None,
         page_size: None,
         hints_on_hold: None,
+        group_start: None,
+        continues_before: None,
+        continues_after: None,
+        keeps_width: None,
     })
 }
 
@@ -877,6 +897,10 @@ fn preview() -> BranchMap {
         trunk_focused: None,
         page_size: None,
         hints_on_hold: None,
+        group_start: None,
+        continues_before: None,
+        continues_after: None,
+        keeps_width: None,
     })
 }
 
@@ -908,6 +932,10 @@ fn split() -> BranchMap {
         trunk_focused: None,
         page_size: None,
         hints_on_hold: None,
+        group_start: None,
+        continues_before: None,
+        continues_after: None,
+        keeps_width: None,
     });
     // 区切っているあいだは，境目の上に区切る操作だけを案内する
     BranchMap {

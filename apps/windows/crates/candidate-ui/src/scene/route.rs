@@ -392,6 +392,23 @@ pub fn draw_stops(painter: &mut Painter, stops: &[Stop], line_width: f32) {
     }
 }
 
+/// 前後のまとまりへ続く印．幹の線の端に，tip_x を先にした山形を描く(points_left なら左向き)
+pub fn more(painter: &mut Painter, tip_x: f32, mid_y: f32, points_left: bool, width: f32) {
+    let size = branch_map::MORE_SIZE;
+    let back = tip_x + if points_left { size } else { -size };
+    painter.draws.push(Draw::Path {
+        figures: vec![Figure {
+            start: Point::new(back, mid_y - size),
+            segments: vec![
+                Segment::Line(Point::new(tip_x, mid_y)),
+                Segment::Line(Point::new(back, mid_y + size)),
+            ],
+        }],
+        color: painter.theme.text_muted,
+        width,
+    });
+}
+
 /// ページの位置を示す点．x の縦の線の下に，ページの数だけ縦に並べる．今のページの点は選択の色，ほかは線の色
 pub fn page_dots(painter: &mut Painter, x: f32, top: f32, count: u32, current: u32) {
     let theme = painter.theme;

@@ -126,6 +126,10 @@ pub fn branch() -> BranchMap {
         trunk_focused: None,
         page_size: None,
         hints_on_hold: None,
+        group_start: None,
+        continues_before: None,
+        continues_after: None,
+        keeps_width: None,
     })
 }
 
@@ -208,7 +212,25 @@ pub fn long_branch(focus: usize) -> BranchMap {
         trunk_focused: None,
         page_size: None,
         hints_on_hold: None,
+        group_start: None,
+        continues_before: None,
+        continues_after: None,
+        keeps_width: None,
     })
+}
+
+/// 長い文を 8 文節ずつのまとまりに区切り，focus の文節が入っているまとまりだけを出した分岐図(macOS の branch-group)
+pub fn group_branch(focus: usize) -> BranchMap {
+    const PER_GROUP: usize = 8;
+    let mut map = long_branch(focus);
+    let total = map.columns.len();
+    let start = focus / PER_GROUP * PER_GROUP;
+    let end = (start + PER_GROUP).min(total);
+    map.columns = map.columns[start..end].to_vec();
+    map.group_start = (start > 0).then_some(start as u32);
+    map.continues_before = (start > 0).then_some(true);
+    map.continues_after = (end < total).then_some(true);
+    with_keys(map)
 }
 
 /// 絵文字の見本を作る設定(変換のページの「絵文字」)

@@ -1923,6 +1923,18 @@ pub struct BranchMap {
     #[serde(rename = "hintsOnHold")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hints_on_hold: Option<bool>,
+    #[serde(rename = "groupStart")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_start: Option<u32>,
+    #[serde(rename = "continuesBefore")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continues_before: Option<bool>,
+    #[serde(rename = "continuesAfter")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub continues_after: Option<bool>,
+    #[serde(rename = "keepsWidth")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keeps_width: Option<bool>,
 }
 
 impl fmt::Debug for BranchMap {
@@ -1943,6 +1955,10 @@ impl fmt::Debug for BranchMap {
             .field("trunkFocused", &self.trunk_focused)
             .field("pageSize", &self.page_size)
             .field("hintsOnHold", &self.hints_on_hold)
+            .field("groupStart", &self.group_start)
+            .field("continuesBefore", &self.continues_before)
+            .field("continuesAfter", &self.continues_after)
+            .field("keepsWidth", &self.keeps_width)
             .finish()
     }
 }

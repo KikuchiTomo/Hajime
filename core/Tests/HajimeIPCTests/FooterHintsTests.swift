@@ -133,6 +133,18 @@ struct FooterHintsTests {
         #expect(map.trunkFocused == true && map.pageSize == 4 && map.hintsOnHold == true)
     }
 
+    @Test("長い文をまとまりに区切ったときは，出すまとまりの文節だけを送り，その先頭の位置と前後に続くことを添える")
+    func group() {
+        var panel = LatticePanel(columns: (0..<5).map { LatticePanel.Column(text: "文節\($0)", isFocused: $0 == 2, isUncertain: false) })
+        let whole = WireBranchMap(panel, hints: [])
+        #expect(whole.columns.count == 5 && whole.groupStart == nil && whole.continuesBefore == nil && whole.continuesAfter == nil)
+        panel.group = 2..<4
+        panel.keepsWidth = true
+        let shown = WireBranchMap(panel, hints: [])
+        #expect(shown.columns.map(\.text) == ["文節2", "文節3"])
+        #expect(shown.groupStart == 2 && shown.continuesBefore == true && shown.continuesAfter == true && shown.keepsWidth == true)
+    }
+
     @Test("文節を区切っているときは区切る操作だけを案内する")
     func split() {
         var column = LatticePanel.Column(text: "問題がある", isFocused: true, isUncertain: true)

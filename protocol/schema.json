@@ -2223,6 +2223,22 @@
         {
           "name": "hintsOnHold",
           "type": "bool?"
+        },
+        {
+          "name": "groupStart",
+          "type": "u32?"
+        },
+        {
+          "name": "continuesBefore",
+          "type": "bool?"
+        },
+        {
+          "name": "continuesAfter",
+          "type": "bool?"
+        },
+        {
+          "name": "keepsWidth",
+          "type": "bool?"
         }
       ]
     },
