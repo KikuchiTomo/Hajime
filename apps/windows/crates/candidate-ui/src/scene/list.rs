@@ -387,6 +387,8 @@ fn draw_list(
     for separator in &cells.separators {
         painter.rect(*separator, theme.line);
     }
+    // 行ごとの文字の範囲(番号から文字の終わりまで)と右に寄せたタグの範囲．吹き出しを窓の中に置くときに使う
+    let mut contents: Vec<(Frame, Option<Frame>)> = Vec::with_capacity(list.entries.len());
     for (index, entry) in list.entries.iter().enumerate() {
         let row = cells.rows[index];
         // コメントのタグは行の中にあるので，行より先に足す(押した位置は先に足した範囲から引く)．
@@ -470,6 +472,14 @@ fn draw_list(
             painter.text(&number, Font::Label, color, number_x, row);
         }
         painter.text(&shown[index], Font::Candidate, text_color, text_x, row);
+        let text_end = text_x
+            + painter.width(&shown[index], Font::Candidate)
+            + painter.detail_width(entry.detail.as_deref());
+        let tag = entry.annotation.as_deref().map(|annotation| {
+            let width = painter.tag_width(annotation);
+            Frame::new(tag_max_x(row, metrics) - width, row.y, width, row.height)
+        });
+        contents.push((Frame::new(row.x, row.y, text_end - row.x, row.height), tag));
         // 絵文字の名前は候補の文字のすぐあとに薄く小さく添える(番号と同じ色)
         if let Some(detail) = entry.detail.as_deref() {
             painter.detail(
@@ -537,17 +547,36 @@ fn draw_list(
     }
     painter.keep_clear.extend(layout.header);
     painter.keep_clear.extend(layout.card);
+    // 窓の中に置くときは，行の背景ではなく文字とタグの範囲を避ける
+    let mut inside = selected
+        .and_then(|index| contents.get(index as usize))
+        .map(|(content, _)| super::bubble::Inside {
+            content: *content,
+            obstacles: contents
+                .iter()
+                .enumerate()
+                .filter(|(index, _)| selected != Some(*index as u32))
+                .flat_map(|(_, (text, tag))| std::iter::once(*text).chain(*tag))
+                .chain(layout.header)
+                .chain(layout.card)
+                .collect(),
+        });
     if layout.footer.height > 0.0 {
         let footer_top = layout.footer_separator.y;
-        painter.keep_clear.push(Frame::new(
+        let footer_region = Frame::new(
             layout.body.x,
             footer_top,
             layout.body.width,
             layout.body.max_y() - footer_top,
-        ));
+        );
+        painter.keep_clear.push(footer_region);
+        if let Some(inside) = &mut inside {
+            inside.obstacles.push(footer_region);
+        }
         painter.rect(layout.footer_separator, theme.line);
         footer_section(painter, footer, layout.footer, metrics.row_padding_x);
     }
+    painter.inside = inside;
 }
 
 /// 候補の行のタグの右端(行の背景の内側の余白の内側．足元の位置の右の端と同じ x)

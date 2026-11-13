@@ -40,6 +40,8 @@ pub(crate) struct Painter<'a> {
     pub hits: Vec<super::Hit>,
     /// 語の意味の吹き出しに覆わせない範囲
     pub keep_clear: Vec<Frame>,
+    /// 語の意味の吹き出しを窓の中の行の文字のすぐ右に置くときの範囲(一覧だけ)
+    pub inside: Option<super::bubble::Inside>,
 }
 
 impl<'a> Painter<'a> {
@@ -50,6 +52,7 @@ impl<'a> Painter<'a> {
             draws: Vec::new(),
             hits: Vec::new(),
             keep_clear: Vec::new(),
+            inside: None,
         }
     }
 
@@ -61,6 +64,7 @@ impl<'a> Painter<'a> {
             draws: self.draws,
             hits: self.hits,
             keep_clear: self.keep_clear,
+            inside: self.inside,
         }
     }
 

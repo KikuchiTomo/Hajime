@@ -72,6 +72,8 @@ pub struct Placement {
 /// 候補の窓 window の空いている所に重ねてよいが，obstacles(ほかの候補・幹の文節・足元の案内・入力中の文字)は覆わない．
 /// 覆ってしまう物があれば上か下へ寄せ，行の横に置けなければ候補の窓の右の外，それも無理なら窓の左の外に置く．
 /// 上の端は候補の窓の上の端にそろえ，三角が行に届かないときだけ下げる．
+/// どれにも入らなければ(画面の端の近くの幅の広い窓など)，inside があれば窓の中の，選んでいる行の文字のすぐ右に置く．
+/// このときは行の背景ではなく文字の範囲で覆わない物を見る(Inside)．
 /// size は本体の大きさ，screen は画面の使える範囲(どれも画面の座標)
 pub fn place(
     row: Frame,
@@ -79,6 +81,7 @@ pub fn place(
     size: (f32, f32),
     screen: Frame,
     obstacles: &[Frame],
+    inside: Option<&Inside>,
     metrics: &Metrics,
 ) -> Placement {
     let (width, height) = size;
@@ -92,7 +95,7 @@ pub fn place(
     let preferred_y = window.y.max(target - highest);
     // 窓の左の端を x に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ None．
     // 吹き出しの上の端は floor より上に出さない
-    let vertical = |x: f32, floor: f32| -> Option<(f32, f32)> {
+    let vertical = |x: f32, floor: f32, obstacles: &[Frame]| -> Option<(f32, f32)> {
         if x < screen.x || x + window_width > screen.max_x() {
             return None;
         }
@@ -124,10 +127,23 @@ pub fn place(
     let outside_left = (Side::Left, window.x - metrics.gap - window_width);
     // まず窓の上の端より上に出さない置き方を探し，無ければ(窓が入力位置の上にあって吹き出しが窓より高いときなど)
     // 入力中の文字やほかの候補を覆わないように，窓の上の端より上に出してよい置き方を探す
+    // 窓の外に置けなければ，窓の中の行の文字のすぐ右(文字の範囲で覆わない物を見る)
+    let mut choices = vec![
+        (beside_row.0, beside_row.1, obstacles),
+        (outside_right.0, outside_right.1, obstacles),
+        (outside_left.0, outside_left.1, obstacles),
+    ];
+    if let Some(inside) = inside {
+        choices.push((
+            Side::Right,
+            inside.content.max_x() + metrics.gap,
+            inside.obstacles.as_slice(),
+        ));
+    }
     let found = [window.y, screen.y].into_iter().find_map(|floor| {
-        [beside_row, outside_right, outside_left]
-            .into_iter()
-            .find_map(|(side, x)| vertical(x, floor).map(|(y, pointer)| (side, x, y, pointer)))
+        choices.iter().find_map(|&(side, x, obstacles)| {
+            vertical(x, floor, obstacles).map(|(y, pointer)| (side, x, y, pointer))
+        })
     });
     // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(三角は角の丸みにかけない範囲で行を指す)
     let (side, x, y, pointer) = found.unwrap_or_else(|| {
@@ -147,6 +163,29 @@ pub fn place(
         window: Frame::new(x.round(), y.round(), window_width, height),
         body: Frame::new(body_x, 0.0, width, height),
         pointer_y: pointer.round(),
+    }
+}
+
+/// 窓の中に置くときに使う，選んでいる行の文字の範囲と，文字の範囲で見た覆わない物(どれも画面の座標)
+#[derive(Debug, Clone, PartialEq)]
+pub struct Inside {
+    /// 選んでいる候補の行の，番号から文字の終わりまで
+    pub content: Frame,
+    /// ほかの候補の文字とタグ・文字種の行・足元の区切りの線から下・入力中の文字
+    pub obstacles: Vec<Frame>,
+}
+
+impl Inside {
+    /// 場面の座標から画面の座標へ(dx, dy)だけずらす
+    pub fn offset(&self, dx: f32, dy: f32) -> Self {
+        Self {
+            content: self.content.offset(dx, dy),
+            obstacles: self
+                .obstacles
+                .iter()
+                .map(|frame| frame.offset(dx, dy))
+                .collect(),
+        }
     }
 }
 
@@ -350,6 +389,7 @@ pub fn beside(
         (shown.width, shown.height),
         Frame::new(-10000.0, -10000.0, 20000.0, 20000.0),
         &window.keep_clear,
+        window.inside.as_ref(),
         &Metrics::tokens(look.theme.is_rounded()),
     );
     let drawn = bubble_scene(&shown, &placement, look, measure);
@@ -377,6 +417,7 @@ pub fn beside(
         draws,
         hits: Vec::new(),
         keep_clear: Vec::new(),
+        inside: None,
     }
 }
 
@@ -438,7 +479,7 @@ mod tests {
     }
 
     fn placed(setup: &Setup, size: (f32, f32), screen: Frame) -> Placement {
-        place(setup.1, setup.0, size, screen, &setup.2, &METRICS)
+        place(setup.1, setup.0, size, screen, &setup.2, None, &METRICS)
     }
 
     fn body(placement: &Placement) -> Frame {
@@ -491,6 +532,67 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn 窓の左右に入らない幅の広い窓では_窓の中の行の文字のすぐ右に置き_ほかの候補の文字と足元を覆わない(
+    ) {
+        // 縦長の画面(x 1920〜3000)の右に寄った幅の広い一覧(Windows の PC で見た場面)
+        let screen = Frame::new(1920.0, -383.0, 1080.0, 1920.0);
+        let window = Frame::new(1982.0, -192.0, 899.0, 265.0);
+        let rows: Vec<Frame> = (0..5)
+            .map(|index| Frame::new(1994.0, -180.0 + 28.0 * index as f32, 875.0, 28.0))
+            .collect();
+        let texts: Vec<Frame> = rows
+            .iter()
+            .map(|row| Frame::new(row.x, row.y, 70.0, row.height))
+            .collect();
+        let footer = Frame::new(1982.0, 41.0, 899.0, 32.0);
+        let selected = 4;
+        let mut obstacles: Vec<Frame> = (0..5)
+            .filter(|index| *index != selected)
+            .map(|index| rows[index])
+            .collect();
+        obstacles.push(footer);
+        let mut inside_obstacles: Vec<Frame> = (0..5)
+            .filter(|index| *index != selected)
+            .map(|index| texts[index])
+            .collect();
+        inside_obstacles.push(footer);
+        let inside = Inside {
+            content: texts[selected],
+            obstacles: inside_obstacles,
+        };
+        let size = (288.0, 100.0);
+        let placement = place(
+            rows[selected],
+            window,
+            size,
+            screen,
+            &obstacles,
+            Some(&inside),
+            &METRICS,
+        );
+        assert_eq!(placement.side, Side::Right);
+        assert_eq!(tip(&placement).x - texts[selected].max_x(), METRICS.gap);
+        assert_eq!(tip(&placement).y, rows[selected].mid_y());
+        for obstacle in &inside.obstacles {
+            assert!(!intersects(body(&placement), *obstacle), "{obstacle:?}");
+        }
+        // 窓の中に置かない場面(分岐図など)では，今までどおり画面の中へ寄せる
+        let fallback = place(
+            rows[selected],
+            window,
+            size,
+            screen,
+            &obstacles,
+            None,
+            &METRICS,
+        );
+        assert_eq!(
+            fallback.window.max_x(),
+            screen.max_x() - METRICS.screen_margin
+        );
     }
 
     #[test]

@@ -687,14 +687,22 @@ impl App {
         let mut keep_clear: Vec<scene::Frame> = window
             .map(|window| window.keep_clear.iter().map(on_screen).collect())
             .unwrap_or_default();
+        // 窓の中の行の文字のすぐ右に置くとき(一覧だけ)は，行の背景ではなく文字とタグの範囲を避ける
+        let mut inside = window
+            .and_then(|window| window.inside.as_ref())
+            .map(|inside| inside.offset(anchor.x, anchor.y));
         // 入力中の文字の行も覆わない
         if let Some(caret) = &self.anchor {
-            keep_clear.push(scene::Frame::new(
+            let line = scene::Frame::new(
                 screen.x,
                 caret.y as f32 / scale,
                 screen.width,
                 (caret.height.max(1) as f32) / scale,
-            ));
+            );
+            keep_clear.push(line);
+            if let Some(inside) = &mut inside {
+                inside.obstacles.push(line);
+            }
         }
         let bubble = scene::bubble::bubble(&note, others, &style, &measure);
         let placement = scene::bubble::place(
@@ -703,6 +711,7 @@ impl App {
             (bubble.width, bubble.height),
             screen,
             &keep_clear,
+            inside.as_ref(),
             &scene::bubble::Metrics::tokens(theme.is_rounded()),
         );
         let drawn = scene::bubble::bubble_scene(&bubble, &placement, &style, &measure);

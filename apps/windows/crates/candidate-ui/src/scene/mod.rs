@@ -293,6 +293,8 @@ pub struct Scene {
     pub draws: Vec<Draw>,
     pub hits: Vec<Hit>,
     pub keep_clear: Vec<Frame>,
+    /// 語の意味の吹き出しを窓の中の行の文字のすぐ右に置くときの範囲(一覧だけ．場面の座標)
+    pub inside: Option<bubble::Inside>,
 }
 
 /// マウスで押せる範囲と，押したときの対象(macOS の BranchView・CandidateView の target(at:) と同じ)
@@ -491,6 +493,9 @@ pub fn surround(scene: Scene, theme: &ResolvedTheme, surround: Surround) -> Scen
             .into_iter()
             .map(|frame| frame.offset(margin_x, margin_top))
             .collect(),
+        inside: scene
+            .inside
+            .map(|inside| inside.offset(margin_x, margin_top)),
     }
 }
 
