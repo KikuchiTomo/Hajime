@@ -685,11 +685,11 @@ enum UIStrings {
         static let numberFormKanji = "漢数字"
         static let numberFormRoman = "ローマ数字"
         static let learning = "学習"
-        static let zenzaiModel = "Zenzai のモデル"
+        static let zenzaiModel = "Zenzai モデル"
         /// 併用を選んだときに出す，入力中と変換で使うモデル
         static let zenzaiCombinedNote = "入力中: 速さを優先 / 変換: 精度を優先"
         static let candidateReranking = "Zenzai で候補を並べ替え"
-        static let jinenModel = "jinen のモデル"
+        static let jinenModel = "Jinen モデル"
         static let resetLearning = "学習結果を消去"
         static let reading = "読み"
         static let word = "単語"

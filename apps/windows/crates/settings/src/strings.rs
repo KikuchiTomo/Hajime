@@ -77,11 +77,11 @@ pub mod settings {
     pub const NUMBER_FORM_KANJI: &str = "漢数字";
     pub const NUMBER_FORM_ROMAN: &str = "ローマ数字";
     pub const LEARNING: &str = "学習";
-    pub const ZENZAI_MODEL: &str = "Zenzai のモデル";
+    pub const ZENZAI_MODEL: &str = "Zenzai モデル";
     /// 併用を選んだときに出す，入力中と変換で使うモデル
     pub const ZENZAI_COMBINED_NOTE: &str = "入力中: 速さを優先 / 変換: 精度を優先";
     pub const CANDIDATE_RERANKING: &str = "Zenzai で候補を並べ替え";
-    pub const JINEN_MODEL: &str = "jinen のモデル";
+    pub const JINEN_MODEL: &str = "Jinen モデル";
     pub const RESET_LEARNING: &str = "学習結果を消去";
     pub const SAVE_FAILED: &str = "設定を保存できませんでした";
     pub const RESTORE_DEFAULTS: &str = "すべての設定を既定に戻す";
@@ -1185,9 +1185,9 @@ pub mod sync {
         ("numberFormKanji", "漢数字"),
         ("numberFormRoman", "ローマ数字"),
         ("learning", "学習"),
-        ("zenzaiModel", "Zenzai のモデル"),
+        ("zenzaiModel", "Zenzai モデル"),
         ("candidateReranking", "Zenzai で候補を並べ替え"),
-        ("jinenModel", "jinen のモデル"),
+        ("jinenModel", "Jinen モデル"),
         ("theme", "テーマ"),
         ("candidateFontSize", "候補の文字サイズ"),
         ("showsModeIndicator", "入力モードの切り替えを表示"),
@@ -1246,7 +1246,7 @@ pub mod windows {
     pub const TEMPLATE_BUTTON_LABEL: &str = "{ }";
     /// 置き換えられない部分(書き方の誤り)の頭に置く印(macOS は exclamationmark.triangle.fill の絵)
     pub const PROBLEM_MARK: &str = "⚠ ";
-    /// jinen のモデルを「自動」にしたときに，エンジンが決めた結果を添える名前の頭(「自動(small)」．macOS の UIStrings.Settings.label(for:automaticResult:))
+    /// Jinen モデルを「自動」にしたときに，エンジンが決めた結果を添える名前の頭(「自動(small)」．macOS の UIStrings.Settings.label(for:automaticResult:))
     pub const JINEN_AUTOMATIC_WITH: &str = "自動";
     /// パレットで使った文字の記録を消したときの知らせ(macOS は消す前に確かめる窓を出す)
     pub const PALETTE_HISTORY_CLEARED: &str = "使用履歴を消去しました";

@@ -190,7 +190,7 @@ public struct Settings: Sendable, Equatable {
     /// 選んでいる候補に連想があるとき，候補の窓の足元に知らせる
     public var showsAssociationHint = true
 
-    /// かな漢字変換に使う Zenzai のモデル
+    /// かな漢字変換に使う Zenzai モデル
     public var zenzaiModel = ZenzaiModelChoice.accurate
     /// 分岐図・文節ごとの一覧・入力中の候補の窓で，文節の候補を前後の語とのつながりで並べ替える(「を」のあとの「かこう」なら「書こう」を先に)
     public var contextualSegmentCandidates = true

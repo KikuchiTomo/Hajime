@@ -72,7 +72,7 @@ targets:
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/ja.lproj/InfoPlist.strings
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/en.lproj/InfoPlist.strings
-      - name: Zenzai のモデルを入れる
+      - name: Zenzai モデルを入れる
         path: ../../tools/macos/copy_zenzai_model.sh
         inputFiles:
           - $(SRCROOT)/../../tools/macos/copy_zenzai_model.sh
@@ -81,7 +81,7 @@ targets:
         outputFiles:
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Zenzai/zenz-v3.2-small-Q5_K_M.gguf
           - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Zenzai/zenz-v3.2-xsmall-Q5_K_M.gguf
-      - name: jinen のモデルを入れる
+      - name: Jinen モデルを入れる
         path: ../../tools/macos/copy_jinen_model.sh
         inputFiles:
           - $(SRCROOT)/../../tools/macos/copy_jinen_model.sh

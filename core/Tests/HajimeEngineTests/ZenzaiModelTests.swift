@@ -3,8 +3,8 @@ import Foundation
 @testable import HajimeEngine
 import Testing
 
-/// Zenzai のモデルは外から取得するので，大きさとハッシュが合わないファイルを使わないことを確かめる
-@Suite("Zenzai のモデルの確認")
+/// Zenzai モデルは外から取得するので，大きさとハッシュが合わないファイルを使わないことを確かめる
+@Suite("Zenzai モデルの確認")
 struct ZenzaiModelTests {
     /// 「abc」の SHA-256
     private let abcSHA256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"

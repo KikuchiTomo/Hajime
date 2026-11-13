@@ -36,7 +36,7 @@ use tokens::opacity::settings_windows as opacity;
 use tokens::size::settings_windows as size;
 use tokens::size::{part, space};
 
-/// jinen のモデルの項目と，エンジンが「自動」で決めた結果を添える名前(core の SettingsFields.automaticJinenModelName)
+/// Jinen モデルの項目と，エンジンが「自動」で決めた結果を添える名前(core の SettingsFields.automaticJinenModelName)
 const JINEN_MODEL_PATH: &str = "jinenModel";
 const AUTOMATIC_JINEN_MODEL: &str = "automaticJinenModel";
 
@@ -499,7 +499,7 @@ struct RowState {
     /// 選択肢の後ろに足して選んだ状態にする名前(カスタムテーマを使っているときのテーマの欄．macOS と同じく，
     /// 既成のテーマのどれも選んでいないことを見せる)．選んでも何もしない
     extra_choice: Option<String>,
-    /// 選択肢「自動」の名前を置き換えるもの．jinen のモデルを「自動」にしたときにエンジンが決めた大きさを添える(「自動(small)」)
+    /// 選択肢「自動」の名前を置き換えるもの．Jinen モデルを「自動」にしたときにエンジンが決めた大きさを添える(「自動(small)」)
     automatic_label: Option<String>,
     /// カスタムテーマの書体の欄の選択肢(選んだときに入れる値と画面に出す名前)
     font_items: Vec<(String, String)>,

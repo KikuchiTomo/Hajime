@@ -38,7 +38,7 @@ Get-ChildItem -Path $Llama -File -Filter 'ggml-cpu-*.dll' | Copy-Item -Destinati
 New-Item -ItemType Directory -Force -Path (Join-Path $Output 'Zenzai') | Out-Null
 Copy-Item (Join-Path $Zenzai 'zenz-v3.2-small-Q5_K_M.gguf') (Join-Path $Output 'Zenzai')
 Copy-Item (Join-Path $Zenzai 'zenz-v3.2-xsmall-Q5_K_M.gguf') (Join-Path $Output 'Zenzai')
-# 合議(ADR 0016 の案 2)に使う jinen のモデル(エンジンは Jinen\ から読み，ハッシュを確かめ直す)．CC BY-SA 4.0(THIRD_PARTY_NOTICES.md)
+# 合議(ADR 0016 の案 2)に使う Jinen モデル(エンジンは Jinen\ から読み，ハッシュを確かめ直す)．CC BY-SA 4.0(THIRD_PARTY_NOTICES.md)
 New-Item -ItemType Directory -Force -Path (Join-Path $Output 'Jinen') | Out-Null
 Copy-Item (Join-Path $Zenzai 'jinen-v2-small-Q5_K_M.gguf') (Join-Path $Output 'Jinen')
 Copy-Item (Join-Path $Zenzai 'jinen-v2-xsmall-Q5_K_M.gguf') (Join-Path $Output 'Jinen')

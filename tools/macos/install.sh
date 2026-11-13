@@ -19,7 +19,7 @@ fi
 identity_label=$(identity_name "$identity")
 echo "署名: ${identity_label:-$identity}"
 
-# Zenzai のモデルとかな漢字変換の辞書を取得してハッシュを確かめる(取得済みなら確かめるだけ)．アプリに入れて使うため
+# Zenzai モデルとかな漢字変換の辞書を取得してハッシュを確かめる(取得済みなら確かめるだけ)．アプリに入れて使うため
 "$root/tools/models/fetch_zenzai.sh"
 "$root/tools/dictionary/fetch_dictionary.sh"
 

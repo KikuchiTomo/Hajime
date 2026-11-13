@@ -11,7 +11,7 @@
 
 1. Issue で何をするかを相談する(小さな修正は不要)．Issue はテンプレートから作る
 2. ブランチを切る．名前は `<種類>/<内容>`(例: `feat/yen-key-policy`)
-3. `make fetch-models` で Zenzai のモデルを取得し，`make check` と `make test` を通す(モデルが無いと本物の Zenzai のテストを飛ばす)
+3. `make fetch-models` で Zenzai モデルを取得し，`make check` と `make test` を通す(モデルが無いと本物の Zenzai のテストを飛ばす)
 4. 利用者から見える変更なら，[CHANGELOG.md](CHANGELOG.md) の「未リリース」に 1 行で書く(リリースノートとアプリの「更新を確認」の変更点になる)．節の中は「追加」「変更」「修正」の見出しで分け，macOS と Windows の片方だけの変更は行の頭に「macOS:」「Windows:」を付ける．句読点は「，」「．」で，行の終わりにも「．」を付ける(「！」や絵文字で終わる行は除く)．PR 番号は書かない(GitHub のリリースノートには，マージした PR の一覧が別に付く)．バージョンを上げると `tools/release/bump_version.sh` が「未リリース」を新しいバージョンの節に移す．バージョンを上げる PR(タイトルが `chore(release)`)では，CI(`.github/workflows/metrics.yml`)が前のリリースと比べたかな漢字変換の指標(AJIMEE-Bench・Tatoeba などの正解率．R-25)を PR にコメントする．手元では `make release-metrics` で同じ表を作れる．書きぶりは `.claude/skills/hajime-docs` の「文体」に従う
 5. PR のテンプレートに沿って説明を書き，`type:` のラベルを付ける
 6. 検査が通ったらスカッシュマージする

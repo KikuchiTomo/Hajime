@@ -34,7 +34,7 @@ enum HostPaths {
         return base.appendingPathComponent("haji.men", isDirectory: true).appendingPathComponent("IME", isDirectory: true)
     }
 
-    /// 実行ファイルと一緒に置いたもの(Zenzai のモデル・かな漢字変換の辞書・連想の辞書・郵便番号の表)
+    /// 実行ファイルと一緒に置いたもの(Zenzai モデル・かな漢字変換の辞書・連想の辞書・郵便番号の表)
     static var installation: URL {
         URL(fileURLWithPath: CommandLine.arguments[0]).deletingLastPathComponent()
     }
@@ -46,7 +46,7 @@ final class UnavailableEnglishLexicon: EnglishLexicon {
     func suggestions(for text: String) -> [String] { [] }
 }
 
-/// インストール先に置いた Zenzai と jinen のモデル(Zenzai\・Jinen\)とかな漢字変換の辞書(Dictionary\)を，同時に確かめて読む．
+/// インストール先に置いた Zenzai モデルと Jinen モデル(Zenzai\・Jinen\)とかな漢字変換の辞書(Dictionary\)を，同時に確かめて読む．
 /// 無いか，大きさとハッシュが合わないものは使わずに動く(モデルが無ければ Zenzai なし・合議なし，辞書が無ければ azooKey に同梱の辞書)
 @MainActor
 func loadStartupResources() -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, jinen: JinenModel?, fastJinen: JinenModel?, dictionary: BundledDictionary?) {

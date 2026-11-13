@@ -1,5 +1,5 @@
 #!/bin/sh
-# 配布物(.pkg)を作る．Zenzai のモデルを入れた本番のアプリを /Library/Input Methods に入れる .pkg になる．
+# 配布物(.pkg)を作る．Zenzai モデルを入れた本番のアプリを /Library/Input Methods に入れる .pkg になる．
 #
 # 使い方: tools/macos/package.sh
 # 出力:   apps/macos/build/dist/Hajime-IME-<バージョン>.pkg

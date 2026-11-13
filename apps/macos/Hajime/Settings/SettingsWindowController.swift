@@ -39,7 +39,7 @@ final class SettingsWindowController {
         model.clearPaletteHistory = clear
     }
 
-    /// jinen のモデルを「自動」にしたときに，エンジンが起動のあとに決めた結果の名前(small・xsmall・使わない)を読む処理を渡す
+    /// Jinen モデルを「自動」にしたときに，エンジンが起動のあとに決めた結果の名前(small・xsmall・使わない)を読む処理を渡す
     func setAutomaticJinenModel(_ read: @escaping () -> String?) {
         model.automaticJinenModel = read
     }
@@ -120,7 +120,7 @@ final class SettingsModel: ObservableObject {
     var checkForUpdates: (() -> Void)?
     /// パレットで使った文字の記録を消す(R-26)．無ければボタンを出さない
     var clearPaletteHistory: (() -> Void)?
-    /// jinen のモデルを「自動」にしたときに決めた大きさ．設定の画面の選択肢に添える
+    /// Jinen モデルを「自動」にしたときに決めた大きさ．設定の画面の選択肢に添える
     var automaticJinenModel: (() -> String?)?
     let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "settings")
     /// 辞書の取り込み・バックアップ・CSV・決まりの一覧の読み書き(Windows のエンジンと同じもの)．無ければ辞書を取り込めない

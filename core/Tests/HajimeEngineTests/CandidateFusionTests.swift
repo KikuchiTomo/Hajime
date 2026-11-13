@@ -22,7 +22,7 @@ struct CandidateFusionTests {
         #expect(AzooKeyConverterSession.alignmentAttempts("3人", reading: "さんにん") == ["3人"])
     }
 
-    /// ファイルを読まずに作った jinen のモデル(大きさの選び方だけを確かめる)
+    /// ファイルを読まずに作った Jinen モデル(大きさの選び方だけを確かめる)
     private func engine(models: [JinenModel.Variant], choice: JinenModelChoice) throws -> AzooKeyConverterEngine {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-jinen-\(UUID().uuidString)")
         let model = { (variant: JinenModel.Variant) in
@@ -137,7 +137,7 @@ struct CandidateFusionTests {
         session.endComposition()
     }
 
-    @Test("使わない設定にしたら，読み込んだ jinen のモデルとコンテキストを解放する．戻せば読み直し，合議を始め直す", .enabled(if: hasModels))
+    @Test("使わない設定にしたら，読み込んだ Jinen モデルとコンテキストを解放する．戻せば読み直し，合議を始め直す", .enabled(if: hasModels))
     func releasesJinenWhenTurnedOff() throws {
         let engine = try makeEngine()
         let session = engine.makeSession()

@@ -100,14 +100,14 @@ pub const OKURIGANA: &[Choice] = &[
     ("engine", "優先しない"),
 ];
 
-/// かな漢字変換に使う Zenzai のモデル(ZenzaiModelChoice)．UIStrings.Settings.label(for: ZenzaiModelChoice)
+/// かな漢字変換に使う Zenzai モデル(ZenzaiModelChoice)．UIStrings.Settings.label(for: ZenzaiModelChoice)
 pub const ZENZAI_MODELS: &[Choice] = &[
     ("accurate", "精度を優先"),
     ("fast", "速さを優先"),
     ("combined", "併用"),
 ];
 
-/// 合議に使う jinen のモデル(JinenModelChoice)．UIStrings.Settings.label(for: JinenModelChoice, automaticResult:)
+/// 合議に使う Jinen モデル(JinenModelChoice)．UIStrings.Settings.label(for: JinenModelChoice, automaticResult:)
 pub const JINEN_MODELS: &[Choice] = &[
     ("automatic", "自動"),
     ("small", "small"),

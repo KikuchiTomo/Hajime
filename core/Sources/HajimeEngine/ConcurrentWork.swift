@@ -2,7 +2,7 @@ import Foundation
 
 /// 互いに関係しない仕事を CPU のコアの数だけ並べて進め，すべて終わるのを待って，渡した順に結果を返す．
 ///
-/// 起動の途中で一度だけ待つ確認(同梱の辞書のファイルごとのハッシュ，Zenzai のモデル)に使う．
+/// 起動の途中で一度だけ待つ確認(同梱の辞書のファイルごとのハッシュ，Zenzai モデル)に使う．
 /// 呼ぶ側(composition root)を同期のまま保つため，async にせず DispatchQueue.concurrentPerform で並べる．
 /// 渡す仕事は @Sendable にし，ほかの状態を書き換えない(結果は戻り値で返す)
 enum ConcurrentWork {

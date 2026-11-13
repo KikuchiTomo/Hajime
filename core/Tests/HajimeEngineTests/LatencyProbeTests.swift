@@ -63,7 +63,7 @@ struct LatencyProbeTests {
 
     /// 打鍵が止まったあいだの手順(InputSession.latticeWarmingSteps)を 1 歩ずつ動かし，1 歩の時間と，手順をすべて終えるまでの時間を測る．
     /// 打鍵が止まったあとに次のキーが来ると，そのとき動いている 1 歩を待つので，1 歩の長さがそのキーの遅れになる．
-    /// 環境変数 HAJIME_JINEN_MODEL に jinen のモデルの場所があれば合議(ADR 0016 の案 2)の手順も含めて測る．大きさは HAJIME_JINEN_VARIANT(small・xsmall)．
+    /// 環境変数 HAJIME_JINEN_MODEL に Jinen モデルの場所があれば合議(ADR 0016 の案 2)の手順も含めて測る．大きさは HAJIME_JINEN_VARIANT(small・xsmall)．
     /// 合議あり・なしを同じ文で比べるために使う(結果は HAJIME_FUSION_STEPS の行)．時間の上限は確かめない
     @Test("打鍵が止まったあいだの手順の 1 歩の時間を，合議を含めて測る", .enabled(if: isReleaseBuild))
     func warmingSteps() throws {

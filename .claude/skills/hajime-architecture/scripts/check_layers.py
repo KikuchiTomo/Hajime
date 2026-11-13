@@ -23,7 +23,7 @@ ALLOWED: dict[str, set[str]] = {
         "KanaKanjiConverterModule",
         "KanaKanjiConverterModuleWithDefaultDictionary",
         "SwiftUtils",
-        # Zenzai のモデルと同梱の辞書のハッシュを確かめるため(OS の標準のライブラリ)．Windows は CNG を呼ぶ C の口
+        # Zenzai モデルと同梱の辞書のハッシュを確かめるため(OS の標準のライブラリ)．Windows は CNG を呼ぶ C の口
         "CryptoKit",
         "CWindowsHash",
     },
