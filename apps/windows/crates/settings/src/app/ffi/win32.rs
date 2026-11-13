@@ -796,7 +796,7 @@ pub fn open_url(url: &str) {
     }
 }
 
-/// Windows Installer で path の MSI を入れる．進み具合だけを出し(/passive)，終わっても再起動しない(/norestart)．
+/// Windows Installer で path の MSI を入れる．進み具合だけを出し(/passive)，終わったら再起動するかを尋ねる(/promptrestart)．
 /// 動いているアプリが DLL を読んでいても閉じさせない(MSIRESTARTMANAGERCONTROL=Disable)．
 /// 管理者の権限は msiexec が UAC で求める．起動できたら true
 pub fn run_installer(path: &std::path::Path) -> bool {
@@ -813,7 +813,7 @@ pub fn run_installer(path: &std::path::Path) -> bool {
     let msiexec = std::path::PathBuf::from(std::ffi::OsString::from_wide(&buffer[..length]))
         .join("msiexec.exe");
     let parameters = format!(
-        "/i \"{}\" /passive /norestart MSIRESTARTMANAGERCONTROL=Disable",
+        "/i \"{}\" /passive /promptrestart MSIRESTARTMANAGERCONTROL=Disable",
         path.display()
     );
     // SAFETY: 文字列は呼び出しの間生きている

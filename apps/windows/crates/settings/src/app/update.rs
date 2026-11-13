@@ -2,7 +2,7 @@
 //!
 //! 1. 別のスレッドで latest.json を取り，今のバージョンより新しい配布物があるかを決める(crate::update)
 //! 2. あれば確かめる窓で変更点を見せて尋ね，はいなら別のスレッドで MSI を %LOCALAPPDATA%\haji.men\IME\updates に取る
-//! 3. latest.json の SHA-256 と同じなら msiexec で入れる(/passive /norestart．UAC は msiexec が出す)
+//! 3. latest.json の SHA-256 と同じなら msiexec で入れる(/passive /promptrestart．UAC は msiexec が出し，終わったら再起動を尋ねる)
 //!
 //! MSI にはまだ署名していないので，確かめられるのは HTTPS で取った latest.json の SHA-256 と同じかだけ．
 //! 署名するようになったら WinVerifyTrust で発行元も確かめる．
