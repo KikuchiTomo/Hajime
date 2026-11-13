@@ -693,6 +693,7 @@
     "reviewCorrectionTimeout": 15,
     "shiftStartsAlphabet": false,
     "showsAssociationHint": true,
+    "showsFewerItems": false,
     "showsHomophones": true,
     "showsKeyHints": true,
     "showsModeIndicator": true,

@@ -85,6 +85,9 @@ public enum IndicatorLabels {
     /// 候補の先の小さな幹(意味・連想)の先に置く案内の言葉．キーは連想変換のキー
     public static let branchExpandLabel = "展開"
 
+    /// 畳んでいる先の枝(表示項目を減らす設定)を開く案内
+    public static let branchExpandHint = Hint(.associate, branchExpandLabel)
+
     /// 候補の先の小さな幹の，語の意味の見出し
     public static let branchMeaningTitle = "意味"
 

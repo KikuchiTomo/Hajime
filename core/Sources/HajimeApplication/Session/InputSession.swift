@@ -122,6 +122,8 @@ public final class InputSession {
     private var pendingNote: Note?
     /// 候補を表に広げているか(KeymapCommand.expandCandidates)．変換を終えるか読みに戻ると閉じる
     private var expandedCandidates = false
+    /// 表示項目を減らす設定で，選んでいる候補の先の枝(語の意味・連想)を開いたか．連想変換のキーで開き，変換を始め直すまで開いたままにする
+    private var branchDetailShown = false
     /// 入力文字なしで案内を出したか．出したら次のキーで消す
     private var showsTransientNote = false
     /// 変換中の候補の選択(表記)と文節の区切りの変更．直前の変更の取り消し(KeymapCommand.undoConversionEdit)で戻す
@@ -1419,6 +1421,7 @@ public final class InputSession {
     /// 変換を始める．設定が一覧でなければ分岐図にする．
     /// 英単語を補正しているときは，直した英単語を読みの中に確定させてから分岐図にする(打ったままに戻すのは補正の直後の Space)
     private func enterConversion(recordsUsage: Bool = true) {
+        branchDetailShown = false
         if recordsUsage { usage?.record(.conversionOpened) }
         conversionHistory.clear()
         heldReading = nil
@@ -2311,6 +2314,7 @@ public final class InputSession {
                 panel.columns[focused].sourceName = converter.sourceName(of: segment.selected.text, reading: segmentReading)
                 panel.associationHint = associationHint(text: segment.selected.text, reading: segmentReading)
             }
+            if settings.current.showsFewerItems { panel = PanelBuilder.reduced(panel, showsDetail: branchDetailShown) }
             if let note = commandNote(for: lattice) { panel.note = note }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
             if splitMode {
@@ -2840,6 +2844,12 @@ public final class InputSession {
     /// 連想変換のキー．入力中なら変換してから，変換中なら選んでいる文節を，連想の一覧に切り替える．
     /// 連想変換を使わない設定のときは，入力中ならふつうに変換する
     private func associate(context: InputContext) -> KeyResult {
+        // 表示項目を減らす設定の分岐図では，1 回目で選んでいる候補の先の枝(語の意味・連想)を開く．2 回目から連想の一覧に移る
+        if settings.current.showsFewerItems, !branchDetailShown, case .lattice(let lattice) = phase, inlineEdit == nil, !splitMode,
+           !expandedCandidates, !isSegmentList, hasBranchDetail(lattice) {
+            branchDetailShown = true
+            return KeyResult(handled: true, actions: render(context: context))
+        }
         guard associationFinder.isEnabled else {
             return phase == .composing ? convert(withoutLearning: false, context: context) : KeyResult(handled: true)
         }
@@ -2851,6 +2861,11 @@ public final class InputSession {
             pendingNote = associationFinder.hasDictionaries ? PanelBuilder.noAssociationNote : PanelBuilder.noAssociationDictionaryNote
         }
         return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 注目している文節で選んでいる候補に，先の枝に出すもの(語の意味か，連想があることの知らせ)があるか
+    private func hasBranchDetail(_ lattice: SegmentLattice) -> Bool {
+        homophone(for: lattice) != nil || associationHint(text: lattice.focused.selected.text, reading: focusedReading(lattice)) != nil
     }
 
     /// 選んでいる文節(一覧なら選んでいる候補)の連想の一覧に切り替える．連想が無ければ false

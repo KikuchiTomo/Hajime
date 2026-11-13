@@ -115,6 +115,7 @@
     "shiftStartsAlphabet",
     "showsAssociationHint",
     "showsEmojiNames",
+    "showsFewerItems",
     "showsHomophones",
     "showsKeyHints",
     "showsModeIndicator",

@@ -306,6 +306,11 @@ public struct LatticePanel: Sendable, Equatable {
     public var associationHint: AssociationHint?
     /// 語の意味(Column.homophone)を候補の枝の右に出すか，下に出すか(設定)
     public var meaningPlacement = MeaningPlacement.side
+    /// 表示項目を減らす設定で，注目している文節の文字種の枝を畳んでいるか．畳んでいる枝は中身(Column.variants)を入れない．
+    /// 描く側は，続きがある印(端へ向けて透かした線)だけを出す
+    public var collapsesVariants = false
+    /// 表示項目を減らす設定で，選んでいる候補の先の枝(語の意味・連想)を畳んでいるか．畳んでいる枝は中身(Column.homophone・associationHint)を入れない
+    public var collapsesDetail = false
 
     public init(columns: [Column], position: Int = 1, total: Int = 0, note: Note? = nil) {
         self.columns = columns

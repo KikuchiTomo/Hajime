@@ -40,6 +40,8 @@ enum SnapshotRenderer {
                 render(suggestionView(theme: look.theme, appearance: appearance), name: "suggestion-\(look.name)", to: output, appearance: appearance)
                 render(latticeView(theme: look.theme, appearance: appearance), name: "branch-\(look.name)", to: output, appearance: appearance)
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
+                render(latticeView(fewerItemsLattice(), theme: look.theme, appearance: appearance), name: "branch-fewer-\(look.name)", to: output,
+                       appearance: appearance)
                 render(splitView(theme: look.theme, appearance: appearance), name: "branch-split-\(look.name)", to: output, appearance: appearance)
                 // 文節をその場で打ち直しているところ(⇧⌫)．読みを打っている途中と，まだ何も打っていないところ
                 render(latticeView(editingLattice(typed: "なかの"), theme: look.theme, appearance: appearance), name: "branch-editing-\(look.name)",
@@ -826,6 +828,19 @@ enum SnapshotRenderer {
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)
+    }
+
+    /// 表示項目を減らす設定の分岐図．文字種の枝と候補の先の枝を畳み，続きがある印だけを出す(core の PanelBuilder.reduced と同じ形)
+    private static func fewerItemsLattice() -> LatticePanel {
+        var panel = SamplePanels.lattice
+        if let focused = panel.columns.firstIndex(where: \.isFocused) {
+            panel.columns[focused].variants = []
+            panel.columns[focused].homophone = nil
+        }
+        panel.associationHint = nil
+        panel.collapsesVariants = true
+        panel.collapsesDetail = true
+        return panel
     }
 
     private static func latticeView(_ panel: LatticePanel = SamplePanels.lattice, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {

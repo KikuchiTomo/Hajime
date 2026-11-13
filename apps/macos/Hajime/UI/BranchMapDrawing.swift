@@ -101,6 +101,17 @@ enum BranchMapDrawing {
         }
     }
 
+    /// 続きがある印．from から to へ，端へ向けて透かした線を引く(畳んでいる枝)．縦か横の線
+    static func drawFadingLine(from: NSPoint, to: NSPoint, color: NSColor, width: CGFloat) {
+        let rect = NSRect(x: min(from.x, to.x) - width / 2, y: min(from.y, to.y) - width / 2, width: abs(from.x - to.x) + width,
+                          height: abs(from.y - to.y) + width)
+        guard let gradient = NSGradient(starting: color, ending: color.withAlphaComponent(0)) else { return }
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(rect: rect).addClip()
+        gradient.draw(from: from, to: to, options: [])
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
     // MARK: - 丸
 
     private static func outline(of stop: Stop, theme: ResolvedTheme) -> NSBezierPath {

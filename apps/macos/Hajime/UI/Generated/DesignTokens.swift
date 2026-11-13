@@ -218,6 +218,7 @@ enum DesignTokens {
             static let meaningIndent: CGFloat = 8
             static let meaningWidth: CGFloat = 240
             static let gripSize: CGFloat = 3
+            static let stubLength: CGFloat = 24
             static let fadeWidth: CGFloat = 48
         }
         enum Settings {

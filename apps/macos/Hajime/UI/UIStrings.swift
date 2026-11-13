@@ -343,6 +343,10 @@ enum UIStrings {
         }
         /// 候補の先の小さな幹の先に置く案内．key は連想変換のキーの名前
         static func expandHint(key: String) -> KeyHint { KeyHint(key: key, label: IndicatorLabels.branchExpandLabel) }
+        /// 畳んでいる先の枝(表示項目を減らす設定)を開く案内．連想変換のキーが割り当てられていなければ nil
+        static func expandHint(for keymap: Keymap) -> KeyHint? {
+            KeyHint.make([IndicatorLabels.branchExpandHint], keymap: keymap).first
+        }
         /// 候補の先の小さな幹の，語の意味の見出し
         static let meaningTitle = IndicatorLabels.branchMeaningTitle
         /// 文節を区切っているときの足元の案内．数字で区切る位置を選び，Esc でやめる(InputSession.handleSplit)．
@@ -917,6 +921,7 @@ enum UIStrings {
 
         static let variantRow = "候補の上に文字種の行を表示"
         static let keyHints = "キーの案内を表示"
+        static let fewerItems = "表示項目を減らす"
         static let typoCorrection = "タイプミスの修正"
         static let yenKey = "¥ キーで入力する文字"
         static let theme = "テーマ"
@@ -1290,7 +1295,7 @@ extension UIStrings {
             "showsPartOfSpeech": UIStrings.Settings.showsPartOfSpeech, "showsUsageExamples": UIStrings.Settings.showsUsageExamples,
             "showsHomophones": UIStrings.Settings.showsHomophones,
             "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
-            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
+            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "showsFewerItems": Choice.fewerItems, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
             "emojiConversion": UIStrings.Settings.emojiConversion, "emojiWordConversion": UIStrings.Settings.emojiWordConversion,
             "emojiCandidatePosition": UIStrings.Settings.emojiCandidatePosition,

@@ -310,6 +310,23 @@ enum PanelBuilder {
     /// 区切る位置を見せる印
     static let splitMark = "｜"
 
+    /// 表示項目を減らす設定のときの分岐図．文字種の枝は文字種を選んでいるあいだだけ出し，選んでいる候補の先の枝(語の意味・連想)は
+    /// 開いたあと(showsDetail)だけ出す．畳んだ枝は中身を除き，畳んでいることを panel に残す(描く側が続きがある印を出す)
+    static func reduced(_ panel: LatticePanel, showsDetail: Bool) -> LatticePanel {
+        guard panel.association == nil, let focused = panel.columns.firstIndex(where: \.isFocused), panel.columns[focused].split == nil else { return panel }
+        var panel = panel
+        if panel.columns[focused].selectedVariant == nil, !panel.columns[focused].variants.isEmpty {
+            panel.columns[focused].variants = []
+            panel.collapsesVariants = true
+        }
+        if !showsDetail, panel.columns[focused].homophone != nil || panel.associationHint != nil {
+            panel.columns[focused].homophone = nil
+            panel.associationHint = nil
+            panel.collapsesDetail = true
+        }
+        return panel
+    }
+
     /// 文節を区切っているとき(⇧↓)の分岐図．注目している文節を区切れる位置で分けて幹に出し，切れ目に番号を振る(SegmentSplitter)．
     /// 番号キーは区切る位置を選ぶので，候補と字種の枝は出さない(枝の番号と取り違えないように)
     static func splitting(_ panel: LatticePanel, pieces: [String]) -> LatticePanel {
@@ -319,6 +336,8 @@ enum PanelBuilder {
         var splitting = LatticePanel.Column(text: column.text, isFocused: true, isUncertain: column.isUncertain, isDecided: column.isDecided)
         splitting.split = .init(pieces: pieces)
         panel.columns[focused] = splitting
+        panel.collapsesVariants = false
+        panel.collapsesDetail = false
         return panel
     }
 }

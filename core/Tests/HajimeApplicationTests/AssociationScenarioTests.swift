@@ -175,6 +175,40 @@ struct AssociationScenarioTests {
         #expect(harness.marked.text == "美しい")
     }
 
+    @Test("表示項目を減らす設定では，文字種の枝は文字種を選んでいるあいだだけ，候補の先の枝は連想変換のキーで開いたあとだけ出す")
+    func fewerItems() {
+        let harness = harness(makeSettings { $0.showsFewerItems = true })
+        harness.type("utukusii")
+        harness.press(.space)
+        // 畳んでいる枝は中身を入れず，畳んでいることだけを伝える
+        #expect(harness.lattice?.columns.first?.variants.isEmpty == true)
+        #expect(harness.lattice?.collapsesVariants == true)
+        #expect(harness.lattice?.associationHint == nil)
+        #expect(harness.lattice?.collapsesDetail == true)
+        // 1 回目の連想変換のキーで先の枝を開く．連想の一覧にはまだ移らない
+        harness.press(.up, .shift)
+        #expect(harness.lattice?.association == nil)
+        #expect(harness.lattice?.associationHint == AssociationHint(key: "⇧↑", label: "連想"))
+        #expect(harness.lattice?.collapsesDetail == false)
+        // 2 回目で連想の一覧に移る
+        harness.press(.up, .shift)
+        #expect(harness.lattice?.association != nil)
+        harness.press(.escape)
+        // 第 1 候補から前の候補へ進むと文字種に入り，文字種の枝が出る
+        harness.press(.up)
+        #expect(harness.lattice?.columns.first?.selectedVariant != nil)
+        #expect(harness.lattice?.columns.first?.variants.isEmpty == false)
+        #expect(harness.lattice?.collapsesVariants == false)
+
+        // 設定がオフなら，どちらも始めから出す
+        let full = self.harness()
+        full.type("utukusii")
+        full.press(.space)
+        #expect(full.lattice?.columns.first?.variants.isEmpty == false)
+        #expect(full.lattice?.collapsesVariants == false)
+        #expect(full.lattice?.collapsesDetail == false)
+    }
+
     @Test("選んでいる候補に連想があれば，分岐図の足元に連想のキーを知らせる．知らせない設定では出さない")
     func hint() {
         let harness = harness()

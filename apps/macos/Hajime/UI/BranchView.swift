@@ -134,9 +134,10 @@ final class BranchView: NSView {
         if let split = panel.columns.first(where: \.isFocused)?.split {
             return Hints(boundary: UIStrings.Branch.splitHints(count: split.pieces.count - 1))
         }
+        // 先の枝を畳んでいるとき(表示項目を減らす設定)は，開くキー(連想変換のキー)を案内する
+        let expand = panel.collapsesDetail ? UIStrings.Branch.expandHint(for: keys) : panel.associationHint?.key.map(UIStrings.Branch.expandHint(key:))
         return Hints(boundary: UIStrings.Branch.boundaryHints(for: keys), variant: UIStrings.Branch.variantHint(for: keys),
-                     candidates: UIStrings.Branch.candidateHints(for: keys),
-                     expand: panel.associationHint?.key.map(UIStrings.Branch.expandHint(key:)))
+                     candidates: UIStrings.Branch.candidateHints(for: keys), expand: expand)
     }
 
     // MARK: - 語の意味
@@ -258,6 +259,10 @@ final class BranchView: NSView {
         var boundaryX: CGFloat = 0
         var stations: [Station] = []
         var expandX: CGFloat?
+        var expandMidY: CGFloat = 0
+        /// 畳んでいる枝の，続きがある印の線(表示項目を減らす設定)．文字種は文節の上へ，先の枝は選んでいる候補の行の先へ
+        var variantStub: (from: NSPoint, to: NSPoint)?
+        var detailStub: (from: NSPoint, to: NSPoint)?
         var meaning: SideMeaning?
         /// 候補の下の行(案内・位置・辞書の名前)
         var bottomMidY: CGFloat?
@@ -370,6 +375,15 @@ final class BranchView: NSView {
             }
         }
         if let meaning, let first = stationOffsets.first { reach = max(reach, first + Map.meaningIndent + meaning.width) }
+        // 先の枝を畳んでいるとき: 候補の行の先に，続きがある印の線と開くキーの案内
+        let showsDetailStub = panel.collapsesDetail && selectedRow != nil && column?.isEditing == false
+        if showsDetailStub {
+            reach = rowEnd + Map.stubLength
+            if let expand = hints.expand {
+                expandOffset = reach + Space.inset
+                reach += Space.inset + BranchMapDrawing.hintWidth(expand, theme: theme)
+            }
+        }
 
         // 文字種の枝．文節の上から横へ伸ばす．並びは反転しない
         let kindWidths = (column?.variants ?? []).map { textWidth($0, font: labelFont) + Part.rowPaddingX * 2 }
@@ -471,7 +485,14 @@ final class BranchView: NSView {
                 result.stations.append(Station(title: title, stop: NSPoint(x: stopX, y: midY), titleX: stopX - titleWidth / 2,
                                                titleMidY: midY - Map.stopSize / 2 - Space.inset - tag / 2))
             }
-            if let expandOffset, let expand = hints.expand { result.expandX = minX(expandOffset, BranchMapDrawing.hintWidth(expand, theme: theme)) }
+            if let expandOffset, let expand = hints.expand {
+                result.expandX = minX(expandOffset, BranchMapDrawing.hintWidth(expand, theme: theme))
+                result.expandMidY = midY
+            }
+            if showsDetailStub {
+                let from = direction > 0 ? stemX + rowEnd : stemX - rowEnd
+                result.detailStub = (NSPoint(x: from, y: midY), NSPoint(x: from + direction * Map.stubLength, y: midY))
+            }
             if let meaning, let station = result.stations.first {
                 let top = midY + Map.stopSize / 2 + Space.inset
                 result.meaning = SideMeaning(text: meaning, lineX: station.stop.x, top: top,
@@ -501,6 +522,10 @@ final class BranchView: NSView {
         result.direction = direction
         result.twigDirection = twigDirection
         result.boundaryX = max(min(focusX + boundaryStart, right - boundaryWidth), left)
+        // 文字種の枝を畳んでいるとき: 文節の上へ，続きがある印の線を境目の案内の行の高さだけ伸ばす
+        if panel.collapsesVariants, let boundaryMidY = result.boundaryMidY, column?.split == nil {
+            result.variantStub = (NSPoint(x: focusX, y: nodeTop + metrics.rowInset), NSPoint(x: focusX, y: boundaryMidY - tag / 2))
+        }
         result.trunkRight = trunkRight
         result.focusSpan = focus.map { nodeX[$0]...(nodeX[$0] + nodeWidths[$0] + nodeGap) }
         result.size = NSSize(width: width, height: height.rounded(.up))
@@ -692,6 +717,12 @@ final class BranchView: NSView {
                                 avoiding: avoided, in: body, theme: theme)
         BranchMapDrawing.stroke(route, color: theme.selection, width: metrics.lineWidthSelected, avoiding: avoided, in: body, theme: theme)
         BranchMapDrawing.draw(branchStops + senseStops, lineWidth: metrics.lineWidth, theme: theme)
+        // 畳んでいる枝の，続きがある印
+        for stub in [layout.variantStub, layout.detailStub].compactMap({ $0 }) {
+            // 線の色のままだと透かした先が見えないので，控えめな文字の色から透かす
+            BranchMapDrawing.drawFadingLine(from: stub.from, to: stub.to, color: theme.textMuted.withAlphaComponent(theme.textMuted.alphaComponent * stale),
+                                            width: metrics.lineWidth)
+        }
 
         // 候補・文字種・先の枝の見出し・語の意味
         for (index, row) in layout.rows.enumerated() where rows.indices.contains(index) {
@@ -718,8 +749,8 @@ final class BranchView: NSView {
         if let x = layout.variantHintX, let hint = hints.variant, let label = layout.kinds.first?.label {
             BranchMapDrawing.drawHint(hint, x: x, midY: label.midY, theme: theme)
         }
-        if let x = layout.expandX, let hint = hints.expand, let station = layout.stations.first {
-            BranchMapDrawing.drawHint(hint, x: x, midY: station.stop.y, theme: theme)
+        if let x = layout.expandX, let hint = hints.expand {
+            BranchMapDrawing.drawHint(hint, x: x, midY: layout.expandMidY, theme: theme)
         }
         if let midY = layout.bottomMidY {
             BranchMapDrawing.drawHints(hints.candidates, x: layout.bottomHintsX, midY: midY, theme: theme)
