@@ -223,13 +223,14 @@ final class PaletteView: NSView {
         let oldLayout = self.layout(for: old)
         let time = clock()
         let changes = panel.motion
-        // 選択の枠．滑っている途中で次へ動いたら，今の位置から滑らせ直す
-        if let from = changes.selectionFrom, panel.selection != nil {
-            let previous = old.selection.map { cellRect(row: $0.row, column: $0.column, in: oldLayout, panel: old) }
+        // 選択の枠．滑っている途中で次へ動いたら，今の位置から滑らせ直す．
+        // スクロールの位置が変わったら止める(滑り始めの位置は前のスクロールの位置のマスなので，続けると枠がマスからずれる)
+        if let from = changes.selectionFrom, panel.visibleSelection != nil {
+            let previous = old.visibleSelection.map { cellRect(row: $0.row, column: $0.column, in: oldLayout, panel: old) }
             let current = motion.selection.flatMap { slide in previous.map { PaletteMotionState.rect(slide, to: $0, at: time, easing: PaletteEasing.easeOut) } }
             motion.selection = .init(from: current ?? cellRect(row: from.row, column: from.column, in: layout, panel: panel), start: time,
                                      duration: Duration.selection / 1000)
-        } else if old.selection != panel.selection || changes.content != nil {
+        } else if old.selection != panel.selection || changes.content != nil || old.firstRow != panel.firstRow {
             motion.selection = nil
         }
         // 種類の切り替えの印
@@ -280,7 +281,7 @@ final class PaletteView: NSView {
         }
         let layout = layout(for: panel)
         let margin = Size.selectionStroke + 2
-        if let slide = motion.selection, let to = panel.selection {
+        if let slide = motion.selection, let to = panel.visibleSelection {
             setNeedsDisplay(slide.from.union(cellRect(row: to.row, column: to.column, in: layout, panel: panel)).insetBy(dx: -margin, dy: -margin))
         }
         if motion.mode != nil { setNeedsDisplay(Self.union(layout.modes)) }
@@ -493,7 +494,10 @@ final class PaletteView: NSView {
         context?.setAlpha(alpha)
         context?.translateBy(x: offset.x, y: offset.y)
         defer { context?.restoreGState() }
-        if let selection = panel.selection {
+        // マス目の外に描かない(ずらしても切る範囲は動かさない．選択の枠の線はマスの内側に描くので，線の太さの分だけ広げる)
+        layout.grid.insetBy(dx: -Size.selectionStroke, dy: -Size.selectionStroke).offsetBy(dx: -offset.x, dy: -offset.y).clip()
+        // 選択の枠は，選んでいる行が見えているときだけ描く(ホイールでスクロールすると見えない行を選んだままになる)
+        if let selection = panel.visibleSelection {
             // 色だけに頼らないよう，背景を塗ったうえで枠も描く．選択が動いたら前のマスから滑らせる
             let target = cellRect(row: selection.row, column: selection.column, in: layout, panel: panel)
             let rect = slidesSelection && offset == .zero ? PaletteMotionState.rect(motion.selection, to: target, at: time, easing: PaletteEasing.easeOut) : target

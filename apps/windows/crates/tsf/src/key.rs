@@ -142,6 +142,30 @@ pub fn is_modifier_only(vk: u16) -> bool {
     ) || (VK_LSHIFT..=VK_RMENU).contains(&vk)
 }
 
+/// 文字でないキーの仮想キー(予約したキーの登録に使う)．キーの位置で決まらないキー(かな・英数・¥)は None
+pub fn named_vk(key: &Key) -> Option<u16> {
+    Some(match key {
+        Key::Backspace => VK_BACK,
+        Key::Tab => VK_TAB,
+        Key::Enter => VK_RETURN,
+        Key::Escape => VK_ESCAPE,
+        Key::Space => VK_SPACE,
+        Key::PageUp => VK_PRIOR,
+        Key::PageDown => VK_NEXT,
+        Key::End => VK_END,
+        Key::Home => VK_HOME,
+        Key::Left => VK_LEFT,
+        Key::Up => VK_UP,
+        Key::Right => VK_RIGHT,
+        Key::Down => VK_DOWN,
+        Key::Delete => VK_DELETE,
+        Key::Henkan => VK_CONVERT,
+        Key::Muhenkan => VK_NONCONVERT,
+        Key::Function { number } if (1..=24).contains(number) => VK_F1 + u16::from(*number) - 1,
+        _ => return None,
+    })
+}
+
 pub fn translate(raw: &RawKey) -> Option<KeyInput> {
     let named = match raw.vk {
         _ if raw.scan == SCAN_LANG1 => Some(Key::Kana),
