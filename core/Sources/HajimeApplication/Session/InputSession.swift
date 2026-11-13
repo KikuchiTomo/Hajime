@@ -398,6 +398,14 @@ public final class InputSession {
                     return rerender(context: context)
                 }]
             } ?? []
+            // 注目している文節の点数での並べ替えをあとに回していれば，まずそれを求めて出し直す(見ている候補なので先に)
+            let scoring: [@MainActor () -> [ClientAction]] = lattice.focused.awaitsScoring ? [{ [self] in
+                guard case .lattice(var current) = phase, composition.conversionReading == reading, current.focused.awaitsScoring else { return [] }
+                current.segments[current.focusedIndex] = latticeBuilder.scored(current.focused, reading: reading,
+                                                                               context: LatticeBuilder.context(in: current, at: current.focusedIndex))
+                phase = .lattice(current)
+                return rerender(context: context)
+            }] : []
             let preview: @MainActor () -> [ClientAction] = { [self] in
                 guard case .lattice(let current) = phase, composition.conversionReading == reading, inlineEdit == nil else { return [] }
                 let key = resizePreviewKey(current)
@@ -405,7 +413,7 @@ public final class InputSession {
                 resizePreviews[key] = latticeBuilder.resizePreview(current, reading: reading)
                 return rerender(context: context)
             }
-            return rest + fills + [preview]
+            return scoring + rest + fills + [preview]
         case .selecting where listSubstitutionPending == composition.conversionReading:
             // 一覧を出したときにまだ求めていなかった文節の候補を 1 文節ずつ求め，迷う文節から順に前後の語を含めた変換を 1 文節ずつ求める．
             // 最後に，文節を入れ替えた文を足して(並べ替えて)出し直す．選んでいる候補は，並びが変わっても同じ候補のままにする
@@ -2254,10 +2262,11 @@ public final class InputSession {
                 fillPendingSegments(only: lattice.focusedIndex)
                 if case .lattice(let filled) = phase { lattice = filled }
             }
-            // 注目している文節の候補を前後の文脈で並べ替える(候補を見せる文節だけ．設定の contextualSegmentCandidates)
+            // 注目している文節の候補を前後の文脈で並べ替える(候補を見せる文節だけ．設定の contextualSegmentCandidates)．
+            // 点数(検証木)での並べ替えは，前もって求めた点数が無ければ待たずに出し，続く処理(followUps)で求めて出し直す
             if !lattice.focused.isContextRanked {
                 let ranked = latticeBuilder.rankedByContext(lattice.focused, reading: composition.conversionReading,
-                                                            context: LatticeBuilder.context(in: lattice, at: lattice.focusedIndex))
+                                                            context: LatticeBuilder.context(in: lattice, at: lattice.focusedIndex), scoring: .later)
                 if ranked.isContextRanked {
                     lattice.segments[lattice.focusedIndex] = ranked
                     phase = .lattice(lattice)
@@ -2763,7 +2772,9 @@ public final class InputSession {
         return true
     }
 
-    /// 打ち直しているあいだの表示．打ち直す文節の位置に打った読みを入れ，分岐図は打ち直す前のまま出しておく
+    /// 打ち直しているあいだの表示．打ち直す文節の位置に打った読みを入れる．分岐図は幹のその文節を打っている読みに差し替えて
+    /// 打ち直していると分かる形にし(isEditing)，その文節の枝は打ち直す前の候補を薄く出す．文節ごとの一覧は候補を薄く出す．
+    /// 1 打鍵ごとには変換しない(候補は Space・Tab・Enter で変換したときに出す)
     private func renderInlineEdit(_ lattice: SegmentLattice) -> [ClientAction] {
         guard let edit = inlineEdit else { return [] }
         let segments: [MarkedText.Segment] = lattice.segments.enumerated().map { index, segment in
@@ -2775,11 +2786,31 @@ public final class InputSession {
             var panel = PanelBuilder.segmentListPanel(for: lattice, perPage: latticePerPage, showsVariants: settings.current.showsVariantRow,
                                                       reading: composition.conversionReading, detail: emojiName)
             panel.note = note
+            panel.isEditing = true
+            panel.selectedEntry = nil
+            panel.homophone = nil
+            panel.associationHint = nil
             return [.setMarkedText(MarkedText(segments, caret: caret)), .showCandidates(panel)]
         }
         var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
                                               showsVariants: settings.current.showsVariantRow, corrected: nil, detail: emojiName)
         panel.note = note
+        panel.associationHint = nil
+        if panel.columns.indices.contains(edit.index) {
+            var column = panel.columns[edit.index]
+            column.text = edit.typed.displayReading
+            column.isEditing = true
+            column.selectedAlternative = nil
+            column.selectedVariant = nil
+            column.isUncertain = false
+            column.isCorrected = false
+            column.preview = nil
+            column.usageNote = nil
+            column.homophone = nil
+            column.sourceName = nil
+            column.split = nil
+            panel.columns[edit.index] = column
+        }
         return [.setMarkedText(MarkedText(segments, caret: caret)), .showLattice(panel)]
     }
 

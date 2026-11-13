@@ -474,6 +474,7 @@ fn variants() -> Vec<CandidateVariant> {
 
 fn list() -> CandidateList {
     CandidateList {
+        is_editing: None,
         association: None,
         association_hint: None,
         association_key: None,
@@ -745,6 +746,7 @@ fn correction() -> CandidateList {
     let mut entries = entries(&["python", "pyてょn", "Python"]);
     entries[1].annotation = Some("入力のまま".into());
     CandidateList {
+        is_editing: None,
         association: None,
         association_hint: None,
         association_key: None,
@@ -773,6 +775,7 @@ fn correction() -> CandidateList {
 
 fn column(text: &str) -> BranchColumn {
     BranchColumn {
+        is_editing: None,
         text: text.into(),
         alternatives: vec![],
         selected_alternative: None,

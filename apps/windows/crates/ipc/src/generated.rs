@@ -1720,6 +1720,9 @@ pub struct CandidateList {
     #[serde(rename = "columnLength")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub column_length: Option<u32>,
+    #[serde(rename = "isEditing")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_editing: Option<bool>,
 }
 
 impl fmt::Debug for CandidateList {
@@ -1741,6 +1744,7 @@ impl fmt::Debug for CandidateList {
             .field("showsNumbers", &self.shows_numbers)
             .field("meaningPlacement", &self.meaning_placement)
             .field("columnLength", &self.column_length)
+            .field("isEditing", &self.is_editing)
             .finish()
     }
 }
@@ -1792,6 +1796,9 @@ pub struct BranchColumn {
     pub source_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub split: Option<BranchSplit>,
+    #[serde(rename = "isEditing")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_editing: Option<bool>,
 }
 
 impl fmt::Debug for BranchColumn {
@@ -1817,6 +1824,7 @@ impl fmt::Debug for BranchColumn {
             .field("alternativeDetails", &REDACTED)
             .field("sourceName", &REDACTED)
             .field("split", &self.split)
+            .field("isEditing", &self.is_editing)
             .finish()
     }
 }

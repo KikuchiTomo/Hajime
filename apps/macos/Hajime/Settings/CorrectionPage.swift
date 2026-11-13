@@ -28,15 +28,19 @@ struct CorrectionPage: View {
                               example: UIStrings.Extras.handShiftExample, titleWidth: exampleTitleWidth)
                     .disabled(model, unless: \.correctsJapaneseTypos)
             }
-            Section(UIStrings.Features.rules) {
-                RuleListEditor(model: model, spec: .correctionRules, labels: .init(
-                    key: UIStrings.Features.typed, value: UIStrings.Features.replacement,
-                    empty: UIStrings.Features.rulesEmpty))
+            BuiltLater(stage: 1) {
+                Section(UIStrings.Features.rules) {
+                    RuleListEditor(model: model, spec: .correctionRules, labels: .init(
+                        key: UIStrings.Features.typed, value: UIStrings.Features.replacement,
+                        empty: UIStrings.Features.rulesEmpty))
+                }
             }
-            Section(UIStrings.Features.exceptions) {
-                RuleListEditor(model: model, spec: .exceptions, labels: .init(
-                    key: UIStrings.Features.exceptionPlaceholder, value: nil,
-                    empty: UIStrings.Features.exceptionsEmpty))
+            BuiltLater(stage: 2) {
+                Section(UIStrings.Features.exceptions) {
+                    RuleListEditor(model: model, spec: .exceptions, labels: .init(
+                        key: UIStrings.Features.exceptionPlaceholder, value: nil,
+                        empty: UIStrings.Features.exceptionsEmpty))
+                }
             }
         }
         .formStyle(.grouped)
