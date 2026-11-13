@@ -35,8 +35,7 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
         switch self {
         case .appModes: UIStrings.Onboarding.appModesDetail
         case .theme: UIStrings.Onboarding.themeDetail
-        case .extras: UIStrings.Onboarding.extrasDetail
-        case .modeSwitch, .correction, .liveConversion, .presentation, .characters, .features: nil
+        case .modeSwitch, .correction, .liveConversion, .presentation, .characters, .features, .extras: nil
         }
     }
 

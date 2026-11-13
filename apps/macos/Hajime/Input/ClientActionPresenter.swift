@@ -152,6 +152,11 @@ final class ClientActionPresenter {
         }
     }
 
+    /// 修飾キーの押し方が変わった(分岐図のキーの案内を，押し続けているあいだだけ出す)
+    func modifiersChanged(_ flags: NSEvent.ModifierFlags) {
+        candidatePanel.modifiersChanged(flags)
+    }
+
     func hideWindows() {
         candidatePanel.hide()
         note.hide()

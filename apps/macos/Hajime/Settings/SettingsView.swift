@@ -202,6 +202,8 @@ private struct ConversionTab: View {
                 BuiltLater(stage: 1) {
                     ResettableToggle(model: model, title: UIStrings.Choice.variantRow, keyPath: \.showsVariantRow)
                     ResettableToggle(model: model, title: UIStrings.Choice.keyHints, keyPath: \.showsKeyHints)
+                    ResettableToggle(model: model, title: UIStrings.Choice.branchHintsAlways, keyPath: \.alwaysShowsBranchHints)
+                        .disabled(model, unless: \.showsKeyHints)
                     ResettableToggle(model: model, title: UIStrings.Choice.fewerItems, keyPath: \.showsFewerItems)
                     ResettableRow(model: model, keyPath: \.liveConversionDelay) {
                         SecondsSlider(title: UIStrings.More.liveConversionDelay, value: model.binding(\.liveConversionDelay),

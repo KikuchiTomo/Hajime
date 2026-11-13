@@ -174,6 +174,8 @@ pub const APP_PROFILES: &[Choice] = &[
 /// 選べる外観．native は標準と同じ見た目なので並べない(古い設定のファイルにあっても標準として読む)
 pub const THEMES: &[Choice] = &[
     ("automatic", "標準"),
+    ("indigo", "インディゴ"),
+    ("indigoNight", "夜のインディゴ"),
     ("washi", "和紙"),
     ("nordic", "北欧"),
     ("neon", "ネオン"),
@@ -239,7 +241,7 @@ mod tests {
     #[test]
     fn 以前の値は標準として選ぶ() {
         assert_eq!(index_of(THEMES, "native"), 0);
-        assert_eq!(index_of(THEMES, "desk"), 7);
+        assert_eq!(index_of(THEMES, "desk"), 9);
         assert_eq!(index_of(INPUT_STYLES, "unknown"), 0);
     }
 

@@ -27,7 +27,7 @@ enum SnapshotRenderer {
             (ThemeChoice(.automatic, custom: sample), .darkAqua, "custom"),
             (ThemeChoice(.automatic), .aqua, "glass-light"), (ThemeChoice(.automatic), .darkAqua, "glass-dark"), (ThemeChoice(.platinum), .aqua, "platinum"), (ThemeChoice(.desk), .darkAqua, "desk"),
             (ThemeChoice(.washi), .aqua, "washi"), (ThemeChoice(.neon), .darkAqua, "neon"), (ThemeChoice(.terminal), .darkAqua, "terminal"), (ThemeChoice(.nordic), .aqua, "nordic"),
-            (ThemeChoice(.contrast), .darkAqua, "contrast"),
+            (ThemeChoice(.contrast), .darkAqua, "contrast"), (ThemeChoice(.indigo), .aqua, "indigo"), (ThemeChoice(.indigoNight), .darkAqua, "indigo-night"),
         ]
         checkPointerTargets()
         checkGridPointerTargets()
@@ -42,6 +42,20 @@ enum SnapshotRenderer {
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
                 render(latticeView(fewerItemsLattice(), theme: look.theme, appearance: appearance), name: "branch-fewer-\(look.name)", to: output,
                        appearance: appearance)
+                // 先の枝(語の意味・連想・変換マクロ)．候補にいるとき・連想の丸の上・マクロの丸の中身
+                for (suffix, panel) in [("", stationLattice(current: nil, inside: false)), ("-association", stationLattice(current: 1, inside: false)),
+                                        ("-macro", stationLattice(current: 2, inside: true))] {
+                    render(latticeView(panel, theme: look.theme, appearance: appearance), name: "branch-station\(suffix)-\(look.name)", to: output,
+                           appearance: appearance)
+                }
+                // 矢印キーで木をたどっていて，幹の上(文節)にいるところ．ページの位置は縦の線の下の点
+                render(latticeView(trunkLattice(), theme: look.theme, appearance: appearance), name: "branch-trunk-\(look.name)", to: output,
+                       appearance: appearance)
+                // キーの案内を，修飾キーを押し続けているあいだだけ出す設定(既定)．押していないとき・Shift・Option
+                for (suffix, modifiers) in [("", NSEvent.ModifierFlags()), ("-shift", .shift), ("-option", .option)] {
+                    render(latticeView(heldHintsLattice(), theme: look.theme, appearance: appearance, heldModifiers: modifiers),
+                           name: "branch-hold\(suffix)-\(look.name)", to: output, appearance: appearance)
+                }
                 render(splitView(theme: look.theme, appearance: appearance), name: "branch-split-\(look.name)", to: output, appearance: appearance)
                 // 文節をその場で打ち直しているところ(⇧⌫)．読みを打っている途中と，まだ何も打っていないところ
                 render(latticeView(editingLattice(typed: "なかの"), theme: look.theme, appearance: appearance), name: "branch-editing-\(look.name)",
@@ -843,10 +857,57 @@ enum SnapshotRenderer {
         return panel
     }
 
-    private static func latticeView(_ panel: LatticePanel = SamplePanels.lattice, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+    /// 先の枝を丸として出した分岐図(core の InputSession.applyBranch と同じ形)．current は今いる丸，inside なら丸の中身を選んでいる
+    private static func stationLattice(current: Int?, inside: Bool) -> LatticePanel {
+        var column = LatticePanel.Column(text: "撮る", alternatives: ["取る", "撮る", "とる", "採る"], selectedAlternative: 1, variants: ["とる", "トル", "ﾄﾙ"],
+                                         isFocused: true, isUncertain: true)
+        var detail = BranchDetail(stations: [.init(kind: .meaning, title: "意味"), .init(kind: .association, title: "連想"), .init(kind: .macro, title: "マクロ")],
+                                  current: current)
+        if current == 1 {
+            detail.items = ["撮影する", "写す", "収める"]
+            detail.label = "写真に収める"
+            detail.groupCount = 2
+            detail.total = 3
+        } else if current == 2 {
+            detail.items = ["「撮る」", "【撮る】", "撮る（とる）", "**撮る**"]
+            detail.total = 4
+        }
+        if current == nil || current == 0 { column.homophone = SamplePanels.homophone }
+        if inside {
+            detail.selectedItem = 1
+            detail.candidates = column.alternatives
+            detail.selectedCandidate = 1
+            column.text = detail.items[1]
+            column.alternatives = detail.items
+        }
+        var panel = SamplePanels.withKeys(LatticePanel(columns: [.init(text: "写真を", isFocused: false, isUncertain: false), column], position: 1, total: 7))
+        if inside { panel.association = AssociationHeading(headword: "撮る", label: "", group: 1, groupCount: 1) }
+        panel.detail = detail
+        return panel
+    }
+
+    /// 幹の上にいる分岐図．案内は押し続けて出す設定(既定)，候補は 2 ページ
+    private static func trunkLattice() -> LatticePanel {
+        var panel = SamplePanels.lattice
+        panel.trunkFocused = true
+        panel.hintsOnHold = true
+        panel.pageSize = 4
+        return panel
+    }
+
+    /// キーの案内を押し続けているあいだだけ出す設定の分岐図(core の InputSession が入れるものと同じ)
+    private static func heldHintsLattice() -> LatticePanel {
+        var panel = SamplePanels.lattice
+        panel.hintsOnHold = true
+        return panel
+    }
+
+    private static func latticeView(_ panel: LatticePanel = SamplePanels.lattice, theme: ThemeChoice, appearance: NSAppearance?,
+                                    heldModifiers: NSEvent.ModifierFlags = []) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
+        view.heldModifiers = heldModifiers
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)

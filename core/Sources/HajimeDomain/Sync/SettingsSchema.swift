@@ -26,11 +26,12 @@
 ///   表に変換中の ⌥↓ か Tab を足した(GridKeyUpgrade)
 /// - バージョン 19: キー設定の表のコマンド `jumpToSegment1`〜`jumpToSegment8`(分岐図の文節へ移る)を足し，表に変換中の ⌥A・⌥S・⌥D・⌥F・⌥J・⌥K・⌥L・⌥; を足した
 ///   (SegmentJumpKeyUpgrade)
+/// - バージョン 20: キー設定の表のコマンド `enterBranch`(候補の先の枝へ移る)を足し，標準・Emacs 風・Vim 風の変換中の → を次の文節から替えた(BranchKeyUpgrade)
 ///
 /// 項目の名前や形を変えるときは，バージョンを 1 つ上げ，`migrations` に移し替えを足す．移し替えは JSON のまま行い，
 /// 読み込む前に古いバージョンから順に当てる．新しいバージョンのファイルを古いバージョンで開いたときは移し替えず，知らない項目を残す(Settings.unknownFields)
 public enum SettingsSchema {
-    public static let currentVersion = 19
+    public static let currentVersion = 20
     public static let versionKey = "schemaVersion"
 
     /// バージョン n から n+1 への移し替え．添字 0 がバージョン 1 → 2
@@ -53,6 +54,7 @@ public enum SettingsSchema {
         { WordToolKeyUpgrade.upgrade(&$0) },
         { GridKeyUpgrade.upgrade(&$0) },
         { SegmentJumpKeyUpgrade.upgrade(&$0) },
+        { BranchKeyUpgrade.upgrade(&$0) },
     ]
 
     /// ファイルのバージョンを読み，今のバージョンまで移し替える．今より新しいバージョンはそのまま
