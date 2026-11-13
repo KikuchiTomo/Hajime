@@ -254,6 +254,15 @@ public struct PalettePanel: Sendable, Equatable {
     }
 }
 
+extension PalettePanel {
+    /// 選んでいるマスが見えている行にあれば，その位置．ホイールでスクロールして選んでいる行が見えなくなったら nil．
+    /// 描く側は選択の枠をこの位置にだけ描く(見えていない行の位置に描くと，枠がマス目の外のタブや説明の欄に重なる)
+    public var visibleSelection: Position? {
+        guard let selection, selection.row >= firstRow, selection.row < firstRow + visibleRows else { return nil }
+        return selection
+    }
+}
+
 extension PalettePanel: CustomStringConvertible, CustomDebugStringConvertible {
     // 探した語は入力の中身なので，ログには行の数と位置だけを出す
     public var description: String { "PalettePanel(rows: \(rowCount), firstRow: \(firstRow), query: \(query.count))" }

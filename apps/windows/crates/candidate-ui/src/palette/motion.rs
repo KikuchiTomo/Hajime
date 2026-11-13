@@ -114,10 +114,9 @@ fn slid(slide: &Option<Slide>, to: Frame, now: Instant, easing: fn(f32) -> f32) 
     (t < 1.0).then(|| lerp(slide.from, to, easing(t)))
 }
 
+/// 選択の枠の位置．選んでいる行が見えていなければ None
 fn selected_frame(panel: &PalettePanel, layout: &Layout) -> Option<Frame> {
-    panel
-        .selection
-        .as_ref()
+    super::layout::visible_selection(panel)
         .map(|position| layout.cell_frame(position.row, position.column))
 }
 
@@ -141,14 +140,17 @@ impl Motion {
         layout: &Layout,
         now: Instant,
     ) {
+        // スクロールの位置が変わったら，滑っている選択の枠を止める(滑り始めの位置は前のスクロールの位置のマスなので，
+        // 続けると枠がマスからずれる)
+        let scrolled = old.first_row != panel.first_row;
         let Some(changes) = &panel.motion else {
             // 動きが添えられていない(同じ内容を出し直した)．選択が変わったなら滑らせない
-            if old.selection != panel.selection {
+            if old.selection != panel.selection || scrolled {
                 self.selection = None;
             }
             return;
         };
-        if let (Some(from), Some(_)) = (&changes.selection_from, &panel.selection) {
+        if let (Some(from), Some(_)) = (&changes.selection_from, selected_frame(panel, layout)) {
             let current = selected_frame(old, old_layout)
                 .and_then(|previous| slid(&self.selection, previous, now, ease_out));
             self.selection = Some(Slide {
@@ -156,7 +158,7 @@ impl Motion {
                 start: now,
                 duration: duration::SELECTION,
             });
-        } else if old.selection != panel.selection || changes.content.is_some() {
+        } else if old.selection != panel.selection || changes.content.is_some() || scrolled {
             self.selection = None;
         }
         if let Some(from) = changes.mode_from {
@@ -392,6 +394,40 @@ mod tests {
         motion.start(&panel, &layout, &jumped, &layout, after(start, 10.0));
         assert_eq!(
             motion.tween(&jumped, &layout, after(start, 20.0)).selection,
+            None
+        );
+    }
+
+    #[test]
+    fn 滑っている途中でスクロールしたら滑っている枠を止める() {
+        let old = sample::emoji();
+        let mut panel = moved(
+            &old,
+            PaletteMotion {
+                selection_from: old.selection.clone(),
+                ..still()
+            },
+        );
+        panel.selection = Some(PalettePosition { row: 4, column: 6 });
+        let (old_layout, layout) = (layout(&old), layout(&panel));
+        let start = Instant::now();
+        let mut motion = Motion::default();
+        motion.start(&old, &old_layout, &panel, &layout, start);
+        // ホイールでスクロールした(選択は同じ．core は動きを添えない)
+        let mut scrolled = moved(&panel, still());
+        scrolled.first_row = 1;
+        let scrolled_layout = Layout::new(&scrolled, &theme("automatic"), &Fixed);
+        motion.start(
+            &panel,
+            &layout,
+            &scrolled,
+            &scrolled_layout,
+            after(start, 10.0),
+        );
+        assert_eq!(
+            motion
+                .tween(&scrolled, &scrolled_layout, after(start, 20.0))
+                .selection,
             None
         );
     }
