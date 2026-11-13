@@ -369,13 +369,16 @@ fn place(
             0.0,
             metrics,
         ),
+        // 結果のタグの行の数に合わせた高さ(画面の側で測る．測れなければ決まった行数)
         Control::PreviewChips(_) => place_inputs(
             position,
             0,
             NO_BUTTONS,
             ListState::default(),
             frame,
-            size::BODY_LINE_HEIGHT * size::MACRO_PREVIEW_LINES,
+            metrics
+                .height(row, frame.width)
+                .unwrap_or(size::BODY_LINE_HEIGHT * size::MACRO_PREVIEW_LINES),
             metrics,
         ),
         Control::KeymapReport => place_inputs(
@@ -906,6 +909,7 @@ const NO_BUTTONS: ListButtons = ListButtons {
     message_line: false,
     result: false,
     template_field: None,
+    caption: None,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -1022,13 +1026,28 @@ fn place_list(
     } else {
         0.0
     };
-    let field_width = ((inner - buttons_width - gaps - arrow_extra - template_extra - fixed_total)
+    // 欄の前に置く名前(判別ルールの「直前」)は，名前の幅と欄までの間を空ける
+    let caption = buttons
+        .caption
+        .filter(|(index, _)| *index < fields)
+        .map(|(index, text)| (index, metrics.width(text, TextKind::Body).ceil()));
+    let caption_extra = caption.map_or(0.0, |(_, width)| width + size::CONTROL_GAP);
+    let field_width = ((inner
+        - buttons_width
+        - gaps
+        - arrow_extra
+        - template_extra
+        - caption_extra
+        - fixed_total)
         / count)
         .max(0.0);
     let mut parts = Vec::new();
     let mut template_button = None;
     let mut cursor = x;
     for index in 0..fields {
+        if caption.is_some_and(|(at, _)| at == index) {
+            cursor += caption_extra;
+        }
         let width = fixed.get(index).copied().unwrap_or(field_width);
         parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
         cursor += width + size::CONTROL_GAP;
@@ -1291,6 +1310,37 @@ mod tests {
             |_| true,
             &Estimate,
         )
+    }
+
+    #[test]
+    fn 判別ルールの足す行は直前の欄の前に名前を置く間を空ける() {
+        let page = sections(Page::Language).unwrap();
+        let layout = layout(&page, 900.0, |_| true, |_| true, &Estimate);
+        let card = page
+            .iter()
+            .zip(&layout.sections)
+            .flat_map(|(section, placed)| {
+                placed
+                    .cards
+                    .iter()
+                    .filter(|card| {
+                        matches!(&section.rows[card.row].control,
+                            crate::pages::Control::List(spec, _) if spec.path == "wordLanguage.rules")
+                    })
+                    .cloned()
+                    .collect::<Vec<_>>()
+            })
+            .next()
+            .unwrap();
+        let caption = Estimate
+            .width(
+                crate::strings::features::LANGUAGE_RULE_CONTEXT,
+                TextKind::Body,
+            )
+            .ceil();
+        // 単語の欄・(間)・「直前」・(間)・直前の欄(macOS の WordLanguagePage の HStack と同じ並び)
+        let between = card.parts[1].x - card.parts[0].max_x();
+        assert!((between - (size::CONTROL_GAP + caption + size::CONTROL_GAP)).abs() < 0.01);
     }
 
     #[test]

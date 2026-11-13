@@ -345,6 +345,8 @@ pub struct Extras {
     pub sync_fields: Vec<Vec<String>>,
     /// キー設定の表の問題の文(無ければ空)
     pub keymap_report: String,
+    /// keymap_report の先頭のうち，キーの無い確定・取り消しの行の数(注意の印と色で出す．macOS の KeymapPage の missingWarning)
+    pub keymap_missing: usize,
     /// キー設定の行ごとの問題(行の印と，使われない行を薄く出すのに使う)
     pub keymap_issues: Vec<ipc::KeymapRowIssue>,
     /// キー設定の表に合うひな形(keys::PRESETS の番号．合わなければ None)
@@ -506,6 +508,8 @@ struct RowState {
     /// 書き方のチップに添える今の値(並べているチップと同じ並び)
     lines: Vec<String>,
     text: String,
+    /// text の先頭のうち，注意の印を付ける行の数(キー設定の知らせのキーの無い確定・取り消し)
+    text_marks: usize,
     /// 色のボタンに出す色(「#RRGGBB」)
     color: String,
     /// カスタムテーマの行のテーマ(見本の色のタグに描く)と，読みにくい組み合わせがあるか
@@ -722,6 +726,7 @@ impl RowState {
             font_items: Vec::new(),
             numbers,
             text,
+            text_marks: 0,
             lines: Vec::new(),
             color: String::new(),
             custom: None,
@@ -2027,7 +2032,10 @@ impl PageView {
                 | Control::InfoAction(Info::PaletteKeys(command), ..) => {
                     row.text = crate::keys::assigned(values.value("keymap"), command)
                 }
-                Control::KeymapReport => row.text = extras.keymap_report.clone(),
+                Control::KeymapReport => {
+                    row.text = extras.keymap_report.clone();
+                    row.text_marks = extras.keymap_missing;
+                }
                 Control::Preset => row.choice = extras.keymap_preset,
                 Control::Preview(TryKind::Macros) | Control::PreviewChips(TryKind::Macros) => {
                     row.preview_result = extras.macro_preview.clone();
@@ -2126,6 +2134,11 @@ impl PageView {
             .map(|row| row.dictionaries.as_ref().map(dictionary_rows::Rows::height))
             .collect();
         let texts: Vec<String> = self.rows.iter().map(|row| row.text.clone()).collect();
+        let chips: Vec<crate::engine::PreviewShown> = self
+            .rows
+            .iter()
+            .map(|row| row.preview_result.clone())
+            .collect();
         let lists: Vec<ListInput> = self
             .rows
             .iter()
@@ -2147,6 +2160,7 @@ impl PageView {
             heights: &heights,
             preview: self.preview_size,
             texts: &texts,
+            chips: &chips,
             lists: &lists,
         };
         self.layout = layout::layout(
@@ -2181,6 +2195,7 @@ impl PageView {
                 heights: &[],
                 preview: None,
                 texts: &[],
+                chips: &[],
                 lists: &[],
             };
             layout::button_width(label, &metrics)
@@ -2261,7 +2276,9 @@ impl PageView {
                 if row.row.control == Control::KeymapReport {
                     if let Some(card) = &row.card {
                         let inner = card.control.width - size::FIELD_PADDING_X * 2.0;
-                        let height = measure.wrapped_height(&row.text, TextStyle::Caption, inner)
+                        let height = report_lines(&row.text, row.text_marks, inner, measure)
+                            .last()
+                            .map_or(0.0, |line| line.top + line.height)
                             + size::FIELD_PADDING_Y * 2.0;
                         row.text_scroll.set_extent(height, card.control.height);
                     }
@@ -4427,20 +4444,35 @@ impl PageView {
         let offset = row.text_scroll.offset(frame.now);
         let padding = size::FIELD_PADDING_X;
         canvas.push_clip(rect);
-        // 高さは測ったときと同じにして，組んだ文字を使い回す
-        let inner = Rect::new(
-            rect.x + padding,
-            rect.y + size::FIELD_PADDING_Y - offset,
-            rect.width - padding * 2.0,
-            f32::MAX,
-        );
-        canvas.text(
-            inner,
-            &row.text,
-            TextStyle::Caption,
-            Color::from(palette.text),
-            TextLayout::WRAP,
-        );
+        // 行ごとに置く．キーの無い確定・取り消しの行は注意の印を付ける(macOS の KeymapPage の missingWarning)．
+        // 印の無い行も同じ左の端から書き，文の列をそろえる
+        let left = rect.x + padding;
+        let top = rect.y + size::FIELD_PADDING_Y - offset;
+        let inner = rect.width - padding * 2.0;
+        let icon = size::ICON_FONT_SIZE;
+        for line in report_lines(&row.text, row.text_marks, inner, &*canvas) {
+            if line.marked {
+                canvas.text(
+                    Rect::new(left, top + line.top, icon, size::NOTE_LINE_HEIGHT),
+                    theme.glyphs.warning,
+                    TextStyle::IconSmall,
+                    Color::from(palette.caution),
+                    TextLayout::CENTER,
+                );
+            }
+            canvas.text(
+                Rect::new(
+                    left + icon + space::INLINE,
+                    top + line.top,
+                    (inner - icon - space::INLINE).max(0.0),
+                    line.height,
+                ),
+                line.text,
+                TextStyle::Caption,
+                Color::from(palette.text),
+                TextLayout::WRAP,
+            );
+        }
         canvas.pop_clip();
         scrollbar(canvas, theme, rect, &row.text_scroll, frame.now);
         let element = Element {
@@ -4755,6 +4787,34 @@ impl PageView {
                 Color::from(color),
                 TextLayout::CENTER,
             );
+        }
+        // 欄の前に置く名前(判別ルールの「直前」)．欄のすぐ左に，欄と同じ間を空けて置く
+        if let Some((field, text)) = row
+            .row
+            .control
+            .list_buttons()
+            .and_then(|buttons| buttons.caption)
+        {
+            if let Some(rect) = row.part_rect(Part::Field(field)) {
+                let width = canvas.width(text, TextStyle::Body).ceil();
+                let color = if row.enabled {
+                    theme.palette.text_secondary
+                } else {
+                    theme.palette.text_disabled
+                };
+                canvas.text(
+                    Rect::new(
+                        rect.x - size::CONTROL_GAP - width,
+                        rect.y,
+                        width,
+                        rect.height,
+                    ),
+                    text,
+                    TextStyle::Body,
+                    Color::from(color),
+                    TextLayout::CENTER,
+                );
+            }
         }
         for part in row.parts() {
             let element = Element { row: index, part };
@@ -5228,13 +5288,11 @@ fn example_chip(
     } else {
         (palette.text_disabled, palette.text_disabled)
     };
-    // タグは試す欄の結果のタグと同じ背景と枠にする
-    canvas.fill_round(rect, PREVIEW_CHIP_RADIUS, Color::from(palette.control));
-    canvas.stroke_round(
+    // チップは試す欄の結果のチップと同じく，枠を付けず文字の色を薄く敷く(macOS の CandidateExample と同じ)
+    canvas.fill_round(
         rect,
         PREVIEW_CHIP_RADIUS,
-        1.0,
-        Color::from(palette.control_stroke),
+        Color::from(palette.text).with_alpha(opacity::PREVIEW_CHIP),
     );
     let parts = crate::layout::example_parts(example, |text| canvas.width(text, TextStyle::Body));
     let texts = [
@@ -5942,6 +6000,43 @@ fn paint_issue(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, text: &str) {
     );
 }
 
+/// キー設定の知らせの 1 行(text_box の中の位置)
+struct ReportLine<'a> {
+    text: &'a str,
+    /// 注意の印を付けるか(キーの無い確定・取り消し)
+    marked: bool,
+    top: f32,
+    height: f32,
+}
+
+/// キー設定の知らせを行に分け，印の分を空けた幅で折り返したときの位置と高さを返す(測るときと描くときで同じにする)
+fn report_lines<'a>(
+    text: &'a str,
+    marks: usize,
+    width: f32,
+    measure: &dyn paint::Measure,
+) -> Vec<ReportLine<'a>> {
+    let inner = (width - size::ICON_FONT_SIZE - space::INLINE).max(1.0);
+    let mut top = 0.0;
+    text.lines()
+        .filter(|line| !line.is_empty())
+        .enumerate()
+        .map(|(index, line)| {
+            let height = measure
+                .wrapped_height(line, TextStyle::Caption, inner)
+                .max(size::NOTE_LINE_HEIGHT);
+            let placed = ReportLine {
+                text: line,
+                marked: index < marks,
+                top,
+                height,
+            };
+            top += height;
+            placed
+        })
+        .collect()
+}
+
 /// 見本の画像の種類
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PreviewKind {
@@ -6004,6 +6099,8 @@ struct Measured<'a> {
     preview: Option<(f32, f32)>,
     /// 行ごとの文(行と同じ並び．読みにくい組み合わせの知らせの高さを測る)
     texts: &'a [String],
+    /// 行ごとの試した結果(行と同じ並び．変換マクロを試す欄の高さを結果の行の数に合わせる)
+    chips: &'a [crate::engine::PreviewShown],
     /// 一覧の行の，状態で出し入れするもの(行と同じ並び)
     lists: &'a [ListInput],
 }
@@ -6111,6 +6208,32 @@ impl Metrics for Measured<'_> {
                 .position(row)
                 .and_then(|position| self.heights.get(position).copied().flatten());
         }
+        // 変換マクロを試す欄は，結果のタグを並べた行の数だけの高さにする(結果が無ければ 1 行)
+        if let Control::PreviewChips(_) = row.control {
+            let shown = self
+                .position(row)
+                .and_then(|position| self.chips.get(position))?;
+            if !shown.line.is_empty() {
+                return Some(
+                    self.measure
+                        .wrapped_height(&shown.line, TextStyle::Body, inner)
+                        .max(size::BODY_LINE_HEIGHT),
+                );
+            }
+            let gap = tokens::size::settings::PREVIEW_CHIP_GAP;
+            let areas = chip_areas(
+                self.measure,
+                Rect::new(0.0, 0.0, inner, f32::MAX),
+                shown,
+                gap,
+            );
+            return Some(
+                areas
+                    .iter()
+                    .map(Rect::max_y)
+                    .fold(size::BODY_LINE_HEIGHT, f32::max),
+            );
+        }
         let Control::Acknowledgement(index) = row.control else {
             return None;
         };
@@ -6189,6 +6312,19 @@ mod chip_tests {
         }
         fn baseline(&self, _: &str, _: TextStyle) -> f32 {
             size::BODY_LINE_HEIGHT * 0.75
+        }
+    }
+
+    #[test]
+    fn キーの無い確定と取り消しの行だけに注意の印を付け_行を上から重ねずに置く() {
+        let lines = report_lines("入力中に「確定」のキーがありません\n変換中に「確定」のキーがありません\nCtrl+K: 使われません", 2, 300.0, &Fixed);
+        assert_eq!(
+            lines.iter().map(|line| line.marked).collect::<Vec<_>>(),
+            [true, true, false]
+        );
+        assert_eq!(lines[0].top, 0.0);
+        for pair in lines.windows(2) {
+            assert_eq!(pair[1].top, pair[0].top + pair[0].height);
         }
     }
 

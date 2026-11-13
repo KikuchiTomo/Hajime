@@ -1506,10 +1506,11 @@ fn add_missing_keys(model: &mut SettingsModel<Store>) -> Result<(), StoreError> 
     }
 }
 
-/// キー設定の表の問題の文と，行ごとの問題(行の印に使う)と，キーの無い確定・取り消しがあるか．調べられなければ空
-pub fn keymap_report(model: &SettingsModel<Store>) -> (String, Vec<ipc::KeymapRowIssue>, bool) {
+/// キー設定の表の問題の文と，行ごとの問題(行の印に使う)と，キーの無い確定・取り消しの数(文の先頭からその数の行)．
+/// 調べられなければ空
+pub fn keymap_report(model: &SettingsModel<Store>) -> (String, Vec<ipc::KeymapRowIssue>, usize) {
     let Some(keymap) = model.value("keymap").cloned() else {
-        return (String::new(), Vec::new(), false);
+        return (String::new(), Vec::new(), 0);
     };
     let entries: Vec<(String, String, String)> = keymap
         .as_array()
@@ -1536,7 +1537,7 @@ pub fn keymap_report(model: &SettingsModel<Store>) -> (String, Vec<ipc::KeymapRo
             (
                 crate::keys::report_lines(&report, &entries).join("\n"),
                 report.rows,
-                !report.missing.is_empty(),
+                report.missing.len(),
             )
         })
         .unwrap_or_default()

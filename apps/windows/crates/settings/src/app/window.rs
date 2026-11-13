@@ -867,16 +867,15 @@ impl App {
         let now = self.now();
         if let Some(model) = &self.model {
             if self.view.page == Page::Keys {
-                let missing;
                 (
                     self.extras.keymap_report,
                     self.extras.keymap_issues,
-                    missing,
+                    self.extras.keymap_missing,
                 ) = super::actions::keymap_report(model);
                 // キーの無い確定・取り消しがあれば，標準の表のキーを足すボタンを出す
                 self.view_values.insert(
                     pages::KEYMAP_MISSING.to_string(),
-                    serde_json::Value::Bool(missing),
+                    serde_json::Value::Bool(self.extras.keymap_missing > 0),
                 );
                 self.extras.keymap_preset = super::actions::matching_preset(model);
             }
