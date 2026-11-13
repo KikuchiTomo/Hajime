@@ -88,6 +88,19 @@ public enum LayoutTokens {
         public static let splitBadgeFontSize: Double = 9
         public static let splitBadgeGap: Double = 2
     }
+    public enum BranchMap {
+        public static let stopSize: Double = 8
+        public static let stopSizeSelected: Double = 10
+        public static let railHeight: Double = 16
+        public static let segmentGap: Double = 8
+        public static let stemGap: Double = 8
+        public static let stationGap: Double = 12
+        public static let rowGap: Double = 12
+        public static let meaningIndent: Double = 8
+        public static let meaningWidth: Double = 240
+        public static let gripSize: Double = 3
+        public static let fadeWidth: Double = 48
+    }
     public enum Settings {
         public static let windowWidth: Double = 820
         public static let windowHeight: Double = 580

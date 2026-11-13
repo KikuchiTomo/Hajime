@@ -329,18 +329,27 @@ enum UIStrings {
         static let corrected = "修正"
         /// 選んでいる候補の取り込んだ辞書
         static func dictionarySource(_ name: String) -> String { "辞書: \(name)" }
-        /// 足元の案内．キーはキー設定の表で，変換中にそのコマンドに割り当てた最初のキーを出す(R-17)
-        /// 文節の長さを変えるキーは「区切り調整」とまとめて出す
-        static func hints(for keymap: Keymap) -> [KeyHint] {
-            KeyHint.make(IndicatorLabels.branchHints, keymap: keymap)
+        /// 選んでいる文節の境目の上に置く案内(区切り・分割)
+        static func boundaryHints(for keymap: Keymap) -> [KeyHint] {
+            KeyHint.make(IndicatorLabels.branchBoundaryHints, keymap: keymap)
         }
+        /// 文字種の枝の先に置く案内
+        static func variantHint(for keymap: Keymap) -> KeyHint? {
+            KeyHint.make([IndicatorLabels.branchVariantHint], keymap: keymap).first
+        }
+        /// 候補の下に置く案内(再入力・表形式)
+        static func candidateHints(for keymap: Keymap) -> [KeyHint] {
+            KeyHint.make(IndicatorLabels.branchCandidateHints, keymap: keymap)
+        }
+        /// 候補の先の小さな幹の先に置く案内．key は連想変換のキーの名前
+        static func expandHint(key: String) -> KeyHint { KeyHint(key: key, label: IndicatorLabels.branchExpandLabel) }
+        /// 候補の先の小さな幹の，語の意味の見出し
+        static let meaningTitle = IndicatorLabels.branchMeaningTitle
         /// 文節を区切っているときの足元の案内．数字で区切る位置を選び，Esc でやめる(InputSession.handleSplit)．
         /// count は区切れる位置の数
         static func splitHints(count: Int) -> [KeyHint] {
             IndicatorLabels.splitHints(count: count).map { KeyHint(key: $0.key, label: $0.label) }
         }
-        /// 上の枝(文字種)の丸に入れる印
-        static let variantBadge = "↑"
         static func position(first: Int, last: Int, total: Int) -> String {
             first == last ? "\(first) / \(total)" : "\(first)–\(last) / \(total)"
         }

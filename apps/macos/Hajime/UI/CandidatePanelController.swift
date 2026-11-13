@@ -77,15 +77,9 @@ final class CandidatePanelController {
         shownLattice = panel
         shownList = nil
         branchView.panel = panel
-        let frame = present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived, holdsEdges: true)
-        if panel.meaningPlacement == .side, let column = panel.columns.first(where: \.isFocused), let note = column.homophone,
-           let row = branchView.selectedRowRect() {
-            bubble.show(note, others: BranchView.others(of: note, in: column), theme: branchView.theme, row: Self.screenRect(row, in: frame),
-                        anchor: frame, obstacles: branchView.bubbleObstacles().map { Self.screenRect($0, in: frame) } + [Self.caretLine(caret)],
-                        screen: FloatingPanel.visibleFrame(for: caret), parent: window)
-        } else {
-            bubble.hide()
-        }
+        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived, holdsEdges: true)
+        // 分岐図の語の意味は，選んでいる候補の先の枝として窓の中に描く(BranchView)．吹き出しは一覧だけで使う
+        bubble.hide()
         if let focused = panel.columns.first(where: \.isFocused) {
             // コマンドの候補を選んでいれば，その名前を「コマンド」と続けて読む(幹の文字には印が付いている)
             let command = focused.selectedAlternative.flatMap { index in

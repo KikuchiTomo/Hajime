@@ -987,8 +987,8 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// 同音異義語の使い分けを分岐図で出したところ．既定では候補の窓の横の吹き出しにし，三角で選んでいる枝の行を指す．
-    /// 同音語のタグには枝に出ていない語だけを出す．selected を意味の無い候補にすると，吹き出しを出さない
+    /// 同音異義語の使い分けを分岐図で出したところ．既定では，選んでいる候補の先の枝(意味の丸の下)に出す．
+    /// 候補の下に出す設定では，同音語のタグに枝に出ていない語だけを出す．selected を意味の無い候補にすると，意味を出さない
     private static func homophoneBranchView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side, selected: Int = 1,
                                             note: HomophoneNote? = nil) -> NSView {
         let view = BranchView()
@@ -1006,9 +1006,7 @@ enum SnapshotRenderer {
             view.panel = panel
         }
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
-        guard placement == .side, let note = panel.columns[1].homophone else { return backdropped(view) }
-        return withBubble(view, note: note, others: BranchView.others(of: note, in: panel.columns[1]), row: view.selectedRowRect(),
-                          obstacles: view.bubbleObstacles(), theme: view.theme)
+        return backdropped(view)
     }
 
     /// コマンドの候補(R-22)を一覧で出したところ．selected は選んでいる行

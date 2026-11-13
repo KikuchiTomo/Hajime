@@ -345,6 +345,19 @@ pub mod size {
         pub const SPLIT_BADGE_FONT_SIZE: f32 = 9.0;
         pub const SPLIT_BADGE_GAP: f32 = 2.0;
     }
+    pub mod branch_map {
+        pub const STOP_SIZE: f32 = 8.0;
+        pub const STOP_SIZE_SELECTED: f32 = 10.0;
+        pub const RAIL_HEIGHT: f32 = 16.0;
+        pub const SEGMENT_GAP: f32 = 8.0;
+        pub const STEM_GAP: f32 = 8.0;
+        pub const STATION_GAP: f32 = 12.0;
+        pub const ROW_GAP: f32 = 12.0;
+        pub const MEANING_INDENT: f32 = 8.0;
+        pub const MEANING_WIDTH: f32 = 240.0;
+        pub const GRIP_SIZE: f32 = 3.0;
+        pub const FADE_WIDTH: f32 = 48.0;
+    }
     pub mod settings {
         pub const WINDOW_WIDTH: f32 = 820.0;
         pub const WINDOW_HEIGHT: f32 = 580.0;
