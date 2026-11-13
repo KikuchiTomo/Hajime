@@ -128,6 +128,24 @@ fn shows_hints(map: &BranchMap) -> bool {
     map.placed_hints.is_some()
 }
 
+/// 出すまとまり(groupStart..<groupEnd)の文節だけにした分岐図と，その先頭が文の全体で何番目か(macOS の LatticePanel.shownGroup)．
+/// エンジンは文の全体を送り，範囲を添える(まとまりを知らない前の版の候補ウィンドウは全体を出す)．範囲が無いか，正しくなければそのまま
+fn shown_group(map: &BranchMap) -> (std::borrow::Cow<'_, BranchMap>, u32) {
+    let (Some(start), Some(end)) = (map.group_start, map.group_end) else {
+        return (std::borrow::Cow::Borrowed(map), 0);
+    };
+    let (start_index, end_index) = (start as usize, end as usize);
+    if start_index >= end_index
+        || end_index > map.columns.len()
+        || end_index - start_index == map.columns.len()
+    {
+        return (std::borrow::Cow::Borrowed(map), 0);
+    }
+    let mut shown = map.clone();
+    shown.columns = map.columns[start_index..end_index].to_vec();
+    (std::borrow::Cow::Owned(shown), start)
+}
+
 /// 注目している文節の位置と文節
 pub(super) fn focused(map: &BranchMap) -> Option<(usize, &BranchColumn)> {
     map.columns
@@ -398,6 +416,9 @@ struct Layout {
     source_x: f32,
     /// ページの位置を示す点
     page_dots: Option<PageDots>,
+    /// 前後のまとまりへ続く印(山形)の先の x
+    more_before_x: Option<f32>,
+    more_after_x: Option<f32>,
     /// 候補の下に出す語の意味のカード
     slot: Option<Slot>,
     card: Option<Frame>,
@@ -415,7 +436,11 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
 
     // 幹(送る前)．文節のあいだには，境目のつまみの両側の空きを取る
     let node_gap = map::SEGMENT_GAP * 2.0;
-    let mut x = metrics.inset;
+    // 前後のまとまりへ続く側には，山形の分を空ける
+    let continues_before = map.continues_before == Some(true);
+    let continues_after = map.continues_after == Some(true);
+    let more_lead = map::MORE_SIZE * 2.0 + space::GROUP;
+    let mut x = metrics.inset + if continues_before { more_lead } else { 0.0 };
     let mut node_x = Vec::new();
     let mut node_widths = Vec::new();
     for column in &map.columns {
@@ -428,7 +453,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         metrics.inset
     } else {
         x - node_gap
-    };
+    } + if continues_after { more_lead } else { 0.0 };
     let focus = focused(map).map(|(index, _)| index);
     let column = focus.map(|index| &map.columns[index]);
     let lower = column.map_or_else(Vec::new, |column| lower_rows(column, rest));
@@ -589,10 +614,17 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
     });
     // 境目の案内は，文節から上へ伸びる線の右に置く
     let boundary_start = BADGE_OFFSET;
+    // 窓の幅．中身に合わせる設定では，枝が右に入るように広げる．固定の設定(keepsWidth)では幹の幅のままにし(枝そのものが入る幅は取る)，
+    // 右に入らない枝は下で左右に反転する
+    let branch_reach = reach.max(kinds_reach).max(boundary_start + boundary_width);
+    let branch_width = if map.keeps_width == Some(true) {
+        branch_reach + metrics.inset * 2.0
+    } else {
+        focus_center + branch_reach + metrics.inset
+    };
     let mut width = candidate::MIN_WIDTH
         .max(trunk_right + metrics.inset)
-        .max(focus_center + reach.max(kinds_reach) + metrics.inset)
-        .max(focus_center + boundary_start + boundary_width + metrics.inset)
+        .max(branch_width)
         .max(notes_width + metrics.inset * 2.0)
         .max(heading_width);
     let limit = candidate::MAX_WIDTH.max(candidate::MIN_WIDTH);
@@ -635,10 +667,21 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         focus_x.max(left + reach).min(right - edge)
     }
     .round();
-    let twig_direction = if focus_x + kinds_reach <= right || focus_x - kinds_reach < left {
+    // 文字種の枝の向き．右に入れば右，入らなければ左．どちらにも入らなければ，窓の右の端にそろえて置き，文節から上へ伸びる線と T 字でつなぐ
+    // (文字種の並びは，どの向きでも左から右のまま)
+    let twig_fits_right = focus_x + kinds_reach <= right;
+    let twig_fits_left = focus_x - kinds_reach >= left;
+    let twig_direction = if twig_fits_right || !twig_fits_left {
         1.0
     } else {
         -1.0
+    };
+    let twig_shift = if twig_fits_right || twig_fits_left {
+        0.0
+    } else {
+        (focus_x + kinds_reach - right)
+            .min(focus_x + kind_start - left)
+            .max(0.0)
     };
     // 縦の線から外へ start の距離に置く，幅 width の物の左の端
     let min_x = |start: f32, width: f32| {
@@ -666,7 +709,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         result.twig_y = (y + map::STOP_SIZE / 2.0).round();
         y += map::STOP_SIZE + space::INSET;
         let mut kind_x = if twig_direction > 0.0 {
-            focus_x + kind_start
+            focus_x + kind_start - twig_shift
         } else {
             focus_x - kinds_reach
                 + if variant_hint_width > 0.0 {
@@ -810,16 +853,23 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
     result.fades_left = overflows && shift > 0.0;
     result.fades_right = overflows && trunk_right - shift > right;
     let stop_x = |node: &Frame| node.x + metrics.stop_offset(node.width);
-    result.rail_start = if result.fades_left {
+    // 前後のまとまりへ続く側は，幹の線を窓の端まで伸ばして山形を付ける
+    result.rail_start = if result.fades_left || continues_before {
         0.0
     } else {
         result.nodes.first().map_or(left, stop_x)
     };
-    result.rail_end = if result.fades_right {
+    result.rail_end = if result.fades_right || continues_after {
         width
     } else {
         result.nodes.last().map_or(left, stop_x)
     };
+    if continues_before && !result.fades_left {
+        result.more_before_x = Some(left);
+    }
+    if continues_after && !result.fades_right {
+        result.more_after_x = Some(right);
+    }
     result.focus = focus;
     result.focus_x = focus_x;
     result.stem_x = stem_x;
@@ -900,7 +950,10 @@ fn tag_max_x(painter: &Painter, note: &str, row: Frame, direction: f32) -> f32 {
 
 // 線・丸・文字・案内の順に重ねる．1 か所で順を決めるので長い
 #[allow(clippy::too_many_lines)]
-pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene {
+pub fn branch_map(whole: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene {
+    // 長い文はまとまりの文節だけを描く．押した文節は文の全体の位置で返す
+    let (shown, offset) = shown_group(whole);
+    let map: &BranchMap = &shown;
     let metrics = Metrics::new(look, measure);
     let mut painter = Painter::new(look, measure);
     let theme = look.theme;
@@ -1048,6 +1101,13 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             metrics.pixel_scale,
         );
         route::draw_stops(&mut painter, &trunk_stops, metrics.line_width);
+        // 前後にまとまりが続く側の山形
+        if let Some(x) = layout.more_before_x {
+            route::more(&mut painter, x, layout.rail_y, true, metrics.line_width);
+        }
+        if let Some(x) = layout.more_after_x {
+            route::more(&mut painter, x, layout.rail_y, false, metrics.line_width);
+        }
         for (index, column) in map.columns.iter().enumerate() {
             let node = layout.nodes[index];
             if node.max_x() >= 0.0 && node.x <= body.max_x() {
@@ -1273,16 +1333,40 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         painter.note(note, row.x, row.mid_y());
     }
 
-    // 押せる範囲と，語の意味の吹き出しに覆わせない範囲
+    // 押せる範囲と，語の意味の吹き出しに覆わせない範囲．文節の位置は文の全体で数える(長い文をまとまりに区切って出すとき)
     for (index, node) in layout.nodes.iter().enumerate() {
         // 文節は，文字と，その下の線の上の丸を押せる
         painter.hit(
             Frame::new(node.x, node.y, node.width, node.height + map::RAIL_HEIGHT),
             ipc::PointerTarget::Segment {
-                index: index as u32,
+                index: offset + index as u32,
             },
         );
         painter.keep_clear.push(*node);
+    }
+    // 前後のまとまりへ: 山形のあたりを押すと，隣のまとまりの文節へ移る
+    let more_width = map::MORE_SIZE * 2.0 + space::GROUP;
+    let rail = |x: f32| {
+        Frame::new(
+            x,
+            layout.rail_y - map::RAIL_HEIGHT / 2.0,
+            more_width,
+            map::RAIL_HEIGHT,
+        )
+    };
+    if let Some(x) = layout.more_before_x.filter(|_| offset > 0) {
+        painter.hit(
+            rail(x - map::MORE_SIZE),
+            ipc::PointerTarget::Segment { index: offset - 1 },
+        );
+    }
+    if let Some(x) = layout.more_after_x {
+        painter.hit(
+            rail(x + map::MORE_SIZE - more_width),
+            ipc::PointerTarget::Segment {
+                index: offset + map.columns.len() as u32,
+            },
+        );
     }
     // 区切っているあいだ(⇧↓)は番号キーで区切る位置を選ぶので，枝は押せない
     if let Some(column) = column.filter(|column| column.split.is_none()) {
@@ -1642,6 +1726,11 @@ mod tests {
             trunk_focused: None,
             page_size: None,
             hints_on_hold: None,
+            group_start: None,
+            group_end: None,
+            continues_before: None,
+            continues_after: None,
+            keeps_width: None,
         }
     }
 
@@ -1922,6 +2011,11 @@ mod tests {
                 trunk_focused: None,
                 page_size: None,
                 hints_on_hold: None,
+                group_start: None,
+                group_end: None,
+                continues_before: None,
+                continues_after: None,
+                keeps_width: None,
             };
             let scene = branch_map(&split, &Look::new(&theme, 15.0), &Fixed);
             let texts = texts(&scene);
@@ -2051,7 +2145,8 @@ mod tests {
         let look = Look::new(theme, 15.0);
         let metrics = Metrics::new(&look, &Fixed);
         let painter = Painter::new(&look, &Fixed);
-        layout(map, &metrics, &painter, 1.0)
+        let (shown, _) = shown_group(map);
+        layout(&shown, &metrics, &painter, 1.0)
     }
 
     #[test]
@@ -2278,5 +2373,52 @@ mod tests {
         assert!(
             super::super::testing::texts(&plain).contains(&("京は".into(), theme.selection_text))
         );
+    }
+
+    #[test]
+    fn まとまりに区切った文では文節の位置を文の全体で返し_山形を押すと隣のまとまりへ移る() {
+        let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let middle = super::super::sample::group_branch(13);
+        let scene = branch_map(&middle, &look, &Fixed);
+        // 2 つ目のまとまり(8 文節目から)の最初の文節は，文の全体で 8 番目
+        let first = text_frame(&scene, "出かけて").expect("文節");
+        assert_eq!(
+            scene.target_at(first.x + 1.0, first.mid_y()),
+            Some(ipc::PointerTarget::Segment { index: 8 })
+        );
+        // 前のまとまりへ続く山形を押すと，前のまとまりの最後の文節へ
+        let layout = metrics_and_layout(&middle, &theme);
+        let x = layout.more_before_x.expect("前の山形");
+        assert_eq!(
+            scene.target_at(x, layout.rail_y),
+            Some(ipc::PointerTarget::Segment { index: 7 })
+        );
+        assert!(layout.more_after_x.is_none());
+        // 最初のまとまりは，後ろへ続く山形だけ
+        let head = metrics_and_layout(&super::super::sample::group_branch(0), &theme);
+        assert!(head.more_before_x.is_none() && head.more_after_x.is_some());
+        assert_eq!(head.rail_end, head.width);
+        // まとまりを知らない前の版の候補ウィンドウと同じく範囲を読まなければ，文の全体を出し，押した文節の位置もそのまま
+        let mut whole = middle.clone();
+        whole.group_start = None;
+        whole.group_end = None;
+        let all = branch_map(&whole, &look, &Fixed);
+        let last = text_frame(&all, "しました").expect("文の最後の文節");
+        assert_eq!(
+            all.target_at(last.x + 1.0, last.mid_y()),
+            Some(ipc::PointerTarget::Segment { index: 13 })
+        );
+    }
+
+    #[test]
+    fn 窓の幅を固定する設定では幹の幅のままにし_右に入らない枝を左へ出す() {
+        let theme = theme("automatic");
+        let mut wide = keyed(map());
+        wide.columns[0].alternatives = vec!["とても長い候補の文字の並びです".into(), "京は".into()];
+        let fitted = metrics_and_layout(&wide, &theme);
+        wide.keeps_width = Some(true);
+        let fixed = metrics_and_layout(&wide, &theme);
+        assert!(fixed.width <= fitted.width);
     }
 }

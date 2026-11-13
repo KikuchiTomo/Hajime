@@ -246,6 +246,13 @@ func run() -> Int32 {
     let emoji = engine
     let resetPaletteHistory: () -> Void = {}
     #endif
+    // 長い文のまとまりを描けるのは Windows の候補ウィンドウだけ(Linux のアドオンは文節を全部並べるので，区切ると
+    // 文節へ移るキーが見えている並びとずれる)．macOS でホストを動かすとき(テスト)も false のまま
+    #if os(Windows)
+    let groupsBranchSegments = true
+    #else
+    let groupsBranchSegments = false
+    #endif
     let service = EngineService(
         makeSession: {
             // エンジンのセッションは，候補を文脈で並べ替える採点(検証木)も受け持つ．合議はこのプロセスの中で行う(ADR 0016)
@@ -253,7 +260,7 @@ func run() -> Int32 {
             return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
                                                                  terms: terms, emoji: emoji, lexicon: lexicon, englishTerms: englishTerms),
                                 lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                                keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
+                                keyNames: .windows, groupsBranchSegments: groupsBranchSegments, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
                                 palette: palette, calendar: calendar, scorer: engineSession, fusing: engineSession)
         },
         settings: settings,

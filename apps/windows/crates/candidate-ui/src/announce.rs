@@ -294,6 +294,11 @@ mod tests {
             trunk_focused: None,
             page_size: None,
             hints_on_hold: None,
+            group_start: None,
+            group_end: None,
+            continues_before: None,
+            continues_after: None,
+            keeps_width: None,
         };
         assert_eq!(branch_map(&map).as_deref(), Some("晴れ"));
 
@@ -377,6 +382,11 @@ mod tests {
             trunk_focused: None,
             page_size: None,
             hints_on_hold: None,
+            group_start: None,
+            group_end: None,
+            continues_before: None,
+            continues_after: None,
+            keeps_width: None,
         };
         assert_eq!(
             branch_map(&map(column.clone())).as_deref(),

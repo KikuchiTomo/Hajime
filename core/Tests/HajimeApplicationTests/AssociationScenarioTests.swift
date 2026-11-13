@@ -229,6 +229,33 @@ struct AssociationScenarioTests {
         #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
     }
 
+    @Test("長い文: 先の枝の丸を出さない作り(Windows)でも，まとまりに区切り，文節へ移るキーをまとまりの中で数える")
+    func segmentGroupsWithoutStations() throws {
+        let reading = "あいうえお"
+        let five = FakeConverter([reading: [("亜胃鵜絵尾", nil)], "あ": [("亜", nil)], "い": [("胃", nil)], "う": [("鵜", nil)], "え": [("絵", nil)], "お": [("尾", nil)]])
+        five.words[reading] = ["亜", "胃", "鵜", "絵", "尾"].map { Candidate.Word(text: $0, readingCount: 1) }
+        var settings = makeSettings { $0.branchSegmentsPerGroup = 3 }
+        settings.initialFocus = .start
+        let harness = Harness(converter: five, settings: settings, keyNames: .windows, branchStations: false, groupsBranchSegments: true)
+        harness.type("aiueo")
+        harness.press(.space)
+        let first = try #require(harness.lattice)
+        #expect(first.group == 0..<3 && first.detail == nil)
+        #expect(first.columns.prefix(3).allSatisfy { $0.jumpKey != nil } && first.columns.suffix(2).allSatisfy { $0.jumpKey == nil })
+        // 4 番目の文節へ移ると，次のまとまりに入れ替わり，キーもそのまとまりの中で数える
+        harness.press(.right)
+        harness.press(.right)
+        harness.press(.right)
+        let second = try #require(harness.lattice)
+        #expect(second.columns.firstIndex(where: \.isFocused) == 3 && second.group == 3..<5)
+        #expect(second.columns.prefix(3).allSatisfy { $0.jumpKey == nil } && second.columns[3].jumpKey == first.columns[0].jumpKey)
+        // 旗が無ければ(前の作り)区切らない
+        let plain = Harness(converter: five, settings: settings, keyNames: .windows, branchStations: false, groupsBranchSegments: false)
+        plain.type("aiueo")
+        plain.press(.space)
+        #expect(plain.lattice?.group == nil)
+    }
+
     @Test("長い文: 区切らない設定で文節がキーの数より多いときは，選んでいる文節のまわりの 8 文節に，文節へ移るキーを付ける")
     func jumpKeysFollowFocus() throws {
         let kana = ["あ", "い", "う", "え", "お", "か", "き", "く", "け", "こ"]

@@ -133,6 +133,18 @@ struct FooterHintsTests {
         #expect(map.trunkFocused == true && map.pageSize == 4 && map.hintsOnHold == true)
     }
 
+    @Test("長い文をまとまりに区切ったときも文節は文の全体を送り，出すまとまりの範囲と前後に続くことを添える(前の版の候補ウィンドウは全体を出す)")
+    func group() {
+        var panel = LatticePanel(columns: (0..<5).map { LatticePanel.Column(text: "文節\($0)", isFocused: $0 == 2, isUncertain: false) })
+        let whole = WireBranchMap(panel, hints: [])
+        #expect(whole.columns.count == 5 && whole.groupStart == nil && whole.groupEnd == nil && whole.continuesBefore == nil && whole.continuesAfter == nil)
+        panel.group = 2..<4
+        panel.keepsWidth = true
+        let shown = WireBranchMap(panel, hints: [])
+        #expect(shown.columns.count == 5)
+        #expect(shown.groupStart == 2 && shown.groupEnd == 4 && shown.continuesBefore == true && shown.continuesAfter == true && shown.keepsWidth == true)
+    }
+
     @Test("文節を区切っているときは区切る操作だけを案内する")
     func split() {
         var column = LatticePanel.Column(text: "問題がある", isFocused: true, isUncertain: true)

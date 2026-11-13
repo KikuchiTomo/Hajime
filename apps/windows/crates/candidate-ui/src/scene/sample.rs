@@ -126,6 +126,11 @@ pub fn branch() -> BranchMap {
         trunk_focused: None,
         page_size: None,
         hints_on_hold: None,
+        group_start: None,
+        group_end: None,
+        continues_before: None,
+        continues_after: None,
+        keeps_width: None,
     })
 }
 
@@ -208,7 +213,35 @@ pub fn long_branch(focus: usize) -> BranchMap {
         trunk_focused: None,
         page_size: None,
         hints_on_hold: None,
+        group_start: None,
+        group_end: None,
+        continues_before: None,
+        continues_after: None,
+        keeps_width: None,
     })
+}
+
+/// 長い文を 8 文節ずつのまとまりに区切り，focus の文節が入っているまとまりだけを出した分岐図(macOS の branch-group)
+pub fn group_branch(focus: usize) -> BranchMap {
+    const PER_GROUP: usize = 8;
+    let mut map = long_branch(focus);
+    let total = map.columns.len();
+    let start = focus / PER_GROUP * PER_GROUP;
+    let end = (start + PER_GROUP).min(total);
+    // エンジンと同じく，文節は文の全体のまま送り，出す範囲を添える．文節へ移るキーは，まとまりの中で左から数える
+    map.group_start = Some(start as u32);
+    map.group_end = Some(end as u32);
+    map.continues_before = (start > 0).then_some(true);
+    map.continues_after = (end < total).then_some(true);
+    let mut map = with_keys(map);
+    for (index, column) in map.columns.iter_mut().enumerate() {
+        column.jump_key = index
+            .checked_sub(start)
+            .filter(|_| index < end)
+            .and_then(|position| JUMP_KEYS.get(position))
+            .map(|key| (*key).to_string());
+    }
+    map
 }
 
 /// 絵文字の見本を作る設定(変換のページの「絵文字」)
