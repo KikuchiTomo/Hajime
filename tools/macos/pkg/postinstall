@@ -17,5 +17,8 @@ if [ -n "$user" ] && [ "$user" != "root" ] && [ -d "$app" ]; then
   chmod 755 "$tool_dir" "$tool_dir/input_source"
   launchctl asuser "$uid" sudo -u "$user" "$tool_dir/input_source" enable "$app" || true
   rm -rf "$tool_dir"
+  # 入れる前に本体が止まっていると(アンインストールしてから入れ直したときなど)，入力メニューで選ばれたままでも
+  # OS が本体を起こさず，ログアウトするまで打てない．ログイン中の利用者として本体を起こしておく
+  launchctl asuser "$uid" sudo -u "$user" /usr/bin/open -g "$app" || true
 fi
 exit 0
