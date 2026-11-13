@@ -264,6 +264,10 @@ public struct LatticePanel: Sendable, Equatable {
         public var sourceName: String?
         /// 文節を区切っているとき(⇧↓)の，区切れる位置で分けた文節．区切っていなければ nil
         public var split: Split?
+        /// この文節へ移るキーの名前(分岐図の丸の上に出す．KeymapCommand.segmentJumps)．キーが割り当てられていない文節と，9 番目からの文節は nil
+        public var jumpKey: String?
+        /// 上の枝の文字種ごとの，その文字種にするキーの名前(variants と同じ数)．キーの無い文字種は nil．キーを出さないときは空
+        public var variantKeys: [String?] = []
         /// その場で打ち直している文節(⇧⌫)．text は打っている読み(変換しない)．枝(alternatives・variants)は打ち直す前の候補で，
         /// 描く側は薄く出して選んでいる形にしない(selectedAlternative・selectedVariant は nil)．候補は変換したときに出し直す
         public var isEditing = false

@@ -786,10 +786,10 @@ enum SnapshotRenderer {
         view.maximumWidth = DesignTokens.Size.Candidate.maxWidth
         // 前の文節から順に注目を移したときの幹のずれを再現する
         for index in 0...focus {
-            view.panel = LatticePanel(columns: longSentence.enumerated().map { column, text in
+            view.panel = SamplePanels.withKeys(LatticePanel(columns: longSentence.enumerated().map { column, text in
                 column == index ? .init(text: text, alternatives: [text, text + "候補", "ひらがなの" + text], selectedAlternative: 0, isFocused: true, isUncertain: false)
                     : .init(text: text, isFocused: false, isUncertain: false)
-            }, position: 1, total: 3)
+            }, position: 1, total: 3))
         }
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: view.panel!))
         return backdropped(view)

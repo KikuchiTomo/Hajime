@@ -58,6 +58,8 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// 入力中の Shift+Space と，変換中の Shift+↑ で連想変換(R-18)．
     /// 変換中の F6〜F8 は選んでいる文節だけの字種(F9・F10 は全文)，Esc は直前の変更の取り消し(続けて押すと全文を読みに戻す)，
     /// Backspace は全文を読みに戻し，Delete は読みに戻して末尾から打ち続ける．
+    /// 変換中の Option とホームポジションの 8 つのキー(A・S・D・F・J・K・L・;)は，分岐図の 1〜8 番目の文節へ移る
+    /// (Windows 風・Mac 風・ATOK 風は Option と英字のキーをほかの操作に使うので，入れていない．キー設定で割り当てられる)．
     /// 変換中の ⌃⌫ で候補を学習から消し，入力中の ⌃⌫ で予測の窓の語句を予測に表示しない(Windows 風・Mac 風・ATOK 風は Ctrl+Delete)．
     /// 予測を確定した直後の Backspace で補う前の読みに戻す(Windows 風・ATOK 風は確定の取り消しの Ctrl+Backspace で戻す)．
     /// 確定した直後の ⌃⌫ で確定する前の変換に戻す(ひな形すべて．確定した直後の変換のキーも同じ)．
@@ -118,6 +120,14 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tF8\tsegmentToHalfwidthKatakana
         converting\tEscape\tundoConversionEdit
         converting\tDelete\tresumeEditing
+        converting\tOption a\tjumpToSegment1
+        converting\tOption s\tjumpToSegment2
+        converting\tOption d\tjumpToSegment3
+        converting\tOption f\tjumpToSegment4
+        converting\tOption j\tjumpToSegment5
+        converting\tOption k\tjumpToSegment6
+        converting\tOption l\tjumpToSegment7
+        converting\tOption ;\tjumpToSegment8
         """
 
     /// Emacs 風．標準に加えて Control+N・P で候補，Control+F・B で文節，Control+G で取り消す

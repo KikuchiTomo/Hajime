@@ -966,6 +966,8 @@ public final class InputSession {
         case .nextSegment: return moveSegment(.next, event: event, context: context)
         case .previousSegment: return moveSegment(.previous, event: event, context: context)
         case .firstSegment: return moveSegment(.first, context: context)
+        case .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8:
+            return moveSegment(.index(command.segmentJumpIndex ?? 0), context: context)
         case .lastSegment: return moveSegment(.last, context: context)
         case .nextUncertainSegment: return moveSegment(.nextUncertain, context: context)
         case .previousUncertainSegment: return moveSegment(.previousUncertain, context: context)
@@ -2314,6 +2316,13 @@ public final class InputSession {
                 panel.columns[focused].sourceName = converter.sourceName(of: segment.selected.text, reading: segmentReading)
                 panel.associationHint = associationHint(text: segment.selected.text, reading: segmentReading)
             }
+            // 文節へ移るキーと，文字種にするキーの名前(分岐図の丸の上に出す)
+            for (index, command) in KeymapCommand.segmentJumps.enumerated() where panel.columns.indices.contains(index) {
+                panel.columns[index].jumpKey = keyLabel(command, in: .converting)
+            }
+            if let focused = panel.columns.firstIndex(where: \.isFocused), panel.columns[focused].variants.count == lattice.focused.variants.count {
+                panel.columns[focused].variantKeys = lattice.focused.variants.map(variantKey)
+            }
             if settings.current.showsFewerItems { panel = PanelBuilder.reduced(panel, showsDetail: branchDetailShown) }
             if let note = commandNote(for: lattice) { panel.note = note }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
@@ -2372,6 +2381,17 @@ public final class InputSession {
         if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
         if let pendingNote { panel.note = pendingNote }
         return panel
+    }
+
+    /// 上の枝の字種を，注目している文節だけその字種にするキーの名前．そのキーが無ければ nil
+    private func variantKey(_ candidate: Candidate) -> String? {
+        guard case .variant(let variant) = candidate.origin else { return nil }
+        switch variant {
+        case .hiragana: return keyLabel(.segmentToHiragana, in: .converting)
+        case .katakana: return keyLabel(.segmentToKatakana, in: .converting)
+        case .halfwidthKatakana: return keyLabel(.segmentToHalfwidthKatakana, in: .converting)
+        case .fullwidthRoman, .halfwidthRoman: return nil
+        }
     }
 
     /// 字種(variant)が文節の字種(上の枝)の何番目か．無ければ nil
@@ -2598,7 +2618,9 @@ public final class InputSession {
     }
 
     /// 文節の動かし方
-    private enum SegmentMove {
+    private enum SegmentMove: Equatable {
+        /// 位置(0 から)で指した文節へ移る
+        case index(Int)
         case next, previous, first, last, nextUncertain, previousUncertain, extend, shrink, extendToWord, shrinkToWord, split
     }
 
@@ -2615,7 +2637,8 @@ public final class InputSession {
             switch move {
             case .next: return handleHorizontal(forward: true, context: context)
             case .previous: return handleHorizontal(forward: false, context: context)
-            case .first, .last, .nextUncertain, .previousUncertain, .extend, .shrink, .extendToWord, .shrinkToWord, .split: return KeyResult(handled: true)
+            case .index, .first, .last, .nextUncertain, .previousUncertain, .extend, .shrink, .extendToWord, .shrinkToWord, .split:
+                return KeyResult(handled: true)
             }
         case .lattice(var lattice):
             if isSegmentList, case .variant(let index) = lattice.focused.choice, move == .next || move == .previous,
@@ -2638,6 +2661,10 @@ public final class InputSession {
             // 端で止まると Tab で次の文節に移れない．← → は端で止める(選び終えた文節に戻らないように)
             case .next: lattice.moveFocus(by: 1, wraps: event?.key == .tab)
             case .previous: lattice.moveFocus(by: -1, wraps: event?.key == .tab)
+            case .index(let index):
+                // その位置に文節が無ければ何もしない
+                guard lattice.segments.indices.contains(index) else { return KeyResult(handled: true) }
+                lattice.focusedIndex = index
             case .first: lattice.focusedIndex = 0
             case .last: lattice.focusedIndex = lattice.segments.count - 1
             case .nextUncertain: lattice.moveToUncertain(forward: true)
