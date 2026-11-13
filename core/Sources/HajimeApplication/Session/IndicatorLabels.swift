@@ -91,7 +91,7 @@ public enum IndicatorLabels {
     public static let branchExpandLabel = "展開"
 
     /// 候補から先の枝へ入る案内(畳んでいる先の枝を開く案内も同じ)．先の枝へ移るキーが無ければ，連想変換のキー
-    public static let branchExpandHint = Hint(.enterBranch, branchExpandLabel, fallback: .associate)
+    public static let branchExpandHint = Hint(.associate, branchExpandLabel, fallback: .enterBranch)
 
     /// 候補の先の小さな幹の，語の意味・連想・変換マクロの見出し
     public static let branchMeaningTitle = "意味"

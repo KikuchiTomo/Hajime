@@ -16,6 +16,8 @@
     "associationLimit": 60,
     "brackets": "corner",
     "branchCandidatesPerPage": 5,
+    "branchSegmentsPerGroup": 8,
+    "branchWindowWidth": "fit",
     "calculation": true,
     "candidateFontSize": 15,
     "candidatePresentation": "automatic",

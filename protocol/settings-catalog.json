@@ -21,6 +21,8 @@
     "associationLimit",
     "brackets",
     "branchCandidatesPerPage",
+    "branchSegmentsPerGroup",
+    "branchWindowWidth",
     "calculation",
     "candidateFontSize",
     "candidateGridColumns",
@@ -489,6 +491,10 @@
     "associationLimit" : [
       10,
       300
+    ],
+    "branchSegmentsPerGroup" : [
+      0,
+      8
     ],
     "candidateFontSize" : [
       12,

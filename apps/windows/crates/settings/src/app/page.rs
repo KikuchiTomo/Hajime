@@ -21,7 +21,7 @@ use crate::pages::{
     Section, TemplateTarget, TryKind, DICTIONARY_CONDITIONS, MACROS_PATH, PROFILE_RULES,
 };
 use crate::store::SettingsStore;
-use crate::strings::{extras, features, keys, more, rule_list, settings, windows as text};
+use crate::strings::{choice, extras, features, keys, more, rule_list, settings, windows as text};
 use crate::template_reference::{self as reference, Face};
 use crate::ui::anim::{Easing, Tween};
 use crate::ui::scroll::Scroller;
@@ -809,6 +809,9 @@ impl RowState {
                 RangeKind::LiveConversionSkipLength | RangeKind::EnglishSkipLength,
             ) => more::skip_length(value),
             Control::Stepper(RangeKind::SuggestionSkipCount) => more::skip_count(value),
+            Control::Stepper(RangeKind::BranchSegmentsPerGroup) => {
+                choice::branch_segment_count(value)
+            }
             Control::Stepper(RangeKind::EmojiCandidatePosition) => {
                 settings::emoji_candidate_position(value)
             }
