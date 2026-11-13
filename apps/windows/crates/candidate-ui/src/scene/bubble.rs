@@ -535,6 +535,67 @@ mod tests {
     }
 
     #[test]
+    fn 窓の左右に入らない幅の広い窓では_窓の中の行の文字のすぐ右に置き_ほかの候補の文字と足元を覆わない(
+    ) {
+        // 縦長の画面(x 1920〜3000)の右に寄った幅の広い一覧(Windows の PC で見た場面)
+        let screen = Frame::new(1920.0, -383.0, 1080.0, 1920.0);
+        let window = Frame::new(1982.0, -192.0, 899.0, 265.0);
+        let rows: Vec<Frame> = (0..5)
+            .map(|index| Frame::new(1994.0, -180.0 + 28.0 * index as f32, 875.0, 28.0))
+            .collect();
+        let texts: Vec<Frame> = rows
+            .iter()
+            .map(|row| Frame::new(row.x, row.y, 70.0, row.height))
+            .collect();
+        let footer = Frame::new(1982.0, 41.0, 899.0, 32.0);
+        let selected = 4;
+        let mut obstacles: Vec<Frame> = (0..5)
+            .filter(|index| *index != selected)
+            .map(|index| rows[index])
+            .collect();
+        obstacles.push(footer);
+        let mut inside_obstacles: Vec<Frame> = (0..5)
+            .filter(|index| *index != selected)
+            .map(|index| texts[index])
+            .collect();
+        inside_obstacles.push(footer);
+        let inside = Inside {
+            content: texts[selected],
+            obstacles: inside_obstacles,
+        };
+        let size = (288.0, 100.0);
+        let placement = place(
+            rows[selected],
+            window,
+            size,
+            screen,
+            &obstacles,
+            Some(&inside),
+            &METRICS,
+        );
+        assert_eq!(placement.side, Side::Right);
+        assert_eq!(tip(&placement).x - texts[selected].max_x(), METRICS.gap);
+        assert_eq!(tip(&placement).y, rows[selected].mid_y());
+        for obstacle in &inside.obstacles {
+            assert!(!intersects(body(&placement), *obstacle), "{obstacle:?}");
+        }
+        // 窓の中に置かない場面(分岐図など)では，今までどおり画面の中へ寄せる
+        let fallback = place(
+            rows[selected],
+            window,
+            size,
+            screen,
+            &obstacles,
+            None,
+            &METRICS,
+        );
+        assert_eq!(
+            fallback.window.max_x(),
+            screen.max_x() - METRICS.screen_margin
+        );
+    }
+
+    #[test]
     fn 足元を覆う高さなら上へ寄せ_三角は行を指したまま() {
         let setup = wide_branch(3);
         let placement = placed(&setup, (288.0, 110.0), SCREEN);
