@@ -398,14 +398,30 @@ public final class InputSession {
                     return rerender(context: context)
                 }]
             } ?? []
-            // 注目している文節の点数での並べ替えをあとに回していれば，まずそれを求めて出し直す(見ている候補なので先に)
-            let scoring: [@MainActor () -> [ClientAction]] = lattice.focused.awaitsScoring ? [{ [self] in
-                guard case .lattice(var current) = phase, composition.conversionReading == reading, current.focused.awaitsScoring else { return [] }
-                current.segments[current.focusedIndex] = latticeBuilder.scored(current.focused, reading: reading,
-                                                                               context: LatticeBuilder.context(in: current, at: current.focusedIndex))
-                phase = .lattice(current)
-                return rerender(context: context)
-            }] : []
+            // 注目している文節を前後の文脈で並べ替え，点数(検証木)で並べ替える．キー(Space・→)では待たずに出し，ここで求めて出し直す
+            // (見ている候補なので先に)．1 歩を短くするため，前後の文脈での並べ替え(前後の語を含めた変換)と採点を分け，両方を終えてから出し直す
+            let focusedIndex = lattice.focusedIndex
+            var ranked: SegmentLattice.Segment?
+            let sameFocus = { [self] (current: SegmentLattice) in
+                composition.conversionReading == reading && current.focusedIndex == focusedIndex
+                    && current.focused.readingStart == lattice.focused.readingStart && current.focused.readingLength == lattice.focused.readingLength
+            }
+            let ranking: [@MainActor () -> [ClientAction]] = !lattice.focused.isContextRanked || lattice.focused.awaitsScoring ? [
+                { [self] in
+                    guard case .lattice(let current) = phase, sameFocus(current) else { return [] }
+                    ranked = latticeBuilder.rankedByContext(current.focused, reading: reading, context: LatticeBuilder.context(in: current, at: focusedIndex),
+                                                            scoring: .later)
+                    return []
+                },
+                { [self] in
+                    guard case .lattice(var current) = phase, sameFocus(current), let segment = ranked else { return [] }
+                    let final = latticeBuilder.scored(segment, reading: reading, context: LatticeBuilder.context(in: current, at: focusedIndex))
+                    guard final != current.focused else { return [] }
+                    current.segments[focusedIndex] = final
+                    phase = .lattice(current)
+                    return rerender(context: context)
+                },
+            ] : []
             let preview: @MainActor () -> [ClientAction] = { [self] in
                 guard case .lattice(let current) = phase, composition.conversionReading == reading, inlineEdit == nil else { return [] }
                 let key = resizePreviewKey(current)
@@ -413,7 +429,7 @@ public final class InputSession {
                 resizePreviews[key] = latticeBuilder.resizePreview(current, reading: reading)
                 return rerender(context: context)
             }
-            return scoring + rest + fills + [preview]
+            return ranking + rest + fills + [preview]
         case .selecting where listSubstitutionPending == composition.conversionReading:
             // 一覧を出したときにまだ求めていなかった文節の候補を 1 文節ずつ求め，迷う文節から順に前後の語を含めた変換を 1 文節ずつ求める．
             // 最後に，文節を入れ替えた文を足して(並べ替えて)出し直す．選んでいる候補は，並びが変わっても同じ候補のままにする
@@ -2262,13 +2278,12 @@ public final class InputSession {
                 fillPendingSegments(only: lattice.focusedIndex)
                 if case .lattice(let filled) = phase { lattice = filled }
             }
-            // 注目している文節の候補を前後の文脈で並べ替える(候補を見せる文節だけ．設定の contextualSegmentCandidates)．
-            // 点数(検証木)での並べ替えは，前もって求めた点数が無ければ待たずに出し，続く処理(followUps)で求めて出し直す
+            // 注目している文節の候補の前後の文脈と点数(検証木)での並べ替えは，キーでは待たずに出し，続く処理(followUps)で求めて出し直す．
+            // 上の枝(字種)と同じ表記を除くのは軽いので，すぐ行う(あとから候補の数が変わらないように)
             if !lattice.focused.isContextRanked {
-                let ranked = latticeBuilder.rankedByContext(lattice.focused, reading: composition.conversionReading,
-                                                            context: LatticeBuilder.context(in: lattice, at: lattice.focusedIndex), scoring: .later)
-                if ranked.isContextRanked {
-                    lattice.segments[lattice.focusedIndex] = ranked
+                let filtered = LatticeBuilder.withoutVariantDuplicates(lattice.focused)
+                if filtered != lattice.focused {
+                    lattice.segments[lattice.focusedIndex] = filtered
                     phase = .lattice(lattice)
                 }
             }
