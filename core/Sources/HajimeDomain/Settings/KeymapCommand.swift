@@ -86,6 +86,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     /// 候補を表に広げる(一覧の候補の数 × 設定の列の数を 1 ページにし，列を横に並べる)．広げているときは元に戻す．
     /// 表では文節を移るキーで列を移り，番号キーは選んでいる列の中で選ぶ．Esc でも元に戻す
     case expandCandidates
+    /// 分岐図で，選んでいる候補の先の枝(語の意味・連想・変換マクロ)へ移る．先の枝の中では次の丸へ移る．先の枝が無ければ次の文節へ移る
+    case enterBranch
 
     // 文節
     case nextSegment
@@ -193,7 +195,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType,
              .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: .scripts
         case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate,
-             .expandCandidates: .candidates
+             .expandCandidates, .enterBranch: .candidates
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
@@ -217,7 +219,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion, .hidePrediction: [.composing]
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType,
              .commit, .cancel, .nextCandidate, .previousCandidate, .associate: [.composing, .converting]
-        case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .expandCandidates,
+        case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .expandCandidates, .enterBranch,
              .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
              .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment, .commitFirstSegment, .backToReading,

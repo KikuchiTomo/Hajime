@@ -218,6 +218,10 @@ enum DesignTokens {
             static let meaningIndent: CGFloat = 8
             static let meaningWidth: CGFloat = 240
             static let gripSize: CGFloat = 3
+            static let badgeRadius: CGFloat = 5
+            static let pageDotSize: CGFloat = 4
+            static let pageDotPitch: CGFloat = 8
+            static let pageDotLimit: CGFloat = 6
             static let stubLength: CGFloat = 24
             static let fadeWidth: CGFloat = 48
         }
@@ -594,6 +598,10 @@ enum DesignTokens {
         }
         enum CorrectionUnderline {
             static let appear: Double = 80
+        }
+        enum BranchMap {
+            static let hintHold: Double = 100
+            static let hintFade: Double = 50
         }
         enum CandidateRest {
             static let fadeIn: Double = 250

@@ -41,7 +41,8 @@ final class Harness {
 
     /// wrap は変換器を包むもの(SupplementedConverter を通して確かめるとき)．wrapLexicon は英単語の辞書を包むもの(EnglishTermLexicon)
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
-         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false, hidesPredictions: Bool = true,
+         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, branchStations: Bool = false,
+         remembersRejections: Bool = false, hidesPredictions: Bool = true,
          wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil,
          wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil, usageDictionary: UsageDictionary? = nil,
          palette: ((FakeSettings) -> PaletteServices)? = nil, calendar: (any CalendarReading)? = nil,
@@ -51,7 +52,7 @@ final class Harness {
         let store = FakeSettings(settings)
         self.settings = store
         self.session = InputSession(converter: wrap?(converter, store) ?? converter, lexicon: wrapLexicon?(lexicon, store) ?? lexicon, settings: store,
-                                    associations: associations, keyNames: keyNames,
+                                    associations: associations, keyNames: keyNames, branchStations: branchStations,
                                     rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil,
                                     predictionHiding: hidesPredictions ? SettingsPredictionHiding(settings: store) : nil,
                                     usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init), palette: palette?(store),
@@ -1118,6 +1119,20 @@ struct BranchMapControlTests {
         #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
         // 上の枝の文字種には，選んでいる文節だけをその文字種にするキーの名前を出す
         #expect(harness.lattice?.columns.first?.variantKeys.prefix(3) == ["F6", "F7", "F8"])
+    }
+
+    @Test("R-17: 分岐図のキーの案内は，既定では修飾キーを押し続けているあいだだけ出す．常に表示する設定なら，いつも出す")
+    func hintsOnHold() {
+        let harness = Harness(converter: converter())
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.hintsOnHold == true)
+        var settings = DefaultSettings.settings
+        settings.alwaysShowsBranchHints = true
+        let always = Harness(converter: converter(), settings: settings)
+        always.type("kyouhaii")
+        always.press(.space)
+        #expect(always.lattice?.hintsOnHold == false)
     }
 
     @Test("R-08: 選んでいる候補に同音異義語があれば使い分けを添え，設定で切れる")

@@ -356,6 +356,10 @@ pub mod size {
         pub const MEANING_INDENT: f32 = 8.0;
         pub const MEANING_WIDTH: f32 = 240.0;
         pub const GRIP_SIZE: f32 = 3.0;
+        pub const BADGE_RADIUS: f32 = 5.0;
+        pub const PAGE_DOT_SIZE: f32 = 4.0;
+        pub const PAGE_DOT_PITCH: f32 = 8.0;
+        pub const PAGE_DOT_LIMIT: f32 = 6.0;
         pub const STUB_LENGTH: f32 = 24.0;
         pub const FADE_WIDTH: f32 = 48.0;
     }
@@ -733,6 +737,10 @@ pub mod motion {
     }
     pub mod correction_underline {
         pub const APPEAR: f32 = 80.0;
+    }
+    pub mod branch_map {
+        pub const HINT_HOLD: f32 = 100.0;
+        pub const HINT_FADE: f32 = 50.0;
     }
     pub mod candidate_rest {
         pub const FADE_IN: f32 = 250.0;

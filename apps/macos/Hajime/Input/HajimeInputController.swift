@@ -47,11 +47,16 @@ final class HajimeInputController: IMKInputController {
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
-        Int(NSEvent.EventTypeMask.keyDown.rawValue)
+        // 修飾キーの押し方も受け取る(分岐図で，押し続けている修飾キーを使うキーの案内を出すため)．キーとしては処理せず，入力先のアプリに渡す
+        Int(NSEvent.EventTypeMask.keyDown.rawValue | NSEvent.EventTypeMask.flagsChanged.rawValue)
     }
 
     @MainActor
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        if let event, event.type == .flagsChanged {
+            presenter.modifiersChanged(event.modifierFlags)
+            return false
+        }
         guard let event, let client = sender as? any IMKTextInput,
             let key = NSEventKeyTranslator.translate(event) else { return false }
         let signposter = InputSignposts.signposter

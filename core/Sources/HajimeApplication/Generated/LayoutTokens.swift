@@ -99,6 +99,10 @@ public enum LayoutTokens {
         public static let meaningIndent: Double = 8
         public static let meaningWidth: Double = 240
         public static let gripSize: Double = 3
+        public static let badgeRadius: Double = 5
+        public static let pageDotSize: Double = 4
+        public static let pageDotPitch: Double = 8
+        public static let pageDotLimit: Double = 6
         public static let stubLength: Double = 24
         public static let fadeWidth: Double = 48
     }
