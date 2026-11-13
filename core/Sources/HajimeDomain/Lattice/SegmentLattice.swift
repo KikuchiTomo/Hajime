@@ -30,6 +30,9 @@ public struct SegmentLattice: Sendable, Equatable {
         public var isPending: Bool
         /// 候補を前後の文脈で並べ替えたか．並べ替えは候補を見せる文節(注目した文節)だけに，注目したときに行う
         public var isContextRanked = false
+        /// 2 番目から後ろを点数(検証木)で並べ替えるのを，あとに回したか．候補を見せるキー(Space・→)では採点を待たずに出し，
+        /// 続く処理(InputSession.followUps)で求めて並べ替える
+        public var awaitsScoring = false
 
         public init(readingStart: Int, readingLength: Int, candidates: [Candidate], variants: [Candidate] = [], choice: Choice = .candidate(0), isConfident: Bool,
                     isDecided: Bool = false, confidenceGap: Double = .infinity, isPending: Bool = false) {
