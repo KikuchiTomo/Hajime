@@ -69,15 +69,12 @@ final class CandidatePanelController {
         branchView.theme = ResolvedTheme.resolve(theme)
         branchView.fontSize = CGFloat(fontSize)
         branchView.maximumWidth = Self.maximumWidth(caret: caret)
-        let arrived = shownLattice.map { shown in
-            shown != panel && shown.columns.map(\.text) == panel.columns.map(\.text)
-                && shown.columns.firstIndex(where: \.isFocused) == panel.columns.firstIndex(where: \.isFocused)
-                && shown.columns.map(\.selectedAlternative) == panel.columns.map(\.selectedAlternative)
-        } ?? false
         shownLattice = panel
         shownList = nil
         branchView.panel = panel
-        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived, holdsEdges: true)
+        // 分岐図は動かさない．キーで起きる変化(候補・文節を移る，枝の反転，幹の送り，窓の幅の変化)も，あとから届いた中身も，その瞬間に差し替える
+        // (文字の位置が変わる変化を動かすと，読めない時間ができる．動くのは，修飾キーを押し続けて出す案内だけ)
+        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, animatesFrame: false, holdsEdges: true)
         // 分岐図の語の意味は，選んでいる候補の先の枝として窓の中に描く(BranchView)．吹き出しは一覧だけで使う
         bubble.hide()
         if let focused = panel.columns.first(where: \.isFocused) {
@@ -273,9 +270,9 @@ final class CandidatePanelController {
         }
     }
 
+    /// 一覧の 2 番目からの候補の濃さ．分岐図は動かさないので，分岐図には渡さない
     private func setRestOpacity(_ value: CGFloat) {
         view.restOpacity = value
-        branchView.restOpacity = value
     }
 
     /// VoiceOver が動いているときだけ，選んでいる候補を読み上げる
