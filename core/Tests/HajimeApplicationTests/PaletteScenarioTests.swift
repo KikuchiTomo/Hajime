@@ -542,6 +542,27 @@ struct PaletteScenarioTests {
         #expect(harness.palette == nil)
     }
 
+    @Test("R-26: ホイールで選んでいる行が見えなくなったら，選択の枠を描く位置を渡さない．見える位置へ戻したら渡す")
+    func scrollHidesSelection() throws {
+        let harness = harness { $0.paletteRows = 1 }
+        openEmoji(harness)
+        harness.press(.right)
+        #expect(harness.palette?.visibleSelection == PalettePanel.Position(row: 0, column: 1))
+        harness.click(.scroll(1))
+        let scrolled = try #require(harness.palette)
+        #expect(scrolled.firstRow == 1)
+        #expect(scrolled.selection == PalettePanel.Position(row: 0, column: 1))
+        #expect(scrolled.visibleSelection == nil)
+        // スクロールしたときは選択の枠を滑らせない
+        #expect(scrolled.motion.selectionFrom == nil)
+        harness.click(.scroll(-1))
+        #expect(harness.palette?.visibleSelection == PalettePanel.Position(row: 0, column: 1))
+        // 見えない行を選んだまま矢印で動いたら，選んだ行が見えるまでスクロールする
+        harness.click(.scroll(1))
+        harness.press(.right)
+        #expect(harness.palette?.visibleSelection == PalettePanel.Position(row: 0, column: 2))
+    }
+
     @Test("R-26: ⌘ との組み合わせはパレットを閉じてアプリに渡す．入力先から外れたら閉じる")
     func closesForCommandAndFocus() {
         let harness = harness()
