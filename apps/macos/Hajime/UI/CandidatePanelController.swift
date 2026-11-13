@@ -182,6 +182,9 @@ final class CandidatePanelController {
     /// 修飾キーの押し方が変わった．分岐図を出しているあいだ，修飾キーを決まった時間(motion.branch-map.hint-hold)押し続けたら，
     /// その修飾キーを使うキーの案内を出す(BranchView．案内を常に出す設定では，始めから出ている)．
     /// キーを組み合わせて押しただけでは出さない．離したら，すぐに消す(離すのは次の操作の始まりなので待たせない)
+    /// 出している分岐図が，候補と先の枝を左へ出しているか(BranchView.isMirrored)．分岐図を出していなければ false
+    var isBranchMirrored: Bool { window.isVisible && shownLattice != nil && branchView.isMirrored }
+
     func modifiersChanged(_ flags: NSEvent.ModifierFlags) {
         let modifiers = flags.intersection([.shift, .option, .control, .command])
         hintHoldTimer?.invalidate()

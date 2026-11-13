@@ -1160,6 +1160,7 @@ pub enum RangeKind {
     AssociationLimit,
     CustomThemeCornerRadius,
     MeaningSenseLimit,
+    BranchSegmentsPerGroup,
     EmojiCandidatePosition,
     EmojiCandidateCount,
     PaletteColumns,
@@ -1186,6 +1187,7 @@ impl RangeKind {
             RangeKind::AssociationLimit => ranges.association_limit,
             RangeKind::CustomThemeCornerRadius => ranges.custom_theme_corner_radius,
             RangeKind::MeaningSenseLimit => ranges.meaning_sense_limit,
+            RangeKind::BranchSegmentsPerGroup => ranges.branch_segments_per_group,
             RangeKind::EmojiCandidatePosition => ranges.emoji_candidate_position,
             RangeKind::EmojiCandidateCount => ranges.emoji_candidate_count,
             RangeKind::PaletteColumns => ranges.palette_columns,
@@ -1499,6 +1501,16 @@ fn conversion() -> Vec<Section> {
                 Row::toggle(choice::KEY_HINTS, "showsKeyHints"),
                 Row::toggle(choice::BRANCH_HINTS_ALWAYS, "alwaysShowsBranchHints"),
                 Row::toggle(choice::FEWER_ITEMS, "showsFewerItems"),
+                Row::stepper(
+                    choice::BRANCH_SEGMENTS,
+                    "branchSegmentsPerGroup",
+                    RangeKind::BranchSegmentsPerGroup,
+                ),
+                Row::choice(
+                    choice::BRANCH_WINDOW_WIDTH,
+                    "branchWindowWidth",
+                    options::BRANCH_WINDOW_WIDTHS,
+                ),
                 Row::seconds(
                     more::LIVE_CONVERSION_DELAY,
                     "liveConversionDelay",
