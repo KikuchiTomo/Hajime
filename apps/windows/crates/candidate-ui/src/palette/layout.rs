@@ -20,7 +20,7 @@ use super::preview;
 use crate::geometry::Frame;
 use crate::scene::Measure;
 use crate::theme::{Font, ResolvedTheme, Role};
-use ipc::{PaletteKind, PalettePanel, PaletteTarget};
+use ipc::{PaletteKind, PalettePanel, PalettePosition, PaletteTarget};
 use tokens::size::{candidate, glass, palette};
 
 /// 外形に合わせて大きさを決める絵文字の書体の候補の数．目当ての一辺より 2 ポイント大きいものから 1 ポイントずつ小さくする
@@ -177,6 +177,16 @@ pub fn cell_size(panel: &PalettePanel) -> f32 {
     } else {
         0.0
     }
+}
+
+/// 選んでいるマスが見えている行にあれば，その位置．ホイールでスクロールして選んでいる行が見えなくなったら None
+/// (core の PalettePanel.visibleSelection)．選択の枠はこの位置にだけ描く(見えていない行の位置に描くと，
+/// 枠が先頭の行のマスや説明の欄に重なる)
+pub fn visible_selection(panel: &PalettePanel) -> Option<&PalettePosition> {
+    panel.selection.as_ref().filter(|position| {
+        position.row >= panel.first_row
+            && position.row < panel.first_row.saturating_add(panel.visible_rows)
+    })
 }
 
 /// 今の種類(選んでいる種類の切り替え．無ければ絵文字)
@@ -518,6 +528,19 @@ mod tests {
 
     fn layout(panel: &PalettePanel, name: &str) -> Layout {
         Layout::new(panel, &theme(name), &Fixed)
+    }
+
+    #[test]
+    fn 選んでいる行が見えているときだけ選択の位置を返す() {
+        let mut panel = sample::emoji();
+        panel.first_row = 3;
+        panel.visible_rows = 6;
+        for (row, visible) in [(2, false), (3, true), (8, true), (9, false)] {
+            panel.selection = Some(PalettePosition { row, column: 0 });
+            assert_eq!(visible_selection(&panel).is_some(), visible, "行 {row}");
+        }
+        panel.selection = None;
+        assert_eq!(visible_selection(&panel), None);
     }
 
     #[test]

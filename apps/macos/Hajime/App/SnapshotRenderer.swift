@@ -79,6 +79,14 @@ enum SnapshotRenderer {
                 render(paletteView(SamplePalettes.reduced, theme: look.theme, appearance: appearance), name: "palette-reduced-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.symbol, theme: look.theme, appearance: appearance), name: "palette-symbol-\(look.name)", to: output, appearance: appearance)
                 render(paletteView(SamplePalettes.kaomoji, theme: look.theme, appearance: appearance), name: "palette-kaomoji-\(look.name)", to: output, appearance: appearance)
+                // スクロールして選んでいる文字の行が見えなくなったところと，選択の枠が滑っている途中でスクロールしたところ
+                render(paletteView(SamplePalettes.scrolledUp, theme: look.theme, appearance: appearance), name: "palette-scrolled-up-\(look.name)", to: output,
+                       appearance: appearance)
+                render(paletteView(SamplePalettes.scrolledDown, theme: look.theme, appearance: appearance), name: "palette-scrolled-down-\(look.name)",
+                       to: output, appearance: appearance)
+                let scroll = SamplePalettes.scrollWhileSliding
+                render(paletteMotionView(from: scroll.from, to: scroll.sliding, then: scroll.scrolled, at: scroll.time, theme: look.theme, appearance: appearance),
+                       name: "palette-scroll-sliding-\(look.name)", to: output, appearance: appearance)
                 // 動きの途中のコマ(選択の枠とタブの印が滑る・種類を切り替えて中身を送る・肌の色の帯が浮かび上がる)
                 for (step, sample) in SamplePalettes.motionSteps.enumerated() {
                     render(paletteMotionView(from: sample.from, to: sample.to, at: sample.time, theme: look.theme, appearance: appearance),
@@ -648,8 +656,9 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// from から to へ動き始めてから time 秒たったところのパレット
-    private static func paletteMotionView(from: PalettePanel, to: PalettePanel, at time: Double, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+    /// from から to へ動き始めてから time 秒たったところのパレット．then があれば，動き始めてすぐに then を出したところ
+    private static func paletteMotionView(from: PalettePanel, to: PalettePanel, then: PalettePanel? = nil, at time: Double, theme: ThemeChoice,
+                                          appearance: NSAppearance?) -> NSView {
         let view = PaletteView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
@@ -658,6 +667,7 @@ enum SnapshotRenderer {
         view.panel = from
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: to))
         view.panel = to
+        if let then { view.panel = then }
         view.clock = { time }
         return backdropped(view)
     }
