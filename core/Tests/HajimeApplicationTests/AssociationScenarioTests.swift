@@ -308,6 +308,13 @@ struct AssociationScenarioTests {
         // ↓ で幹の上へ戻る
         harness.press(.down)
         #expect(harness.lattice?.trunkFocused == true && harness.lattice?.columns.first?.selectedVariant == nil)
+        // 2 番目の文字種からも，↓ の 1 回で幹の上へ戻る(1 つ前の文字種へは移らない)
+        harness.press(.up)
+        harness.press(.right)
+        #expect(harness.lattice?.columns.first?.selectedVariant == 1)
+        harness.press(.down)
+        #expect(harness.lattice?.trunkFocused == true && harness.lattice?.columns.first?.selectedVariant == nil)
+        #expect(harness.lattice?.columns.first?.selectedAlternative == 0)
     }
 
     @Test("矢印で木をたどる: 先の枝を左へ出しているとき(反転)は，← で先の枝へ入って進み，→ で戻る．丸の中身でも同じ向き")
