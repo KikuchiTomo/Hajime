@@ -315,7 +315,8 @@ final class CandidateView: NSView {
                 rect.fill()
             }
         }
-        let opacity: CGFloat = (isSelected || index == 0) ? 1 : restOpacity
+        // 文節を打ち直しているあいだ(⇧⌫)の候補は打ち直す前のものなので薄く出す(候補は変換したときに出し直す)
+        let opacity: CGFloat = panel.isEditing ? DesignTokens.Opacity.Candidate.editingStale : (isSelected || index == 0) ? 1 : restOpacity
         let textColor = (isSelected ? theme.selectionText : theme.text).withAlphaComponent(opacity)
         let mutedColor = (isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(opacity)
         // 表では選んでいる列の番号だけを番号キーで選べる．ほかの列と，選び始める前の入力中の候補の窓の番号は薄く出し，

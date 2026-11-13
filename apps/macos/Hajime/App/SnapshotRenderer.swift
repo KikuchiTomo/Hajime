@@ -41,6 +41,11 @@ enum SnapshotRenderer {
                 render(latticeView(theme: look.theme, appearance: appearance), name: "branch-\(look.name)", to: output, appearance: appearance)
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
                 render(splitView(theme: look.theme, appearance: appearance), name: "branch-split-\(look.name)", to: output, appearance: appearance)
+                // 文節をその場で打ち直しているところ(⇧⌫)．読みを打っている途中と，まだ何も打っていないところ
+                render(latticeView(editingLattice(typed: "なかの"), theme: look.theme, appearance: appearance), name: "branch-editing-\(look.name)",
+                       to: output, appearance: appearance)
+                render(latticeView(editingLattice(typed: ""), theme: look.theme, appearance: appearance), name: "branch-editing-empty-\(look.name)",
+                       to: output, appearance: appearance)
                 render(correctionView(theme: look.theme, appearance: appearance), name: "correction-\(look.name)", to: output, appearance: appearance)
                 render(readingCorrectionView(theme: look.theme, appearance: appearance), name: "correction-reading-\(look.name)", to: output, appearance: appearance)
                 render(correctedLatticeView(theme: look.theme, appearance: appearance), name: "branch-correction-\(look.name)", to: output, appearance: appearance)
@@ -848,6 +853,18 @@ enum SnapshotRenderer {
     }
 
     /// 文節を区切っているところ(⇧↓)．注目している文節の読みの文字のあいだに番号を挟む
+    /// 見本の分岐図で，注目している文節(中野です)をその場で打ち直しているところ．幹は打っている読み，枝は打ち直す前の候補
+    private static func editingLattice(typed: String) -> LatticePanel {
+        var panel = SamplePanels.lattice
+        panel.columns[2].text = typed
+        panel.columns[2].isEditing = true
+        panel.columns[2].selectedAlternative = nil
+        panel.columns[2].isUncertain = false
+        panel.columns[2].shorter = nil
+        panel.note = Note(tone: .info, title: "再入力", subject: "中野です", key: "Tab", keyAction: "変換")
+        return panel
+    }
+
     private static func splitView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)

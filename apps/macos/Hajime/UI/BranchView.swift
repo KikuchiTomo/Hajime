@@ -23,6 +23,7 @@ final class BranchView: NSView {
     private typealias Meaning = DesignTokens.Size.Meaning
     private typealias Space = DesignTokens.Size.Space
     private typealias Part = DesignTokens.Size.Part
+    private typealias Opacity = DesignTokens.Opacity.Candidate
 
     var panel: LatticePanel? {
         didSet {
@@ -179,7 +180,9 @@ final class BranchView: NSView {
         var trunkX: [CGFloat] = []
         var trunkWidths: [CGFloat] = []
         for column in panel.columns {
-            let text = trunkCommand(column).map { CommandDrawing.width + textWidth($0.title, font: trunkFont) } ?? textWidth(column.text, font: trunkFont)
+            var text = trunkCommand(column).map { CommandDrawing.width + textWidth($0.title, font: trunkFont) } ?? textWidth(column.text, font: trunkFont)
+            // 打ち直している文節は，読みのあとの入力位置の線の分を足し，読みが空でも場所が分かる幅を残す
+            if column.isEditing { text = max(text + Glass.editingCaretWidth, Glass.editingMinWidth) }
             let width = (column.split.map { splitPieces($0).width } ?? text) + Part.rowPaddingX * 2
                 + (column.isCorrected ? correctedLabelWidth : 0)
             trunkX.append(x)
@@ -381,8 +384,10 @@ final class BranchView: NSView {
                 NSRect(x: node.maxX, y: node.midY.rounded(), width: layout.trunkX[index + 1] - node.maxX, height: Branch.lineWidth).fill()
             }
             if column.isFocused {
-                drawBranches(lowerRows(column), from: node, width: layout.branchWidth, downward: true)
-                drawBranches(upperRows(column), from: node, width: layout.branchWidth, downward: false)
+                // 打ち直しているあいだの枝は打ち直す前の候補なので，線も文字も薄くする(候補は変換したときに出し直す)
+                let lineOpacity = column.isEditing ? Opacity.editingStale : 1
+                drawBranches(lowerRows(column), from: node, width: layout.branchWidth, downward: true, lineOpacity: lineOpacity)
+                drawBranches(upperRows(column), from: node, width: layout.branchWidth, downward: false, lineOpacity: lineOpacity)
             } else if let preview = column.preview, !(branchRange?.overlaps(node.minX...node.maxX) ?? false) {
                 // 添える候補は次の文節の手前までに収め，はみ出す分は省く(次の文節の添え書きと重ねない)
                 let limit = index + 1 < layout.trunkX.count ? layout.trunkX[index + 1] : body.maxX - metrics.inset
@@ -412,6 +417,10 @@ final class BranchView: NSView {
     // MARK: - 幹
 
     private func drawTrunkNode(_ column: LatticePanel.Column, in node: NSRect) {
+        if column.isEditing {
+            drawEditingNode(column, in: node)
+            return
+        }
         let color: NSColor
         if theme.isRounded {
             if column.isFocused { GlassDrawing.fillCapsule(node.insetBy(dx: 0, dy: Glass.selectionInsetY), color: theme.focusTint) }
@@ -448,6 +457,29 @@ final class BranchView: NSView {
             let dotColor = !theme.isRounded && column.isFocused ? theme.selectionText : theme.correction
             GlassDrawing.drawUnderline(from: from, to: to, y: y, color: dotColor, dotted: true, theme: theme)
         }
+    }
+
+    /// その場で打ち直している文節(⇧⌫)の幹．塗らずに選択の色の枠線で囲み，打っている読みのあとに入力位置の線を置く．
+    /// 読みが空のあいだも枠を残し，どこを打ち直しているかを見せる
+    private func drawEditingNode(_ column: LatticePanel.Column, in node: NSRect) {
+        let stroke = DesignTokens.Size.Part.stroke
+        theme.selection.setStroke()
+        if theme.isRounded {
+            let frame = node.insetBy(dx: stroke / 2, dy: Glass.selectionInsetY + stroke / 2)
+            let path = NSBezierPath(roundedRect: frame, xRadius: Glass.selectionRadius, yRadius: Glass.selectionRadius)
+            path.lineWidth = stroke
+            path.stroke()
+        } else {
+            let path = NSBezierPath(rect: node.insetBy(dx: stroke / 2, dy: stroke / 2))
+            path.lineWidth = stroke
+            path.stroke()
+        }
+        let x = node.minX + Part.rowPaddingX
+        drawText(column.text, attributes: [.font: trunkFont, .foregroundColor: theme.text], x: x, in: node)
+        let height = (trunkFont.ascender - trunkFont.descender).rounded()
+        theme.selection.setFill()
+        NSRect(x: (x + textWidth(column.text, font: trunkFont)).rounded(), y: (node.midY - height / 2).rounded(), width: Glass.editingCaretWidth,
+               height: height).fill()
     }
 
     /// 幹の文節で選んでいるコマンドの種類と名前．コマンドを選んでいなければ nil
@@ -514,7 +546,8 @@ final class BranchView: NSView {
     /// 下の枝(変換の候補)．第 1 候補はすぐに濃く出す
     private func lowerRows(_ column: LatticePanel.Column) -> [Row] {
         column.alternatives.enumerated().map { index, text in
-            Row(text: text, badge: "\(index + 1)", isSelected: index == column.selectedAlternative, opacity: index == 0 ? 1 : restOpacity,
+            Row(text: text, badge: "\(index + 1)", isSelected: index == column.selectedAlternative,
+                opacity: column.isEditing ? Opacity.editingStale : index == 0 ? 1 : restOpacity,
                 note: column.alternativeNotes.indices.contains(index) ? column.alternativeNotes[index] : nil,
                 command: column.alternativeCommands.indices.contains(index) ? column.alternativeCommands[index] : nil,
                 detail: column.alternativeDetails.indices.contains(index) ? column.alternativeDetails[index] : nil)
@@ -524,7 +557,8 @@ final class BranchView: NSView {
     /// 上の枝(文字種)．幹に近いものから上へ積む
     private func upperRows(_ column: LatticePanel.Column) -> [Row] {
         column.variants.enumerated().map { index, text in
-            Row(text: text, badge: UIStrings.Branch.variantBadge, isSelected: index == column.selectedVariant, opacity: restOpacity)
+            Row(text: text, badge: UIStrings.Branch.variantBadge, isSelected: index == column.selectedVariant,
+                opacity: column.isEditing ? Opacity.editingStale : restOpacity)
         }
     }
 
@@ -538,7 +572,7 @@ final class BranchView: NSView {
     /// 枝の行のタグの右端
     private func tagMaxX(in row: NSRect) -> CGFloat { row.maxX - Part.rowPaddingX }
 
-    private func drawBranches(_ rows: [Row], from node: NSRect, width: CGFloat, downward: Bool) {
+    private func drawBranches(_ rows: [Row], from node: NSRect, width: CGFloat, downward: Bool, lineOpacity: CGFloat = 1) {
         guard !rows.isEmpty else { return }
         let metrics = metrics
         let rowRect = { (index: Int) -> NSRect in
@@ -546,7 +580,8 @@ final class BranchView: NSView {
         }
         BranchLineDrawing.draw(stemX: node.minX + metrics.stemX, rootY: rootY(of: node, downward: downward),
                                rowMidYs: rows.indices.map { rowRect($0).midY }, tipX: leadMinX(in: rowRect(0)) - Space.inline,
-                               selected: rows.firstIndex(where: \.isSelected), style: lineStyle(color: theme.line))
+                               selected: rows.firstIndex(where: \.isSelected),
+                               style: lineStyle(color: theme.line.withAlphaComponent(theme.line.alphaComponent * lineOpacity)))
         for (index, row) in rows.enumerated() {
             drawRow(row, in: rowRect(index))
         }

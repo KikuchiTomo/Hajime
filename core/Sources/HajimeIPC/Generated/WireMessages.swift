@@ -1873,8 +1873,9 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
     public var showsNumbers: Bool?
     public var meaningPlacement: WireMeaningPlacement?
     public var columnLength: UInt32?
+    public var isEditing: Bool?
 
-    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint]? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, homophone: WireHomophoneNote? = nil, showsNumbers: Bool? = nil, meaningPlacement: WireMeaningPlacement? = nil, columnLength: UInt32? = nil) {
+    public init(variants: [WireCandidateVariant], selectedVariant: UInt32? = nil, entries: [WireCandidateEntry], selectedEntry: UInt32? = nil, focus: WireCandidateFocus, position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint]? = nil, association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, homophone: WireHomophoneNote? = nil, showsNumbers: Bool? = nil, meaningPlacement: WireMeaningPlacement? = nil, columnLength: UInt32? = nil, isEditing: Bool? = nil) {
         self.variants = variants
         self.selectedVariant = selectedVariant
         self.entries = entries
@@ -1891,6 +1892,7 @@ public struct WireCandidateList: Sendable, Equatable, Codable {
         self.showsNumbers = showsNumbers
         self.meaningPlacement = meaningPlacement
         self.columnLength = columnLength
+        self.isEditing = isEditing
     }
 }
 
@@ -1920,8 +1922,9 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
     public var alternativeDetails: [String?]?
     public var sourceName: String?
     public var split: WireBranchSplit?
+    public var isEditing: Bool?
 
-    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, isCorrected: Bool? = nil, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, homophone: WireHomophoneNote? = nil, alternativeNotes: [String?], alternativeCommands: [WireCommandKind?]? = nil, alternativeComments: [Bool]? = nil, alternativeDetails: [String?]? = nil, sourceName: String? = nil, split: WireBranchSplit? = nil) {
+    public init(text: String, alternatives: [String], selectedAlternative: UInt32? = nil, variants: [String], selectedVariant: UInt32? = nil, isFocused: Bool, isUncertain: Bool, isDecided: Bool, isCorrected: Bool? = nil, preview: String? = nil, shorter: String? = nil, longer: String? = nil, usageNote: String? = nil, homophone: WireHomophoneNote? = nil, alternativeNotes: [String?], alternativeCommands: [WireCommandKind?]? = nil, alternativeComments: [Bool]? = nil, alternativeDetails: [String?]? = nil, sourceName: String? = nil, split: WireBranchSplit? = nil, isEditing: Bool? = nil) {
         self.text = text
         self.alternatives = alternatives
         self.selectedAlternative = selectedAlternative
@@ -1942,6 +1945,7 @@ public struct WireBranchColumn: Sendable, Equatable, Codable {
         self.alternativeDetails = alternativeDetails
         self.sourceName = sourceName
         self.split = split
+        self.isEditing = isEditing
     }
 }
 

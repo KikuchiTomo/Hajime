@@ -204,13 +204,17 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter) -> Layout {
     let mut trunk_x = Vec::new();
     let mut trunk_width = Vec::new();
     for column in &map.columns {
-        let text = column.split.as_ref().map_or_else(
+        let mut text = column.split.as_ref().map_or_else(
             || match trunk_command(column) {
                 Some((_, title)) => Painter::command_width() + painter.width(title, Font::Trunk),
                 None => painter.width(&column.text, Font::Trunk),
             },
             |split| split_pieces(split, painter).width,
         );
+        // 打ち直している文節は，読みのあとの入力位置の線の分を足し，読みが空でも場所が分かる幅を残す
+        if editing(column) {
+            text = (text + glass::EDITING_CARET_WIDTH).max(glass::EDITING_MIN_WIDTH);
+        }
         let width = text + edge * 2.0 + corrected_label_width(column, painter);
         trunk_x.push(x);
         trunk_width.push(width);
@@ -453,12 +457,19 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
             }
             // 区切っているあいだ(⇧↓)は番号キーで区切る位置を選ぶので，枝は押せない
             let pressable = column.split.is_none();
+            // 打ち直しているあいだの枝は打ち直す前の候補なので，線も文字も薄くする(候補は変換したときに出し直す)
+            let line_opacity = if editing(column) {
+                tokens::opacity::candidate::EDITING_STALE
+            } else {
+                1.0
+            };
             branches(
                 &mut painter,
                 &lower_rows(column, look.rest_opacity),
                 node,
                 layout.branch_width,
                 true,
+                line_opacity,
                 &metrics,
             );
             branches(
@@ -467,6 +478,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
                 node,
                 layout.branch_width,
                 false,
+                line_opacity,
                 &metrics,
             );
             if pressable {
@@ -576,7 +588,50 @@ fn trunk_command(column: &BranchColumn) -> Option<(CommandKind, &str)> {
     Some((kind, column.alternatives.get(index)?))
 }
 
+/// その場で打ち直している文節(⇧⌫)か(core の LatticePanel.Column.isEditing)
+fn editing(column: &BranchColumn) -> bool {
+    column.is_editing == Some(true)
+}
+
+/// 打ち直している文節の幹(macOS の BranchView.drawEditingNode)．塗らずに選択の色の枠線で囲み，
+/// 打っている読みのあとに入力位置の線を置く．読みが空のあいだも枠を残し，どこを打ち直しているかを見せる
+fn editing_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
+    let theme = painter.theme;
+    let stroke = part::STROKE;
+    let (frame, radius) = if theme.is_rounded() {
+        (
+            node.inset(stroke / 2.0, glass::SELECTION_INSET_Y + stroke / 2.0),
+            glass::SELECTION_RADIUS,
+        )
+    } else {
+        (node.inset(stroke / 2.0, stroke / 2.0), 0.0)
+    };
+    painter.draws.push(Draw::RoundRect {
+        frame,
+        radius,
+        fill: None,
+        stroke: Some((theme.selection, stroke)),
+    });
+    let x = node.x + part::ROW_PADDING_X;
+    painter.text(&column.text, Font::Trunk, theme.text, x, node);
+    let height = painter.measure.height(Font::Trunk).round();
+    let caret_x = (x + painter.width(&column.text, Font::Trunk)).round();
+    painter.rect(
+        Frame::new(
+            caret_x,
+            (node.mid_y() - height / 2.0).round(),
+            glass::EDITING_CARET_WIDTH,
+            height,
+        ),
+        theme.selection,
+    );
+}
+
 fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
+    if editing(column) {
+        editing_node(painter, column, node);
+        return;
+    }
     let theme = painter.theme;
     let rounded = theme.is_rounded();
     if column.is_focused {
@@ -694,7 +749,13 @@ fn lower_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
             text: text.clone(),
             badge: (index + 1).to_string(),
             selected: column.selected_alternative == Some(index as u32),
-            opacity: if index == 0 { 1.0 } else { rest },
+            opacity: if editing(column) {
+                tokens::opacity::candidate::EDITING_STALE
+            } else if index == 0 {
+                1.0
+            } else {
+                rest
+            },
             note: column.alternative_notes.get(index).cloned().flatten(),
             command: column
                 .alternative_commands
@@ -718,7 +779,11 @@ fn upper_rows(column: &BranchColumn, rest: f32) -> Vec<Row> {
             text: text.clone(),
             badge: strings::VARIANT_BADGE.to_string(),
             selected: column.selected_variant == Some(index as u32),
-            opacity: rest,
+            opacity: if editing(column) {
+                tokens::opacity::candidate::EDITING_STALE
+            } else {
+                rest
+            },
             note: None,
             command: None,
             detail: None,
@@ -753,6 +818,7 @@ fn branches(
     node: Frame,
     width: f32,
     downward: bool,
+    line_opacity: f32,
     metrics: &Metrics,
 ) {
     if rows.is_empty() {
@@ -762,7 +828,7 @@ fn branches(
     let mids: Vec<f32> = (0..rows.len())
         .map(|index| row_frame(index).mid_y())
         .collect();
-    let color = painter.theme.line;
+    let color = painter.theme.line.faded(line_opacity);
     lines(
         painter,
         Point::new(node.x + metrics.stem_x, root_y(node, downward, metrics)),
@@ -1023,6 +1089,7 @@ mod tests {
 
     fn column(text: &str, focused: bool) -> BranchColumn {
         BranchColumn {
+            is_editing: None,
             text: text.into(),
             alternatives: if focused {
                 vec!["今日は".into(), "京は".into()]
@@ -1091,6 +1158,56 @@ mod tests {
         BranchMap {
             columns: vec![focused],
             ..map()
+        }
+    }
+
+    #[test]
+    fn 打ち直している文節は塗らずに枠線で囲み_読みと入力位置の線を出し_枝を薄くする() {
+        for name in ["automatic", "platinum"] {
+            let theme = theme(name);
+            let look = Look::new(&theme, 15.0);
+            let mut editing = map();
+            editing.columns[0].text = "かな".into();
+            editing.columns[0].is_editing = Some(true);
+            editing.columns[0].selected_alternative = None;
+            let scene = branch_map(&editing, &look, &Fixed);
+            // 幹のその文節は打っている読み．塗らない枠線
+            assert!(
+                texts(&scene)
+                    .iter()
+                    .any(|(text, color)| text == "かな" && *color == theme.text),
+                "{name}"
+            );
+            assert!(scene.draws.iter().any(|draw| matches!(draw,
+                Draw::RoundRect { fill: None, stroke: Some((color, _)), .. } if *color == theme.selection)), "{name}");
+            // 入力位置の線
+            assert!(scene.draws.iter().any(|draw| matches!(draw,
+                Draw::Rect { frame, color } if frame.width == glass::EDITING_CARET_WIDTH && *color == theme.selection)), "{name}");
+            // 枝(打ち直す前の候補)は薄い
+            let stale = theme.text.faded(tokens::opacity::candidate::EDITING_STALE);
+            assert!(
+                texts(&scene)
+                    .iter()
+                    .any(|(text, color)| text == "今日は" && *color == stale),
+                "{name}"
+            );
+            // 読みが空でも枠の幅を残す
+            editing.columns[0].text = String::new();
+            let empty = branch_map(&editing, &look, &Fixed);
+            let frame = empty
+                .draws
+                .iter()
+                .find_map(|draw| match draw {
+                    Draw::RoundRect {
+                        frame,
+                        fill: None,
+                        stroke: Some(_),
+                        ..
+                    } => Some(*frame),
+                    _ => None,
+                })
+                .expect("枠線");
+            assert!(frame.width >= glass::EDITING_MIN_WIDTH, "{name}");
         }
     }
 

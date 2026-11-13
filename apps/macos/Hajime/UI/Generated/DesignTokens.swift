@@ -276,6 +276,8 @@ enum DesignTokens {
             static let keycapPaddingY: CGFloat = 3
             static let keycapHeight: CGFloat = 16
             static let hintGap: CGFloat = 8
+            static let editingCaretWidth: CGFloat = 2
+            static let editingMinWidth: CGFloat = 16
             static let footerHeight: CGFloat = 28
             static let trunkGap: CGFloat = 8
             static let branchIndent: CGFloat = 28
@@ -683,6 +685,7 @@ enum DesignTokens {
         }
         enum Candidate {
             static let unselectableNumber: CGFloat = 0.4
+            static let editingStale: CGFloat = 0.35
         }
     }
 }

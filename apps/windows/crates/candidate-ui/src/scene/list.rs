@@ -420,7 +420,10 @@ fn draw_list(
             }
         }
         // 出した直後は，第 1 候補と選んでいる候補だけを濃く出す
-        let opacity = if selected || index == 0 {
+        // 文節を打ち直しているあいだ(⇧⌫)の候補は打ち直す前のものなので薄く出す(候補は変換したときに出し直す)
+        let opacity = if list.is_editing == Some(true) {
+            tokens::opacity::candidate::EDITING_STALE
+        } else if selected || index == 0 {
             1.0
         } else {
             rest_opacity
@@ -678,6 +681,7 @@ mod tests {
 
     fn list(selected: Option<u32>) -> CandidateList {
         CandidateList {
+            is_editing: None,
             association: None,
             association_hint: None,
             association_key: None,
