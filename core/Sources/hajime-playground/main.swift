@@ -106,6 +106,15 @@ MainActor.assumeIsolated {
                                     repeats: arguments.value(of: "--repeat").flatMap(Int.init) ?? 5)
         } else if let file = arguments.value(of: "--dump-candidates") {
             Evaluation.dump(cases: try EvaluationCase.load(from: file), engine: playground.engine, scores: CommandLine.arguments.contains("--score"))
+        } else if let keys = arguments.value(of: "--service-typing") {
+            // Windows のエンジンに決まった間隔で打鍵を送ったときの返事の遅れ(合間の wake も DLL と同じく送る)
+            ServiceTyping.run(keys: keys, repeats: arguments.value(of: "--repeat").flatMap(Int.init) ?? 10,
+                              interval: arguments.value(of: "--interval").flatMap(Double.init) ?? 120, engine: playground.engine)
+        } else if let keys = arguments.value(of: "--live-key-times") {
+            // ライブ変換のまま長い文を打ったときの 1 打鍵の時間(読みの長さごと)．keys を --repeat 回くり返して打つ
+            LiveKeyTimes.run(keys: keys, repeats: arguments.value(of: "--repeat").flatMap(Int.init) ?? 10,
+                             settleEvery: arguments.value(of: "--settle-every").flatMap(Int.init) ?? 0,
+                             adaptive: CommandLine.arguments.contains("--adaptive"), engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-live") {
             Evaluation.live(cases: try EvaluationCase.load(from: file), engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-typo") {

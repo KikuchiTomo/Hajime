@@ -58,7 +58,7 @@ let package = Package(
         // 入れずに変換を試す道具(make try)
         .executableTarget(
             name: "hajime-playground",
-            dependencies: ["HajimeDomain", "HajimeApplication", "HajimeEngine", "HajimePersistence"],
+            dependencies: ["HajimeDomain", "HajimeApplication", "HajimeEngine", "HajimePersistence", "HajimeIPC"],
             swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
         ),
         .target(name: "HajimeTestSupport", dependencies: ["HajimeDomain", "HajimeApplication"], path: "Tests/Support"),
