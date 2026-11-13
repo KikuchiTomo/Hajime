@@ -1799,6 +1799,12 @@ pub struct BranchColumn {
     #[serde(rename = "isEditing")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_editing: Option<bool>,
+    #[serde(rename = "jumpKey")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jump_key: Option<String>,
+    #[serde(rename = "variantKeys")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant_keys: Option<Vec<Option<String>>>,
 }
 
 impl fmt::Debug for BranchColumn {
@@ -1825,6 +1831,8 @@ impl fmt::Debug for BranchColumn {
             .field("sourceName", &REDACTED)
             .field("split", &self.split)
             .field("isEditing", &self.is_editing)
+            .field("jumpKey", &REDACTED)
+            .field("variantKeys", &REDACTED)
             .finish()
     }
 }
@@ -1858,6 +1866,27 @@ impl fmt::Debug for KeyHint {
 }
 
 #[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct BranchHints {
+    pub boundary: Vec<KeyHint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant: Option<KeyHint>,
+    pub candidates: Vec<KeyHint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub expand: Option<KeyHint>,
+}
+
+impl fmt::Debug for BranchHints {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BranchHints")
+            .field("boundary", &self.boundary)
+            .field("variant", &self.variant)
+            .field("candidates", &self.candidates)
+            .field("expand", &self.expand)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
 pub struct BranchMap {
     pub columns: Vec<BranchColumn>,
     pub position: u32,
@@ -1876,6 +1905,24 @@ pub struct BranchMap {
     #[serde(rename = "meaningPlacement")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub meaning_placement: Option<MeaningPlacement>,
+    #[serde(rename = "collapsesVariants")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collapses_variants: Option<bool>,
+    #[serde(rename = "collapsesDetail")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collapses_detail: Option<bool>,
+    #[serde(rename = "placedHints")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub placed_hints: Option<BranchHints>,
+    #[serde(rename = "trunkFocused")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trunk_focused: Option<bool>,
+    #[serde(rename = "pageSize")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
+    #[serde(rename = "hintsOnHold")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hints_on_hold: Option<bool>,
 }
 
 impl fmt::Debug for BranchMap {
@@ -1890,6 +1937,12 @@ impl fmt::Debug for BranchMap {
             .field("associationHint", &REDACTED)
             .field("associationKey", &REDACTED)
             .field("meaningPlacement", &self.meaning_placement)
+            .field("collapsesVariants", &self.collapses_variants)
+            .field("collapsesDetail", &self.collapses_detail)
+            .field("placedHints", &self.placed_hints)
+            .field("trunkFocused", &self.trunk_focused)
+            .field("pageSize", &self.page_size)
+            .field("hintsOnHold", &self.hints_on_hold)
             .finish()
     }
 }
