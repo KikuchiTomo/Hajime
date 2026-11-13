@@ -143,20 +143,32 @@ pub fn remove_old_versions() -> Result<()> {
         .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
         .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
         .collect();
+    let retired = tsf.join(crate::install::RETIRED_FOLDER);
+    let mut moved = false;
     for name in crate::install::stale_versions(&names, &current) {
         let folder = tsf.join(name);
         if std::fs::remove_dir_all(&folder).is_err() {
-            remove_at_reboot(&folder);
+            // 前に退けたファイルのフォルダは，その場で再起動を待つ(もう一度退けない)
+            let target = (!name.eq_ignore_ascii_case(crate::install::RETIRED_FOLDER))
+                .then_some(retired.as_path());
+            moved |= remove_at_reboot(&folder, target);
         }
+    }
+    if moved {
+        delete_at_reboot(&retired);
     }
     Ok(())
 }
 
-/// folder の中のファイルとフォルダを，消せるものは今消し，消せないものは次の再起動で消えるよう頼む(中から順に)
-fn remove_at_reboot(folder: &std::path::Path) {
+/// folder の中のファイルとフォルダを，消せるものは今消し，消せないもの(アプリが読み込んでいる DLL)は次の再起動で消えるよう頼む(中から順に)．
+/// retired があれば，消せないファイルを retired(同じドライブ)へ名前を変えて退けてから頼む．読み込まれている DLL でも名前は変えられる．
+/// 退けておくと，このあと古い版を消す Windows Installer(RemoveExistingProducts)がそのファイルを見つけず，「アプリを終了する必要があります」の窓を出さない．
+/// ファイルを retired へ退けたら true
+fn remove_at_reboot(folder: &std::path::Path, retired: Option<&std::path::Path>) -> bool {
     let Ok(entries) = std::fs::read_dir(folder) else {
-        return;
+        return false;
     };
+    let mut moved = false;
     for entry in entries.filter_map(|entry| entry.ok()) {
         let path = entry.path();
         // リンクはたどらない(指す先を消さない)
@@ -164,14 +176,40 @@ fn remove_at_reboot(folder: &std::path::Path) {
             continue;
         };
         if kind.is_dir() && !kind.is_symlink() {
-            remove_at_reboot(&path);
+            moved |= remove_at_reboot(&path, retired);
         } else if std::fs::remove_file(&path).is_err() {
-            delete_at_reboot(&path);
+            match retired.and_then(|retired| retire(&path, retired)) {
+                Some(target) => {
+                    delete_at_reboot(&target);
+                    moved = true;
+                }
+                None => delete_at_reboot(&path),
+            }
         }
     }
     if std::fs::remove_dir(folder).is_err() {
         delete_at_reboot(folder);
     }
+    moved
+}
+
+/// path を retired の中へ，ほかと重ならない名前で移す．移した先
+fn retire(path: &std::path::Path, retired: &std::path::Path) -> Option<std::path::PathBuf> {
+    std::fs::create_dir_all(retired).ok()?;
+    let name = path.file_name()?.to_string_lossy().into_owned();
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or_default();
+    (0..16u32).find_map(|attempt| {
+        let target = retired.join(crate::install::retired_name(
+            &name,
+            std::process::id(),
+            stamp,
+            attempt,
+        ));
+        std::fs::rename(path, &target).ok().map(|()| target)
+    })
 }
 
 fn delete_at_reboot(path: &std::path::Path) {

@@ -11,6 +11,14 @@ pub const TSF_FOLDER: &str = "tsf";
 /// 32 ビットの DLL を置くフォルダ
 pub const X86_FOLDER: &str = "x86";
 
+/// 前の版の消せない DLL を，再起動で消えるまで退けておくフォルダ(tsf の下)．バージョンの名前と重ならないよう . で始める
+pub const RETIRED_FOLDER: &str = ".old";
+
+/// 退けるファイルの名前(元の名前に，重ならないための番号を付ける)
+pub fn retired_name(name: &str, process: u32, stamp: u128, attempt: u32) -> String {
+    format!("{process}-{stamp}-{attempt}-{name}")
+}
+
 /// module(読み込まれた DLL のパス)からインストール先のフォルダを求める
 pub fn installation_folder(module: &Path) -> Option<PathBuf> {
     let mut folder = module.parent()?;
@@ -100,6 +108,18 @@ mod tests {
         ];
         assert_eq!(stale_versions(&names, "0.3.4"), vec!["0.3.3", "0.2.7"]);
         assert!(stale_versions(&["0.3.4".to_string()], "0.3.4").is_empty());
+        // 退けたファイルのフォルダも今の版ではないので選ぶ(再起動を待つ)
+        assert_eq!(
+            stale_versions(&[RETIRED_FOLDER.to_string(), "0.3.4".to_string()], "0.3.4"),
+            vec![RETIRED_FOLDER]
+        );
+    }
+
+    #[test]
+    fn 退けるファイルの名前は試すたびに変わる() {
+        let first = retired_name("hajime_tsf.dll", 10, 20, 0);
+        assert_eq!(first, "10-20-0-hajime_tsf.dll");
+        assert_ne!(first, retired_name("hajime_tsf.dll", 10, 20, 1));
     }
 
     fn path(parts: &[&str]) -> PathBuf {

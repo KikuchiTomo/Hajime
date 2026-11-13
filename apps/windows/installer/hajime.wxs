@@ -1,9 +1,11 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Hajime IME" Manufacturer="haji.men" Version="$(Version)" UpgradeCode="08481E5D-EF2E-4129-9B02-0DB3228DF9D5" Scope="perMachine" Language="1041" Codepage="932">
     <!-- 同じ版でも上書きできるようにする(試しに入れた版の上から入れ直すとき) -->
-    <!-- 古い版は，新しい版を入れ終えてから消す(afterInstallExecute)．TSF の DLL の部品は版によらず同じ GUID なので，古い版を消すときに
-         その部品は新しい版が使っていることになり，古い版の DLL を Windows Installer が消さない(消そうとすると，ほぼすべてのアプリが読み込んでいて
-         「アプリを終了する必要があります」の窓が出る)．古い版のフォルダは RemoveOldVersions が消す(消せないファイルは再起動で消す) -->
+    <!-- 古い版は，新しい版を入れ終えてから消す(afterInstallExecute)．古い版を消すとき，Windows Installer は古い版の DLL(tsf\<前のバージョン>\)を
+         消そうとし，ほぼすべてのアプリが読み込んでいるので「アプリを終了する必要があります」の窓が出る．それを避けるため，新しい版を入れた直後
+         (古い版を消す前)に RetireOldVersions が古い版のフォルダを消し，消せない DLL は同じドライブの tsf\.old へ退けて再起動で消えるよう頼む．
+         古い版を消す Windows Installer はそのファイルを見つけないので窓を出さない．
+         この順では，同じ版の番号のファイル(exe・DLL の版は apps/windows/Cargo.toml の版)は上書きされない．リリースでは版を上げる -->
     <MajorUpgrade AllowSameVersionUpgrades="yes" Schedule="afterInstallExecute" DowngradeErrorMessage="新しいバージョンの Hajime IME がインストール済みです。" />
     <MediaTemplate EmbedCab="yes" />
     <!-- 上書きのときに，TSF の DLL を読み込んでいるアプリ(ほぼすべてのアプリ)を閉じさせない．
@@ -75,6 +77,7 @@
     <CustomAction Id="Reregister64" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]regsvr32.exe&quot; /s &quot;[TSFVERSIONFOLDER]hajime_tsf.dll&quot;" Execute="deferred" Impersonate="no" Return="check" />
     <CustomAction Id="Reregister32" Directory="INSTALLFOLDER" ExeCommand="&quot;[SystemFolder]regsvr32.exe&quot; /s &quot;[TSFX86FOLDER]hajime_tsf.dll&quot;" Execute="deferred" Impersonate="no" Return="check" />
     <!-- 前の版の DLL のフォルダ(tsf\<前のバージョン>)を消す．消せないファイルは再起動で消す．管理者の権限で呼ぶ．失敗しても止めない -->
+    <CustomAction Id="RetireOldVersions" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]rundll32.exe&quot; &quot;[TSFVERSIONFOLDER]hajime_tsf.dll&quot;,RemoveOldVersions" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="RemoveOldVersions" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]rundll32.exe&quot; &quot;[TSFVERSIONFOLDER]hajime_tsf.dll&quot;,RemoveOldVersions" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="RemoveOldVersionsOnRemove" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]rundll32.exe&quot; &quot;[TSFVERSIONFOLDER]hajime_tsf.dll&quot;,RemoveOldVersions" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="StartEngine" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]hajime-engine-host.exe&quot;" Execute="immediate" Impersonate="yes" Return="asyncNoWait" />
@@ -87,6 +90,8 @@
       <Custom Action="Unregister32" After="Unregister64" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="Register64" After="InstallFiles" Condition="NOT REMOVE" />
       <Custom Action="Register32" After="Register64" Condition="NOT REMOVE" />
+      <!-- 古い版を消す(RemoveExistingProducts)前に，古い版の DLL を退ける(上の MajorUpgrade の説明) -->
+      <Custom Action="RetireOldVersions" After="Register32" Condition="WIX_UPGRADE_DETECTED AND NOT REMOVE" />
       <Custom Action="Reregister64" After="RemoveExistingProducts" Condition="WIX_UPGRADE_DETECTED AND NOT REMOVE" />
       <Custom Action="Reregister32" After="Reregister64" Condition="WIX_UPGRADE_DETECTED AND NOT REMOVE" />
       <Custom Action="RemoveOldVersions" After="Reregister32" Condition="NOT REMOVE" />
