@@ -93,6 +93,8 @@ public final class EngineService {
     private let listHints: (CandidatePanel, Settings) -> [WireKeyHint]
     /// 分岐図の，操作する場所に置くキーの案内(FooterHints.placed)
     private let placedHints: (LatticePanel, Settings) -> WireBranchHints?
+    /// 候補ウィンドウが先の枝を左へ出しているか(branchLayout)．キーを渡す前に InputSession.branchMirrored に入れる
+    private var branchMirrored = false
     /// 打ち間違いの訂正を別に求めるもの(Zenzai があるとき)．nil なら InputSession が変換器で求める
     private let typoService: (any TypoCorrecting)?
     private let now: () -> ContinuousClock.Instant
@@ -313,6 +315,12 @@ public final class EngineService {
         case .handwritingChosen(let text):
             guard connection.isCandidateWindow, Self.isValidHandwritingText(text) else { return .error(code: .malformed) }
             handwriting?.chosen = text
+            return .done
+        case .branchLayout(let mirrored):
+            // 候補ウィンドウが，先の枝を左へ出しているか(窓の右に入らないときは左右に反転する)を知らせた．
+            // 矢印キーを表示の向きに効かせるために，次のキーから InputSession に渡す(知らせない前の版の候補ウィンドウでは false のまま)
+            guard connection.isCandidateWindow else { return .error(code: .malformed) }
+            branchMirrored = mirrored
             return .done
         case .chooseCandidate(let target):
             // 候補ウィンドウで候補を押した．押したときに候補を出していたセッションの次の wake で，キーで選んだのと同じに処理する
@@ -535,6 +543,7 @@ public final class EngineService {
         cancelCorrections(of: session)
         sessions[session]?.prefetch?.cancel()
         sessions[session]?.prefetch = nil
+        current.input.branchMirrored = branchMirrored
         let result = current.input.handle(event, context: context)
         rememberMode(of: current)
         sessions[session]?.hasSettled = false

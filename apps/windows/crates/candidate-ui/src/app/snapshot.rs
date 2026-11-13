@@ -185,7 +185,7 @@ fn render_all(output: &Path) -> Result<()> {
                 None => window,
             }
         };
-        let scenes: [(&str, Scene); 26] = [
+        let scenes: [(&str, Scene); 29] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "list-grid",
@@ -261,6 +261,18 @@ fn render_all(output: &Path) -> Result<()> {
             (
                 "branch-group-13",
                 scene::branch_map(&scene::sample::group_branch(13), &look, &measure),
+            ),
+            (
+                "branch-station",
+                scene::branch_map(&station_branch(None, false), &look, &measure),
+            ),
+            (
+                "branch-station-association",
+                scene::branch_map(&station_branch(Some(1), false), &look, &measure),
+            ),
+            (
+                "branch-station-macro",
+                scene::branch_map(&station_branch(Some(2), true), &look, &measure),
             ),
             (
                 "branch-trunk",
@@ -622,6 +634,104 @@ fn meaning_empty_list() -> CandidateList {
 
 /// 同音異義語の使い分けを分岐図で出したところ(macOS の homophoneBranchView)．既定では選んでいる候補の先に線を伸ばしてカードをつなぐ．
 /// 同音語のタグには枝に出ていない語だけを出す．selected を意味の無い候補(2)にすると，カードの場所を空けたままにする
+/// 先の枝を丸として出した分岐図(macOS の stationLattice．core の InputSession.applyBranch と同じ形)．
+/// current は今いる丸，inside なら丸の中身を選んでいる
+fn station_branch(current: Option<u32>, inside: bool) -> BranchMap {
+    let alternatives = strings(&["取る", "撮る", "とる", "採る"]);
+    let mut detail = ipc::BranchDetail {
+        stations: vec![
+            ipc::BranchStation {
+                kind: ipc::BranchStationKind::Meaning,
+                title: "意味".into(),
+            },
+            ipc::BranchStation {
+                kind: ipc::BranchStationKind::Association,
+                title: "連想".into(),
+            },
+            ipc::BranchStation {
+                kind: ipc::BranchStationKind::Macro,
+                title: "マクロ".into(),
+            },
+        ],
+        current,
+        items: Vec::new(),
+        selected_item: None,
+        label: String::new(),
+        group: 1,
+        group_count: 1,
+        position: 1,
+        total: 0,
+        page_size: 0,
+        candidates: Vec::new(),
+        selected_candidate: None,
+    };
+    if current == Some(1) {
+        detail.items = strings(&["撮影する", "写す", "収める"]);
+        detail.label = "写真に収める".into();
+        detail.group_count = 2;
+        detail.total = 3;
+    } else if current == Some(2) {
+        detail.items = strings(&["「撮る」", "【撮る】", "撮る（とる）", "**撮る**"]);
+        detail.total = 4;
+    }
+    let mut focused = BranchColumn {
+        selected_alternative: Some(1),
+        variants: strings(&["とる", "トル", "ﾄﾙ"]),
+        is_focused: true,
+        is_uncertain: true,
+        homophone: matches!(current, None | Some(0)).then(homophone),
+        alternative_notes: vec![None; alternatives.len()],
+        alternatives: alternatives.clone(),
+        ..column("撮る")
+    };
+    if inside {
+        detail.selected_item = Some(1);
+        detail.candidates = alternatives;
+        detail.selected_candidate = Some(1);
+        focused.text = detail.items[1].clone();
+        focused.alternatives = detail.items.clone();
+    }
+    let mut map = scene::sample::with_keys(BranchMap {
+        association: inside.then(|| ipc::AssociationHeading {
+            headword: "撮る".into(),
+            label: String::new(),
+            group: 1,
+            group_count: 1,
+        }),
+        association_hint: None,
+        association_key: None,
+        columns: vec![column("写真を"), focused],
+        position: 1,
+        total: 7,
+        note: None,
+        hints: vec![],
+        meaning_placement: Some(MeaningPlacement::Side),
+        collapses_variants: None,
+        collapses_detail: None,
+        placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
+        group_start: None,
+        group_end: None,
+        continues_before: None,
+        continues_after: None,
+        keeps_width: None,
+        detail: Some(detail),
+    });
+    if let Some(hints) = map.placed_hints.as_mut() {
+        // 候補にいるあいだは先の枝へ入るキー，中身にいるあいだは中身の下に選ぶ・戻るキー(エンジンの FooterHints.placed と同じ)
+        hints.expand = current.is_none().then(|| hint("Shift+↑", "展開"));
+        if inside {
+            hints.boundary = Vec::new();
+            hints.variant = None;
+            hints.candidates = Vec::new();
+            hints.items = Some(vec![hint("Space", "選択"), hint("Esc", "戻る")]);
+        }
+    }
+    map
+}
+
 fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
     let alternatives = strings(&["取る", "撮る", "とる", "採る"]);
     let has_meaning = selected == 1;
@@ -658,6 +768,7 @@ fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
         continues_before: None,
         continues_after: None,
         keeps_width: None,
+        detail: None,
     })
 }
 
@@ -762,6 +873,7 @@ fn emoji_branch() -> BranchMap {
         continues_before: None,
         continues_after: None,
         keeps_width: None,
+        detail: None,
     })
 }
 
@@ -904,6 +1016,7 @@ fn preview() -> BranchMap {
         continues_before: None,
         continues_after: None,
         keeps_width: None,
+        detail: None,
     })
 }
 
@@ -940,6 +1053,7 @@ fn split() -> BranchMap {
         continues_before: None,
         continues_after: None,
         keeps_width: None,
+        detail: None,
     });
     // 区切っているあいだは，境目の上に区切る操作だけを案内する
     BranchMap {
@@ -948,6 +1062,7 @@ fn split() -> BranchMap {
             variant: None,
             candidates: Vec::new(),
             expand: None,
+            items: None,
         }),
         ..map
     }

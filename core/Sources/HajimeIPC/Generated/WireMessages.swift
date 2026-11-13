@@ -1030,9 +1030,10 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
     case mergeUserDictionary(entries: [WireDictionaryEntry])
     case openWordRegistration(text: String, reading: String?)
     case takeWordRegistration
+    case branchLayout(mirrored: Bool)
 
     private enum CodingKeys: String, CodingKey {
-        case type, protocolVersion, session, input, context, mode, text, reading, rect, composition, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, kind, output, isEnabled, inputs, target, names, defaults, values, preset, theme, precedingText, pattern, offset, limit, entry, entries
+        case type, protocolVersion, session, input, context, mode, text, reading, rect, composition, settings, command, path, enabled, group, scope, field, isLocal, replacing, id, list, kind, output, isEnabled, inputs, target, names, defaults, values, preset, theme, precedingText, pattern, offset, limit, entry, entries, mirrored
     }
 
     public init(from decoder: any Decoder) throws {
@@ -1155,6 +1156,8 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             self = try .openWordRegistration(text: container.decode(String.self, forKey: .text), reading: container.decodeIfPresent(String.self, forKey: .reading))
         case "takeWordRegistration":
             self = .takeWordRegistration
+        case "branchLayout":
+            self = try .branchLayout(mirrored: container.decode(Bool.self, forKey: .mirrored))
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "知らない種類")
         }
@@ -1357,6 +1360,9 @@ public enum WireRequestBody: Sendable, Equatable, Codable {
             try container.encodeIfPresent(reading, forKey: .reading)
         case .takeWordRegistration:
             try container.encode("takeWordRegistration", forKey: .type)
+        case .branchLayout(let mirrored):
+            try container.encode("branchLayout", forKey: .type)
+            try container.encode(mirrored, forKey: .mirrored)
         }
     }
 }
@@ -1422,6 +1428,7 @@ extension WireRequestBody: CustomStringConvertible, CustomDebugStringConvertible
         case .mergeUserDictionary: "WireRequestBody.mergeUserDictionary"
         case .openWordRegistration: "WireRequestBody.openWordRegistration"
         case .takeWordRegistration: "WireRequestBody.takeWordRegistration"
+        case .branchLayout: "WireRequestBody.branchLayout"
         }
     }
     public var debugDescription: String { description }
@@ -1991,17 +1998,80 @@ public struct WireBranchHints: Sendable, Equatable, Codable {
     public var variant: WireKeyHint?
     public var candidates: [WireKeyHint]
     public var expand: WireKeyHint?
+    public var items: [WireKeyHint]?
 
-    public init(boundary: [WireKeyHint], variant: WireKeyHint? = nil, candidates: [WireKeyHint], expand: WireKeyHint? = nil) {
+    public init(boundary: [WireKeyHint], variant: WireKeyHint? = nil, candidates: [WireKeyHint], expand: WireKeyHint? = nil, items: [WireKeyHint]? = nil) {
         self.boundary = boundary
         self.variant = variant
         self.candidates = candidates
         self.expand = expand
+        self.items = items
     }
 }
 
 extension WireBranchHints: CustomStringConvertible, CustomDebugStringConvertible {
     public var description: String { "WireBranchHints" }
+    public var debugDescription: String { description }
+}
+
+public enum WireBranchStationKind: String, Sendable, Equatable, Codable, CaseIterable {
+    case meaning
+    case association
+    case macro
+}
+
+extension WireBranchStationKind: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireBranchStationKind.\(rawValue)" }
+    public var debugDescription: String { description }
+}
+
+public struct WireBranchStation: Sendable, Equatable, Codable {
+    public var kind: WireBranchStationKind
+    public var title: String
+
+    public init(kind: WireBranchStationKind, title: String) {
+        self.kind = kind
+        self.title = title
+    }
+}
+
+extension WireBranchStation: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireBranchStation" }
+    public var debugDescription: String { description }
+}
+
+public struct WireBranchDetail: Sendable, Equatable, Codable {
+    public var stations: [WireBranchStation]
+    public var current: UInt32?
+    public var items: [String]
+    public var selectedItem: UInt32?
+    public var label: String
+    public var group: UInt32
+    public var groupCount: UInt32
+    public var position: UInt32
+    public var total: UInt32
+    public var pageSize: UInt32
+    public var candidates: [String]
+    public var selectedCandidate: UInt32?
+
+    public init(stations: [WireBranchStation], current: UInt32? = nil, items: [String], selectedItem: UInt32? = nil, label: String, group: UInt32, groupCount: UInt32, position: UInt32, total: UInt32, pageSize: UInt32, candidates: [String], selectedCandidate: UInt32? = nil) {
+        self.stations = stations
+        self.current = current
+        self.items = items
+        self.selectedItem = selectedItem
+        self.label = label
+        self.group = group
+        self.groupCount = groupCount
+        self.position = position
+        self.total = total
+        self.pageSize = pageSize
+        self.candidates = candidates
+        self.selectedCandidate = selectedCandidate
+    }
+}
+
+extension WireBranchDetail: CustomStringConvertible, CustomDebugStringConvertible {
+    public var description: String { "WireBranchDetail" }
     public var debugDescription: String { description }
 }
 
@@ -2026,8 +2096,9 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
     public var continuesBefore: Bool?
     public var continuesAfter: Bool?
     public var keepsWidth: Bool?
+    public var detail: WireBranchDetail?
 
-    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, meaningPlacement: WireMeaningPlacement? = nil, collapsesVariants: Bool? = nil, collapsesDetail: Bool? = nil, placedHints: WireBranchHints? = nil, trunkFocused: Bool? = nil, pageSize: UInt32? = nil, hintsOnHold: Bool? = nil, groupStart: UInt32? = nil, groupEnd: UInt32? = nil, continuesBefore: Bool? = nil, continuesAfter: Bool? = nil, keepsWidth: Bool? = nil) {
+    public init(columns: [WireBranchColumn], position: UInt32, total: UInt32, note: WireNote? = nil, hints: [WireKeyHint], association: WireAssociationHeading? = nil, associationHint: String? = nil, associationKey: String? = nil, meaningPlacement: WireMeaningPlacement? = nil, collapsesVariants: Bool? = nil, collapsesDetail: Bool? = nil, placedHints: WireBranchHints? = nil, trunkFocused: Bool? = nil, pageSize: UInt32? = nil, hintsOnHold: Bool? = nil, groupStart: UInt32? = nil, groupEnd: UInt32? = nil, continuesBefore: Bool? = nil, continuesAfter: Bool? = nil, keepsWidth: Bool? = nil, detail: WireBranchDetail? = nil) {
         self.columns = columns
         self.position = position
         self.total = total
@@ -2048,6 +2119,7 @@ public struct WireBranchMap: Sendable, Equatable, Codable {
         self.continuesBefore = continuesBefore
         self.continuesAfter = continuesAfter
         self.keepsWidth = keepsWidth
+        self.detail = detail
     }
 }
 

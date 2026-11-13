@@ -1020,6 +1020,9 @@ pub enum RequestBody {
         reading: Option<String>,
     },
     TakeWordRegistration,
+    BranchLayout {
+        mirrored: bool,
+    },
 }
 
 impl fmt::Debug for RequestBody {
@@ -1257,6 +1260,10 @@ impl fmt::Debug for RequestBody {
                 .field("reading", &REDACTED)
                 .finish(),
             Self::TakeWordRegistration => f.write_str("TakeWordRegistration"),
+            Self::BranchLayout { mirrored, .. } => f
+                .debug_struct("BranchLayout")
+                .field("mirrored", mirrored)
+                .finish(),
         }
     }
 }
@@ -1873,6 +1880,8 @@ pub struct BranchHints {
     pub candidates: Vec<KeyHint>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub expand: Option<KeyHint>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub items: Option<Vec<KeyHint>>,
 }
 
 impl fmt::Debug for BranchHints {
@@ -1882,6 +1891,72 @@ impl fmt::Debug for BranchHints {
             .field("variant", &self.variant)
             .field("candidates", &self.candidates)
             .field("expand", &self.expand)
+            .field("items", &self.items)
+            .finish()
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum BranchStationKind {
+    Meaning,
+    Association,
+    Macro,
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct BranchStation {
+    pub kind: BranchStationKind,
+    pub title: String,
+}
+
+impl fmt::Debug for BranchStation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BranchStation")
+            .field("kind", &self.kind)
+            .field("title", &REDACTED)
+            .finish()
+    }
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+pub struct BranchDetail {
+    pub stations: Vec<BranchStation>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub current: Option<u32>,
+    pub items: Vec<String>,
+    #[serde(rename = "selectedItem")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_item: Option<u32>,
+    pub label: String,
+    pub group: u32,
+    #[serde(rename = "groupCount")]
+    pub group_count: u32,
+    pub position: u32,
+    pub total: u32,
+    #[serde(rename = "pageSize")]
+    pub page_size: u32,
+    pub candidates: Vec<String>,
+    #[serde(rename = "selectedCandidate")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_candidate: Option<u32>,
+}
+
+impl fmt::Debug for BranchDetail {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("BranchDetail")
+            .field("stations", &self.stations)
+            .field("current", &self.current)
+            .field("items", &REDACTED)
+            .field("selectedItem", &self.selected_item)
+            .field("label", &REDACTED)
+            .field("group", &self.group)
+            .field("groupCount", &self.group_count)
+            .field("position", &self.position)
+            .field("total", &self.total)
+            .field("pageSize", &self.page_size)
+            .field("candidates", &REDACTED)
+            .field("selectedCandidate", &self.selected_candidate)
             .finish()
     }
 }
@@ -1938,6 +2013,8 @@ pub struct BranchMap {
     #[serde(rename = "keepsWidth")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub keeps_width: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<BranchDetail>,
 }
 
 impl fmt::Debug for BranchMap {
@@ -1963,6 +2040,7 @@ impl fmt::Debug for BranchMap {
             .field("continuesBefore", &self.continues_before)
             .field("continuesAfter", &self.continues_after)
             .field("keepsWidth", &self.keeps_width)
+            .field("detail", &self.detail)
             .finish()
     }
 }

@@ -447,6 +447,7 @@ mod tests {
             continues_before: None,
             continues_after: None,
             keeps_width: None,
+            detail: None,
         }
     }
 

@@ -82,6 +82,7 @@ pub fn with_keys(mut map: BranchMap) -> BranchMap {
             .as_ref()
             .map(|key| hint(key, "展開"))
             .or_else(|| (map.collapses_detail == Some(true)).then(|| hint("Alt+↑", "展開"))),
+        items: None,
     });
     map
 }
@@ -131,6 +132,7 @@ pub fn branch() -> BranchMap {
         continues_before: None,
         continues_after: None,
         keeps_width: None,
+        detail: None,
     })
 }
 
@@ -218,6 +220,7 @@ pub fn long_branch(focus: usize) -> BranchMap {
         continues_before: None,
         continues_after: None,
         keeps_width: None,
+        detail: None,
     })
 }
 

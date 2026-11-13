@@ -18,18 +18,32 @@ public enum FooterHints {
     public static func placed(for panel: LatticePanel, settings: Settings) -> WireBranchHints? {
         guard settings.showsKeyHints else { return nil }
         if panel.association != nil {
-            return WireBranchHints(boundary: [], candidates: make(IndicatorLabels.associationHints, keymap: settings.keymap))
+            let hints = make(IndicatorLabels.associationHints, keymap: settings.keymap)
+            // 先の枝の丸の中身として出しているときは，中身の下に置く．矢印だけで移る操作(まとまりの切り替え)は案内しない
+            // (線のつながりで分かる．矢印は表示の向きに効く)
+            if panel.detail != nil {
+                return WireBranchHints(boundary: [], candidates: [], items: hints.filter { !isArrowOnly($0.keys) })
+            }
+            return WireBranchHints(boundary: [], candidates: hints)
         }
         if let split = panel.columns.first(where: \.isFocused)?.split {
             return WireBranchHints(boundary: splitHints(count: split.pieces.count - 1), candidates: [])
         }
-        // 先の枝を畳んでいるとき(表示項目を減らす設定)は，開くキー(連想変換のキー)を案内する
-        let expand = panel.collapsesDetail
+        // 先の枝へ入るキー．候補にいるあいだと，先の枝を畳んでいるあいだ(表示項目を減らす設定)は，連想変換のキーを案内する．
+        // 矢印だけで入れるときは案内しない(線のつながりで分かる)
+        let expand = panel.collapsesDetail || (panel.detail != nil && panel.detail?.current == nil)
             ? make([IndicatorLabels.branchExpandHint], keymap: settings.keymap).first
             : panel.associationHint?.key.map { WireKeyHint(keys: $0, label: IndicatorLabels.branchExpandLabel) }
         return WireBranchHints(boundary: make(IndicatorLabels.branchBoundaryHints, keymap: settings.keymap),
                                variant: make([IndicatorLabels.branchVariantHint], keymap: settings.keymap).first,
-                               candidates: make(IndicatorLabels.branchCandidateHints, keymap: settings.keymap), expand: expand)
+                               candidates: make(IndicatorLabels.branchCandidateHints, keymap: settings.keymap),
+                               expand: expand.flatMap { isArrowOnly($0.keys) ? nil : $0 })
+    }
+
+    /// 矢印だけのキー(修飾キーの付かない ← → ↑ ↓)か
+    public static func isArrowOnly(_ keys: String) -> Bool {
+        let arrows: Set<Character> = ["←", "→", "↑", "↓", "↔", "↕", " "]
+        return !keys.isEmpty && keys.allSatisfy(arrows.contains)
     }
 
     /// 一覧の足元の案内

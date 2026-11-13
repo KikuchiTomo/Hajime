@@ -295,6 +295,8 @@ pub struct Scene {
     pub keep_clear: Vec<Frame>,
     /// 語の意味の吹き出しを窓の中の行の文字のすぐ右に置くときの範囲(一覧だけ．場面の座標)
     pub inside: Option<bubble::Inside>,
+    /// 分岐図で，候補と先の枝を左右に反転して左へ出しているか．矢印キーを表示の向きに効かせるため，エンジンに知らせる
+    pub mirrored: bool,
 }
 
 /// マウスで押せる範囲と，押したときの対象(macOS の BranchView・CandidateView の target(at:) と同じ)
@@ -496,6 +498,8 @@ pub fn surround(scene: Scene, theme: &ResolvedTheme, surround: Surround) -> Scen
         inside: scene
             .inside
             .map(|inside| inside.offset(margin_x, margin_top)),
+        // 分岐図の向きはそのまま
+        mirrored: scene.mirrored,
     }
 }
 
