@@ -2763,7 +2763,9 @@ public final class InputSession {
         return true
     }
 
-    /// 打ち直しているあいだの表示．打ち直す文節の位置に打った読みを入れ，分岐図は打ち直す前のまま出しておく
+    /// 打ち直しているあいだの表示．打ち直す文節の位置に打った読みを入れる．分岐図は幹のその文節を打っている読みに差し替えて
+    /// 打ち直していると分かる形にし(isEditing)，その文節の枝は打ち直す前の候補を薄く出す．文節ごとの一覧は候補を薄く出す．
+    /// 1 打鍵ごとには変換しない(候補は Space・Tab・Enter で変換したときに出す)
     private func renderInlineEdit(_ lattice: SegmentLattice) -> [ClientAction] {
         guard let edit = inlineEdit else { return [] }
         let segments: [MarkedText.Segment] = lattice.segments.enumerated().map { index, segment in
@@ -2775,11 +2777,31 @@ public final class InputSession {
             var panel = PanelBuilder.segmentListPanel(for: lattice, perPage: latticePerPage, showsVariants: settings.current.showsVariantRow,
                                                       reading: composition.conversionReading, detail: emojiName)
             panel.note = note
+            panel.isEditing = true
+            panel.selectedEntry = nil
+            panel.homophone = nil
+            panel.associationHint = nil
             return [.setMarkedText(MarkedText(segments, caret: caret)), .showCandidates(panel)]
         }
         var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
                                               showsVariants: settings.current.showsVariantRow, corrected: nil, detail: emojiName)
         panel.note = note
+        panel.associationHint = nil
+        if panel.columns.indices.contains(edit.index) {
+            var column = panel.columns[edit.index]
+            column.text = edit.typed.displayReading
+            column.isEditing = true
+            column.selectedAlternative = nil
+            column.selectedVariant = nil
+            column.isUncertain = false
+            column.isCorrected = false
+            column.preview = nil
+            column.usageNote = nil
+            column.homophone = nil
+            column.sourceName = nil
+            column.split = nil
+            panel.columns[edit.index] = column
+        }
         return [.setMarkedText(MarkedText(segments, caret: caret)), .showLattice(panel)]
     }
 

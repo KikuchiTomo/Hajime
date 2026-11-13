@@ -207,7 +207,9 @@ extension WireCandidateList {
             // 意味が無ければ送らない
             meaningPlacement: panel.homophone == nil ? nil : WireMeaningPlacement(panel.meaningPlacement),
             // 表に広げていなければ送らない(知らない候補ウィンドウは 1 列の一覧として出す)
-            columnLength: panel.columnLength.map(UInt32.init(clamping:))
+            columnLength: panel.columnLength.map(UInt32.init(clamping:)),
+            // 打ち直していなければ送らない(知らない候補ウィンドウはふつうの一覧として出す)
+            isEditing: panel.isEditing ? true : nil
         )
     }
 }
@@ -307,7 +309,9 @@ extension WireBranchMap {
                     alternativeComments: column.alternativeComments.isEmpty ? nil : column.alternativeComments,
                     alternativeDetails: column.alternativeDetails.isEmpty ? nil : column.alternativeDetails,
                     sourceName: column.sourceName,
-                    split: column.split.map { WireBranchSplit(pieces: $0.pieces) }
+                    split: column.split.map { WireBranchSplit(pieces: $0.pieces) },
+                    // 打ち直していなければ送らない
+                    isEditing: column.isEditing ? true : nil
                 )
             },
             position: UInt32(clamping: panel.position),

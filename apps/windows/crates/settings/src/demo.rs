@@ -394,6 +394,7 @@ fn entry(text: &str) -> CandidateEntry {
 
 fn list(entries: Vec<CandidateEntry>, selected: usize) -> CandidateList {
     CandidateList {
+        is_editing: None,
         variants: vec![],
         selected_variant: None,
         selected_entry: Some(selected as u32),
