@@ -439,6 +439,9 @@ mod tests {
             collapses_variants: None,
             collapses_detail: None,
             placed_hints: None,
+            trunk_focused: None,
+            page_size: None,
+            hints_on_hold: None,
         }
     }
 
@@ -460,6 +463,8 @@ mod tests {
             "terminal",
             "nordic",
             "contrast",
+            "indigo",
+            "indigoNight",
         ] {
             let theme = theme(name);
             // 文字が明るいテーマは暗い背景に置く

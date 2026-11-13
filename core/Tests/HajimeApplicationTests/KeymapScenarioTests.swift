@@ -74,6 +74,22 @@ struct KeymapScenarioTests {
         #expect(harness.committed == "今日は仮名")
     }
 
+    @Test("打ち直しているあいだに入力モードを切り替えるキーを押しても，変換は続く．英数にすると打った字がそのまま入り，かなに戻すとかなで続けられる")
+    func editSegmentSwitchesMode() {
+        let harness = editingSecondSegment()
+        harness.press(.eisu)
+        // 変換も分岐図もそのまま．打ち直しも続いている
+        #expect(harness.lattice?.columns[1].isEditing == true)
+        #expect(harness.committed.isEmpty)
+        harness.type("ok")
+        #expect(harness.marked.text == "今日はok")
+        harness.press(.kana)
+        harness.type("ka")
+        #expect(harness.marked.text == "今日はokか")
+        #expect(harness.lattice?.columns[1].isEditing == true)
+        #expect(harness.committed.isEmpty)
+    }
+
     @Test("打ち直しているあいだ，分岐図の幹のその文節は打っている読みに追従し，打ち直していると分かる形になる．枝は選んでいない形にする")
     func editSegmentFollowsReading() throws {
         let harness = editingSecondSegment()

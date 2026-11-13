@@ -435,6 +435,7 @@ enum UIStrings {
             case .lastCandidate: "末尾の候補"
             case .associate: "連想変換"
             case .expandCandidates: "候補を表に展開"
+            case .enterBranch: "候補の先の枝へ移動"
             case .nextSegment: "右の文節"
             case .previousSegment: "左の文節"
             case .firstSegment: "先頭の文節"
@@ -514,6 +515,7 @@ enum UIStrings {
             case .registerWord: "選択中の文字でユーザー辞書の登録を開きます"
             case .openMenu: "入力メニューを入力位置に表示します"
             case .expandCandidates: "候補を表に展開します"
+            case .enterBranch: "選んでいる候補の意味・連想・変換マクロへ移動します"
             case .englishAutoStyle: "zoom dekaigi → zoom で会議"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
@@ -870,8 +872,7 @@ enum UIStrings {
 
         // g. 機能の紹介
         static let featuresTitle = "便利な機能"
-        static let extrasTitle = "試験的な機能"
-        static let extrasDetail = "既定ではオフの機能です。"
+        static let extrasTitle = "そのほかの機能"
         static let macros = "変換マクロ"
         static let macrosDetail = "連想変換と同じ Shift + Space で、選択中の単語を「」で囲む・ルビを付けるなどして表示します。"
         static let dynamicDictionary = "書式の展開"
@@ -931,6 +932,7 @@ enum UIStrings {
         static let variantRow = "候補の上に文字種の行を表示"
         static let keyHints = "キーの案内を表示"
         static let fewerItems = "表示項目を減らす"
+        static let branchHintsAlways = "分岐図のキーの案内を常に表示"
         static let typoCorrection = "タイプミスの修正"
         static let yenKey = "¥ キーで入力する文字"
         static let theme = "テーマ"
@@ -986,7 +988,7 @@ enum UIStrings {
         }
 
         /// 選べる外観．native は標準と同じ見た目なので並べない(古い設定のファイルにあっても標準として読む)
-        static let themes: [ThemePreference] = [.automatic, .washi, .nordic, .neon, .terminal, .contrast, .platinum, .desk]
+        static let themes: [ThemePreference] = [.automatic, .indigo, .indigoNight, .washi, .nordic, .neon, .terminal, .contrast, .platinum, .desk]
 
         static func label(for theme: ThemePreference) -> String {
             switch theme {
@@ -998,6 +1000,8 @@ enum UIStrings {
             case .terminal: "ターミナル"
             case .nordic: "北欧"
             case .contrast: "高コントラスト"
+            case .indigo: "インディゴ"
+            case .indigoNight: "夜のインディゴ"
             }
         }
     }
@@ -1304,7 +1308,7 @@ extension UIStrings {
             "showsPartOfSpeech": UIStrings.Settings.showsPartOfSpeech, "showsUsageExamples": UIStrings.Settings.showsUsageExamples,
             "showsHomophones": UIStrings.Settings.showsHomophones,
             "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
-            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "showsFewerItems": Choice.fewerItems, "numberKeySelection": UIStrings.Settings.numberKeySelection,
+            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "showsFewerItems": Choice.fewerItems, "alwaysShowsBranchHints": Choice.branchHintsAlways, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
             "emojiConversion": UIStrings.Settings.emojiConversion, "emojiWordConversion": UIStrings.Settings.emojiWordConversion,
             "emojiCandidatePosition": UIStrings.Settings.emojiCandidatePosition,

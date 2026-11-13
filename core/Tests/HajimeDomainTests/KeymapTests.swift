@@ -284,7 +284,7 @@ struct LegacyKeySettingsTests {
         #expect(keymap.command(for: KeyEvent(.space), in: .converting) == nil)
         #expect(keymap.command(for: KeyEvent(.character(";"), modifiers: [.control, .option, .shift]), in: .idle) == .openSettings)
         #expect(keymap.command(for: KeyEvent(.character(","), modifiers: [.control, .option]), in: .idle) == nil)
-        #expect(keymap.command(for: KeyEvent(.right), in: .converting) == .nextSegment)
+        #expect(keymap.command(for: KeyEvent(.right), in: .converting) == .enterBranch)
     }
 
     @Test("変えた切り替えのキーは いつでも の行にし，使わない にしたキーは切り替えの行を消す")

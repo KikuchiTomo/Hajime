@@ -2211,6 +2211,18 @@
         {
           "name": "placedHints",
           "type": "BranchHints?"
+        },
+        {
+          "name": "trunkFocused",
+          "type": "bool?"
+        },
+        {
+          "name": "pageSize",
+          "type": "u32?"
+        },
+        {
+          "name": "hintsOnHold",
+          "type": "bool?"
         }
       ]
     },

@@ -174,7 +174,64 @@ final class CandidatePanelController {
         return frame
     }
 
+    // MARK: - 押し続けて出すキーの案内
+
+    private var hintHoldTimer: Timer?
+    private var hintFadeTimer: Timer?
+
+    /// 修飾キーの押し方が変わった．分岐図を出しているあいだ，修飾キーを決まった時間(motion.branch-map.hint-hold)押し続けたら，
+    /// その修飾キーを使うキーの案内を出す(BranchView．案内を常に出す設定では，始めから出ている)．
+    /// キーを組み合わせて押しただけでは出さない．離したら，すぐに消す(離すのは次の操作の始まりなので待たせない)
+    func modifiersChanged(_ flags: NSEvent.ModifierFlags) {
+        let modifiers = flags.intersection([.shift, .option, .control, .command])
+        hintHoldTimer?.invalidate()
+        hintHoldTimer = nil
+        guard !modifiers.isEmpty, window.isVisible, shownLattice != nil else {
+            hideHeldHints()
+            return
+        }
+        // すでに出しているときに修飾キーを足した・減らしたら，待たずに出す案内を替える
+        guard branchView.heldModifiers.isEmpty else {
+            branchView.heldModifiers = modifiers
+            return
+        }
+        hintHoldTimer = Timer.scheduledTimer(withTimeInterval: DesignTokens.Motion.BranchMap.hintHold / 1000, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.revealHeldHints(modifiers) }
+        }
+    }
+
+    /// 案内を，位置を変えずに濃くしながら出す(不透明度だけの変化なので「視差効果を減らす」でも同じ)
+    private func revealHeldHints(_ modifiers: NSEvent.ModifierFlags) {
+        hintHoldTimer = nil
+        hintFadeTimer?.invalidate()
+        branchView.hintOpacity = 0
+        branchView.heldModifiers = modifiers
+        let duration = DesignTokens.Motion.BranchMap.hintFade / 1000
+        let start = Date()
+        hintFadeTimer = Timer.scheduledTimer(withTimeInterval: Self.frameInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let progress = min(Date().timeIntervalSince(start) / duration, 1)
+                self.branchView.hintOpacity = CGFloat(progress)
+                if progress >= 1 {
+                    self.hintFadeTimer?.invalidate()
+                    self.hintFadeTimer = nil
+                }
+            }
+        }
+    }
+
+    private func hideHeldHints() {
+        hintHoldTimer?.invalidate()
+        hintHoldTimer = nil
+        hintFadeTimer?.invalidate()
+        hintFadeTimer = nil
+        branchView.heldModifiers = []
+        branchView.hintOpacity = 1
+    }
+
     func hide() {
+        hideHeldHints()
         fadeTimer?.invalidate()
         fadeTimer = nil
         lastAnnounced = nil

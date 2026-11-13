@@ -3,7 +3,7 @@
 //! 設定と OS の外観から決めた，描画に使う色と書体(macOS の ResolvedTheme と同じ決め方)．
 //!
 //! 描き方は 2 通り．
-//! - 角丸と曲線の枝(is_rounded): glass と，和紙・ネオン・端末・北欧・高コントラスト．glass だけ背景をすりガラスにし，ほかは背景を色で塗る
+//! - 角丸と曲線の枝(is_rounded): glass と，和紙・ネオン・端末・北欧・高コントラスト・インディゴ．glass だけ背景をすりガラスにし，ほかは背景を色で塗る
 //! - 四角い枠とベベル: platinum と desk
 
 use ipc::CustomTheme;
@@ -70,6 +70,8 @@ pub enum Kind {
     Terminal,
     Nordic,
     Contrast,
+    Indigo,
+    IndigoNight,
 }
 
 impl Kind {
@@ -83,6 +85,8 @@ impl Kind {
             "terminal" => Self::Terminal,
             "nordic" => Self::Nordic,
             "contrast" => Self::Contrast,
+            "indigo" => Self::Indigo,
+            "indigoNight" => Self::IndigoNight,
             _ => Self::Glass,
         }
     }
@@ -96,6 +100,8 @@ impl Kind {
             Self::Neon => "neon",
             Self::Terminal => "terminal",
             Self::Contrast => "contrast",
+            Self::Indigo => "indigo",
+            Self::IndigoNight => "indigo-night",
         }
     }
 }
@@ -223,7 +229,9 @@ impl ResolvedTheme {
             Kind::Washi => Self::rounded(kind, Typeface::Mincho, contrast),
             Kind::Neon => Self::rounded(kind, Typeface::Rounded, contrast),
             Kind::Terminal => Self::rounded(kind, Typeface::Monospaced, contrast),
-            Kind::Nordic => Self::rounded(kind, Typeface::System, contrast),
+            Kind::Nordic | Kind::Indigo | Kind::IndigoNight => {
+                Self::rounded(kind, Typeface::System, contrast)
+            }
             Kind::Contrast => Self::rounded(kind, Typeface::System, true),
         }
     }

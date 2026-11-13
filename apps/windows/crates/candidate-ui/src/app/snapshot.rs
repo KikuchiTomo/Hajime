@@ -124,7 +124,7 @@ fn sample_theme() -> CustomTheme {
 }
 
 /// 書き出す見た目: 名前・テーマ・ダークか
-const LOOKS: [(&str, &str, bool); 10] = [
+const LOOKS: [(&str, &str, bool); 12] = [
     ("custom", "automatic", true),
     ("glass-light", "automatic", false),
     ("glass-dark", "automatic", true),
@@ -135,6 +135,8 @@ const LOOKS: [(&str, &str, bool); 10] = [
     ("terminal", "terminal", true),
     ("nordic", "nordic", false),
     ("contrast", "contrast", true),
+    ("indigo", "indigo", false),
+    ("indigo-night", "indigoNight", true),
 ];
 
 fn render_all(output: &Path) -> Result<()> {
@@ -632,6 +634,9 @@ fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
     })
 }
 
@@ -728,6 +733,9 @@ fn emoji_branch() -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
     })
 }
 
@@ -862,6 +870,9 @@ fn preview() -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
     })
 }
 
@@ -890,6 +901,9 @@ fn split() -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
     });
     // 区切っているあいだは，境目の上に区切る操作だけを案内する
     BranchMap {

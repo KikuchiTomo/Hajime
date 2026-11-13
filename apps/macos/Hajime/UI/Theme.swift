@@ -5,7 +5,7 @@ import HajimeDomain
 /// glass の色は OS の意味の色(labelColor・controlAccentColor など)を使う．ライト・ダークとアクセントカラーに OS が合わせるため．
 ///
 /// 描き方は 2 通り．
-/// - 角丸と曲線の枝(isRounded): glass と，和紙・ネオン・端末・北欧・高コントラスト．glass だけ背景をぼかし，ほかは背景を色で塗る
+/// - 角丸と曲線の枝(isRounded): glass と，和紙・ネオン・端末・北欧・高コントラスト・インディゴ．glass だけ背景をぼかし，ほかは背景を色で塗る
 /// - 四角い枠とベベル: platinum と desk
 struct ResolvedTheme {
     enum Kind {
@@ -18,6 +18,8 @@ struct ResolvedTheme {
         case terminal
         case nordic
         case contrast
+        case indigo
+        case indigoNight
     }
 
     /// 書体の系統．テーマの個性を出す
@@ -95,18 +97,19 @@ struct ResolvedTheme {
         case .terminal: return rounded(DesignTokens.Palette.terminal, kind: .terminal, typeface: .monospaced, increaseContrast: increaseContrast)
         case .nordic: return rounded(DesignTokens.Palette.nordic, kind: .nordic, typeface: .system, increaseContrast: increaseContrast)
         case .contrast: return rounded(DesignTokens.Palette.contrast, kind: .contrast, typeface: .system, increaseContrast: true)
+        case .indigo: return rounded(DesignTokens.Palette.indigo, kind: .indigo, typeface: .system, increaseContrast: increaseContrast)
+        case .indigoNight: return rounded(DesignTokens.Palette.indigoNight, kind: .indigoNight, typeface: .system, increaseContrast: increaseContrast)
         }
     }
 
     /// 標準のテーマの書体(ヒラギノ丸ゴ)．標準のテーマは枝を直線で描く
     static let standardFontName = "HiraMaruProN-W4"
 
-    /// 標準のテーマ．暗い背景に青い選択と赤い補正，丸い書体と直線の枝(色は tokens.json の theme.standard)．
+    /// 標準のテーマ．暗い背景に青い選択と赤い補正，丸い書体(色は tokens.json の theme.standard)．枝の曲がり角は，選択の背景と同じ丸みにする．
     /// カスタムテーマと同じく，角丸の描き方に色・書体・形を重ねる．ライトとダークで色を変えない
     private static func standard(increaseContrast: Bool) -> ResolvedTheme {
         var theme = rounded(DesignTokens.Palette.standard, kind: .nordic, typeface: .rounded, increaseContrast: increaseContrast)
         theme.cornerRadius = DesignTokens.Size.StandardTheme.cornerRadius
-        theme.straightBranches = true
         theme.customFontName = standardFontName
         return theme
     }

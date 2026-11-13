@@ -1914,6 +1914,15 @@ pub struct BranchMap {
     #[serde(rename = "placedHints")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub placed_hints: Option<BranchHints>,
+    #[serde(rename = "trunkFocused")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trunk_focused: Option<bool>,
+    #[serde(rename = "pageSize")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
+    #[serde(rename = "hintsOnHold")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hints_on_hold: Option<bool>,
 }
 
 impl fmt::Debug for BranchMap {
@@ -1931,6 +1940,9 @@ impl fmt::Debug for BranchMap {
             .field("collapsesVariants", &self.collapses_variants)
             .field("collapsesDetail", &self.collapses_detail)
             .field("placedHints", &self.placed_hints)
+            .field("trunkFocused", &self.trunk_focused)
+            .field("pageSize", &self.page_size)
+            .field("hintsOnHold", &self.hints_on_hold)
             .finish()
     }
 }
