@@ -65,7 +65,6 @@ final class BranchView: NSView {
     var hintOpacity: CGFloat = 1 { didSet { if hintOpacity != oldValue { needsDisplay = true } } }
     var theme = ResolvedTheme.resolveStatic { didSet { invalidate() } }
     var fontSize: CGFloat = Size.fontSize { didSet { invalidate() } }
-    var restOpacity: CGFloat = 1 { didSet { needsDisplay = true } }
     /// glass の面を自分で塗るか．ぼかしの背景(GlassBackdrop)の無いところ(画像への書き出し)で使う
     var fillsSurface = false { didSet { needsDisplay = true } }
 
@@ -1265,7 +1264,7 @@ final class BranchView: NSView {
     private func lowerRows(_ column: LatticePanel.Column) -> [Row] {
         column.alternatives.enumerated().map { index, text in
             Row(text: text, badge: "\(index + 1)", isSelected: index == column.selectedAlternative,
-                opacity: column.isEditing ? Opacity.editingStale : index == 0 ? 1 : restOpacity,
+                opacity: column.isEditing ? Opacity.editingStale : 1,
                 note: column.alternativeNotes.indices.contains(index) ? column.alternativeNotes[index] : nil,
                 command: column.alternativeCommands.indices.contains(index) ? column.alternativeCommands[index] : nil,
                 detail: column.alternativeDetails.indices.contains(index) ? column.alternativeDetails[index] : nil)
