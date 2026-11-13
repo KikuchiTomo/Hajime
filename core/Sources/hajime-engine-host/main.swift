@@ -52,12 +52,18 @@ final class UnavailableEnglishLexicon: EnglishLexicon {
 func loadStartupResources() -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, jinen: JinenModel?, fastJinen: JinenModel?, dictionary: BundledDictionary?) {
     let models = HostPaths.installation.appendingPathComponent("Zenzai", isDirectory: true)
     let jinen = HostPaths.installation.appendingPathComponent("Jinen", isDirectory: true)
+    // 前回確かめて合ったファイルが変わっていなければ，ハッシュを求め直さない(ADR 0017)．記録はこの PC の本人だけの場所に置く．
+    // エンジンはアプリのバージョンを持たないので，実行ファイル自身を見分ける値を使う(入れ直せば変わる)．読めなければ記録を使わない
+    let executable = Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])
+    let version = StartupResources.executableIdentity(at: executable)
     let resources = StartupResources.verified(
         zenzai: models.appendingPathComponent(ZenzaiModel.Variant.small.fileName),
         fastZenzai: models.appendingPathComponent(ZenzaiModel.Variant.xsmall.fileName),
         jinen: jinen.appendingPathComponent(JinenModel.Variant.small.fileName),
         fastJinen: jinen.appendingPathComponent(JinenModel.Variant.xsmall.fileName),
-        dictionary: HostPaths.installation.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true))
+        dictionary: HostPaths.installation.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true),
+        records: version.map { _ in FileVerificationRecordStore(fileURL: HostPaths.local.appendingPathComponent(DefaultSettings.verificationRecordFileName)) },
+        appVersion: version ?? "")
     return (accepted(resources.zenzai, name: "Zenzai(small)"), accepted(resources.fastZenzai, name: "Zenzai(xsmall)"),
             accepted(resources.jinen, name: "jinen(small)"), accepted(resources.fastJinen, name: "jinen(xsmall)"),
             accepted(resources.dictionary, name: "同梱の辞書"))

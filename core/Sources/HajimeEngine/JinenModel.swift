@@ -39,9 +39,13 @@ public struct JinenModel: Sendable, Equatable {
 
     /// ファイルを確かめてから作る．大きさとハッシュのどちらかが違えば使わない
     public static func verified(at url: URL, variant: Variant = .small) throws(ZenzaiModel.VerificationError) -> JinenModel {
-        guard let (handle, size) = FileDigest.openRegularFile(at: url) else { throw .fileNotFound }
-        guard size == variant.expectedSize else { throw .sizeMismatch(actual: size) }
-        guard try ZenzaiModel.sha256(of: handle, maximumBytes: variant.expectedSize) == variant.expectedSHA256 else { throw .hashMismatch }
-        return JinenModel(url: url, variant: variant)
+        try verified(at: url, variant: variant, previous: nil).model
+    }
+
+    /// 前回の記録(ADR 0017)と同じファイルなら，ハッシュを求めずに使う(StartupResources)
+    static func verified(at url: URL, variant: Variant, previous: VerificationRecord.Entry?)
+        throws(ZenzaiModel.VerificationError) -> (model: JinenModel, record: VerificationRecord.Entry?) {
+        let record = try ZenzaiModel.check(url, expectedSize: variant.expectedSize, expectedSHA256: variant.expectedSHA256, previous: previous)
+        return (JinenModel(url: url, variant: variant), record)
     }
 }
