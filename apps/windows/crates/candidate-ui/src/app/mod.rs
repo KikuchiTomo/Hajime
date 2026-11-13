@@ -391,7 +391,7 @@ impl App {
                 if !matches!(&self.content, Content::BranchMap(shown) if **shown == map) {
                     self.hint_hold.other_key();
                 }
-                self.arrived = matches!(&self.content, Content::BranchMap(shown) if motion::arrived_branch(shown, &map));
+                self.arrived = false;
                 self.content = Content::BranchMap(Box::new(map));
                 self.anchor = anchor.or(self.anchor.take());
             }
@@ -466,8 +466,14 @@ impl App {
             }
         }
         let is_list = matches!(self.content, Content::Candidates(_) | Content::BranchMap(_));
-        if is_list && !was_list {
+        // 分岐図は出した瞬間から濃く出す(キーで起きる変化はその瞬間に終える．macOS #566 と同じ)
+        if is_list && !was_list && !matches!(self.content, Content::BranchMap(_)) {
             self.start_rest_fade();
+        } else if matches!(self.content, Content::BranchMap(_))
+            && matches!(self.fade, Fade::Rest(_))
+        {
+            self.rest_opacity = 1.0;
+            self.fade = Fade::None;
         }
     }
 
@@ -844,11 +850,13 @@ impl App {
         // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，枠線を動かさずにすぐ変える(macOS と同じ)
         let typing =
             matches!(&self.content, Content::Candidates(list) if list.selected_entry.is_none());
+        // 分岐図は，窓の大きさと中身をその瞬間に替える(動いているあいだは候補を読めないため．macOS #566 と同じ)
+        let instant = typing || matches!(self.content, Content::BranchMap(_));
         let natural = scene.as_ref().map(|scene| (scene.width, scene.height));
-        if typing {
+        if instant {
             self.resize = None;
         }
-        if let (true, false, Some(natural)) = (is_list, typing, natural) {
+        if let (true, false, Some(natural)) = (is_list, instant, natural) {
             if let Some(size) = self.moving_size(natural, now) {
                 scene = build(
                     &self.content,
@@ -859,7 +867,7 @@ impl App {
                 );
             }
             self.shown_size = scene.as_ref().map(|scene| (scene.width, scene.height));
-        } else if typing {
+        } else if instant {
             self.shown_size = natural;
         } else {
             self.shown_size = None;
@@ -868,9 +876,12 @@ impl App {
         // 吹き出しの三角で指す行は，影を足す前の場面(本体が原点)の座標で探す
         let bare = scene.clone();
         let scene = scene.map(|scene| scene::surround(scene, &theme, Surround::Shadow));
-        // あとから届いた中身は，前の中身の上に重ねて濃くしていく
-        if std::mem::take(&mut self.arrived) && is_list {
+        // あとから届いた中身は，前の中身の上に重ねて濃くしていく(一覧だけ．分岐図はその瞬間に差し替える)
+        let branch = matches!(self.content, Content::BranchMap(_));
+        if std::mem::take(&mut self.arrived) && is_list && !branch {
             self.crossfade = self.scene.clone().map(|shown| (shown, now));
+        } else if branch {
+            self.crossfade = None;
         }
         if self
             .crossfade
