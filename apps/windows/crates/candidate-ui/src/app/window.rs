@@ -364,8 +364,9 @@ impl Window {
     }
 
     /// 本体(scene.body)を入力位置の下(入らなければ上)に置く．影や余白はそのまわりにはみ出す．
-    /// holds なら，前も選んでいたときに置いた窓から候補が並び始める辺(上と左)を動かさない(position)
-    pub fn place(&self, anchor: &Rect, scene: &Scene, gap: i32, holds: bool) {
+    /// holds なら，前も選んでいたときに置いた窓から候補が並び始める辺(上と左)を動かさない(position)．
+    /// 窓を置き直した(一番手前に出し直した)なら true
+    pub fn place(&self, anchor: &Rect, scene: &Scene, gap: i32, holds: bool) -> bool {
         let scale = self.scale();
         let anchor_rect = RECT {
             left: anchor.x,
@@ -403,7 +404,7 @@ impl Window {
             y - pixels(scene.body.y),
             (scene.width * scale).ceil() as i32,
             (scene.height * scale).ceil() as i32,
-        );
+        )
     }
 
     /// ナレーターに text を読み上げてもらう．前の読み上げを打ち切り，今の選択を読む
@@ -461,8 +462,9 @@ impl Window {
         };
     }
 
-    /// 窓を (x, y) に width × height で出す(画面のピクセル)．前と同じ位置と大きさで出していれば何もしない
-    fn show_at(&self, x: i32, y: i32, width: i32, height: i32) {
+    /// 窓を (x, y) に width × height で出す(画面のピクセル)．前と同じ位置と大きさで出していれば何もしない．
+    /// 置き直した(SetWindowPos で一番手前に出した)なら true
+    fn show_at(&self, x: i32, y: i32, width: i32, height: i32) -> bool {
         let rect = RECT {
             left: x,
             top: y,
@@ -470,7 +472,7 @@ impl Window {
             bottom: y + height,
         };
         if self.shown.get() == Some(rect) {
-            return;
+            return false;
         }
         self.shown.set(Some(rect));
         // SAFETY: hwnd はこの窓
@@ -485,6 +487,7 @@ impl Window {
                 SWP_NOACTIVATE | SWP_SHOWWINDOW,
             )
         };
+        true
     }
 
     pub fn hide(&self) {
