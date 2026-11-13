@@ -50,6 +50,7 @@ fn list(step: usize) -> CandidateList {
         })
         .collect();
     CandidateList {
+        is_editing: None,
         association: None,
         association_hint: None,
         association_key: None,

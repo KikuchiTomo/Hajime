@@ -54,6 +54,9 @@ public final class EngineService {
         var prefetch: Task<Void, Never>?
         /// 入力先のアプリの識別子．activate で受け取り，モードを覚えるのに使う
         var application: String?
+        /// 打鍵の合間の Zenzai の変換(performDeferredConversion)が打鍵の間隔より長くかかったか．
+        /// true のあいだは合間に求めず，打鍵が止まったときに求める(次の打鍵を待たせない)．入力を終えたら戻す
+        var deferredIsSlow = false
     }
 
     /// 打ち間違いの訂正を裏で求めている途中の仕事．求め終わったら result が入り，次の wake で使う
@@ -91,6 +94,10 @@ public final class EngineService {
     private let runCommand: (LauncherCommand) -> Void
     private let hints: (LatticePanel, Settings) -> [WireKeyHint]
     private let listHints: (CandidatePanel, Settings) -> [WireKeyHint]
+    /// 分岐図の，操作する場所に置くキーの案内(FooterHints.placed)
+    private let placedHints: (LatticePanel, Settings) -> WireBranchHints?
+    /// 候補ウィンドウが先の枝を左へ出しているか(branchLayout)．キーを渡す前に InputSession.branchMirrored に入れる
+    private var branchMirrored = false
     /// 打ち間違いの訂正を別に求めるもの(Zenzai があるとき)．nil なら InputSession が変換器で求める
     private let typoService: (any TypoCorrecting)?
     private let now: () -> ContinuousClock.Instant
@@ -126,6 +133,7 @@ public final class EngineService {
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
                 openSettings: @escaping (_ arguments: [String]) -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
                 listHints: @escaping (CandidatePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
+                placedHints: @escaping (LatticePanel, Settings) -> WireBranchHints? = { _, _ in nil },
                 typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
                 sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
                 services: SettingsServices = SettingsServices(), runCommand: @escaping (LauncherCommand) -> Void = { _ in },
@@ -144,6 +152,7 @@ public final class EngineService {
         self.openSettings = openSettings
         self.hints = hints
         self.listHints = listHints
+        self.placedHints = placedHints
     }
 
     public func connect(isCandidateWindow: Bool = false, isSettingsApp: Bool = false) -> ConnectionID {
@@ -309,6 +318,12 @@ public final class EngineService {
         case .handwritingChosen(let text):
             guard connection.isCandidateWindow, Self.isValidHandwritingText(text) else { return .error(code: .malformed) }
             handwriting?.chosen = text
+            return .done
+        case .branchLayout(let mirrored):
+            // 候補ウィンドウが，先の枝を左へ出しているか(窓の右に入らないときは左右に反転する)を知らせた．
+            // 矢印キーを表示の向きに効かせるために，次のキーから InputSession に渡す(知らせない前の版の候補ウィンドウでは false のまま)
+            guard connection.isCandidateWindow else { return .error(code: .malformed) }
+            branchMirrored = mirrored
             return .done
         case .chooseCandidate(let target):
             // 候補ウィンドウで候補を押した．押したときに候補を出していたセッションの次の wake で，キーで選んだのと同じに処理する
@@ -531,8 +546,11 @@ public final class EngineService {
         cancelCorrections(of: session)
         sessions[session]?.prefetch?.cancel()
         sessions[session]?.prefetch = nil
+        current.input.branchMirrored = branchMirrored
         let result = current.input.handle(event, context: context)
         rememberMode(of: current)
+        // 入力を終えたら，次の入力は短い読みから始まるので，合間の変換をまた試す
+        if !current.input.isComposing { sessions[session]?.deferredIsSlow = false }
         sessions[session]?.hasSettled = false
         sessions[session]?.stoppedAt = now()
         sessions[session]?.warming = []
@@ -593,8 +611,11 @@ public final class EngineService {
                     current.input.skipReview()
                 }
             }
-        } else if current.input.awaitsDeferredConversion {
+        } else if current.input.awaitsDeferredConversion, !current.deferredIsSlow || settleDelay(of: current) == 0 {
+            // 合間の変換が打鍵の間隔より長くかかる入力(長い読み・CPU の推論)では，打鍵が止まってから求める
+            let started = now()
             current.input.performDeferredConversion()
+            if now() - started > .seconds(DefaultSettings.deferredConversionBudget) { sessions[session]?.deferredIsSlow = true }
             // 打鍵の合間に，Space で出す分岐図の候補も 1 文節ずつ前もって求める．文節の候補は読みごとにためるので，
             // 打ち進めても前の文節の分は使える(打ってすぐ Space を押しても，求めるのは新しい文節の分だけになる)
             sessions[session]?.warming = current.input.latticeWarmingSteps
@@ -662,7 +683,8 @@ public final class EngineService {
     private func edit(_ actions: [ClientAction], handled: Bool, session: UInt32, anchor: WireRect?, wakeOnlyForHandwriting: Bool = false) -> WireResponseBody {
         let current = settings.current
         let routed = RoutedActions(actions, anchor: anchor, composition: lastComposition, hints: { [hints] in hints($0, current) },
-                                   listHints: { [listHints] in listHints($0, current) }, paletteCellSize: current.paletteCellSize)
+                                   listHints: { [listHints] in listHints($0, current) }, placedHints: { [placedHints] in placedHints($0, current) },
+                                   paletteCellSize: current.paletteCellSize)
         routed.ui.forEach(ui)
         for command in routed.ui {
             switch command {
@@ -705,7 +727,10 @@ public final class EngineService {
         if !current.followUps.isEmpty { return Self.followUpPollMilliseconds }
         if current.correction != nil { return Self.correctionPollMilliseconds }
         let delays = settings.current
-        if current.input.awaitsDeferredConversion { return Self.deferredConversionPollMilliseconds }
+        if current.input.awaitsDeferredConversion {
+            // 合間の変換が長くかかる入力では，打鍵が止まったときに来てもらう
+            return current.deferredIsSlow ? Self.milliseconds(settleDelay(of: current)) : Self.deferredConversionPollMilliseconds
+        }
         if !current.warming.isEmpty { return Self.latticeWarmingPollMilliseconds }
         // 訂正を前もって求め始める時機にも来てもらう
         let prefetch = typoService != nil && current.prefetch == nil && current.input.prefetchRequest != nil

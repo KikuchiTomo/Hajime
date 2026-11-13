@@ -5,8 +5,9 @@
 //! - 出ている窓の大きさが変わるときは，枠線を motion.candidate-window.resize の時間で滑らかに動かす(ease-out)
 //! - 選んでいるものが同じまま中身が変わったとき(あとから届いた候補)は，motion.candidate-window.update の時間で重ねて変える
 //! - アニメーション効果がオフなら，大きさはすぐ変え，重ね変わりだけにする
+//! - 分岐図は動かさず，大きさも中身もその瞬間に替える(macOS #566 と同じ．動いているあいだは候補を読めないため)
 
-use ipc::{BranchMap, CandidateList};
+use ipc::CandidateList;
 use std::time::{Duration, Instant};
 
 /// 選んでいる候補が同じまま中身が変わったか(あとから届いた候補)．選び直したときはすぐ見せるので false
@@ -15,24 +16,6 @@ pub fn arrived_list(shown: &CandidateList, next: &CandidateList) -> bool {
         && shown.selected_entry == next.selected_entry
         && shown.focus == next.focus
         && shown.selected_variant == next.selected_variant
-}
-
-/// 分岐図の文節と選んでいるものが同じまま中身が変わったか(あとから届いた文節の候補や下見)
-pub fn arrived_branch(shown: &BranchMap, next: &BranchMap) -> bool {
-    let key = |map: &BranchMap| {
-        map.columns
-            .iter()
-            .map(|column| {
-                (
-                    column.text.clone(),
-                    column.is_focused,
-                    column.selected_alternative,
-                    column.selected_variant,
-                )
-            })
-            .collect::<Vec<_>>()
-    };
-    shown != next && key(shown) == key(next)
 }
 
 /// 窓の大きさが from から to へ変わる途中
@@ -98,7 +81,6 @@ fn lerp(from: f32, to: f32, t: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scene::sample;
 
     #[test]
     fn 大きさは_ease_out_で動き_時間が過ぎたら着く() {
@@ -134,24 +116,5 @@ mod tests {
         let start = Instant::now();
         assert_eq!(crossfade_opacity(start, start), 0.0);
         assert_eq!(crossfade_opacity(start, start + crossfade_duration()), 1.0);
-    }
-
-    #[test]
-    fn 文節の候補が届いたときだけ重ねて変え_文節を移ったときはすぐ見せる() {
-        let shown = sample::branch();
-        let mut arrived = shown.clone();
-        arrived.columns[0].alternatives.push("届いた候補".into());
-        assert!(arrived_branch(&shown, &arrived));
-        let mut moved = shown.clone();
-        let focused = moved
-            .columns
-            .iter()
-            .position(|column| column.is_focused)
-            .unwrap_or(0);
-        moved.columns[focused].is_focused = false;
-        let next = (focused + 1) % moved.columns.len();
-        moved.columns[next].is_focused = true;
-        assert!(!arrived_branch(&shown, &moved));
-        assert!(!arrived_branch(&shown, &shown));
     }
 }

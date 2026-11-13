@@ -155,6 +155,7 @@ mod tests {
 
     fn list(focus: CandidateFocus) -> CandidateList {
         CandidateList {
+            is_editing: None,
             association: None,
             association_hint: None,
             association_key: None,
@@ -253,6 +254,7 @@ mod tests {
     #[test]
     fn 分岐図は注目している文節を読む() {
         let column = |text: &str, focused: bool| BranchColumn {
+            is_editing: None,
             text: text.into(),
             alternatives: vec![],
             selected_alternative: None,
@@ -273,6 +275,8 @@ mod tests {
             alternative_details: None,
             source_name: None,
             split: None,
+            jump_key: None,
+            variant_keys: None,
         };
         let map = BranchMap {
             association: None,
@@ -284,6 +288,18 @@ mod tests {
             note: None,
             hints: vec![],
             meaning_placement: None,
+            collapses_variants: None,
+            collapses_detail: None,
+            placed_hints: None,
+            trunk_focused: None,
+            page_size: None,
+            hints_on_hold: None,
+            group_start: None,
+            group_end: None,
+            continues_before: None,
+            continues_after: None,
+            keeps_width: None,
+            detail: None,
         };
         assert_eq!(branch_map(&map).as_deref(), Some("晴れ"));
 
@@ -327,6 +343,7 @@ mod tests {
     #[test]
     fn 分岐図で選んでいる枝にコメントがあれば続けて読む() {
         let mut column = BranchColumn {
+            is_editing: None,
             text: "ピヨ株式会社".into(),
             alternatives: vec!["会社".into(), "ピヨ株式会社".into()],
             selected_alternative: Some(1),
@@ -347,6 +364,8 @@ mod tests {
             alternative_details: None,
             source_name: None,
             split: None,
+            jump_key: None,
+            variant_keys: None,
         };
         let map = |column: BranchColumn| BranchMap {
             association: None,
@@ -358,6 +377,18 @@ mod tests {
             note: None,
             hints: vec![],
             meaning_placement: None,
+            collapses_variants: None,
+            collapses_detail: None,
+            placed_hints: None,
+            trunk_focused: None,
+            page_size: None,
+            hints_on_hold: None,
+            group_start: None,
+            group_end: None,
+            continues_before: None,
+            continues_after: None,
+            keeps_width: None,
+            detail: None,
         };
         assert_eq!(
             branch_map(&map(column.clone())).as_deref(),

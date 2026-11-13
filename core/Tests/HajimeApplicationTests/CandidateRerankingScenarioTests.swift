@@ -44,6 +44,36 @@ struct CandidateRerankingScenarioTests {
         #expect(harness.focusedAlternatives == ["雨", "天", "亜目", "飴"])
     }
 
+    @Test("分岐図では，Space で採点を待たずに出し，続く処理で採点して並べ替える")
+    func branchMapScoresAfterShowing() {
+        let scorer = FakeCandidateScorer(["雨": -9, "飴": -5, "天": -1, "亜目": -3])
+        let harness = Harness(converter: singleSegment(), scorer: scorer)
+        harness.runsFollowUps = false
+        harness.type("ame")
+        harness.press(.space)
+        #expect(scorer.requests.isEmpty)
+        #expect(harness.focusedAlternatives == ["雨", "飴", "天", "亜目"])
+        harness.followUp()
+        #expect(scorer.requests.count == 1)
+        #expect(harness.focusedAlternatives == ["雨", "天", "亜目", "飴"])
+    }
+
+    @Test("あとから並べ替えるとき，利用者が候補を動かしていれば，選んでいる候補とそれより前は動かさない")
+    func lateScoringKeepsSelection() {
+        let scorer = FakeCandidateScorer(["雨": -9, "飴": -5, "天": -1, "亜目": -3])
+        let harness = Harness(converter: singleSegment(), scorer: scorer)
+        harness.runsFollowUps = false
+        harness.type("ame")
+        harness.press(.space)
+        harness.press(.down)
+        let before = harness.lattice?.columns.first(where: \.isFocused)
+        harness.followUp()
+        let after = harness.lattice?.columns.first(where: \.isFocused)
+        #expect(scorer.requests.count == 1)
+        #expect(after?.text == before?.text)
+        #expect(after?.alternatives.prefix(2) == before?.alternatives.prefix(2))
+    }
+
     @Test("文節は前後の文節の幹の文字を文脈にして採点する")
     func usesNeighborSegmentsAsContext() {
         let scorer = FakeCandidateScorer(["飴": -1, "天": -2, "京は": -3, "経は": -1])

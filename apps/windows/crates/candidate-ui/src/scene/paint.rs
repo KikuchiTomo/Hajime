@@ -7,7 +7,7 @@ use crate::keys::{self, Icon, Part};
 use crate::theme::{Color, Font, Kind, ResolvedTheme};
 use ipc::{CommandKind, KeyHint};
 use tokens::opacity;
-use tokens::size::{branch, candidate, glass};
+use tokens::size::{branch, candidate, glass, part, space};
 
 /// 候補の横のタグの色分け
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,6 +42,8 @@ pub(crate) struct Painter<'a> {
     pub keep_clear: Vec<Frame>,
     /// 語の意味の吹き出しを窓の中の行の文字のすぐ右に置くときの範囲(一覧だけ)
     pub inside: Option<super::bubble::Inside>,
+    /// 案内を押し続けているあいだだけ出すときの，押している修飾キーと案内の濃さ．None ならいつも出す
+    pub hold: Option<(super::Held, f32)>,
 }
 
 impl<'a> Painter<'a> {
@@ -53,7 +55,13 @@ impl<'a> Painter<'a> {
             hits: Vec::new(),
             keep_clear: Vec::new(),
             inside: None,
+            hold: None,
         }
+    }
+
+    /// 今，この案内を出すか．押し続けて出すときは，押している修飾キーを使うキーの案内だけを出す
+    pub fn shows_hint(&self, keys: &str) -> bool {
+        self.hold.is_none_or(|(held, _)| held.uses(keys))
     }
 
     pub fn finish(self, width: f32, height: f32) -> Scene {
@@ -65,6 +73,7 @@ impl<'a> Painter<'a> {
             hits: self.hits,
             keep_clear: self.keep_clear,
             inside: self.inside,
+            mirrored: false,
         }
     }
 
@@ -650,6 +659,179 @@ impl<'a> Painter<'a> {
         self.keycaps_width(&hint.keys)
             + glass::KEYCAP_PADDING_X
             + self.width(&hint.label, Font::Label)
+    }
+
+    // MARK: - 分岐図の案内(macOS の BranchMapDrawing)
+
+    /// キーの部品(文字かアイコン)を並べた幅．キーキャップの枠は含めない
+    fn parts_width(&self, keys: &str) -> f32 {
+        let caps = keys::keycaps(keys);
+        caps.iter()
+            .map(|parts| {
+                parts.iter().map(|part| self.part_width(part)).sum::<f32>()
+                    + glass::KEYCAP_PART_GAP * parts.len().saturating_sub(1) as f32
+            })
+            .sum::<f32>()
+            + glass::KEYCAP_GAP * caps.len().saturating_sub(1) as f32
+    }
+
+    /// キーの部品を x から row の高さの真ん中に描き，描き終えた右の端(最後の部品のあとの空きを含む)を返す
+    fn draw_parts(&mut self, keys: &str, x: f32, row: Frame, ink: Color) -> f32 {
+        let mut part_x = x;
+        for (index, parts) in keys::keycaps(keys).iter().enumerate() {
+            if index > 0 {
+                part_x += glass::KEYCAP_GAP - glass::KEYCAP_PART_GAP;
+            }
+            for part in parts {
+                let width = self.part_width(part);
+                let frame = Frame::new(part_x, row.y, width, row.height);
+                match part {
+                    Part::Icon(icon) => self.icon(
+                        *icon,
+                        Frame::square(
+                            Point::new(frame.mid_x(), frame.mid_y()),
+                            glass::KEY_FONT_SIZE,
+                        ),
+                        ink,
+                    ),
+                    Part::Text(text) => self.centered(text, Font::Key, ink, frame),
+                }
+                part_x += width + glass::KEYCAP_PART_GAP;
+            }
+        }
+        part_x
+    }
+
+    /// 分岐図の，操作する場所に置く案内の幅．キーと言葉を 1 つの面で囲む
+    pub fn placed_hint_width(&self, hint: &KeyHint) -> f32 {
+        let label = if hint.label.is_empty() {
+            0.0
+        } else {
+            self.width(&hint.label, Font::Key).ceil() + space::INLINE
+        };
+        glass::TAG_HEIGHT.max(part::TAG_PADDING_X * 2.0 + self.parts_width(&hint.keys) + label)
+    }
+
+    /// 案内を並べた幅
+    pub fn placed_hints_width(&self, hints: &[KeyHint]) -> f32 {
+        if hints.is_empty() {
+            return 0.0;
+        }
+        hints
+            .iter()
+            .map(|hint| self.placed_hint_width(hint))
+            .sum::<f32>()
+            + glass::HINT_GAP * (hints.len() - 1) as f32
+    }
+
+    /// 案内を x から描く．候補の中身と見分けられるよう，文字の色の面に背景の色の文字(背景と反転した色)．
+    /// selected なら選択の色の面(選んでいる文節へ移るキー)
+    /// 押し続けて出す設定で，押している修飾キーを使わない案内は描かない(場所は呼ぶ側で空けたままにする)
+    pub fn placed_hint(&mut self, hint: &KeyHint, x: f32, mid_y: f32, selected: bool) {
+        if !self.shows_hint(&hint.keys) {
+            return;
+        }
+        let opacity = self.hold.map_or(1.0, |(_, opacity)| opacity);
+        let theme = self.theme;
+        let width = self.placed_hint_width(hint);
+        let rect = Frame::new(
+            x.round(),
+            (mid_y - glass::TAG_HEIGHT / 2.0).round(),
+            width,
+            glass::TAG_HEIGHT,
+        );
+        let (fill, ink) = if selected {
+            (theme.selection, theme.selection_text)
+        } else {
+            (theme.hint_fill(), theme.hint_ink())
+        };
+        let (fill, ink) = (fill.faded(opacity), ink.faded(opacity));
+        self.draws.push(Draw::RoundRect {
+            frame: rect,
+            radius: if theme.is_rounded() {
+                tokens::size::branch_map::BADGE_RADIUS
+            } else {
+                0.0
+            },
+            fill: Some(fill),
+            stroke: None,
+        });
+        // 言葉の無い案内(キーだけ)は，面の真ん中に置く
+        let start = if hint.label.is_empty() {
+            rect.mid_x() - self.parts_width(&hint.keys) / 2.0
+        } else {
+            rect.x + part::TAG_PADDING_X
+        };
+        let end = self.draw_parts(&hint.keys, start, rect, ink);
+        if !hint.label.is_empty() {
+            self.text(
+                &hint.label,
+                Font::Key,
+                ink,
+                end - glass::KEYCAP_PART_GAP + space::INLINE,
+                rect,
+            );
+        }
+    }
+
+    /// 案内を x から左へ並べて描く
+    pub fn placed_hints(&mut self, hints: &[KeyHint], x: f32, mid_y: f32) {
+        let mut x = x;
+        for hint in hints {
+            self.placed_hint(hint, x, mid_y, false);
+            x += self.placed_hint_width(hint) + glass::HINT_GAP;
+        }
+    }
+
+    /// 文字種の前に置く，キーだけの印の幅．候補の番号と同じキーキャップの形
+    pub fn key_mark_width(&self, keys: &str) -> f32 {
+        glass::TAG_HEIGHT.max(part::TAG_PADDING_X * 2.0 + self.parts_width(keys))
+    }
+
+    /// キーだけの印を x から描く．selected なら選択の背景の上の描き方
+    pub fn key_mark(&mut self, keys: &str, x: f32, mid_y: f32, selected: bool) {
+        let theme = self.theme;
+        let rect = Frame::new(
+            x.round(),
+            (mid_y - glass::TAG_HEIGHT / 2.0).round(),
+            self.key_mark_width(keys),
+            glass::TAG_HEIGHT,
+        );
+        self.badge_box(rect, selected);
+        let ink = if selected {
+            theme.selection_text
+        } else {
+            theme.text_muted
+        };
+        let start = rect.mid_x() - self.parts_width(keys) / 2.0;
+        self.draw_parts(keys, start, rect, ink);
+    }
+
+    /// 分岐図の候補の番号と，キーだけの印の面．番号キー・キーで選べる物の印なので，キーキャップの形にする．
+    /// 角の丸みは候補の行と同じ比率(size.branch-map.badge-radius)．選んでいる行の上では，選択の文字の色を薄く敷く
+    pub fn badge_box(&mut self, rect: Frame, selected: bool) {
+        let theme = self.theme;
+        if !theme.is_rounded() {
+            if !selected {
+                self.keycap(rect);
+            }
+            return;
+        }
+        let stroke = tokens::size::part::STROKE;
+        let (fill, line) = if selected {
+            (
+                theme.selection_text.with_alpha(opacity::badge::SELECTED),
+                None,
+            )
+        } else {
+            (theme.badge, Some((theme.line, stroke)))
+        };
+        self.draws.push(Draw::RoundRect {
+            frame: rect.inset(stroke / 2.0, stroke / 2.0),
+            radius: tokens::size::branch_map::BADGE_RADIUS,
+            fill: Some(fill),
+            stroke: line,
+        });
     }
 
     /// 幅に収まる案内．前から並べ，収まらなくなったところから後ろを出さない(macOS の GlassDrawing.hints(fitting:))

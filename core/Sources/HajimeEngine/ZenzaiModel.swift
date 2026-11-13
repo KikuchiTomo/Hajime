@@ -66,10 +66,33 @@ public struct ZenzaiModel: Sendable, Equatable {
 
     /// 確かめる値を渡せる形．テストで小さなファイルを使って確かめるため
     static func verified(at url: URL, expectedSize: Int, expectedSHA256: String) throws(VerificationError) -> ZenzaiModel {
+        _ = try check(url, expectedSize: expectedSize, expectedSHA256: expectedSHA256, previous: nil)
+        return ZenzaiModel(url: url)
+    }
+
+    /// 前回の記録(ADR 0017)と同じファイルなら，ハッシュを求めずに使う(StartupResources)
+    static func verified(at url: URL, variant: Variant, previous: VerificationRecord.Entry?)
+        throws(VerificationError) -> (model: ZenzaiModel, record: VerificationRecord.Entry?) {
+        let record = try check(url, expectedSize: variant.expectedSize, expectedSHA256: variant.expectedSHA256, previous: previous)
+        return (ZenzaiModel(url: url), record)
+    }
+
+    /// モデルのファイルの大きさとハッシュを確かめる(JinenModel と共有)．合えば，このファイルの記録を返す(属性を読めなければ nil)．
+    /// 大きさ・更新日時・ファイル ID と照らし合わせる値と場所が前回の記録 previous と同じなら，読まずに合ったものとする(ADR 0017)．
+    /// 属性は読む前に得る．読んでいるあいだに書き換えられたら更新日時が変わるので，次の起動で確かめ直す
+    static func check(_ url: URL, expectedSize: Int, expectedSHA256: String, previous: VerificationRecord.Entry?)
+        throws(VerificationError) -> VerificationRecord.Entry? {
+        let record = FileDigest.stamp(at: url).flatMap { stamp in
+            stamp.size == Int64(expectedSize)
+                ? VerificationRecord.Entry(location: url.path, expectedSHA256: expectedSHA256,
+                                           files: FileStamp.digest(of: [(name: url.lastPathComponent, stamp: stamp)]))
+                : nil
+        }
+        if let record, record == previous { return record }
         guard let (handle, size) = FileDigest.openRegularFile(at: url) else { throw .fileNotFound }
         guard size == expectedSize else { throw .sizeMismatch(actual: size) }
         guard try sha256(of: handle, maximumBytes: expectedSize) == expectedSHA256 else { throw .hashMismatch }
-        return ZenzaiModel(url: url)
+        return record
     }
 
     /// 決まった大きさを超えたら読むのをやめる(FileDigest.sha256)．超えたときは読んだ量を大きさとして返す

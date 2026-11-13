@@ -72,7 +72,7 @@ final class CompositionRoot {
         let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
             .appendingPathComponent(AppIdentity.supportDirectoryName, isDirectory: true)
         let settings = FileSettingsStore(fileURL: support.appendingPathComponent("settings.json"))
-        let resources = loadStartupResources()
+        let resources = loadStartupResources(records: FileVerificationRecordStore(fileURL: support.appendingPathComponent(DefaultSettings.verificationRecordFileName)))
         let zenzai = resources.zenzai
         let memory = support.appendingPathComponent("memory", isDirectory: true)
         let engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: AppIdentity.versionString, zenzai: zenzai,
@@ -107,16 +107,20 @@ final class CompositionRoot {
     }
 
     /// アプリに入れた Zenzai モデルと Jinen モデルとかな漢字変換の辞書を，同時に確かめて読む．
-    /// 無いか，ハッシュが合わないものは使わずに動く(small が無ければ Zenzai なし，jinen が無ければ合議なし，辞書が無ければ azooKey に同梱の辞書)
-    private static func loadStartupResources()
+    /// 無いか，ハッシュが合わないものは使わずに動く(small が無ければ Zenzai なし，jinen が無ければ合議なし，辞書が無ければ azooKey に同梱の辞書)．
+    /// 前回確かめて合ったファイルが，アプリのバージョンも含めて変わっていなければ，ハッシュを求め直さない(ADR 0017)
+    private static func loadStartupResources(records: any VerificationRecordStoring)
         -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, jinen: JinenModel?, fastJinen: JinenModel?, dictionary: BundledDictionary?) {
+        let info = Bundle.main.infoDictionary
+        let version = [info?["CFBundleShortVersionString"], info?["CFBundleVersion"]].compactMap { $0 as? String }.joined(separator: " ")
         let resources = Bundle.main.resourceURL.map { url in
             StartupResources.verified(
                 zenzai: url.appendingPathComponent("Zenzai", isDirectory: true).appendingPathComponent(ZenzaiModel.Variant.small.fileName),
                 fastZenzai: url.appendingPathComponent("Zenzai", isDirectory: true).appendingPathComponent(ZenzaiModel.Variant.xsmall.fileName),
                 jinen: url.appendingPathComponent("Jinen", isDirectory: true).appendingPathComponent(JinenModel.Variant.small.fileName),
                 fastJinen: url.appendingPathComponent("Jinen", isDirectory: true).appendingPathComponent(JinenModel.Variant.xsmall.fileName),
-                dictionary: url.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true))
+                dictionary: url.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true),
+                records: records, appVersion: version)
         }
         let zenzaiLog = Logger(subsystem: AppIdentity.bundleIdentifier, category: "zenzai")
         let dictionaryLog = Logger(subsystem: AppIdentity.bundleIdentifier, category: "dictionary")
@@ -145,7 +149,7 @@ final class CompositionRoot {
         let engineSession = engine.makeSession()
         return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
                                                              terms: terms, emoji: emojiLookup, lexicon: lexicon, englishTerms: englishTerms),
-                            lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
+                            lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations, branchStations: true, groupsBranchSegments: true,
                             rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices,
                             calendar: calendar, scorer: engineSession, fusing: engineSession)
     }

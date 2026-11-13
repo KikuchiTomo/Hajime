@@ -9,6 +9,12 @@ import HajimeDomain
 /// InputMethodKit は入力先のアプリ(クライアント)ごとにこのクラスを作る．呼び出しはすべてメインスレッドから来る．
 /// InputMethodKit には並行性の注釈が無いので，メソッドに @MainActor を付けてメインスレッドで動くことを示す
 /// (このターゲットだけ Swift 5 の言語モードにしている理由．docs/dev/GUIDELINES.md)．
+/// 打鍵から表示までの時間を Instruments(os_signpost)で測るための区間．名前と時間だけを残し，打った文字・読み・候補は残さない．
+/// 記録していないときはほとんど何もしない(OSSignposter は記録の有無を見てから印を付ける)
+enum InputSignposts {
+    static let signposter = OSSignposter(subsystem: AppIdentity.bundleIdentifier, category: "latency")
+}
+
 @objc(HajimeInputController)
 final class HajimeInputController: IMKInputController {
     private let root: CompositionRoot
@@ -41,22 +47,32 @@ final class HajimeInputController: IMKInputController {
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
-        Int(NSEvent.EventTypeMask.keyDown.rawValue)
+        // 修飾キーの押し方も受け取る(分岐図で，押し続けている修飾キーを使うキーの案内を出すため)．キーとしては処理せず，入力先のアプリに渡す
+        Int(NSEvent.EventTypeMask.keyDown.rawValue | NSEvent.EventTypeMask.flagsChanged.rawValue)
     }
 
     @MainActor
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        if let event, event.type == .flagsChanged {
+            presenter.modifiersChanged(event.modifierFlags)
+            return false
+        }
         guard let event, let client = sender as? any IMKTextInput,
             let key = NSEventKeyTranslator.translate(event) else { return false }
+        let signposter = InputSignposts.signposter
+        let keyInterval = signposter.beginInterval("key")
+        defer { signposter.endInterval("key", keyInterval) }
         followUpTask?.cancel()
         followUpTask = nil
         let context = root.contextProvider.context(for: client, includePrecedingText: !session.isComposing)
-        let result = session.handle(key, context: context)
+        // 矢印キーは表示の向きに効かせる．今出している分岐図が先の枝を左へ出しているかを，キーを渡す前に知らせる
+        session.branchMirrored = presenter.isBranchMirrored
+        let result = signposter.withIntervalSignpost("session") { session.handle(key, context: context) }
         if !result.handled {
             root.passThroughDiagnostics.recordPassThrough(key, mode: session.mode, context: context)
         }
         presenter.context = context
-        presenter.apply(result.actions, to: client)
+        signposter.withIntervalSignpost("present") { presenter.apply(result.actions, to: client) }
         runFollowUps(client: client, context: context)
         // 再変換できなかった(選んでいる文字が無い・読めない)ときは，キーをアプリに渡す(Ctrl+Shift+R などをアプリで使えるように)
         if result.actions.contains(.requestReconversion), !reconvert(client: client, context: context) {
@@ -138,7 +154,9 @@ final class HajimeInputController: IMKInputController {
             if settles {
                 try? await Task.sleep(until: start + .seconds(settleDelay), clock: .continuous)
                 guard !Task.isCancelled, let self else { return }
-                self.presenter.apply(self.session.settle(context: context), to: client)
+                InputSignposts.signposter.withIntervalSignpost("settle") {
+                    self.presenter.apply(self.session.settle(context: context), to: client)
+                }
                 // 見直しを待つあいだに，Space で出す分岐図の候補を前もって求める
                 await self.warmLattice()
             }
@@ -197,7 +215,9 @@ final class HajimeInputController: IMKInputController {
             for step in steps {
                 await Task.yield()
                 guard !Task.isCancelled, let self else { return }
-                self.presenter.apply(step(), to: client)
+                let signposter = InputSignposts.signposter
+                let actions = signposter.withIntervalSignpost("followUp") { step() }
+                signposter.withIntervalSignpost("present") { self.presenter.apply(actions, to: client) }
             }
         }
     }
@@ -214,7 +234,7 @@ final class HajimeInputController: IMKInputController {
         for step in session.latticeWarmingSteps {
             await Task.yield()
             guard !Task.isCancelled else { return }
-            step()
+            InputSignposts.signposter.withIntervalSignpost("warmingStep") { step() }
         }
     }
 

@@ -137,6 +137,19 @@ pub mod choice {
     pub const ENGLISH_AUTO_EXAMPLE: (&str, &str) = ("zoom dekaigi", "zoom で会議");
     pub const VARIANT_ROW: &str = "候補の上に文字種の行を表示";
     pub const KEY_HINTS: &str = "キーの案内を表示";
+    pub const FEWER_ITEMS: &str = "表示項目を減らす";
+    pub const BRANCH_HINTS_ALWAYS: &str = "分岐図のキーの案内を常に表示";
+    pub const BRANCH_SEGMENTS: &str = "分岐図に一度に表示する文節数";
+    pub const BRANCH_WINDOW_WIDTH: &str = "分岐図の窓の幅";
+
+    /// 分岐図に一度に出す文節の数の表示．0 は区切らずにすべて出す
+    pub fn branch_segment_count(value: f64) -> String {
+        if value == 0.0 {
+            "すべて".to_string()
+        } else {
+            format!("{value} 文節")
+        }
+    }
     pub const TYPO_CORRECTION: &str = "タイプミスの修正";
     pub const YEN_KEY: &str = "¥ キーで入力する文字";
     pub const THEME: &str = "テーマ";
@@ -822,6 +835,14 @@ pub mod keys {
         ("lastSegment", "末尾の文節"),
         ("nextUncertainSegment", "誤りやすい次の文節"),
         ("previousUncertainSegment", "誤りやすい前の文節"),
+        ("jumpToSegment1", "1 番目の文節"),
+        ("jumpToSegment2", "2 番目の文節"),
+        ("jumpToSegment3", "3 番目の文節"),
+        ("jumpToSegment4", "4 番目の文節"),
+        ("jumpToSegment5", "5 番目の文節"),
+        ("jumpToSegment6", "6 番目の文節"),
+        ("jumpToSegment7", "7 番目の文節"),
+        ("jumpToSegment8", "8 番目の文節"),
         ("extendSegment", "文節を伸ばす"),
         ("shrinkSegment", "文節を縮める"),
         ("extendSegmentToWord", "文節を単語単位で伸ばす"),
@@ -852,6 +873,7 @@ pub mod keys {
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
         ("expandCandidates", "候補を表に展開"),
+        ("enterBranch", "候補の先の枝へ移動"),
     ];
     /// コマンドの説明(UIStrings.Keys.help(for:))．名前で分かるコマンドは並べない
     pub const COMMAND_HELP: &[(&str, &str)] = &[
@@ -877,6 +899,14 @@ pub mod keys {
         ),
         ("nextUncertainSegment", "誤変換の多い文節に移動します"),
         ("previousUncertainSegment", "誤変換の多い文節に移動します"),
+        ("jumpToSegment1", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment2", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment3", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment4", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment5", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment6", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment7", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment8", "分岐図の，その位置の文節に移動します"),
         (
             "extendSegmentToWord",
             "文節の終わりを単語の切れ目まで動かします",
@@ -924,6 +954,10 @@ pub mod keys {
         ("registerWord", "選択中の文字でユーザー辞書の登録を開きます"),
         ("openMenu", "入力メニューを入力位置に表示します"),
         ("expandCandidates", "候補を表に展開します"),
+        (
+            "enterBranch",
+            "選んでいる候補の意味・連想・変換マクロへ移動します",
+        ),
     ];
 }
 
@@ -1170,6 +1204,10 @@ pub mod sync {
         ("prefersKatakana", "カタカナ語を優先"),
         ("showsVariantRow", "候補の上に文字種の行を表示"),
         ("showsKeyHints", "キーの案内を表示"),
+        ("showsFewerItems", "表示項目を減らす"),
+        ("alwaysShowsBranchHints", "分岐図のキーの案内を常に表示"),
+        ("branchSegmentsPerGroup", "分岐図に一度に表示する文節数"),
+        ("branchWindowWidth", "分岐図の窓の幅"),
         ("numberKeySelection", "数字キーで候補を選択"),
         ("dateConversion", "日付と時刻に変換"),
         ("symbolConversion", "記号に変換"),
@@ -1344,8 +1382,7 @@ pub mod wizard {
     pub const INITIAL_FOCUS: &str = "最初に選択する文節";
     pub const CHARACTERS_TITLE: &str = "入力する文字";
     pub const FEATURES_TITLE: &str = "便利な機能";
-    pub const EXTRAS_TITLE: &str = "試験的な機能";
-    pub const EXTRAS_DETAIL: &str = "既定ではオフの機能です。";
+    pub const EXTRAS_TITLE: &str = "そのほかの機能";
     pub const MACROS: &str = "変換マクロ";
     pub const MACROS_DETAIL: &str =
         "連想変換と同じ Shift + Space で、選択中の単語を「」で囲む・ルビを付けるなどして表示します。";

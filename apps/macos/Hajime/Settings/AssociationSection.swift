@@ -9,11 +9,10 @@ struct AssociationSection: View {
         Section {
             ResettableToggle(model: model, title: UIStrings.Association.enabled, keyPath: \.association)
             Group {
-                ResettableStepper(model: model, title: UIStrings.Association.limit, keyPath: \.associationLimit, range: DefaultSettings.associationLimitRange, step: DefaultSettings.associationLimitStep,
-                                  value: "\(model.settings.associationLimit)")
+                ResettableStepper(model: model, title: UIStrings.Association.limit, keyPath: \.associationLimit, range: DefaultSettings.associationLimitRange, step: DefaultSettings.associationLimitStep)
                 ResettableToggle(model: model, title: UIStrings.Association.hint, keyPath: \.showsAssociationHint)
             }
-            .disabled(!model.settings.association)
+            .disabled(model, unless: \.association)
         } header: {
             Text(UIStrings.Association.section)
         }

@@ -31,6 +31,6 @@ enum GridKeyUpgrade {
 
     /// バージョン 17 のひな形の表．今のひな形の表から足した行を除いたもの
     static func previous(_ preset: KeymapPreset) -> Keymap {
-        Keymap(preset.keymap.entries.filter { $0.command != .expandCandidates })
+        Keymap(SegmentJumpKeyUpgrade.previous(preset).entries.filter { $0.command != .expandCandidates })
     }
 }

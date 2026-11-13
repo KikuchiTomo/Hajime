@@ -89,6 +89,8 @@ struct LatencyProbeTests {
         var keys: [Duration] = []
         var steps: [Duration] = []
         var totals: [Duration] = []
+        // 手順を進めているあいだに次のキーが来たときの待ち(そのとき動いている 1 歩の残り)．来る時刻を 0.5ms ごとに置いて数える
+        var waits: [Double] = []
         // 1 回目は辞書とモデルの準備を含むので数えない
         for pass in 0...Self.passes {
             for sentence in sentences {
@@ -105,7 +107,11 @@ struct LatencyProbeTests {
                     for step in session.latticeWarmingSteps {
                         let time = clock.measure { step() }
                         total += time
-                        if pass > 0 { steps.append(time) }
+                        if pass > 0 {
+                            steps.append(time)
+                            let length = Double(time.components.attoseconds) / 1e15 + Double(time.components.seconds) * 1000
+                            waits += stride(from: 0, to: length, by: 0.5).map { length - $0 }
+                        }
                     }
                     if pass > 0 { totals.append(total) }
                 }
@@ -116,10 +122,12 @@ struct LatencyProbeTests {
         let sortedSteps = steps.sorted()
         let sortedTotals = totals.sorted()
         func at(_ values: [Duration], _ ratio: Double) -> Duration { values[min(values.count - 1, Int(Double(values.count) * ratio))] }
+        let sortedWaits = waits.sorted()
+        func waitAt(_ ratio: Double) -> Double { sortedWaits.isEmpty ? 0 : sortedWaits[min(sortedWaits.count - 1, Int(Double(sortedWaits.count) * ratio))] }
         print("HAJIME_FUSION_STEPS zenzai=\(engine.usesZenzai) jinen=\(jinen == nil ? "none" : variant.rawValue) "
               + "key_p50=\(at(sortedKeys, 0.5)) key_p95=\(at(sortedKeys, 0.95)) "
               + "step_p50=\(at(sortedSteps, 0.5)) step_p95=\(at(sortedSteps, 0.95)) step_max=\(sortedSteps.last!) "
-              + "pause_total_p50=\(at(sortedTotals, 0.5)) pause_total_p95=\(at(sortedTotals, 0.95)) steps=\(steps.count) pauses=\(totals.count)\(Self.loadAverage)")
+              + "pause_total_p50=\(at(sortedTotals, 0.5)) pause_total_p95=\(at(sortedTotals, 0.95)) key_wait_ms_p50=\(String(format: "%.1f", waitAt(0.5))) key_wait_ms_p95=\(String(format: "%.1f", waitAt(0.95))) key_wait_ms_max=\(String(format: "%.1f", sortedWaits.last ?? 0)) steps=\(steps.count) pauses=\(totals.count)\(Self.loadAverage)")
     }
 
     @Test("長い文で，打つ位置ごとの 1 キーの時間と Space で変換するまでの時間を測る", .enabled(if: isReleaseBuild))
@@ -141,7 +149,7 @@ struct LatencyProbeTests {
         // ほかのプロセスに CPU を取られた回があっても正しく測れるよう，同じ文を何回か打ち，項目ごとにいちばん速かった回で判定する(perKey と同じ)
         var chunks: [Duration] = []
         var space = Duration.seconds(Int64.max), right = Duration.seconds(Int64.max), resize = Duration.seconds(Int64.max)
-        var warmedSpace = Duration.seconds(Int64.max), warmingStep = Duration.seconds(Int64.max)
+        var warmedSpace = Duration.seconds(Int64.max), warmingStep = Duration.seconds(Int64.max), rescored = Duration.seconds(Int64.max)
         for _ in 0..<Self.passes {
             // 打鍵が止まったあいだに分岐図の候補を前もって求めたとき(アプリでふつうに起きる順)の Space
             for key in keys { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
@@ -161,6 +169,10 @@ struct LatencyProbeTests {
                 }
             }
             space = min(space, clock.measure { _ = session.handle(KeyEvent(.space), context: InputContext()) })
+            // Space のあとの続く処理を，表示を変える(並べ替えた候補を出し直す)ところまで動かす．Space から並べ替えた候補が届くまでは space ＋ これ
+            rescored = min(rescored, clock.measure {
+                for step in session.followUps(context: InputContext()) where !step().isEmpty { break }
+            })
             // 変換中の文節の移動と，文節の長さを変える操作(区切り直しと下見)
             right = min(right, clock.measure { _ = session.handle(KeyEvent(.right), context: InputContext()) })
             resize = min(resize, clock.measure { _ = session.handle(KeyEvent(.right, modifiers: [.shift]), context: InputContext()) })
@@ -170,7 +182,7 @@ struct LatencyProbeTests {
             }
             chunks = chunks.isEmpty ? passChunks : zip(chunks, passChunks).map { min($0, $1) }
         }
-        print("HAJIME_LONG zenzai=\(engine.usesZenzai) keys=\(keys.count) passes=\(Self.passes) max_per_10keys=\(chunks) space=\(space) warmed_space=\(warmedSpace) warming_step=\(warmingStep) right=\(right) resize=\(resize)\(Self.loadAverage)")
+        print("HAJIME_LONG zenzai=\(engine.usesZenzai) keys=\(keys.count) passes=\(Self.passes) max_per_10keys=\(chunks) space=\(space) space_follow_up=\(rescored) warmed_space=\(warmedSpace) warming_step=\(warmingStep) right=\(right) resize=\(resize)\(Self.loadAverage)")
         // 文が長くなっても 1 キーは 50ms 以内(R-01)．Space で分岐図を出すまでは，待たされたと感じない 0.1 秒を目安に，
         // ほかのプロセスの負荷で延びる分を見込んで 0.15 秒以内．文節ごとにライブ変換の状態を捨てて変換し直していたときは 0.58 秒だった
         #expect(chunks.allSatisfy { $0 < .milliseconds(50) }, "長い文で 1 キーが 50ms を超えた: \(chunks)")

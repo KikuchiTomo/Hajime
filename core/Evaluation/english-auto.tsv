@@ -23,3 +23,14 @@ sake	酒	お
 take	たけ	松と
 # 混ざる文
 hello kyouhaiitenkidesune	hello 今日はいい天気ですね
+# 空白を挟まずに英単語を続けて打った文(英単語の後ろの日本語は日本語に戻す)
+kyouhazoomdekaigiwosimasu	今日はzoomで会議をします
+githubnipushsitekarakaerimasu	githubにpushしてから帰ります
+asitanomeetingnisankasimasu	明日のmeetingに参加します
+slackderenrakusimasu	slackで連絡します
+# 英語の語を確定したあとの語(前が英語でも，ローマ字として読める日本語の語は日本語に戻す)
+zoom dekaigiwosimasu	zoom で会議をします
+githubni pushsitekara kaerimasu	githubにpushしてから帰ります
+hello world kyouhaiitenkidesune	hello world 今日はいい天気ですね
+# 英単語だけを続けた並びは英語のまま
+pushnotification	pushnotification

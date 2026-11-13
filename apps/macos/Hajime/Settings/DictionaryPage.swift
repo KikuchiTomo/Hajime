@@ -93,7 +93,7 @@ struct TermDictionaryView: View {
                     ResettableToggle(model: model, title: field.name, keyPath: keyPath)
                 }
             }
-            .disabled(!model.settings.termDictionary)
+            .disabled(model, unless: \.termDictionary)
         }
         .formStyle(.grouped)
     }
@@ -110,35 +110,37 @@ private struct UserWordsView: View {
             Section {
                 ResettableToggle(model: model, title: UIStrings.Extras.dynamicDictionary, keyPath: \.dynamicDictionary)
             }
-            Section {
-                RuleListEditor(
-                    labels: .init(key: UIStrings.Settings.reading, value: UIStrings.Settings.word,
-                                  empty: UIStrings.Settings.dictionaryEmpty, note: UIStrings.Settings.comment, notePrompt: UIStrings.Settings.commentPrompt),
-                    items: model.settings.userDictionary.map {
-                        RuleItem(id: "\($0.reading)\t\($0.word)", key: $0.reading, value: $0.word, kind: $0.wordClass.rawValue,
-                                 kindTitle: UIStrings.Settings.label(for: $0.wordClass), note: $0.comment)
-                    },
-                    kinds: Self.wordClasses,
-                    problem: { reading, word in
-                        UserDictionaryEntry(reading: reading, word: word).isValid ? nil : UIStrings.Settings.invalidEntry
-                    },
-                    save: { reading, word, kind, comment, editing in
-                        model.saveEntry(replacing: editing.map { UserDictionaryEntry(reading: $0.key, word: $0.value) }, reading: reading, word: word,
-                                        wordClass: kind.flatMap(WordClass.init(rawValue:)) ?? DefaultSettings.userWordClass, comment: comment ?? "")
-                    },
-                    remove: { items in
-                        model.removeEntries(items.map { UserDictionaryEntry(reading: $0.key, word: $0.value) })
-                    },
-                    importFile: model.importDictionary,
-                    exportFile: model.exportDictionary,
-                    keysAreUnique: false,
-                    tableHeight: DesignTokens.Size.Settings.userDictionaryTableHeight
-                )
-                .prefilled($model.userWordDraft)
-                // スイッチがオフなら書き方は値にならないので，書き方のボタンもチップも出さない
-                .assistingTemplates(model.settings.dynamicDictionary
-                    ? TemplateAssist(reference: UIStrings.Templates.word, target: .value, isOpen: $templatesOpen) : nil)
-                .showingResult { _, word in model.settings.dynamicDictionary ? Self.result(of: word) : nil }
+            BuiltLater(stage: 1) {
+                Section {
+                    RuleListEditor(
+                        labels: .init(key: UIStrings.Settings.reading, value: UIStrings.Settings.word,
+                                      empty: UIStrings.Settings.dictionaryEmpty, note: UIStrings.Settings.comment, notePrompt: UIStrings.Settings.commentPrompt),
+                        items: model.settings.userDictionary.map {
+                            RuleItem(id: "\($0.reading)\t\($0.word)", key: $0.reading, value: $0.word, kind: $0.wordClass.rawValue,
+                                     kindTitle: UIStrings.Settings.label(for: $0.wordClass), note: $0.comment)
+                        },
+                        kinds: Self.wordClasses,
+                        problem: { reading, word in
+                            UserDictionaryEntry(reading: reading, word: word).isValid ? nil : UIStrings.Settings.invalidEntry
+                        },
+                        save: { reading, word, kind, comment, editing in
+                            model.saveEntry(replacing: editing.map { UserDictionaryEntry(reading: $0.key, word: $0.value) }, reading: reading, word: word,
+                                            wordClass: kind.flatMap(WordClass.init(rawValue:)) ?? DefaultSettings.userWordClass, comment: comment ?? "")
+                        },
+                        remove: { items in
+                            model.removeEntries(items.map { UserDictionaryEntry(reading: $0.key, word: $0.value) })
+                        },
+                        importFile: model.importDictionary,
+                        exportFile: model.exportDictionary,
+                        keysAreUnique: false,
+                        tableHeight: DesignTokens.Size.Settings.userDictionaryTableHeight
+                    )
+                    .prefilled($model.userWordDraft)
+                    // スイッチがオフなら書き方は値にならないので，書き方のボタンもチップも出さない
+                    .assistingTemplates(model.settings.dynamicDictionary
+                        ? TemplateAssist(reference: UIStrings.Templates.word, target: .value, isOpen: $templatesOpen) : nil)
+                    .showingResult { _, word in model.settings.dynamicDictionary ? Self.result(of: word) : nil }
+                }
             }
         }
         .formStyle(.grouped)

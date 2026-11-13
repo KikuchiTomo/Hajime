@@ -280,6 +280,143 @@ fn content(painter: &mut Painter, card: &Card, rect: Frame) {
     }
 }
 
+// MARK: - 分岐図の枝として出す語の意味(macOS の BranchView.MeaningText)
+
+/// 分岐図の意味の丸の下に出す語の意味．品詞のタグと，意味ごとの文と使い方の例(幅 branch_map::MEANING_WIDTH で折り返す)
+pub(super) struct Side {
+    tag: Option<&'static str>,
+    senses: Vec<(Vec<Line>, Vec<Line>)>,
+    pub width: f32,
+    pub height: f32,
+}
+
+impl Side {
+    pub fn new(painter: &Painter, note: &HomophoneNote) -> Self {
+        let measure = painter.measure;
+        let width_limit = tokens::size::branch_map::MEANING_WIDTH;
+        let body = Style {
+            font: Font::MeaningBody,
+            color: painter.theme.text,
+        };
+        let tag = note.part_of_speech.map(strings::part_of_speech);
+        let mut width = tag.map_or(0.0, |tag| Self::tag_width(painter, tag));
+        let mut height = if tag.is_some() {
+            meaning::PART_OF_SPEECH_HEIGHT + tokens::size::space::STACK
+        } else {
+            0.0
+        };
+        let mut senses = Vec::new();
+        for (index, sense) in note.senses.iter().enumerate() {
+            let meaning_lines = lines(
+                measure,
+                &styled(&sense.meaning, body),
+                width_limit,
+                meaning::MEANING_LINES as usize,
+            );
+            let example_lines = sense.example.as_deref().map_or_else(Vec::new, |example| {
+                lines(
+                    measure,
+                    &example_text(example, &note.word, painter),
+                    width_limit,
+                    meaning::EXAMPLE_LINES as usize,
+                )
+            });
+            for line in meaning_lines.iter().chain(&example_lines) {
+                width = width.max(line_width(measure, line).ceil());
+            }
+            height += meaning_lines.len() as f32 * meaning::MEANING_PITCH
+                + example_lines.len() as f32 * meaning::EXAMPLE_PITCH;
+            if index + 1 < note.senses.len() {
+                height += meaning::SENSE_GAP;
+            }
+            senses.push((meaning_lines, example_lines));
+        }
+        Self {
+            tag,
+            senses,
+            width,
+            height,
+        }
+    }
+
+    fn tag_width(painter: &Painter, tag: &str) -> f32 {
+        painter.width(tag, Font::MeaningTag) + meaning::PART_OF_SPEECH_PADDING_X * 2.0
+    }
+
+    /// 意味ごとの文の行の真ん中の y(意味の丸を置く)．top は品詞のタグの上の端
+    pub fn sense_mid_ys(&self, top: f32) -> Vec<f32> {
+        let mut y = top
+            + if self.tag.is_some() {
+                meaning::PART_OF_SPEECH_HEIGHT + tokens::size::space::STACK
+            } else {
+                0.0
+            };
+        let mut result = Vec::new();
+        for (meaning_lines, example_lines) in &self.senses {
+            result.push((y + meaning::MEANING_PITCH / 2.0).round());
+            y += meaning_lines.len() as f32 * meaning::MEANING_PITCH
+                + example_lines.len() as f32 * meaning::EXAMPLE_PITCH
+                + meaning::SENSE_GAP;
+        }
+        result
+    }
+
+    /// top から描く．文は縦の線に近い側の端(text_x)にそろえる．direction が負なら text_x が右の端
+    pub fn draw(&self, painter: &mut Painter, top: f32, text_x: f32, direction: f32) {
+        let theme = painter.theme;
+        let x = |width: f32| {
+            if direction > 0.0 {
+                text_x
+            } else {
+                text_x - width
+            }
+        };
+        let mut y = top;
+        if let Some(tag) = self.tag {
+            let width = Self::tag_width(painter, tag);
+            let rect = Frame::new(
+                x(width).round(),
+                y.round(),
+                width,
+                meaning::PART_OF_SPEECH_HEIGHT,
+            );
+            let stroke = tokens::size::part::STROKE;
+            painter.draws.push(Draw::RoundRect {
+                frame: rect.inset(stroke / 2.0, stroke / 2.0),
+                radius: if theme.is_rounded() {
+                    tokens::size::branch_map::BADGE_RADIUS
+                } else {
+                    0.0
+                },
+                fill: None,
+                stroke: Some((theme.line, stroke)),
+            });
+            painter.centered(tag, Font::MeaningTag, theme.text_muted, rect);
+            y += meaning::PART_OF_SPEECH_HEIGHT + tokens::size::space::STACK;
+        }
+        for (meaning_lines, example_lines) in &self.senses {
+            for (lines, pitch) in [
+                (meaning_lines, meaning::MEANING_PITCH),
+                (example_lines, meaning::EXAMPLE_PITCH),
+            ] {
+                for line in lines {
+                    let width = line_width(painter.measure, line);
+                    draw_line(painter, line, Frame::new(x(width), y, width, pitch));
+                    y += pitch;
+                }
+            }
+            y += meaning::SENSE_GAP;
+        }
+    }
+}
+
+fn line_width(measure: &dyn Measure, line: &Line) -> f32 {
+    line.runs
+        .iter()
+        .map(|run| measure.width(&run.text, run.style.font))
+        .sum()
+}
+
 /// 目印の枠(目印の列の一辺の正方形)の真ん中に置くアイコンの枠
 fn icon_frame(marker: Frame) -> Frame {
     Frame::square(

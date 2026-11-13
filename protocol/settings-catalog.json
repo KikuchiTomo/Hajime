@@ -15,11 +15,14 @@
   "fields" : [
     "alphabetWidth",
     "alphanumericHyphen",
+    "alwaysShowsBranchHints",
     "association",
     "associationDictionaries",
     "associationLimit",
     "brackets",
     "branchCandidatesPerPage",
+    "branchSegmentsPerGroup",
+    "branchWindowWidth",
     "calculation",
     "candidateFontSize",
     "candidateGridColumns",
@@ -115,6 +118,7 @@
     "shiftStartsAlphabet",
     "showsAssociationHint",
     "showsEmojiNames",
+    "showsFewerItems",
     "showsHomophones",
     "showsKeyHints",
     "showsModeIndicator",
@@ -201,6 +205,9 @@
       "converting",
       "direct"
     ],
+    "enterBranch" : [
+      "converting"
+    ],
     "expandCandidates" : [
       "converting"
     ],
@@ -259,6 +266,30 @@
       "composing",
       "converting",
       "direct"
+    ],
+    "jumpToSegment1" : [
+      "converting"
+    ],
+    "jumpToSegment2" : [
+      "converting"
+    ],
+    "jumpToSegment3" : [
+      "converting"
+    ],
+    "jumpToSegment4" : [
+      "converting"
+    ],
+    "jumpToSegment5" : [
+      "converting"
+    ],
+    "jumpToSegment6" : [
+      "converting"
+    ],
+    "jumpToSegment7" : [
+      "converting"
+    ],
+    "jumpToSegment8" : [
+      "converting"
     ],
     "kanaStyle" : [
       "idle",
@@ -460,6 +491,10 @@
     "associationLimit" : [
       10,
       300
+    ],
+    "branchSegmentsPerGroup" : [
+      0,
+      8
     ],
     "candidateFontSize" : [
       12,

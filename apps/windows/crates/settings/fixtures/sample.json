@@ -2,6 +2,7 @@
   "defaults": {
     "alphabetWidth": "halfwidth",
     "alphanumericHyphen": true,
+    "alwaysShowsBranchHints": false,
     "association": true,
     "associationDictionaries": [
       {
@@ -15,6 +16,8 @@
     "associationLimit": 60,
     "brackets": "corner",
     "branchCandidatesPerPage": 5,
+    "branchSegmentsPerGroup": 8,
+    "branchWindowWidth": "fit",
     "calculation": true,
     "candidateFontSize": 15,
     "candidatePresentation": "automatic",
@@ -22,7 +25,7 @@
     "jinenModel": "automatic",
     "commands": [],
     "contextualSegmentCandidates": true,
-    "conversionMacros": false,
+    "conversionMacros": true,
     "correction": {
       "english": true,
       "japanese": true,
@@ -37,7 +40,7 @@
     "customThemes": [],
     "cyclesLetterCase": true,
     "dateConversion": true,
-    "dynamicDictionary": false,
+    "dynamicDictionary": true,
     "emojiConversion": true,
     "emojiWordConversion": true,
     "emojiCandidatePosition": 4,
@@ -371,7 +374,7 @@
     "keypadDirect": true,
     "lateCorrectionTimeout": 5,
     "latexConversion": false,
-    "launcherCommands": false,
+    "launcherCommands": true,
     "learning": "enabled",
     "listCandidatesPerPage": 9,
     "candidateGridColumns": 4,
@@ -380,7 +383,7 @@
     "liveConversion": true,
     "liveConversionDelay": 0.4,
     "liveConversionSkipLength": 2,
-    "looseReadings": false,
+    "looseReadings": true,
     "macros": [
       {
         "id": "6A0C9E10-1B2D-4F3A-8C5D-000000000001",
@@ -537,7 +540,7 @@
     "paletteShowsReadings": true,
     "paletteShowsShortcodes": true,
     "paletteShowsUnicodeName": true,
-    "phoneticSpelling": false,
+    "phoneticSpelling": true,
     "postalCodeConversion": true,
     "predictionDisplay": "whenLiveConversionOff",
     "prefersKatakana": true,
@@ -693,6 +696,7 @@
     "reviewCorrectionTimeout": 15,
     "shiftStartsAlphabet": false,
     "showsAssociationHint": true,
+    "showsFewerItems": false,
     "showsHomophones": true,
     "showsKeyHints": true,
     "showsModeIndicator": true,

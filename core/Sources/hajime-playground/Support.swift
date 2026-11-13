@@ -14,6 +14,18 @@ import HajimePersistence
 ///   短くなるもの(pthon → phon)は打った文字を捨てるので後ろに回す
 /// 頻度が無いので，同じ順位のもの(pyhton に対する phyton と python)は区別できない．
 /// また一覧に無い語(javascript)は候補に出ない
+/// 英字入力(自動)の評価で使う英単語の辞書．単語の一覧(/usr/share/dict/words)が無い Windows では，アプリと同じスペルチェッカーを使う
+@MainActor
+func languageEvaluationLexicon() -> any EnglishLexicon {
+    #if os(Windows)
+    if !FileManager.default.fileExists(atPath: "/usr/share/dict/words") {
+        let spellChecker = WindowsSpellCheckerLexicon()
+        if spellChecker.isAvailable { return spellChecker }
+    }
+    #endif
+    return WordListLexicon()
+}
+
 @MainActor
 final class WordListLexicon: EnglishLexicon {
     private let words: Set<String>

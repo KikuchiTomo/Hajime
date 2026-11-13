@@ -60,6 +60,24 @@ pub enum Timer {
     Fade = 2,
     /// 窓の大きさの動きと，あとから届いた中身の重ね変わりの 1 コマ
     Motion = 3,
+    /// 押し続けて出すキーの案内のために，修飾キーの状態を読む 1 コマ(案内を押し続けて出す分岐図を出しているあいだだけ)
+    Hold = 4,
+}
+
+/// 押している修飾キー(Shift・Ctrl・Alt)を読む．押し続けて出すキーの案内に使う．
+/// 読むのはこの 3 つだけ(案内の出し分けに要るのは修飾キーだけで，文字のキーを読むと入力の内容が分かってしまうため)．
+/// 読んだ状態はログにも通信にも出さない．管理者として動いているアプリが前面のときは読めないことがあり(UIPI)，そのときは案内が出ないだけ
+pub fn held_modifiers() -> crate::scene::Held {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{
+        GetAsyncKeyState, VIRTUAL_KEY, VK_CONTROL, VK_MENU, VK_SHIFT,
+    };
+    // 最上位のビットが立っていれば押している
+    let down = |key: VIRTUAL_KEY| unsafe { GetAsyncKeyState(i32::from(key.0)) } < 0;
+    crate::scene::Held {
+        shift: down(VK_SHIFT),
+        control: down(VK_CONTROL),
+        alt: down(VK_MENU),
+    }
 }
 
 struct Callbacks {
@@ -671,6 +689,7 @@ unsafe extern "system" fn procedure(
                 id if id == Timer::Mode as usize => Some(Timer::Mode),
                 id if id == Timer::Fade as usize => Some(Timer::Fade),
                 id if id == Timer::Motion as usize => Some(Timer::Motion),
+                id if id == Timer::Hold as usize => Some(Timer::Hold),
                 _ => None,
             };
             let callbacks = CALLBACKS.get();

@@ -1,13 +1,13 @@
 # install.sh・uninstall.sh・package.sh で共有する，本番と開発版の名前と，署名の証明書の決め方．
-# 名前は apps/macos/project.yml の configs と合わせる(app_name はアプリの名前，display_name は入力メニューに出す名前 HAJIME_DISPLAY_NAME)
+# 名前は apps/macos/project.yml の configs と合わせる(app_name はアプリの名前，display_name は入力ソースの一覧に出る日本語の入力モードの名前 HAJIME_JAPANESE_MODE_NAME)
 # 全ユーザー共通の置き場所に入れる．配布物(.pkg)と azooKey と同じ場所で，手元で入力ソースとして選べることを確かめた場所
 destination="/Library/Input Methods"
 
 # 開発版は Dev の構成でビルドする(最適化は本番と同じ)．Debug の構成は画像の書き出し用の別のアプリで，ここでは入れない
 variant() {
   case "$1" in
-    Release) configuration=Release; app_name="Hajime"; display_name="Hajime IME"; bundle_id="men.haji.inputmethod.Hajime" ;;
-    Dev) configuration=Dev; app_name="Hajime Dev"; display_name="Hajime IME Dev"; bundle_id="men.haji.inputmethod.develop" ;;
+    Release) configuration=Release; app_name="Hajime"; display_name="はじめ"; bundle_id="men.haji.inputmethod.Hajime" ;;
+    Dev) configuration=Dev; app_name="Hajime Dev"; display_name="はじめ Dev"; bundle_id="men.haji.inputmethod.develop" ;;
     *) echo "Release か Dev を指定してください" >&2; exit 1 ;;
   esac
 }

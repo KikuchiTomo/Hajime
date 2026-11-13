@@ -17,7 +17,8 @@ mkdir -p "$output" "$models"
 work=$(mktemp -d)
 trap 'git -C "$root" worktree remove --force "$work/base" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
 
-# 版の取得スクリプトから，辞書の版と，モデルのファイル(1 つ目が small，2 つ目が xsmall)を読む
+# 版の取得スクリプトから，辞書の版と，モデルのファイル(1 つ目が Zenzai の small，2 つ目が xsmall，3 つ目と 4 つ目が jinen の small と xsmall)を読む．
+# jinen の無い古い版では，3 つ目と 4 つ目はファイルでない場所になり，metrics.py が渡さない
 dictionary_of() { echo "$models/hajime-dictionary-$(sed -n 's/^version="\(.*\)"/\1/p' "$1/tools/dictionary/fetch_dictionary.sh")/Dictionary"; }
 model_of() { echo "$models/$(sed -n 's/^fetch "\([^"]*\)".*/\1/p' "$1/tools/models/fetch_zenzai.sh" | sed -n "$2p")"; }
 
@@ -29,7 +30,7 @@ measure() {
   swift build --package-path "$tree/core" -c release --product hajime-playground >/dev/null
   playground="$(swift build --package-path "$tree/core" -c release --show-bin-path)/hajime-playground"
   python3 -I "$root/tools/evaluation/metrics.py" --playground "$playground" --dictionary "$(dictionary_of "$tree")" \
-    --small-model "$(model_of "$tree" 1)" --xsmall-model "$(model_of "$tree" 2)" \
+    --small-model "$(model_of "$tree" 1)" --xsmall-model "$(model_of "$tree" 2)"     --jinen-small-model "$(model_of "$tree" 3)" --jinen-xsmall-model "$(model_of "$tree" 4)" \
     --evaluation "$evaluation" --sets "$root/core/Evaluation" --label "$label" --output "$out"
 }
 

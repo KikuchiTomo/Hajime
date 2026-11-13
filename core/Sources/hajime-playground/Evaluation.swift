@@ -352,7 +352,7 @@ enum Evaluation {
         let lines = try String(contentsOfFile: file, encoding: .utf8).split(whereSeparator: \.isNewline).filter { !$0.hasPrefix("#") && !$0.isEmpty }
         var settings = DefaultSettings.settings
         settings.inputStyle = .englishAuto
-        let lexicon = WordListLexicon()
+        let lexicon = languageEvaluationLexicon()
         var passed = 0
         for line in lines {
             let columns = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
@@ -376,6 +376,62 @@ enum Evaluation {
             print("\(ok ? "○" : "×")  \(columns[0]) → \(text)\(ok ? "" : "   期待: \(columns[1])")")
         }
         print("正解: \(passed) / \(lines.count)")
+    }
+
+    /// 英字入力(自動)で 1 行の文字を 1 キーずつ打ったときの，InputSession.handle の時間(ミリ秒)．
+    /// 行は「打ったキー<TAB>…」の 1 列目．空白は Space．line は 1 から数えた行の番号(行ごとに別のプロセスで測るため)．
+    /// idles なら，キーごとに打鍵の合間の処理(InputSession.performDeferredConversion)を残りが無くなるまで行い，1 回ずつの時間も出す．
+    /// settles なら，キーごとに打鍵が止まったときの処理(InputSession.settle)も行い，その時間も出す(どちらも打鍵の時間には含めない)．
+    /// 最後に Enter を押した時間も出す．打った文字列は出さず，キーの番号と時間だけを出す
+    static func languageKeyTimes(file: String, line: Int, idles: Bool, settles: Bool, engine: AzooKeyConverterEngine) throws {
+        let lines = try String(contentsOfFile: file, encoding: .utf8).split(whereSeparator: \.isNewline).filter { !$0.hasPrefix("#") && !$0.isEmpty }
+        guard lines.indices.contains(line - 1), let keys = lines[line - 1].split(separator: "\t").first else { return }
+        var settings = DefaultSettings.settings
+        settings.inputStyle = .englishAuto
+        let session = InputSession(converter: engine.makeSession(), lexicon: languageEvaluationLexicon(), settings: StaticSettings(settings))
+        let clock = ContinuousClock()
+        var text = ""
+        var times: [Double] = []
+        var settleTimes: [Double] = []
+        var idleTimes: [Double] = []
+        func milliseconds(_ duration: Duration) -> Double {
+            Double(duration.components.attoseconds) / 1e15 + Double(duration.components.seconds) * 1000
+        }
+        func press(_ key: KeyEvent.Key) -> Double {
+            let context = InputContext(precedingText: session.isComposing ? nil : text)
+            var result: KeyResult?
+            let elapsed = clock.measure { result = session.handle(KeyEvent(key), context: context) }
+            for action in result?.actions ?? [] { if case .commit(let value) = action { text += value } }
+            return milliseconds(elapsed)
+        }
+        for character in keys {
+            times.append(press(character == " " ? .space : .character(character)))
+            var row = String(format: "キー %d\t%.3f", times.count, times.last ?? 0)
+            if idles {
+                var steps: [Double] = []
+                while session.awaitsDeferredConversion, steps.count < DefaultSettings.maximumMixedWordKeys * 2 {
+                    steps.append(milliseconds(clock.measure { session.performDeferredConversion() }))
+                }
+                idleTimes += steps
+                row += String(format: "\t合間 %d 回 最大 %.3f", steps.count, steps.max() ?? 0)
+            }
+            if settles {
+                settleTimes.append(milliseconds(clock.measure { _ = session.settle(context: InputContext(precedingText: nil)) }))
+                row += String(format: "\t止まったとき %.3f", settleTimes.last ?? 0)
+            }
+            print(row)
+        }
+        let enter = press(.enter)
+        func summary(_ title: String, _ values: [Double]) {
+            let sorted = values.sorted()
+            guard !sorted.isEmpty else { return }
+            func percentile(_ value: Double) -> Double { sorted[min(sorted.count - 1, Int(Double(sorted.count) * value))] }
+            print(title + String(format: " %d  中央値 %.3f ms  95%% %.3f ms  最大 %.3f ms", sorted.count, percentile(0.5), percentile(0.95), sorted.last ?? 0))
+        }
+        summary("キーの数", times)
+        summary("合間の 1 回", idleTimes)
+        summary("止まったとき", settleTimes)
+        print(String(format: "Enter %.3f ms", enter))
     }
 
     private static func isHiragana(_ character: Character) -> Bool {

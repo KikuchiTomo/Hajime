@@ -63,8 +63,8 @@ struct RuleListSpec<Rule> {
 
 extension RuleListEditor {
     /// 設定の一覧をそのまま編集する．足す・書き換える・消す・読み込む・書き出すをすべて spec の決まりで行う
-    init<Rule>(model: SettingsModel, spec: RuleListSpec<Rule>, labels: Labels) {
-        let rules = model.settings[keyPath: spec.list]
+    init<Rule: Equatable>(model: SettingsModel, spec: RuleListSpec<Rule>, labels: Labels) {
+        let rules = model.settings[spec.list]
         func upsert(_ rule: Rule, replacing old: String?, in settings: inout HajimeDomain.Settings) -> Bool {
             RuleListEditing.upsert(rule, key: spec.key, isValid: spec.isValid, limit: spec.limit, replacing: old, in: &settings[keyPath: spec.list])
         }

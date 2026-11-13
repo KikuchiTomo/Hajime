@@ -39,6 +39,15 @@ struct AssociationFinder {
         return groups.isEmpty ? nil : Associations(headword: text, groups: groups)
     }
 
+    /// text(読みは reading)の変換マクロの結果だけ．使わない設定のときと，結果が無いときは nil
+    func macros(text: String, reading: String) -> Associations? {
+        let current = settings.current
+        guard current.conversionMacros, !text.isEmpty else { return nil }
+        let results = ConversionMacros.results(text: text, reading: KanaWidth.hiragana(from: reading), macros: current.macros,
+                                               values: templateValues.values(), skipsSameReading: current.macroSkipsSameReading)
+        return results.isEmpty ? nil : Associations(headword: text, groups: [AssociationGroup(label: "", words: results)])
+    }
+
     private func dictionaryGroups(text: String, reading: String) -> [AssociationGroup] {
         guard let lookup else { return [] }
         let dictionaries = settings.current.associationDictionaries.filter(\.isEnabled)

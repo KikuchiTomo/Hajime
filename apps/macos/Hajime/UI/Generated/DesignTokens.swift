@@ -119,6 +119,30 @@ enum DesignTokens {
             text: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
             textMuted: RGB(red: 0xE6, green: 0xE6, blue: 0xE6)
         )
+        static let indigo = ThemePalette(
+            bevelLight: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            bevelShadow: RGB(red: 0xE8, green: 0xEB, blue: 0xF0),
+            correction: RGB(red: 0xC2, green: 0x45, blue: 0x2D),
+            frame: RGB(red: 0xCD, green: 0xD2, blue: 0xD8),
+            prediction: RGB(red: 0x53, green: 0x5A, blue: 0x61),
+            selection: RGB(red: 0x4B, green: 0x57, blue: 0xF2),
+            selectionText: RGB(red: 0xFF, green: 0xFF, blue: 0xFF),
+            surface: RGB(red: 0xFD, green: 0xFD, blue: 0xFE),
+            text: RGB(red: 0x16, green: 0x18, blue: 0x1C),
+            textMuted: RGB(red: 0x53, green: 0x5A, blue: 0x61)
+        )
+        static let indigoNight = ThemePalette(
+            bevelLight: RGB(red: 0x3A, green: 0x3E, blue: 0x46),
+            bevelShadow: RGB(red: 0x1F, green: 0x21, blue: 0x26),
+            correction: RGB(red: 0xFF, green: 0x9E, blue: 0x85),
+            frame: RGB(red: 0x4B, green: 0x50, blue: 0x58),
+            prediction: RGB(red: 0xB6, green: 0xBC, blue: 0xC3),
+            selection: RGB(red: 0x98, green: 0xA2, blue: 0xFF),
+            selectionText: RGB(red: 0x16, green: 0x18, blue: 0x1C),
+            surface: RGB(red: 0x2A, green: 0x2D, blue: 0x34),
+            text: RGB(red: 0xF1, green: 0xF3, blue: 0xF5),
+            textMuted: RGB(red: 0xB6, green: 0xBC, blue: 0xC3)
+        )
     }
     enum Size {
         enum Space {
@@ -207,6 +231,25 @@ enum DesignTokens {
             static let splitBadgeFontSize: CGFloat = 9
             static let splitBadgeGap: CGFloat = 2
         }
+        enum BranchMap {
+            static let stopSize: CGFloat = 8
+            static let stopSizeSelected: CGFloat = 10
+            static let railHeight: CGFloat = 16
+            static let segmentGap: CGFloat = 8
+            static let stemGap: CGFloat = 8
+            static let stationGap: CGFloat = 12
+            static let rowGap: CGFloat = 12
+            static let meaningIndent: CGFloat = 8
+            static let meaningWidth: CGFloat = 240
+            static let gripSize: CGFloat = 3
+            static let moreSize: CGFloat = 4
+            static let badgeRadius: CGFloat = 5
+            static let pageDotSize: CGFloat = 4
+            static let pageDotPitch: CGFloat = 8
+            static let pageDotLimit: CGFloat = 6
+            static let stubLength: CGFloat = 24
+            static let fadeWidth: CGFloat = 48
+        }
         enum Settings {
             static let windowWidth: CGFloat = 820
             static let windowHeight: CGFloat = 580
@@ -276,6 +319,8 @@ enum DesignTokens {
             static let keycapPaddingY: CGFloat = 3
             static let keycapHeight: CGFloat = 16
             static let hintGap: CGFloat = 8
+            static let editingCaretWidth: CGFloat = 2
+            static let editingMinWidth: CGFloat = 16
             static let hintLineGap: CGFloat = 4
             static let footerHeight: CGFloat = 28
             static let trunkGap: CGFloat = 8
@@ -579,6 +624,10 @@ enum DesignTokens {
         enum CorrectionUnderline {
             static let appear: Double = 80
         }
+        enum BranchMap {
+            static let hintHold: Double = 100
+            static let hintFade: Double = 50
+        }
         enum CandidateRest {
             static let fadeIn: Double = 250
         }
@@ -588,6 +637,7 @@ enum DesignTokens {
         }
         enum Settings {
             static let disclosure: Double = 167
+            static let selectionSettle: Double = 100
         }
         enum SettingsWindows {
             static let pageEnter: Double = 167
@@ -684,6 +734,7 @@ enum DesignTokens {
         }
         enum Candidate {
             static let unselectableNumber: CGFloat = 0.4
+            static let editingStale: CGFloat = 0.35
         }
     }
 }

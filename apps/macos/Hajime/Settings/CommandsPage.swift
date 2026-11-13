@@ -43,48 +43,50 @@ struct CommandsPage: View {
             } footer: {
                 Text(UIStrings.Extras.commandsStoredLocally).font(.caption).foregroundStyle(.secondary)
             }
-            Section {
-                ResettableToggle(model: model, title: UIStrings.Extras.conversionMacros, keyPath: \.conversionMacros)
-                ResettableToggle(model: model, title: UIStrings.Extras.macroSkipsSameReading, keyPath: \.macroSkipsSameReading)
-                // 試す語と読み．チップの {text} と {reading} の値，形の欄の下の結果，下の「試す」の結果に使う
-                HStack {
-                    TextField(UIStrings.Extras.tryMacroWord, text: $sampleText, prompt: Text(UIStrings.Extras.tryMacroWord))
-                        .textFieldStyle(.roundedBorder)
-                    TextField(UIStrings.Extras.tryMacroReading, text: $sampleReading, prompt: Text(UIStrings.Extras.tryMacroReading))
-                        .textFieldStyle(.roundedBorder)
-                }
-                .labelsHidden()
-                RuleListEditor(
-                    labels: .init(key: UIStrings.Extras.macroPattern, value: nil, empty: UIStrings.Extras.macrosEmpty),
-                    items: model.settings.macros.map { RuleItem(id: $0.id, key: $0.pattern, value: "", isEnabled: $0.isEnabled) },
-                    problem: { pattern, _ in ConversionMacro(pattern: pattern).isValid ? nil : UIStrings.Extras.invalidMacro },
-                    save: { pattern, _, editing in saveMacro(pattern: pattern, replacing: editing?.id) },
-                    remove: { items in
-                        let ids = Set(items.map(\.id))
-                        model.update { $0.macros.removeAll { ids.contains($0.id) } }
-                    },
-                    setEnabled: { item, enabled in
-                        model.update { settings in
-                            if let index = settings.macros.firstIndex(where: { $0.id == item.id }) { settings.macros[index].isEnabled = enabled }
-                        }
+            BuiltLater(stage: 1) {
+                Section {
+                    ResettableToggle(model: model, title: UIStrings.Extras.conversionMacros, keyPath: \.conversionMacros)
+                    ResettableToggle(model: model, title: UIStrings.Extras.macroSkipsSameReading, keyPath: \.macroSkipsSameReading)
+                    // 試す語と読み．チップの {text} と {reading} の値，形の欄の下の結果，下の「試す」の結果に使う
+                    HStack {
+                        TextField(UIStrings.Extras.tryMacroWord, text: $sampleText, prompt: Text(UIStrings.Extras.tryMacroWord))
+                            .textFieldStyle(.roundedBorder)
+                        TextField(UIStrings.Extras.tryMacroReading, text: $sampleReading, prompt: Text(UIStrings.Extras.tryMacroReading))
+                            .textFieldStyle(.roundedBorder)
                     }
-                )
-                .assistingTemplates(TemplateAssist(reference: UIStrings.Templates.macro, sample: macroSample, target: .key, isOpen: $templatesOpen))
-                .showingResult { pattern, _ in
-                    let draft = pattern.trimmingCharacters(in: .whitespaces)
-                    guard !draft.isEmpty, let result = macroResult(draft) else { return nil }
-                    let sample = macroSample
-                    let values = TextTemplate.Values(now: SystemCalendar(clock: Date.init).now(), uuid: { UUID().uuidString },
-                                                     random: { Int.random(in: $0) }, text: sample.text, reading: sample.reading)
-                    return RuleResult(text: result, problems: TextTemplate.problems(in: draft, values: values))
+                    .labelsHidden()
+                    RuleListEditor(
+                        labels: .init(key: UIStrings.Extras.macroPattern, value: nil, empty: UIStrings.Extras.macrosEmpty),
+                        items: model.settings.macros.map { RuleItem(id: $0.id, key: $0.pattern, value: "", isEnabled: $0.isEnabled) },
+                        problem: { pattern, _ in ConversionMacro(pattern: pattern).isValid ? nil : UIStrings.Extras.invalidMacro },
+                        save: { pattern, _, editing in saveMacro(pattern: pattern, replacing: editing?.id) },
+                        remove: { items in
+                            let ids = Set(items.map(\.id))
+                            model.update { $0.macros.removeAll { ids.contains($0.id) } }
+                        },
+                        setEnabled: { item, enabled in
+                            model.update { settings in
+                                if let index = settings.macros.firstIndex(where: { $0.id == item.id }) { settings.macros[index].isEnabled = enabled }
+                            }
+                        }
+                    )
+                    .assistingTemplates(TemplateAssist(reference: UIStrings.Templates.macro, sample: macroSample, target: .key, isOpen: $templatesOpen))
+                    .showingResult { pattern, _ in
+                        let draft = pattern.trimmingCharacters(in: .whitespaces)
+                        guard !draft.isEmpty, let result = macroResult(draft) else { return nil }
+                        let sample = macroSample
+                        let values = TextTemplate.Values(now: SystemCalendar(clock: Date.init).now(), uuid: { UUID().uuidString },
+                                                         random: { Int.random(in: $0) }, text: sample.text, reading: sample.reading)
+                        return RuleResult(text: result, problems: TextTemplate.problems(in: draft, values: values))
+                    }
+                    // 一覧の「結果」の列に，試す語と読みに当てた結果を出す
+                    .showingItemResults { item in macroResult(item.key) }
+                } header: {
+                    Text(UIStrings.Extras.macrosSection)
                 }
-                // 一覧の「結果」の列に，試す語と読みに当てた結果を出す
-                .showingItemResults { item in macroResult(item.key) }
-            } header: {
-                Text(UIStrings.Extras.macrosSection)
-            }
-            if let preview = model.previewMacros {
-                macroPreview(preview)
+                if let preview = model.previewMacros {
+                    macroPreview(preview)
+                }
             }
         }
         .formStyle(.grouped)
