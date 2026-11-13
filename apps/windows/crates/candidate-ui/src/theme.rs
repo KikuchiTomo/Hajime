@@ -154,6 +154,16 @@ pub struct ResolvedTheme {
 }
 
 impl ResolvedTheme {
+    /// 分岐図のキーの案内の面．文字の色にし，背景と反転させて候補の中身と見分ける(macOS の Theme.hintFill)
+    pub fn hint_fill(&self) -> Color {
+        self.text
+    }
+
+    /// 分岐図のキーの案内の文字．背景の色(すりガラスの背景は透かさない色)
+    pub fn hint_ink(&self) -> Color {
+        self.surface.with_alpha(1.0)
+    }
+
     /// 補正の色を薄く敷いた背景(候補の横の「修正」のタグと，案内の頭のアイコンの丸)
     pub fn correction_tint(&self) -> Color {
         self.correction.with_alpha(if self.kind == Kind::Contrast {

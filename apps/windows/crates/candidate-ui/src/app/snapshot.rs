@@ -183,7 +183,7 @@ fn render_all(output: &Path) -> Result<()> {
                 None => window,
             }
         };
-        let scenes: [(&str, Scene); 19] = [
+        let scenes: [(&str, Scene); 22] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "list-grid",
@@ -248,6 +248,18 @@ fn render_all(output: &Path) -> Result<()> {
                 scene::branch_map(&preview(), &look, &measure),
             ),
             ("branch-split", scene::branch_map(&split(), &look, &measure)),
+            (
+                "branch-fewer",
+                scene::branch_map(&scene::sample::fewer_branch(), &look, &measure),
+            ),
+            (
+                "branch-long-6",
+                scene::branch_map(&scene::sample::long_branch(6), &look, &measure),
+            ),
+            (
+                "branch-long-13",
+                scene::branch_map(&scene::sample::long_branch(13), &look, &measure),
+            ),
             ("mode", scene::mode("あ", &look, &measure)),
             (
                 "note",
@@ -595,7 +607,7 @@ fn meaning_empty_list() -> CandidateList {
 fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
     let alternatives = strings(&["取る", "撮る", "とる", "採る"]);
     let has_meaning = selected == 1;
-    BranchMap {
+    scene::sample::with_keys(BranchMap {
         association: None,
         association_hint: None,
         association_key: None,
@@ -620,7 +632,7 @@ fn homophone_branch(placement: MeaningPlacement, selected: usize) -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
-    }
+    })
 }
 
 /// 「ねこがかわいい」の「ねこが」の文節の候補．4・5 番目に語を絵文字にした候補を出す(macOS の SamplePanels.emojiCandidates)
@@ -690,7 +702,7 @@ fn emoji_suggestion() -> CandidateList {
 /// 分岐図で語を絵文字にした候補を選んだところ(macOS の emoji-branch)
 fn emoji_branch() -> BranchMap {
     let alternatives = strings(&EMOJI_CANDIDATES[..5]);
-    BranchMap {
+    scene::sample::with_keys(BranchMap {
         association: None,
         association_hint: None,
         association_key: None,
@@ -716,7 +728,7 @@ fn emoji_branch() -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
-    }
+    })
 }
 
 /// コマンドの候補(R-22)を含む一覧で，アプリを開くコマンドを選んだところ(macOS の command-list-selected)
@@ -816,7 +828,7 @@ fn lattice() -> BranchMap {
 }
 
 fn preview() -> BranchMap {
-    BranchMap {
+    scene::sample::with_keys(BranchMap {
         association: None,
         association_hint: None,
         association_key: None,
@@ -850,11 +862,11 @@ fn preview() -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
-    }
+    })
 }
 
 fn split() -> BranchMap {
-    BranchMap {
+    let map = scene::sample::with_keys(BranchMap {
         association: None,
         association_hint: None,
         association_key: None,
@@ -878,5 +890,15 @@ fn split() -> BranchMap {
         collapses_variants: None,
         collapses_detail: None,
         placed_hints: None,
+    });
+    // 区切っているあいだは，境目の上に区切る操作だけを案内する
+    BranchMap {
+        placed_hints: Some(ipc::BranchHints {
+            boundary: vec![hint("1–2", "分割"), hint("Esc", "キャンセル")],
+            variant: None,
+            candidates: Vec::new(),
+            expand: None,
+        }),
+        ..map
     }
 }
