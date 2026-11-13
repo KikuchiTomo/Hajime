@@ -48,7 +48,7 @@ fn hint(keys: &str, label: &str) -> KeyHint {
 }
 
 /// 標準のキー設定の表で，文節へ移るキー(1〜8 番目)
-const JUMP_KEYS: [&str; 8] = [
+pub const JUMP_KEYS: [&str; 8] = [
     "Alt+A", "Alt+S", "Alt+D", "Alt+F", "Alt+J", "Alt+K", "Alt+L", "Alt+;",
 ];
 /// 標準のキー設定の表で，ひらがな・カタカナ・半角カタカナにするキー
@@ -82,6 +82,7 @@ pub fn with_keys(mut map: BranchMap) -> BranchMap {
             .as_ref()
             .map(|key| hint(key, "展開"))
             .or_else(|| (map.collapses_detail == Some(true)).then(|| hint("Alt+↑", "展開"))),
+        items: None,
     });
     map
 }
@@ -131,6 +132,7 @@ pub fn branch() -> BranchMap {
         continues_before: None,
         continues_after: None,
         keeps_width: None,
+        detail: None,
     })
 }
 
@@ -218,6 +220,7 @@ pub fn long_branch(focus: usize) -> BranchMap {
         continues_before: None,
         continues_after: None,
         keeps_width: None,
+        detail: None,
     })
 }
 

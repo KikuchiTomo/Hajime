@@ -38,8 +38,9 @@ type Inbox = Arc<Mutex<VecDeque<UiCommand>>>;
 
 enum Content {
     Hidden,
-    Candidates(ipc::CandidateList),
-    BranchMap(ipc::BranchMap),
+    Candidates(Box<ipc::CandidateList>),
+    /// 一覧と分岐図は大きいので箱に入れる
+    BranchMap(Box<ipc::BranchMap>),
     Note(ipc::Note),
     /// モード表示の文字
     Mode(String),
@@ -80,6 +81,8 @@ struct App {
     on_glass: bool,
     /// 押した候補をエンジンに知らせる口．初めて押したときにつなぐ
     engine: Option<EngineClient>,
+    /// エンジンに最後に知らせた，分岐図の候補と先の枝を左へ出しているか(BranchLayout)
+    reported_mirrored: bool,
     scene: Option<Scene>,
     theme: Option<ResolvedTheme>,
     rest_opacity: f32,
@@ -177,6 +180,7 @@ pub fn run() {
             anchor: None,
             on_glass: false,
             engine: None,
+            reported_mirrored: false,
             scene: None,
             theme: None,
             rest_opacity: 1.0,
@@ -275,13 +279,29 @@ impl App {
         let Some(target) = scene.target_at(x as f32 / scale, y as f32 / scale) else {
             return;
         };
+        self.send(RequestBody::ChooseCandidate { target });
+    }
+
+    /// エンジンに知らせる．初めて知らせるときにつなぐ
+    fn send(&mut self, body: RequestBody) {
         if self.engine.is_none() {
             self.engine = pipe_name("engine")
                 .ok()
                 .and_then(|name| EngineClient::start(name).ok());
         }
         if let Some(engine) = &self.engine {
-            let _ = engine.send(RequestBody::ChooseCandidate { target });
+            let _ = engine.send(body);
+        }
+    }
+
+    /// 分岐図の候補と先の枝を左へ出しているかが変わったら，エンジンに知らせる(矢印キーを表示の向きに効かせるため．
+    /// エンジンは次のキーから InputSession.branchMirrored に入れる)
+    fn report_layout(&mut self) {
+        let mirrored = matches!(self.content, Content::BranchMap(_))
+            && self.scene.as_ref().is_some_and(|scene| scene.mirrored);
+        if mirrored != self.reported_mirrored {
+            self.reported_mirrored = mirrored;
+            self.send(RequestBody::BranchLayout { mirrored });
         }
     }
 
@@ -353,12 +373,12 @@ impl App {
             UiCommand::SetPresentation { presentation } => self.presentation = presentation,
             UiCommand::ShowCandidates { list, anchor } => {
                 self.arrived = matches!(&self.content, Content::Candidates(shown) if motion::arrived_list(shown, &list));
-                self.content = Content::Candidates(list);
+                self.content = Content::Candidates(Box::new(list));
                 self.anchor = anchor.or(self.anchor.take());
             }
             UiCommand::ShowBranchMap { map, anchor } => {
                 self.arrived = matches!(&self.content, Content::BranchMap(shown) if motion::arrived_branch(shown, &map));
-                self.content = Content::BranchMap(map);
+                self.content = Content::BranchMap(Box::new(map));
                 self.anchor = anchor.or(self.anchor.take());
             }
             UiCommand::ShowNote { note, anchor } => {
@@ -917,5 +937,6 @@ impl App {
         self.announce();
         self.scene = scene;
         self.theme = Some(theme);
+        self.report_layout();
     }
 }

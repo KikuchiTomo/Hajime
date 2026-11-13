@@ -109,6 +109,22 @@ struct FooterHintsTests {
         #expect(FooterHints.placed(for: panel, settings: settings) == nil)
     }
 
+    @Test("先の枝を丸として出すときは，候補の上で丸へ入るキーを案内し，丸の中身では中身の下に矢印だけの操作を除いて案内する")
+    func stationHints() throws {
+        let settings = DefaultSettings.settings
+        var stations = panel
+        stations.detail = BranchDetail(stations: [.init(kind: .association, title: "連想")], current: nil)
+        let expand = try #require(FooterHints.placed(for: stations, settings: settings)?.expand)
+        #expect(expand.label == "展開" && !FooterHints.isArrowOnly(expand.keys))
+        stations.detail?.current = 0
+        stations.association = AssociationHeading(headword: "速い", label: "速度", group: 1, groupCount: 3)
+        let inside = try #require(FooterHints.placed(for: stations, settings: settings))
+        #expect(inside.candidates.isEmpty && inside.boundary.isEmpty)
+        let items = try #require(inside.items)
+        #expect(!items.isEmpty && items.allSatisfy { !FooterHints.isArrowOnly($0.keys) })
+        #expect(FooterHints.isArrowOnly("←→") && FooterHints.isArrowOnly("↑") && !FooterHints.isArrowOnly("Shift+↑") && !FooterHints.isArrowOnly(""))
+    }
+
     @Test("分岐図で足した項目(文節へ移るキー・文字種にするキー・畳んだ枝・置き場所ごとの案内)は，無ければ送らない")
     func optionalFields() {
         let plain = WireBranchMap(panel, hints: [])

@@ -1460,6 +1460,15 @@
         },
         {
           "name": "takeWordRegistration"
+        },
+        {
+          "name": "branchLayout",
+          "fields": [
+            {
+              "name": "mirrored",
+              "type": "bool"
+            }
+          ]
         }
       ]
     },
@@ -2157,6 +2166,87 @@
         {
           "name": "expand",
           "type": "KeyHint?"
+        },
+        {
+          "name": "items",
+          "type": "[KeyHint]?"
+        }
+      ]
+    },
+    {
+      "name": "BranchStationKind",
+      "kind": "enum",
+      "cases": [
+        "meaning",
+        "association",
+        "macro"
+      ]
+    },
+    {
+      "name": "BranchStation",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "BranchStationKind"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "BranchDetail",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "stations",
+          "type": "[BranchStation]"
+        },
+        {
+          "name": "current",
+          "type": "u32?"
+        },
+        {
+          "name": "items",
+          "type": "[string]"
+        },
+        {
+          "name": "selectedItem",
+          "type": "u32?"
+        },
+        {
+          "name": "label",
+          "type": "string"
+        },
+        {
+          "name": "group",
+          "type": "u32"
+        },
+        {
+          "name": "groupCount",
+          "type": "u32"
+        },
+        {
+          "name": "position",
+          "type": "u32"
+        },
+        {
+          "name": "total",
+          "type": "u32"
+        },
+        {
+          "name": "pageSize",
+          "type": "u32"
+        },
+        {
+          "name": "candidates",
+          "type": "[string]"
+        },
+        {
+          "name": "selectedCandidate",
+          "type": "u32?"
         }
       ]
     },
@@ -2243,6 +2333,10 @@
         {
           "name": "keepsWidth",
           "type": "bool?"
+        },
+        {
+          "name": "detail",
+          "type": "BranchDetail?"
         }
       ]
     },

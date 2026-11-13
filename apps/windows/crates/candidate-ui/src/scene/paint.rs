@@ -65,6 +65,7 @@ impl<'a> Painter<'a> {
             hits: self.hits,
             keep_clear: self.keep_clear,
             inside: self.inside,
+            mirrored: false,
         }
     }
 

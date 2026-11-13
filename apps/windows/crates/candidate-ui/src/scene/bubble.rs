@@ -295,7 +295,10 @@ pub fn for_branch<'a>(
     map: &'a ipc::BranchMap,
     scene: &Scene,
 ) -> Option<(&'a HomophoneNote, Vec<String>, Frame)> {
-    if meaning::placement(map.meaning_placement) != ipc::MeaningPlacement::Side {
+    // 先の枝を丸として出すときは，語の意味を意味の丸の下に枝として出す(吹き出しは使わない)
+    if meaning::placement(map.meaning_placement) != ipc::MeaningPlacement::Side
+        || map.detail.is_some()
+    {
         return None;
     }
     let column = map.columns.iter().find(|column| column.is_focused)?;
@@ -418,6 +421,7 @@ pub fn beside(
         hits: Vec::new(),
         keep_clear: Vec::new(),
         inside: None,
+        mirrored: false,
     }
 }
 

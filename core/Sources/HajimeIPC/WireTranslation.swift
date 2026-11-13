@@ -346,8 +346,39 @@ extension WireBranchMap {
             groupEnd: range.map { UInt32(clamping: $0.upperBound) },
             continuesBefore: shown.panel.continuesBefore ? true : nil,
             continuesAfter: shown.panel.continuesAfter ? true : nil,
-            keepsWidth: panel.keepsWidth ? true : nil
+            keepsWidth: panel.keepsWidth ? true : nil,
+            // 先の枝を別々の丸として出す作り(branchStations)のときだけ送る
+            detail: panel.detail.map(WireBranchDetail.init)
         )
+    }
+}
+
+extension WireBranchDetail {
+    public init(_ detail: BranchDetail) {
+        self.init(
+            stations: detail.stations.map { WireBranchStation(kind: WireBranchStationKind($0.kind), title: $0.title) },
+            current: detail.current.map(UInt32.init(clamping:)),
+            items: detail.items,
+            selectedItem: detail.selectedItem.map(UInt32.init(clamping:)),
+            label: detail.label,
+            group: UInt32(clamping: detail.group),
+            groupCount: UInt32(clamping: detail.groupCount),
+            position: UInt32(clamping: detail.position),
+            total: UInt32(clamping: detail.total),
+            pageSize: UInt32(clamping: detail.pageSize),
+            candidates: detail.candidates,
+            selectedCandidate: detail.selectedCandidate.map(UInt32.init(clamping:))
+        )
+    }
+}
+
+extension WireBranchStationKind {
+    public init(_ kind: BranchDetail.Kind) {
+        switch kind {
+        case .meaning: self = .meaning
+        case .association: self = .association
+        case .macro: self = .macro
+        }
     }
 }
 
