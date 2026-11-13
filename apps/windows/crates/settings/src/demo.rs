@@ -36,8 +36,9 @@ pub struct Segment {
 /// 入力欄の下に出す窓
 #[derive(Debug, Clone, PartialEq)]
 pub enum Panel {
-    Lattice(BranchMap),
-    List(CandidateList),
+    /// 分岐図と一覧は大きいので箱に入れる
+    Lattice(Box<BranchMap>),
+    List(Box<CandidateList>),
     Note(Note),
 }
 
@@ -693,7 +694,7 @@ fn theme() -> Vec<Frame> {
             ("中野です", Style::Focused),
         ],
         "",
-        Some(Panel::Lattice(map)),
+        Some(Panel::Lattice(Box::new(map))),
     )]
 }
 
@@ -723,7 +724,7 @@ fn live_conversion(choices: &Choices) -> Vec<Frame> {
                 ("天気ですね", Style::Converted),
             ],
             "",
-            Some(Panel::Lattice(lattice(&columns, 0, None))),
+            Some(Panel::Lattice(Box::new(lattice(&columns, 0, None)))),
         ));
     }
     frames.push(Frame::committed("今日はいい天気ですね", hold() / 2.0));
@@ -758,7 +759,7 @@ fn presentation(choices: &Choices) -> Vec<Frame> {
                 [names[2], "中のです", "なかのです"]
             };
             let shown = list(entries.iter().map(|text| entry(text)).collect(), 0);
-            frames.push(converted(&marked, "", Some(Panel::List(shown))));
+            frames.push(converted(&marked, "", Some(Panel::List(Box::new(shown)))));
         }
         "list" => {
             let entries = [
@@ -770,7 +771,7 @@ fn presentation(choices: &Choices) -> Vec<Frame> {
             frames.push(converted(
                 &[(entries[0], Style::Focused)],
                 "",
-                Some(Panel::List(shown)),
+                Some(Panel::List(Box::new(shown))),
             ));
         }
         _ => {
@@ -785,7 +786,7 @@ fn presentation(choices: &Choices) -> Vec<Frame> {
             frames.push(converted(
                 &marked,
                 "",
-                Some(Panel::Lattice(lattice(&columns, focus, Some(2)))),
+                Some(Panel::Lattice(Box::new(lattice(&columns, focus, Some(2))))),
             ));
         }
     }
@@ -881,7 +882,11 @@ fn choosing(choosing: Choosing) -> Vec<Frame> {
         } else {
             choosing.entries[selected].to_string()
         };
-        let mut frame = converted(&[(&text, Style::Focused)], "", Some(Panel::List(shown)));
+        let mut frame = converted(
+            &[(&text, Style::Focused)],
+            "",
+            Some(Panel::List(Box::new(shown))),
+        );
         // 選んでいる候補を動かすあいだは短く，最後の候補は長く見せる
         if selected != choosing.to {
             frame.duration = hold() / 2.0;
