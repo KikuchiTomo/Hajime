@@ -51,11 +51,14 @@ struct KeymapPage: View {
     var body: some View {
         // 絞り込んだ行は 1 回だけ求め，表と下の件数で使う
         let rows = rows
+        // 表のセルは body のあとで作られる．選択肢を出す行はここで読んで渡し，変わったら表を描き直す．
+        // 選択を外した行の選択肢はすぐに消す(選んでいる行だけが選択肢を持つ)
+        let pickerRows = editable.intersection(selection)
         VStack(alignment: .leading, spacing: DesignTokens.Size.Space.section) {
             toolbar
             missingWarning
             composer
-            table(rows)
+            table(rows, editable: pickerRows)
             footer(rows)
         }
         // Form でない画面なので，Form の余白にそろえてほかのページのカードと端を合わせる
@@ -215,7 +218,7 @@ struct KeymapPage: View {
 
     // MARK: 表
 
-    private func table(_ rows: [Row]) -> some View {
+    private func table(_ rows: [Row], editable: Set<Int>) -> some View {
         Table(rows, selection: $selection) {
             // 選んでいる行だけ選択肢を出し，ほかの行は文字で見せる．行ごとに選択肢(60 ほどのコマンド)を作ると開くのに数秒かかる
             TableColumn(Keys.state) { row in
