@@ -139,6 +139,17 @@ pub mod choice {
     pub const KEY_HINTS: &str = "キーの案内を表示";
     pub const FEWER_ITEMS: &str = "表示項目を減らす";
     pub const BRANCH_HINTS_ALWAYS: &str = "分岐図のキーの案内を常に表示";
+    pub const BRANCH_SEGMENTS: &str = "分岐図に一度に表示する文節数";
+    pub const BRANCH_WINDOW_WIDTH: &str = "分岐図の窓の幅";
+
+    /// 分岐図に一度に出す文節の数の表示．0 は区切らずにすべて出す
+    pub fn branch_segment_count(value: f64) -> String {
+        if value == 0.0 {
+            "すべて".to_string()
+        } else {
+            format!("{value} 文節")
+        }
+    }
     pub const TYPO_CORRECTION: &str = "タイプミスの修正";
     pub const YEN_KEY: &str = "¥ キーで入力する文字";
     pub const THEME: &str = "テーマ";
@@ -1195,6 +1206,8 @@ pub mod sync {
         ("showsKeyHints", "キーの案内を表示"),
         ("showsFewerItems", "表示項目を減らす"),
         ("alwaysShowsBranchHints", "分岐図のキーの案内を常に表示"),
+        ("branchSegmentsPerGroup", "分岐図に一度に表示する文節数"),
+        ("branchWindowWidth", "分岐図の窓の幅"),
         ("numberKeySelection", "数字キーで候補を選択"),
         ("dateConversion", "日付と時刻に変換"),
         ("symbolConversion", "記号に変換"),

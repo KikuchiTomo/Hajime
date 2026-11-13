@@ -27,7 +27,7 @@ enum SnapshotRenderer {
             (ThemeChoice(.automatic, custom: sample), .darkAqua, "custom"),
             (ThemeChoice(.automatic), .aqua, "glass-light"), (ThemeChoice(.automatic), .darkAqua, "glass-dark"), (ThemeChoice(.platinum), .aqua, "platinum"), (ThemeChoice(.desk), .darkAqua, "desk"),
             (ThemeChoice(.washi), .aqua, "washi"), (ThemeChoice(.neon), .darkAqua, "neon"), (ThemeChoice(.terminal), .darkAqua, "terminal"), (ThemeChoice(.nordic), .aqua, "nordic"),
-            (ThemeChoice(.contrast), .darkAqua, "contrast"),
+            (ThemeChoice(.contrast), .darkAqua, "contrast"), (ThemeChoice(.indigo), .aqua, "indigo"), (ThemeChoice(.indigoNight), .darkAqua, "indigo-night"),
         ]
         checkPointerTargets()
         checkGridPointerTargets()
@@ -131,7 +131,14 @@ enum SnapshotRenderer {
             (appearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
                 for focus in [0, 6, 13] {
                     render(longLatticeView(theme: look.theme, appearance: appearance, focus: focus), name: "branch-long-\(focus)-\(look.name)", to: output, appearance: appearance)
+                    // 長い文をまとまりに区切って出す(1 つのまとまりは 5 文節まで)．最初・途中・最後のまとまり
+                    render(groupLatticeView(theme: look.theme, appearance: appearance, focus: focus), name: "branch-group-\(focus)-\(look.name)", to: output,
+                           appearance: appearance)
                 }
+                // 窓の幅を固定する設定．最後の文節の枝が右に入らないので，左右に反転して左へ出す
+                var fixed = SamplePanels.withKeys(SamplePanels.lattice)
+                fixed.keepsWidth = true
+                render(latticeView(fixed, theme: look.theme, appearance: appearance), name: "branch-fixed-\(look.name)", to: output, appearance: appearance)
                 render(longListView(theme: look.theme, appearance: appearance), name: "list-long-\(look.name)", to: output, appearance: appearance)
                 render(gridView(longGrid, theme: look.theme, appearance: appearance), name: "list-grid-long-\(look.name)", to: output, appearance: appearance)
             }
@@ -807,6 +814,21 @@ enum SnapshotRenderer {
         }
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: view.panel!))
         return backdropped(view)
+    }
+
+    /// 長い文をまとまりに区切って出す分岐図(core の InputSession が入れるものと同じ)．文節へ移るキーは，出しているまとまりの中で数える
+    private static func groupLatticeView(theme: ThemeChoice, appearance: NSAppearance?, focus: Int) -> NSView {
+        var panel = LatticePanel(columns: longSentence.enumerated().map { column, text in
+            column == focus ? .init(text: text, alternatives: [text, text + "候補", "ひらがなの" + text], selectedAlternative: 0, isFocused: true, isUncertain: false)
+                : .init(text: text, isFocused: false, isUncertain: false)
+        }, position: 1, total: 3)
+        panel.pageSize = DefaultSettings.latticeCandidatesPerSegment
+        panel.group = SegmentGrouping.group(containing: focus, texts: longSentence, size: 5)
+        let keymap = KeymapPreset.standard.keymap
+        for (command, index) in zip(KeymapCommand.segmentJumps, panel.group ?? panel.columns.indices) {
+            panel.columns[index].jumpKey = keymap.strokes(for: command, in: .converting).first.map(UIStrings.Keys.name(of:))
+        }
+        return latticeView(panel, theme: theme, appearance: appearance)
     }
 
     /// 候補を表に広げた一覧．窓の幅は表の上限まで広げる

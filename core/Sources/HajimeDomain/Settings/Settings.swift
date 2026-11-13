@@ -145,6 +145,10 @@ public struct Settings: Sendable, Equatable {
     /// 分岐図の表示項目を減らす．文字種の枝は文字種を選んでいるあいだだけ，候補の先の枝(語の意味・連想)は連想変換のキーで開いたあとだけ出す．
     /// 畳んでいる枝には，続きがある印だけを出す
     public var showsFewerItems = false
+    /// 分岐図で，長い文を区切って 1 つずつ出すときの，1 つのまとまりの文節の数の上限．0 なら区切らず，文の全体を 1 本の幹に並べる
+    public var branchSegmentsPerGroup = DefaultSettings.branchSegmentsPerGroup
+    /// 分岐図の窓の幅の決め方
+    public var branchWindowWidth = BranchWindowWidth.fit
     /// 番号キーで候補を選ぶ
     public var numberKeySelection = true
     /// 「きょう」「いま」などを日付や時刻に変換する候補を出す
@@ -291,6 +295,7 @@ public struct Settings: Sendable, Equatable {
         candidateGridColumns = clamp(candidateGridColumns, DefaultSettings.candidateGridColumnsRange)
         associationLimit = clamp(associationLimit, DefaultSettings.associationLimitRange)
         meaningSenseLimit = clamp(meaningSenseLimit, DefaultSettings.meaningSenseLimitRange)
+        branchSegmentsPerGroup = clamp(branchSegmentsPerGroup, DefaultSettings.branchSegmentsPerGroupRange)
         emojiCandidatePosition = clamp(emojiCandidatePosition, DefaultSettings.emojiCandidatePositionRange)
         emojiCandidateCount = clamp(emojiCandidateCount, DefaultSettings.emojiCandidateCountRange)
         var associationIDs = Set<String>()
@@ -426,7 +431,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, candidateGridColumns, expandsGridOnPaging, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, alwaysShowsBranchHints, showsFewerItems, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, alwaysShowsBranchHints, showsFewerItems, branchSegmentsPerGroup, branchWindowWidth, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking,
              jinenModel
@@ -522,6 +527,8 @@ extension Settings: Codable {
         read(.showsVariantRow, into: \.showsVariantRow)
         read(.showsKeyHints, into: \.showsKeyHints)
         read(.showsFewerItems, into: \.showsFewerItems)
+        read(.branchSegmentsPerGroup, into: \.branchSegmentsPerGroup)
+        read(.branchWindowWidth, into: \.branchWindowWidth)
         read(.alwaysShowsBranchHints, into: \.alwaysShowsBranchHints)
         read(.numberKeySelection, into: \.numberKeySelection)
         read(.dateConversion, into: \.dateConversion)
@@ -665,6 +672,8 @@ extension Settings: Codable {
         try container.encode(showsVariantRow, forKey: .showsVariantRow)
         try container.encode(showsKeyHints, forKey: .showsKeyHints)
         try container.encode(showsFewerItems, forKey: .showsFewerItems)
+        try container.encode(branchSegmentsPerGroup, forKey: .branchSegmentsPerGroup)
+        try container.encode(branchWindowWidth, forKey: .branchWindowWidth)
         try container.encode(alwaysShowsBranchHints, forKey: .alwaysShowsBranchHints)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)
         try container.encode(dateConversion, forKey: .dateConversion)
@@ -753,6 +762,10 @@ public struct ProfileRule: Sendable, Equatable, Codable, Hashable {
 public enum ThemePreference: String, Sendable, Equatable, Codable, CaseIterable {
     /// 標準(すりガラス．ライトとダークに合わせる)
     case automatic
+    /// 白い面に藍色の選択
+    case indigo
+    /// indigo の暗いほう
+    case indigoNight
     case platinum
     case desk
     /// 以前の値．標準と同じに読む
