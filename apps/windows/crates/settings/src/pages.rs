@@ -580,6 +580,8 @@ pub struct ListButtons {
     pub result: bool,
     /// この番号の入力欄のすぐ右に，書き方のチップを開け閉めする「{ }」のボタンを置く(TemplateTarget::field)
     pub template_field: Option<usize>,
+    /// この番号の入力欄の前に置く名前(判別ルールの「直前」．macOS の WordLanguagePage は欄と選ぶ部品のあいだに文字で置く)
+    pub caption: Option<(usize, &'static str)>,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -775,6 +777,12 @@ impl Control {
             result: matches!(self, Control::Dictionary(_))
                 || matches!(self, Control::List(spec, _) if spec.path == MACROS_PATH),
             template_field: self.template_target().map(TemplateTarget::field),
+            caption: match self {
+                Control::List(spec, _) if spec.path == "wordLanguage.rules" => {
+                    Some((1, features::LANGUAGE_RULE_CONTEXT))
+                }
+                _ => None,
+            },
         })
     }
 
