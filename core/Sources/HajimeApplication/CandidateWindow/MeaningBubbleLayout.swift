@@ -8,6 +8,8 @@
 /// - 窓の上の端より上に出さない置き方が無いとき(窓が入力位置の上にあって吹き出しが窓より高いときなど)だけ，
 ///   入力中の文字やほかの候補を覆わないように窓の上の端より上へ寄せる
 /// - 行の右に置けなければ(画面の右に入らない・寄せても覆う・三角が行に届かない)，候補の窓の右の外，それも無理なら窓の左の外に置く
+/// - どれにも入らなければ(画面の端の近くの幅の広い窓など)，窓の中の，選んでいる行の文字のすぐ右に置く(inside)．
+///   このときは行の背景ではなく文字の範囲で覆わない物を見る(ほかの候補の文字・タグ・足元の案内は覆わない)
 /// - 枠線は本体と三角を 1 本でなぞる(outline)
 ///
 /// 座標は上が y の小さい側(画面の上の端が 0 に近い)．macOS は画面の座標(下が y の小さい側)から直して使う．
@@ -60,14 +62,28 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
     /// 三角の頂点の y．窓の中の座標
     public var pointerY: Double
 
+    /// 窓の中に置くときに使う，選んでいる行の文字の範囲と，文字の範囲で見た覆わない物(どれも画面の座標)
+    public struct Inside: Sendable, Equatable {
+        /// 選んでいる候補の行の，番号から文字の終わりまで
+        public var content: Box
+        /// ほかの候補の文字とタグ・文字種の行・足元の区切りの線から下・入力中の文字
+        public var obstacles: [Box]
+
+        public init(content: Box, obstacles: [Box]) {
+            self.content = content
+            self.obstacles = obstacles
+        }
+    }
+
     /// - Parameters:
     ///   - row: 選んでいる候補の行の背景(画面の座標)．三角はこの行の縦の真ん中を指す
     ///   - window: 候補の窓の本体の枠(画面の座標)
     ///   - size: 本体の大きさ
     ///   - screen: 画面の使える範囲
     ///   - obstacles: 覆わない物(ほかの候補・幹の文節・足元の案内・入力中の文字．画面の座標)
+    ///   - inside: 窓の中の行の文字のすぐ右に置くときの範囲(一覧だけ．無ければ窓の中には置かない)
     public init(row: Box, window candidate: Box, size: (width: Double, height: Double), screen: Box, obstacles: [Box],
-                metrics: Metrics) {
+                inside: Inside? = nil, metrics: Metrics) {
         let screen = Box(x: screen.x + metrics.screenMargin, y: screen.y + metrics.screenMargin,
                          width: screen.width - metrics.screenMargin * 2, height: screen.height - metrics.screenMargin * 2)
         let windowWidth = size.width + metrics.pointerLength
@@ -78,7 +94,7 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         let preferredY = max(candidate.y, targetY - pointerRange.upperBound)
         // x(窓の左の端)に置いたときの縦の位置と三角の位置．覆う物があれば上か下へ寄せる．置けなければ nil．
         // 吹き出しの上の端は floor より上に出さない
-        func vertical(at x: Double, floor: Double) -> (y: Double, pointer: Double)? {
+        func vertical(at x: Double, floor: Double, avoiding obstacles: [Box]) -> (y: Double, pointer: Double)? {
             guard x >= screen.x, x + windowWidth <= screen.maxX else { return nil }
             var top = max(screen.y, floor), bottom = screen.maxY
             // floor より上にある物(入力中の文字の行など)は，floor で止めるだけで覆わないので見ない．
@@ -100,9 +116,15 @@ public struct MeaningBubbleLayout: Sendable, Equatable {
         let besideRow = (Side.right, row.maxX + metrics.gap)
         let outsideRight = (Side.right, candidate.maxX + metrics.gap)
         let outsideLeft = (Side.left, candidate.x - metrics.gap - windowWidth)
+        // 窓の外に置けなければ，窓の中の行の文字のすぐ右(文字の範囲で覆わない物を見る)
+        let choices: [(side: Side, x: Double, obstacles: [Box])] = [(besideRow.0, besideRow.1, obstacles), (outsideRight.0, outsideRight.1, obstacles),
+                                                                    (outsideLeft.0, outsideLeft.1, obstacles)]
+            + (inside.map { [(Side.right, $0.content.maxX + metrics.gap, $0.obstacles)] } ?? [])
         // まず窓の上の端より上に出さない置き方を探し，無ければ上に出してよい置き方を探す
         let found = [candidate.y, screen.y].lazy.flatMap { floor in
-            [besideRow, outsideRight, outsideLeft].lazy.compactMap { side, x in vertical(at: x, floor: floor).map { (side, x, $0.y, $0.pointer) } }
+            choices.lazy.compactMap { choice in
+                vertical(at: choice.x, floor: floor, avoiding: choice.obstacles).map { (choice.side, choice.x, $0.y, $0.pointer) }
+            }
         }.first
         // どこにも置けなければ，候補の窓の右の外に置いて画面の中へ寄せる(三角は角の丸みにかけない範囲で行を指す)
         let (side, x, y, pointer) = found ?? {

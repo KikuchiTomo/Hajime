@@ -151,6 +151,31 @@ struct MeaningBubbleLayoutTests {
         #expect(!Self.bodyBox(layout).intersects(caret))
     }
 
+    @Test("窓の右にも左にも入らない幅の広い窓では，窓の中の行の文字のすぐ右に置き，ほかの候補の文字と足元を覆わない")
+    func insideNextToText() {
+        // 縦長の画面(x 1920〜3000)の右に寄った幅の広い一覧(Windows の PC で見た場面)
+        let screen = Box(x: 1920, y: -383, width: 1080, height: 1920)
+        let window = Box(x: 1982, y: -192, width: 899, height: 265)
+        let rows = (0..<5).map { Box(x: 1994, y: -192 + 12 + 28 * Double($0), width: 875, height: 28) }
+        let texts = (0..<5).map { Box(x: 1994, y: rows[$0].y, width: 70, height: 28) }
+        let footer = Box(x: 1982, y: 41, width: 899, height: 32)
+        let selected = 4
+        let obstacles = rows.indices.filter { $0 != selected }.map { rows[$0] } + [footer]
+        let inside = Layout.Inside(content: texts[selected], obstacles: texts.indices.filter { $0 != selected }.map { texts[$0] } + [footer])
+        let layout = Layout(row: rows[selected], window: window, size: (288, 100), screen: screen, obstacles: obstacles, inside: inside,
+                            metrics: Self.metrics)
+        #expect(layout.side == .right)
+        #expect(Self.tip(layout).x - texts[selected].maxX == Self.metrics.gap)
+        #expect(Self.tip(layout).y == rows[selected].midY)
+        let body = Self.bodyBox(layout)
+        for obstacle in inside.obstacles {
+            #expect(!body.intersects(obstacle), "\(obstacle)")
+        }
+        // 窓の中に入らない設定(分岐図など)では，今までどおり画面の中へ寄せる
+        let fallback = Layout(row: rows[selected], window: window, size: (288, 100), screen: screen, obstacles: obstacles, metrics: Self.metrics)
+        #expect(fallback.window.maxX == screen.maxX - Self.metrics.screenMargin)
+    }
+
     @Test("三角が行に届かないときだけ，届くところまで下げる")
     func lowersToReach() {
         let setup = Self.list(x: 100, y: 100, selected: 3)

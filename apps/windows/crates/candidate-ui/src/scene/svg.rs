@@ -565,6 +565,11 @@ mod tests {
                             (shown.width, shown.height),
                             Frame::new(-1000.0, -1000.0, 4000.0, 4000.0),
                             &keep_clear,
+                            drawn
+                                .inside
+                                .as_ref()
+                                .map(|inside| inside.offset(margin, margin))
+                                .as_ref(),
                             &super::super::bubble::Metrics::tokens(theme.is_rounded()),
                         );
                         let bubble =
@@ -777,6 +782,11 @@ mod tests {
                     (shown.width, shown.height),
                     Frame::new(0.0, 0.0, width, height),
                     &keep_clear,
+                    window
+                        .inside
+                        .as_ref()
+                        .map(|inside| inside.offset(x, y))
+                        .as_ref(),
                     &metrics,
                 );
                 let drawn = bubble::bubble_scene(shown, &placement, &look, &measure);
