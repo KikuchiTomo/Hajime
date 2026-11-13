@@ -194,8 +194,3 @@ layout: hextra-home
     {{< hajime/catalog-item title="更新を確認" link="docs/install/" >}}新しいバージョンの変更点を確認して，そのまま更新できます．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
 {{< /hajime/catalog >}}
-
-<div class="hajime-engine">
-  かな漢字変換には <a href="https://github.com/azooKey/AzooKeyKanaKanjiConverter">azooKey</a> のエンジンと，ニューラル言語モデルの Zenzai を使っています．
-  このプロジェクトではなく，azooKeyおよびZenzaiプロジェクトを支援していただけると幸いです．
-</div>
