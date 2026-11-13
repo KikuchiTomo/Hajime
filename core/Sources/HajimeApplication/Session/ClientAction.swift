@@ -177,6 +177,9 @@ public struct CandidatePanel: Sendable, Equatable {
     /// 候補を表に広げたとき(KeymapCommand.expandCandidates)の 1 列の候補の数．entries を上から下へ詰め，列を左から右へ並べる．
     /// 広げていなければ nil(1 列)
     public var columnLength: Int?
+    /// 文節ごとの一覧で，注目している文節をその場で打ち直している(⇧⌫)．entries は打ち直す前の候補で，
+    /// 描く側は薄く出して選んでいる形にしない(selectedEntry は nil)．候補は変換したときに出し直す
+    public var isEditing = false
 
     /// 列の数．広げていなければ 1
     public var columnCount: Int {
@@ -261,6 +264,9 @@ public struct LatticePanel: Sendable, Equatable {
         public var sourceName: String?
         /// 文節を区切っているとき(⇧↓)の，区切れる位置で分けた文節．区切っていなければ nil
         public var split: Split?
+        /// その場で打ち直している文節(⇧⌫)．text は打っている読み(変換しない)．枝(alternatives・variants)は打ち直す前の候補で，
+        /// 描く側は薄く出して選んでいる形にしない(selectedAlternative・selectedVariant は nil)．候補は変換したときに出し直す
+        public var isEditing = false
 
         /// 区切れる位置の案内．幹に pieces を並べ，あいだに 1 から番号を振る
         public struct Split: Sendable, Equatable {

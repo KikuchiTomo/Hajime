@@ -378,6 +378,7 @@ mod tests {
 
     fn list() -> CandidateList {
         CandidateList {
+            is_editing: None,
             association: None,
             association_hint: None,
             association_key: None,
