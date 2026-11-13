@@ -13,6 +13,25 @@ public enum FooterHints {
         return make(panel.association == nil ? IndicatorLabels.branchHints : IndicatorLabels.associationHints, keymap: settings.keymap)
     }
 
+    /// 分岐図で，操作する場所に置く案内(macOS の BranchView.hints(for:) と同じ表)．区切りは文節の境目の上，文字種は上の枝の先，
+    /// 再入力・表形式は候補の下，展開は先の枝の先に置く．連想の一覧では候補の下に連想の操作，区切っているあいだは境目の上に区切る操作
+    public static func placed(for panel: LatticePanel, settings: Settings) -> WireBranchHints? {
+        guard settings.showsKeyHints else { return nil }
+        if panel.association != nil {
+            return WireBranchHints(boundary: [], candidates: make(IndicatorLabels.associationHints, keymap: settings.keymap))
+        }
+        if let split = panel.columns.first(where: \.isFocused)?.split {
+            return WireBranchHints(boundary: splitHints(count: split.pieces.count - 1), candidates: [])
+        }
+        // 先の枝を畳んでいるとき(表示項目を減らす設定)は，開くキー(連想変換のキー)を案内する
+        let expand = panel.collapsesDetail
+            ? make([IndicatorLabels.branchExpandHint], keymap: settings.keymap).first
+            : panel.associationHint?.key.map { WireKeyHint(keys: $0, label: IndicatorLabels.branchExpandLabel) }
+        return WireBranchHints(boundary: make(IndicatorLabels.branchBoundaryHints, keymap: settings.keymap),
+                               variant: make([IndicatorLabels.branchVariantHint], keymap: settings.keymap).first,
+                               candidates: make(IndicatorLabels.branchCandidateHints, keymap: settings.keymap), expand: expand)
+    }
+
     /// 一覧の足元の案内
     public static func make(for panel: CandidatePanel, settings: Settings) -> [WireKeyHint] {
         guard settings.showsKeyHints else { return [] }
