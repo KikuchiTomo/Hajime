@@ -59,6 +59,22 @@ const MENU_REGISTRATION_LENGTH: u32 = 64;
 /// 予約したキーで受け取った打鍵が，続けてキーのシンクにも届くのを待つ長さ
 const PRESERVED_ECHO_WINDOW: Duration = Duration::from_millis(500);
 
+/// 試しのビルドだけ: 経路の番号と有無だけを OutputDebugString に出す(入力した文字・読み・候補は出さない)
+fn trace(route: u32, a: bool, b: bool) {
+    let text = format!(
+        "hajime-trace route={route} a={} b={}\0",
+        u8::from(a),
+        u8::from(b)
+    );
+    let wide: Vec<u16> = text.encode_utf16().collect();
+    // SAFETY: wide は 0 で終わる文字列で，呼び出しのあいだ生きている
+    unsafe {
+        windows::Win32::System::Diagnostics::Debug::OutputDebugStringW(windows_core::PCWSTR(
+            wide.as_ptr(),
+        ))
+    };
+}
+
 thread_local! {
     static ACTIVE: RefCell<Option<ComObject<TextService>>> = const { RefCell::new(None) };
 }
@@ -698,6 +714,7 @@ impl TextService_Impl {
         }
         // メニューは閉じるまで戻らないので，キーの処理と組み立て中の文字の確定(下の edit)を終えてから出す
         if shows_menu {
+            trace(6, true, false);
             timer::defer(on_menu);
         }
         if edits.is_empty() {
@@ -1052,10 +1069,17 @@ impl TextService_Impl {
     /// 入力位置を読めなければポインターの位置に出す
     fn show_input_menu(&self) {
         let client_id = self.inner.borrow().client_id;
-        let caret = self
-            .focused_context()
-            .and_then(|(context, ..)| read_field(&context, client_id, 0, true).caret)
-            .or_else(|| self.inner.borrow().caret.clone());
+        let focused = self.focused_context();
+        let read = focused
+            .as_ref()
+            .and_then(|(context, ..)| read_field(context, client_id, 0, true).caret);
+        trace(2, focused.is_some(), read.is_some());
+        trace(
+            3,
+            self.inner.borrow().caret.is_some(),
+            self.inner.borrow().session.is_some(),
+        );
+        let caret = read.or_else(|| self.inner.borrow().caret.clone());
         let rect = match caret {
             Some(caret) => RECT {
                 left: caret.x,
@@ -1118,11 +1142,14 @@ impl TextService_Impl {
         make: impl FnOnce(u32, FieldContext) -> RequestBody,
     ) {
         let (Some(engine), Some(session)) = (engine, session) else {
+            trace(5, false, false);
             return;
         };
         let field = self.field_context(context);
         let pending = engine.send(make(session, field));
-        match pending.outcome(RESPONSE_TIMEOUT) {
+        let outcome = pending.outcome(RESPONSE_TIMEOUT);
+        trace(5, true, matches!(outcome, Outcome::Reply(_)));
+        match outcome {
             Outcome::Reply(body) => {
                 self.apply_response(context, body);
             }
@@ -1179,7 +1206,15 @@ impl langbar::Actions for MenuActions {
     }
 
     fn open_palette(&self) {
-        if let Some(service) = Self::active() {
+        let service = Self::active();
+        trace(
+            4,
+            service.is_some(),
+            service
+                .as_ref()
+                .is_some_and(|service| service.focused_context().is_some()),
+        );
+        if let Some(service) = service {
             service.open_palette();
         }
     }
@@ -1215,6 +1250,7 @@ impl langbar::Actions for MenuActions {
 /// キーで頼まれた入力メニューを，キーの処理を終えてから出す(timer の窓の手続きが panic を受け止める)
 fn on_menu() {
     let service = ACTIVE.with(|active| active.borrow().clone());
+    trace(1, service.is_some(), false);
     if let Some(service) = service {
         service.show_input_menu();
     }
