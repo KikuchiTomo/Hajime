@@ -124,7 +124,7 @@ fn sample_theme() -> CustomTheme {
 }
 
 /// 書き出す見た目: 名前・テーマ・ダークか
-const LOOKS: [(&str, &str, bool); 10] = [
+const LOOKS: [(&str, &str, bool); 12] = [
     ("custom", "automatic", true),
     ("glass-light", "automatic", false),
     ("glass-dark", "automatic", true),
@@ -135,6 +135,8 @@ const LOOKS: [(&str, &str, bool); 10] = [
     ("terminal", "terminal", true),
     ("nordic", "nordic", false),
     ("contrast", "contrast", true),
+    ("indigo", "indigo", false),
+    ("indigo-night", "indigoNight", true),
 ];
 
 fn render_all(output: &Path) -> Result<()> {

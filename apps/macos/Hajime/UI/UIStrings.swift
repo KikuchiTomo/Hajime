@@ -988,7 +988,7 @@ enum UIStrings {
         }
 
         /// 選べる外観．native は標準と同じ見た目なので並べない(古い設定のファイルにあっても標準として読む)
-        static let themes: [ThemePreference] = [.automatic, .washi, .nordic, .neon, .terminal, .contrast, .platinum, .desk]
+        static let themes: [ThemePreference] = [.automatic, .indigo, .indigoNight, .washi, .nordic, .neon, .terminal, .contrast, .platinum, .desk]
 
         static func label(for theme: ThemePreference) -> String {
             switch theme {
@@ -1000,6 +1000,8 @@ enum UIStrings {
             case .terminal: "ターミナル"
             case .nordic: "北欧"
             case .contrast: "高コントラスト"
+            case .indigo: "インディゴ"
+            case .indigoNight: "夜のインディゴ"
             }
         }
     }
