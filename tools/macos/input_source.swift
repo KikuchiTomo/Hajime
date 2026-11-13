@@ -1,4 +1,4 @@
-// 入力メソッドを OS の入力ソースとして有効・無効にする．ログアウトしなくても入力メニューに出し入れするため．
+// 入力メソッドを OS の入力ソースとして有効・無効にする．入れたあとログインし直したときに入力メニューに出しておくため．
 // 使い方: swift tools/macos/input_source.swift enable|disable <.app のパス>
 import Carbon
 import Foundation

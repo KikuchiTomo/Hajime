@@ -1,11 +1,6 @@
 #!/bin/sh
-# 入れ替えたあと，動いている古いバージョンを止める．次にキーを打ったとき OS が新しいバージョンを起こす
-pkill -x "Hajime" 2>/dev/null || true
-# 入力メソッドを起こす OS の常駐(imklaunchagent)は入れ替える前の本体の情報を持ったままで，
-# 新しい本体を起こせない(LaunchInputMethod() Error, status=-50)．止めると OS が起こし直し，新しい本体の情報を読む
-pkill -x imklaunchagent 2>/dev/null || true
-
-# ログイン中の利用者の入力ソースに登録して有効にする．ログアウトしなくても入力メニューに出る．
+# 入れたあとはログアウトを求める(distribution.xml の RequireLogout)．ログインし直すと OS が新しい本体を読む．
+# ログイン中の利用者の入力ソースに登録して有効にしておき，ログインし直したときに入力メニューに出るようにする．
 # 誰もログインしていなければ(コマンドで入れたときなど)何もしない．次のログインで OS が見つける
 app="$2/Hajime.app"
 user=$(stat -f %Su /dev/console)
@@ -17,8 +12,5 @@ if [ -n "$user" ] && [ "$user" != "root" ] && [ -d "$app" ]; then
   chmod 755 "$tool_dir" "$tool_dir/input_source"
   launchctl asuser "$uid" sudo -u "$user" "$tool_dir/input_source" enable "$app" || true
   rm -rf "$tool_dir"
-  # 入れる前に本体が止まっていると(アンインストールしてから入れ直したときなど)，入力メニューで選ばれたままでも
-  # OS が本体を起こさず，ログアウトするまで打てない．ログイン中の利用者として本体を起こしておく
-  launchctl asuser "$uid" sudo -u "$user" /usr/bin/open -g "$app" || true
 fi
 exit 0
