@@ -65,6 +65,8 @@ final class HajimeInputController: IMKInputController {
         followUpTask?.cancel()
         followUpTask = nil
         let context = root.contextProvider.context(for: client, includePrecedingText: !session.isComposing)
+        // 矢印キーは表示の向きに効かせる．今出している分岐図が先の枝を左へ出しているかを，キーを渡す前に知らせる
+        session.branchMirrored = presenter.isBranchMirrored
         let result = signposter.withIntervalSignpost("session") { session.handle(key, context: context) }
         if !result.handled {
             root.passThroughDiagnostics.recordPassThrough(key, mode: session.mode, context: context)

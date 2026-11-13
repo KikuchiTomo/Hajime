@@ -91,6 +91,8 @@ public final class EngineService {
     private let runCommand: (LauncherCommand) -> Void
     private let hints: (LatticePanel, Settings) -> [WireKeyHint]
     private let listHints: (CandidatePanel, Settings) -> [WireKeyHint]
+    /// 分岐図の，操作する場所に置くキーの案内(FooterHints.placed)
+    private let placedHints: (LatticePanel, Settings) -> WireBranchHints?
     /// 打ち間違いの訂正を別に求めるもの(Zenzai があるとき)．nil なら InputSession が変換器で求める
     private let typoService: (any TypoCorrecting)?
     private let now: () -> ContinuousClock.Instant
@@ -126,6 +128,7 @@ public final class EngineService {
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
                 openSettings: @escaping (_ arguments: [String]) -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
                 listHints: @escaping (CandidatePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
+                placedHints: @escaping (LatticePanel, Settings) -> WireBranchHints? = { _, _ in nil },
                 typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
                 sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
                 services: SettingsServices = SettingsServices(), runCommand: @escaping (LauncherCommand) -> Void = { _ in },
@@ -144,6 +147,7 @@ public final class EngineService {
         self.openSettings = openSettings
         self.hints = hints
         self.listHints = listHints
+        self.placedHints = placedHints
     }
 
     public func connect(isCandidateWindow: Bool = false, isSettingsApp: Bool = false) -> ConnectionID {
@@ -662,7 +666,8 @@ public final class EngineService {
     private func edit(_ actions: [ClientAction], handled: Bool, session: UInt32, anchor: WireRect?, wakeOnlyForHandwriting: Bool = false) -> WireResponseBody {
         let current = settings.current
         let routed = RoutedActions(actions, anchor: anchor, composition: lastComposition, hints: { [hints] in hints($0, current) },
-                                   listHints: { [listHints] in listHints($0, current) }, paletteCellSize: current.paletteCellSize)
+                                   listHints: { [listHints] in listHints($0, current) }, placedHints: { [placedHints] in placedHints($0, current) },
+                                   paletteCellSize: current.paletteCellSize)
         routed.ui.forEach(ui)
         for command in routed.ui {
             switch command {

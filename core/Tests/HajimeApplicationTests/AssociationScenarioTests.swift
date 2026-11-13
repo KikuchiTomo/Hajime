@@ -229,6 +229,123 @@ struct AssociationScenarioTests {
         #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
     }
 
+    @Test("長い文: 区切らない設定で文節がキーの数より多いときは，選んでいる文節のまわりの 8 文節に，文節へ移るキーを付ける")
+    func jumpKeysFollowFocus() throws {
+        let kana = ["あ", "い", "う", "え", "お", "か", "き", "く", "け", "こ"]
+        let reading = kana.joined()
+        let words = ["亜", "胃", "鵜", "絵", "尾", "蚊", "木", "区", "毛", "子"]
+        var table: [String: [(text: String, readingCount: Int?)]] = [reading: [(words.joined(), nil)]]
+        for (character, word) in zip(kana, words) { table[character] = [(word, nil)] }
+        let ten = FakeConverter(table)
+        ten.words[reading] = words.map { Candidate.Word(text: $0, readingCount: 1) }
+        var settings = makeSettings { $0.branchSegmentsPerGroup = 0 }
+        settings.initialFocus = .start
+        let harness = Harness(converter: ten, settings: settings, branchStations: true)
+        harness.type("aiueokakikukeko")
+        harness.press(.space)
+        #expect(harness.lattice?.group == nil)
+        #expect(harness.lattice?.columns.map(\.jumpKey) == ["⌥A", "⌥S", "⌥D", "⌥F", "⌥J", "⌥K", "⌥L", "⌥;", nil, nil])
+        // 9 番目の文節へ移ると，9 番目からの文節にキーが付く
+        harness.press(.end)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 9)
+        #expect(harness.lattice?.columns.map(\.jumpKey) == [nil, nil, nil, nil, nil, nil, nil, nil, "⌥A", "⌥S"])
+        harness.press(.character("a"), .option)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 8)
+    }
+
+    @Test("矢印で木をたどる: 文字種は横に並ぶので，幹の上の ↑ で入り，← → で移り，↓ で幹の上へ戻る．端では動かない")
+    func variantsByHorizontalArrows() throws {
+        let two = FakeConverter(["きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil)], "いい": [("良い", nil), ("いい", nil)]])
+        two.words["きょうはいい"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "はいい", readingCount: 3, startsWithParticle: true),
+        ]
+        var settings = makeSettings { _ in }
+        settings.initialFocus = .start
+        let harness = Harness(converter: two, settings: settings, branchStations: true)
+        harness.type("kyouhaii")
+        harness.press(.space)
+        harness.press(.up)
+        #expect(harness.lattice?.trunkFocused == true)
+        // 幹の上の ↑ で，文字種の先頭(ひらがな)に入る
+        harness.press(.up)
+        #expect(harness.lattice?.trunkFocused == false && harness.lattice?.columns.first?.selectedVariant == 0)
+        // 先頭の ← と，上へは動かない
+        harness.press(.left)
+        harness.press(.up)
+        #expect(harness.lattice?.columns.first?.selectedVariant == 0 && harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+        // → で次の文字種(カタカナ)へ．文節は移らない
+        harness.press(.right)
+        #expect(harness.lattice?.columns.first?.selectedVariant == 1 && harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+        harness.press(.left)
+        #expect(harness.lattice?.columns.first?.selectedVariant == 0)
+        // ↓ で幹の上へ戻る
+        harness.press(.down)
+        #expect(harness.lattice?.trunkFocused == true && harness.lattice?.columns.first?.selectedVariant == nil)
+    }
+
+    @Test("矢印で木をたどる: 先の枝を左へ出しているとき(反転)は，← で先の枝へ入って進み，→ で戻る．丸の中身でも同じ向き")
+    func mirroredBranch() throws {
+        let harness = stationHarness()
+        harness.type("utukusii")
+        harness.press(.space)
+        harness.session.branchMirrored = true
+        // 候補の上の → は，先の枝ではなく次の文節の向き(文節が 1 つなので動かず，幹の上になる)
+        harness.press(.right)
+        #expect(harness.lattice?.detail?.current == nil)
+        harness.press(.down)
+        // ← で先の枝の最初の丸へ，もう一度 ← で次の丸へ
+        harness.press(.left)
+        #expect(harness.lattice?.detail?.current == 0)
+        let count = try #require(harness.lattice?.detail?.stations.count)
+        #expect(count >= 2)
+        harness.press(.left)
+        #expect(harness.lattice?.detail?.current == 1)
+        // → で前の丸へ，最初の丸の → で候補へ戻る
+        harness.press(.right)
+        #expect(harness.lattice?.detail?.current == 0)
+        harness.press(.right)
+        #expect(harness.lattice?.detail?.current == nil)
+    }
+
+    @Test("長い文: 文節が上限を超えたら，選んでいる文節のまとまりだけを出す．文節へ移るキーは，出しているまとまりの中で数える．0 なら区切らない")
+    func segmentGroups() throws {
+        let reading = "あいうえお"
+        let five = FakeConverter([reading: [("亜胃鵜絵尾", nil)], "あ": [("亜", nil)], "い": [("胃", nil)], "う": [("鵜", nil)], "え": [("絵", nil)], "お": [("尾", nil)]])
+        five.words[reading] = ["亜", "胃", "鵜", "絵", "尾"].map { Candidate.Word(text: $0, readingCount: 1) }
+        var settings = makeSettings { $0.branchSegmentsPerGroup = 3 }
+        settings.initialFocus = .start
+        let harness = Harness(converter: five, settings: settings, branchStations: true)
+        harness.type("aiueo")
+        harness.press(.space)
+        let first = try #require(harness.lattice)
+        #expect(first.columns.count == 5 && first.group == 0..<3)
+        #expect(first.columns.map(\.jumpKey) == ["⌥A", "⌥S", "⌥D", nil, nil])
+        let shown = first.shownGroup()
+        #expect(shown.panel.columns.map(\.text) == ["亜", "胃", "鵜"] && shown.offset == 0)
+        #expect(shown.panel.continuesBefore == false && shown.panel.continuesAfter == true)
+        // 3 番目から → で 4 番目へ移ると，次のまとまりに入れ替わる
+        harness.press(.character("d"), .option)
+        harness.press(.right)
+        let second = try #require(harness.lattice)
+        #expect(second.columns.firstIndex(where: \.isFocused) == 3 && second.group == 3..<5)
+        #expect(second.columns.map(\.jumpKey) == [nil, nil, nil, "⌥A", "⌥S"])
+        #expect(second.shownGroup().panel.continuesBefore == true && second.shownGroup().panel.continuesAfter == false)
+        // 文節へ移るキーは，出しているまとまりの中で数える．まとまりに無い位置は何もしない
+        harness.press(.character("s"), .option)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 4)
+        harness.press(.character("d"), .option)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 4)
+        // 区切らない設定では，文の全体を出す
+        var whole = makeSettings { $0.branchSegmentsPerGroup = 0 }
+        whole.branchWindowWidth = .fixed
+        let all = Harness(converter: five, settings: whole, branchStations: true)
+        all.type("aiueo")
+        all.press(.space)
+        #expect(all.lattice?.group == nil && all.lattice?.keepsWidth == true)
+        #expect(all.lattice?.columns.map(\.jumpKey) == ["⌥A", "⌥S", "⌥D", "⌥F", "⌥J"])
+        #expect(harness.lattice?.keepsWidth == false)
+    }
+
     @Test("矢印で木をたどる: 先頭の候補で ↑ を押すと幹の上へ上り，幹の上の ← → は文節を移り，↓ で候補へ下りる．丸の上の Space は中身に入らず次の候補")
     func trunkLevel() throws {
         let two = FakeConverter(["きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil)], "いい": [("良い", nil), ("いい", nil)]])

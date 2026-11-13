@@ -268,6 +268,7 @@ func run() -> Int32 {
         },
         hints: { FooterHints.make(for: $0, settings: $1) },
         listHints: { FooterHints.make(for: $0, settings: $1) },
+        placedHints: { FooterHints.placed(for: $0, settings: $1) },
         typoService: typoService,
         sync: sync,
         files: files,

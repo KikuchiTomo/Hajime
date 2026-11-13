@@ -42,6 +42,14 @@ public enum InitialFocus: String, Sendable, Equatable, Codable, CaseIterable {
 }
 
 /// 語の意味(R-08)を候補の窓のどこに出すか
+/// 分岐図の窓の幅の決め方
+public enum BranchWindowWidth: String, Sendable, Equatable, Codable, CaseIterable {
+    /// 中身に合わせる．枝が右に入らなければ窓を広げる(枝の向きはいつも同じ)
+    case fit
+    /// 幹の幅のまま変えない．枝が右に入らなければ，左右に反転して左へ出す
+    case fixed
+}
+
 public enum MeaningPlacement: String, Sendable, Equatable, Codable, CaseIterable {
     /// 候補の右．一覧は選んでいる候補を指すカードにし，分岐図は選んでいる候補の先に意味の枝を伸ばす
     case side
