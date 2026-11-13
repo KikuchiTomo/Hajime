@@ -17,6 +17,7 @@ description: 変換・候補の選択・文節の操作・補正・便利な変�
 | Tab / Shift+Tab | 文節の移動(端まで行くと反対の端に戻ります) |
 | Option+← → | 誤変換の可能性が高い文節へ移動 |
 | Home / End | 先頭・末尾の文節へ移動 |
+| Option+A・S・D・F・J・K・L・; | 1〜8 番目の文節へ移動(ひな形が Mac 風なら Shift+Option+A・S・D・F・G・H・J・K)．分岐図の文節の下にキーが表示されます |
 | PageDown / PageUp | 候補の次・前のページ |
 | 数字キー | 番号の候補を選択 |
 | Enter | 確定 |

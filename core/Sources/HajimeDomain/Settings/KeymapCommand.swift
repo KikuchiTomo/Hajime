@@ -95,6 +95,15 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     /// 確信の低い次の文節へ移る
     case nextUncertainSegment
     case previousUncertainSegment
+    /// 分岐図の 1〜8 番目の文節へ移る(→ を何度も押さずに，離れた文節へ 1 回で移る)
+    case jumpToSegment1
+    case jumpToSegment2
+    case jumpToSegment3
+    case jumpToSegment4
+    case jumpToSegment5
+    case jumpToSegment6
+    case jumpToSegment7
+    case jumpToSegment8
     case extendSegment
     case shrinkSegment
     /// 文節の終わりを次の語の切れ目まで延ばす(1 文字ずつの extendSegment より少ない打鍵で長さを変える)
@@ -167,6 +176,14 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case tools
     }
 
+    /// 文節へ移るコマンド．1 番目の文節から順
+    public static let segmentJumps: [KeymapCommand] = [
+        .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8,
+    ]
+
+    /// 文節へ移るコマンドなら，移る先の文節の位置(0 から)
+    public var segmentJumpIndex: Int? { Self.segmentJumps.firstIndex(of: self) }
+
     public var group: Group {
         switch self {
         case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle,
@@ -178,6 +195,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate,
              .expandCandidates: .candidates
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
+             .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
         case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit, .undoPrediction, .undoCommit: .commit
         case .forgetCandidate, .forgetLastCommit, .hidePrediction: .learning
@@ -201,6 +219,7 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
              .commit, .cancel, .nextCandidate, .previousCandidate, .associate: [.composing, .converting]
         case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .expandCandidates,
              .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
+             .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment, .commitFirstSegment, .backToReading,
              .resumeEditing, .undoConversionEdit, .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana,
              .forgetCandidate: [.converting]

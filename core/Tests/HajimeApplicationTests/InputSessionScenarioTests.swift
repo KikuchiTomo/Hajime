@@ -1103,6 +1103,23 @@ struct BranchMapControlTests {
         #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
     }
 
+    @Test("R-17: ⌥ とホームポジションのキーで，その位置の文節へ移る．文節の無い位置のキーは何もしない．分岐図に移るキーの名前を出す")
+    func jumpToSegment() {
+        let harness = Harness(converter: converter())
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+        #expect(harness.lattice?.columns.map(\.jumpKey) == ["⌥A", "⌥S"])
+        harness.press(.character("s"), .option)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        harness.press(.character("f"), .option)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        harness.press(.character("a"), .option)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+        // 上の枝の文字種には，選んでいる文節だけをその文字種にするキーの名前を出す
+        #expect(harness.lattice?.columns.first?.variantKeys.prefix(3) == ["F6", "F7", "F8"])
+    }
+
     @Test("R-08: 選んでいる候補に同音異義語があれば使い分けを添え，設定で切れる")
     func homophoneNote() {
         let converter = FakeConverter(["とった": [("撮った", nil), ("取った", nil)]])

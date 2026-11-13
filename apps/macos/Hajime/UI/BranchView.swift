@@ -282,6 +282,12 @@ final class BranchView: NSView {
         var overflows = false
     }
 
+    /// 上の枝の文字種ごとの，その文字種にするキー(variants と同じ数)．案内を出さない設定と，キーの無い文字種は nil
+    private func variantKeys(of column: LatticePanel.Column?) -> [String?] {
+        guard let column else { return [] }
+        return column.variants.indices.map { showsHints && column.variantKeys.indices.contains($0) ? column.variantKeys[$0] : nil }
+    }
+
     /// 幹の文節の幅(文字と左右の余白)
     private func trunkWidth(_ column: LatticePanel.Column) -> CGFloat {
         var text = trunkCommand(column).map { CommandDrawing.width + textWidth($0.title, font: trunkFont) } ?? textWidth(column.text, font: trunkFont)
@@ -386,7 +392,11 @@ final class BranchView: NSView {
         }
 
         // 文字種の枝．文節の上から横へ伸ばす．並びは反転しない
-        let kindWidths = (column?.variants ?? []).map { textWidth($0, font: labelFont) + Part.rowPaddingX * 2 }
+        // 文字種の文字の前に，その文字種にするキーを置く(案内を出す設定で，キーが割り当てられているとき)
+        let kindKeys = variantKeys(of: column)
+        let kindWidths = (column?.variants ?? []).enumerated().map { index, text in
+            textWidth(text, font: labelFont) + Part.rowPaddingX * 2 + (kindKeys[index].map { BranchMapDrawing.keyWidth($0, theme: theme) + Space.inline } ?? 0)
+        }
         // 文字種の文字・境目の案内・候補の番号・候補の下の案内の左の端を，縦の線から同じ距離にそろえる
         let kindStart = badgeOffset - Part.rowPaddingX
         let variantHintWidth = kindWidths.isEmpty ? 0 : hints.variant.map { BranchMapDrawing.hintWidth($0, theme: theme) } ?? 0
@@ -682,6 +692,16 @@ final class BranchView: NSView {
             for (index, column) in panel.columns.enumerated() where layout.nodes[index].maxX >= 0 && layout.nodes[index].minX <= body.maxX {
                 drawTrunkNode(column, in: layout.nodes[index])
             }
+            // 文節へ移るキーを，文節の丸の上に重ねる(区切っているあいだは，番号キーが別の意味になるので出さない)
+            if showsHints, !panel.columns.contains(where: { $0.split != nil }) {
+                for (index, column) in panel.columns.enumerated() {
+                    guard let key = column.jumpKey else { continue }
+                    let hint = KeyHint(key: key, label: "")
+                    let stop = trunkStops[index]
+                    BranchMapDrawing.drawHint(hint, x: stop.center.x - BranchMapDrawing.hintWidth(hint, theme: theme) / 2, midY: stop.center.y, theme: theme,
+                                              selected: index == layout.focus)
+                }
+            }
         }
 
         // 枝の線．選んでいない線をまとめて描き，選んだ道すじを選択の色と太さで上に重ねる
@@ -729,8 +749,9 @@ final class BranchView: NSView {
             drawRow(rows[index], in: row, direction: layout.direction)
         }
         if let column {
+            let keys = variantKeys(of: column)
             for (index, kind) in layout.kinds.enumerated() where column.variants.indices.contains(index) {
-                drawKind(column.variants[index], in: kind.label, selected: index == column.selectedVariant, opacity: stale)
+                drawKind(column.variants[index], key: keys[index], in: kind.label, selected: index == column.selectedVariant, opacity: stale)
             }
         }
         for station in layout.stations {
@@ -969,7 +990,7 @@ final class BranchView: NSView {
     }
 
     /// 文字種．選んでいるものは選択の背景で囲む
-    private func drawKind(_ text: String, in label: NSRect, selected: Bool, opacity: CGFloat) {
+    private func drawKind(_ text: String, key: String?, in label: NSRect, selected: Bool, opacity: CGFloat) {
         if selected {
             if theme.isRounded {
                 GlassDrawing.fillCapsule(label, color: theme.selection)
@@ -979,7 +1000,12 @@ final class BranchView: NSView {
             }
         }
         let color = selected ? theme.selectionText : theme.text.withAlphaComponent(theme.text.alphaComponent * opacity)
-        TextFitting.draw(text, attributes: [.font: labelFont, .foregroundColor: color], x: label.minX + Part.rowPaddingX, midY: label.midY)
+        var textX = label.minX + Part.rowPaddingX
+        if let key {
+            BranchMapDrawing.drawKey(key, x: textX, midY: label.midY, theme: theme, selected: selected)
+            textX += BranchMapDrawing.keyWidth(key, theme: theme) + Space.inline
+        }
+        TextFitting.draw(text, attributes: [.font: labelFont, .foregroundColor: color], x: textX, midY: label.midY)
     }
 
     /// 枝として出す語の意味．品詞のタグと，意味ごとの文と使い方の例．文は縦の線に近い側の端にそろえる

@@ -144,12 +144,28 @@ enum SamplePanels {
         return LatticePanel(columns: [column, .init(text: "かわいい", isFocused: false, isUncertain: false)], position: 1, total: 11)
     }()
 
-    static let lattice = LatticePanel(columns: [
+    static let lattice = withKeys(LatticePanel(columns: [
         .init(text: "私の", isFocused: false, isUncertain: false),
         .init(text: "名前は", isFocused: false, isUncertain: false, isDecided: true),
         .init(text: "中野です", alternatives: ["中のです", "中野です", "仲のです", "那珂のです"], selectedAlternative: 1,
               variants: ["なかのです", "ナカノデス", "ﾅｶﾉﾃﾞｽ"], isFocused: true, isUncertain: true, shorter: "中野で", longer: nil),
-    ], position: 1, total: 8)
+    ], position: 1, total: 8))
+
+    /// 標準のキー設定の，文節へ移るキーと文字種にするキーを入れた見本(core の InputSession が入れるものと同じ)
+    static func withKeys(_ panel: LatticePanel) -> LatticePanel {
+        var panel = panel
+        let keymap = KeymapPreset.standard.keymap
+        for (index, command) in KeymapCommand.segmentJumps.enumerated() where panel.columns.indices.contains(index) {
+            panel.columns[index].jumpKey = keymap.strokes(for: command, in: .converting).first.map(UIStrings.Keys.name(of:))
+        }
+        let variantCommands: [KeymapCommand] = [.segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana]
+        if let focused = panel.columns.firstIndex(where: \.isFocused) {
+            panel.columns[focused].variantKeys = panel.columns[focused].variants.indices.map { index in
+                variantCommands.indices.contains(index) ? keymap.strokes(for: variantCommands[index], in: .converting).first.map(UIStrings.Keys.name(of:)) : nil
+            }
+        }
+        return panel
+    }
 }
 
 /// 見本のパレット(R-26)．設定の画面の外観のプレビューと，見本の画像(SnapshotRenderer)で使う

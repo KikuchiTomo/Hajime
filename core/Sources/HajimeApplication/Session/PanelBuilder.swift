@@ -317,6 +317,7 @@ enum PanelBuilder {
         var panel = panel
         if panel.columns[focused].selectedVariant == nil, !panel.columns[focused].variants.isEmpty {
             panel.columns[focused].variants = []
+            panel.columns[focused].variantKeys = []
             panel.collapsesVariants = true
         }
         if !showsDetail, panel.columns[focused].homophone != nil || panel.associationHint != nil {

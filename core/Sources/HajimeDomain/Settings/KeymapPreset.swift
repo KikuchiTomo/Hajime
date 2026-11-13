@@ -21,12 +21,12 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     /// ひな形の行(「状態<タブ>キー<タブ>コマンド」の形)
     public var source: String {
         switch self {
-        case .standard: Self.common + "\n" + Self.standardRows
-        case .windows: Self.common + "\n" + Self.windowsRows
-        case .mac: Self.common + "\n" + Self.macRows
-        case .emacs: Self.common + "\n" + Self.standardRows + "\n" + Self.emacsRows
-        case .vim: Self.common + "\n" + Self.standardRows + "\n" + Self.vimRows
-        case .atok: Self.common + "\n" + Self.atokRows
+        case .standard: Self.common + "\n" + Self.standardRows + "\n" + Self.segmentJumpRows
+        case .windows: Self.common + "\n" + Self.windowsRows + "\n" + Self.segmentJumpRows
+        case .mac: Self.common + "\n" + Self.macRows + "\n" + Self.macSegmentJumpRows
+        case .emacs: Self.common + "\n" + Self.standardRows + "\n" + Self.segmentJumpRows + "\n" + Self.emacsRows
+        case .vim: Self.common + "\n" + Self.standardRows + "\n" + Self.segmentJumpRows + "\n" + Self.vimRows
+        case .atok: Self.common + "\n" + Self.atokRows + "\n" + Self.segmentJumpRows
         }
     }
 
@@ -34,6 +34,31 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
     public static func matching(_ keymap: Keymap) -> KeymapPreset? {
         allCases.first { $0.keymap.entries == keymap.entries }
     }
+
+    /// 分岐図の 1〜8 番目の文節へ移るキー．変換中の Option とホームポジションの 8 つのキー(A・S・D・F・J・K・L・;)．Mac 風のほかのすべてのひな形に入れる
+    static let segmentJumpRows = """
+        converting\tOption a\tjumpToSegment1
+        converting\tOption s\tjumpToSegment2
+        converting\tOption d\tjumpToSegment3
+        converting\tOption f\tjumpToSegment4
+        converting\tOption j\tjumpToSegment5
+        converting\tOption k\tjumpToSegment6
+        converting\tOption l\tjumpToSegment7
+        converting\tOption ;\tjumpToSegment8
+        """
+
+    /// Mac 風の，文節へ移るキー．Mac 風は変換中の Option+A・S・K をほかの操作(半角カタカナ・半角英数・次の候補)に使うので，Shift を足す．
+    /// Shift を押すと「;」は別の字になるので，中段の左から 8 つの英字(A・S・D・F・G・H・J・K)にする
+    static let macSegmentJumpRows = """
+        converting\tShift Option a\tjumpToSegment1
+        converting\tShift Option s\tjumpToSegment2
+        converting\tShift Option d\tjumpToSegment3
+        converting\tShift Option f\tjumpToSegment4
+        converting\tShift Option g\tjumpToSegment5
+        converting\tShift Option h\tjumpToSegment6
+        converting\tShift Option j\tjumpToSegment7
+        converting\tShift Option k\tjumpToSegment8
+        """
 
     /// どのひな形にも入れる行．日本語と英数の切り替えと，入力の状態によらない IME の機能
     static let common = """

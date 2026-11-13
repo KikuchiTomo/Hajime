@@ -199,6 +199,39 @@ enum BranchMapDrawing {
         }
     }
 
+    // MARK: - キーだけの印
+
+    /// 文字種の前に置く，キーだけの印の幅．候補の番号と同じキーキャップの形
+    static func keyWidth(_ key: String, theme: ResolvedTheme) -> CGFloat {
+        max(Glass.tagHeight, Part.tagPaddingX * 2 + keyWidth(KeyHint(key: key, label: ""), theme: theme))
+    }
+
+    /// キーだけの印を x から描く．selected なら選択の背景の上の描き方
+    static func drawKey(_ key: String, x: CGFloat, midY: CGFloat, theme: ResolvedTheme, selected: Bool) {
+        let hint = KeyHint(key: key, label: "")
+        let rect = NSRect(x: x.rounded(), y: (midY - Glass.tagHeight / 2).rounded(), width: keyWidth(key, theme: theme), height: Glass.tagHeight)
+        if selected {
+            theme.selectionText.withAlphaComponent(DesignTokens.Opacity.Badge.selected).setFill()
+            if theme.isRounded {
+                NSBezierPath(roundedRect: rect, xRadius: Glass.keycapRadius, yRadius: Glass.keycapRadius).fill()
+            } else {
+                rect.fill()
+            }
+        } else {
+            GlassDrawing.drawKeycap(rect, theme: theme)
+        }
+        let ink = selected ? theme.selectionText : theme.textMuted
+        var partX = rect.midX - keyWidth(hint, theme: theme) / 2
+        for (index, parts) in hint.keycaps.enumerated() {
+            if index > 0 { partX += Glass.keycapGap - Glass.keycapPartGap }
+            for part in parts {
+                let partWidth = GlassDrawing.partWidth(part, theme: theme)
+                GlassDrawing.drawPart(part, in: NSRect(x: partX, y: rect.minY, width: partWidth, height: rect.height), theme: theme, color: ink)
+                partX += partWidth + Glass.keycapPartGap
+            }
+        }
+    }
+
     // MARK: - 境目のつまみ
 
     /// 文節の境目のつまみ．縦の線と，左右の山形(境目を左右へ動かせる印)
