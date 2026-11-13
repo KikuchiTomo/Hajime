@@ -2009,6 +2009,10 @@
         {
           "name": "columnLength",
           "type": "u32?"
+        },
+        {
+          "name": "isEditing",
+          "type": "bool?"
         }
       ]
     },
@@ -2095,6 +2099,10 @@
         {
           "name": "split",
           "type": "BranchSplit?"
+        },
+        {
+          "name": "isEditing",
+          "type": "bool?"
         }
       ]
     },
