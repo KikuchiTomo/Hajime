@@ -88,6 +88,75 @@ struct EnglishAutoScenarioTests {
         #expect(harness.marked.text == "kathio")
     }
 
+    @Test("R-05: 英字入力(自動)で空白を挟まずに英単語を打っても，英単語の後ろの日本語は日本語に戻す")
+    func automaticRecoversAfterEnglishWord() {
+        let converter = FakeConverter([
+            "きょうは": [("今日は", nil)],
+            "でかいぎ": [("で会議", nil)],
+            "に": [("に", nil)],
+        ])
+        let harness = harness(.englishAuto, converter: converter, lexicon: ["zoom", "github", "push", "notification"])
+        harness.type("kyouhazoom")
+        harness.settle()
+        #expect(harness.marked.text == "今日はzoom")
+        harness.type("dekaigi")
+        harness.settle()
+        #expect(harness.marked.text == "今日はzoomで会議")
+        harness.press(.enter)
+        #expect(harness.committed == "今日はzoomで会議")
+        #expect(harness.lastResult.handled)
+        // 確定したあとも英語のままにならない．打鍵が止まらないまま確定しても，確定するときに分ける
+        harness.type("githubni")
+        harness.press(.space)
+        #expect(harness.committed == "今日はzoomで会議githubに")
+        // 英単語だけを続けた並びは英語のまま
+        harness.type("pushnotification")
+        harness.settle()
+        #expect(harness.marked.text == "pushnotification")
+    }
+
+    @Test("R-05: 英語と日本語に分けるのは打鍵が止まったときで，打っているあいだは前に分けた結果に打ち足した英字をつなぐ")
+    func automaticSplitsWhenSettled() {
+        let converter = FakeConverter([
+            "でかいぎ": [("で会議", nil)],
+            "でかいぎを": [("で会議を", nil)],
+        ])
+        let harness = harness(.englishAuto, converter: converter, lexicon: ["zoom"])
+        harness.type("zoomdekaigi")
+        // 打鍵では分けない(打鍵を待たせない)．打鍵の合間に 1 歩ずつ分け，表示は変えない
+        #expect(harness.marked.text == "zoomdekaigi")
+        #expect(harness.session.awaitsSettle)
+        #expect(harness.session.awaitsDeferredConversion)
+        var steps = 0
+        while harness.session.awaitsDeferredConversion, steps < 10 {
+            harness.session.performDeferredConversion()
+            steps += 1
+        }
+        #expect(steps == 2)
+        #expect(harness.marked.text == "zoomdekaigi")
+        // 打鍵が止まったら分けた結果を見せる
+        harness.settle()
+        #expect(harness.marked.text == "zoomで会議")
+        #expect(!harness.session.awaitsSettle)
+        harness.type("wo")
+        #expect(harness.marked.text == "zoomで会議wo")
+        harness.settle()
+        #expect(harness.marked.text == "zoomで会議を")
+    }
+
+    @Test("R-05: 英語と日本語に分けて見せた並びも，Esc で英字に戻す")
+    func automaticMixedEscape() {
+        let converter = FakeConverter(["でかいぎ": [("で会議", nil)]])
+        let harness = harness(.englishAuto, converter: converter, lexicon: ["zoom"])
+        harness.type("zoomdekaigi")
+        harness.settle()
+        #expect(harness.marked.text == "zoomで会議")
+        harness.press(.escape)
+        #expect(harness.marked.text == "zoomdekaigi")
+        harness.press(.enter)
+        #expect(harness.committed == "zoomdekaigi")
+    }
+
     @Test("R-02: 英語にも日本語にも読める語(「make」)は，前が英語なら英語，前が日本語なら日本語", arguments: [
         ("Let's ", "make"),
         ("試合に", "負け"),
