@@ -20,7 +20,9 @@ use std::mem::ManuallyDrop;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 use windows::Win32::Foundation::{LPARAM, POINT, RECT, WPARAM};
+use windows::Win32::Graphics::Gdi::ClientToScreen;
 use windows::Win32::System::Com::{CoCreateInstance, CoTaskMemFree, CLSCTX_INPROC_SERVER};
+use windows::Win32::System::Threading::GetCurrentThreadId;
 use windows::Win32::System::Variant::{VariantClear, VARIANT, VT_I4, VT_UNKNOWN};
 use windows::Win32::UI::TextServices::{
     CLSID_TF_CategoryMgr, IEnumTfDisplayAttributeInfo, ITfCategoryMgr, ITfCompartment,
@@ -39,6 +41,7 @@ use windows::Win32::UI::TextServices::{
     TF_DEFAULT_SELECTION, TF_ES_ASYNCDONTCARE, TF_ES_READ, TF_ES_READWRITE, TF_ES_SYNC,
     TF_IAS_QUERYONLY, TF_SELECTION, TF_SELECTIONSTYLE, TF_ST_CORRECTION,
 };
+use windows::Win32::UI::WindowsAndMessaging::{GetGUIThreadInfo, GUITHREADINFO};
 use windows_core::{implement, ComObject, IUnknownImpl, Interface, Ref, Result, BOOL, GUID};
 
 const RESPONSE_TIMEOUT: Duration = Duration::from_millis(ipc::timing::KEY_RESPONSE_MILLISECONDS);
@@ -593,7 +596,12 @@ impl TextService_Impl {
             )
         };
         // 組み立てている途中は前の位置を使うので，入力位置の画面の上の位置は尋ねない(キーごとにアプリに配置を尋ねない)
-        let field = read_field(context, client_id, wanted.unwrap_or(0), !composing);
+        let mut field = read_field(context, client_id, wanted.unwrap_or(0), !composing);
+        // 何も選んでいない入力位置の画面の位置を返さない欄(WinForms の TextBox など)では，システムのキャレットの位置を使う
+        // (使わないと前の欄やほかのアプリの位置が残り，パレットやモード表示がそこに出る)
+        if !composing && field.caret.is_none() {
+            field.caret = system_caret();
+        }
         // 組み立てていないときは今の入力位置を使う(前の組み立ての位置は，ほかの欄やほかのアプリのことがある．
         // モード表示や最初の候補の窓がそこに出てしまう)
         let caret = match (composing, field.caret) {
@@ -1594,6 +1602,41 @@ struct FieldReading {
 
 /// 入力欄が秘密の欄か(パスワードなど)と，入力位置の前の文字列(最大 length 文字．UTF-16 で数える)を 1 回の読み取りで読む．
 /// 秘密の欄では前の文字列を読まない．wants_caret なら入力位置の画面の上の位置も読む
+/// この入力のスレッドのシステムのキャレット(画面の位置)．キャレットを出していなければ None
+fn system_caret() -> Option<Rect> {
+    let mut info = GUITHREADINFO {
+        cbSize: std::mem::size_of::<GUITHREADINFO>() as u32,
+        ..Default::default()
+    };
+    // SAFETY: info は cbSize を入れた GUITHREADINFO．スレッドはこの入力のスレッド(TSF はアプリの UI のスレッドで呼ぶ)
+    unsafe { GetGUIThreadInfo(GetCurrentThreadId(), &mut info) }.ok()?;
+    if info.hwndCaret.is_invalid() {
+        return None;
+    }
+    let mut corners = [
+        POINT {
+            x: info.rcCaret.left,
+            y: info.rcCaret.top,
+        },
+        POINT {
+            x: info.rcCaret.right,
+            y: info.rcCaret.bottom,
+        },
+    ];
+    for corner in &mut corners {
+        // SAFETY: hwndCaret はキャレットを持つ窓，corner はこの呼び出しのあいだ生きている
+        unsafe { ClientToScreen(info.hwndCaret, corner) }
+            .ok()
+            .ok()?;
+    }
+    Some(Rect {
+        x: corners[0].x,
+        y: corners[0].y,
+        width: corners[1].x - corners[0].x,
+        height: corners[1].y - corners[0].y,
+    })
+}
+
 fn read_field(
     context: &ITfContext,
     client_id: u32,
