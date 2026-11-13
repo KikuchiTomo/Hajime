@@ -101,7 +101,8 @@ enum SettingsBenchmark {
 
 extension SettingsBenchmark {
     /// ページの中の操作(スクロール・設定の変更・文字の入力・表の行の選択)にかかる時間を，ページごとに出す．
-    /// 1 回の操作を画面に映し終わるまでの時間で，16.7 ms を超えると 1 こま(60 Hz)に収まらない
+    /// 1 回の操作を画面に映し終わるまでの時間で，16.7 ms を超えると 1 こま(60 Hz)に収まらない．
+    /// 操作ごとの関数は，プロファイラで操作を見分けられるよう，呼び出し元に埋め込ませない(@inline(never))
     static func measureInteractions(pages: [SettingsView.Page]) {
         print("ページ\tスクロール中央値(ms)\tスクロール最大(ms)\tページの設定の変更(ms)\tほかの設定の変更(ms)\t入力中央値(ms)\t入力最大(ms)\t行を選ぶ(ms)")
         for page in pages {
@@ -128,6 +129,7 @@ extension SettingsBenchmark {
     }
 
     /// ページを初めて開く時間を，新しい窓で count 回ずつ測る(1 つの窓では 1 回しか測れないため)
+    @inline(never)
     static func measureFirstOpens(pages: [SettingsView.Page], count: Int) {
         print("ページ\t初めて開く中央値(ms)\t最大(ms)")
         for page in pages {
@@ -166,6 +168,7 @@ extension SettingsBenchmark {
     }
 
     /// ページの最初の表の行を上から 1 つずつ選び，1 行ごとの時間を返す．表の無いページは空
+    @inline(never)
     private static func selectionTimes(_ window: NSWindow) -> [Double] {
         guard let table = pageViews(window).compactMap({ $0 as? NSTableView }).first(where: { $0.numberOfRows > 1 }) else { return [] }
         let times = (0..<min(table.numberOfRows, 8)).map { row in
@@ -208,6 +211,7 @@ extension SettingsBenchmark {
     }
 
     /// ページを上から下まで少しずつ送り，1 段ごとの時間を返す．送れないページは空
+    @inline(never)
     private static func scrollTimes(_ window: NSWindow) -> [Double] {
         let scrolls = pageViews(window).compactMap { $0 as? NSScrollView }
         // ページ全体を送るスクロールビュー(いちばん長く送れるもの)
@@ -234,6 +238,7 @@ extension SettingsBenchmark {
     }
 
     /// ページの最初の入力欄に 1 字ずつ打ち，1 字ごとの時間を返す．入力欄の無いページは空
+    @inline(never)
     private static func typingTimes(_ window: NSWindow) -> [Double] {
         let fields = pageViews(window).compactMap { $0 as? NSTextField }.filter { $0.isEditable && $0.isEnabled }
         // 画面の上にある欄から使う

@@ -128,12 +128,10 @@ private struct InputTab: View {
             Section(UIStrings.Settings.inputStyleSection) {
                 // 英字入力(自動)を選んだときだけ，名前のすぐ後ろに打った英文が日本語になる見本を出す
                 let titleWidth = ExampleToggle.titleWidth([UIStrings.Choice.inputStyle, UIStrings.Choice.englishInputLiveConversion])
-                ResettablePicker(model: model, title: UIStrings.Choice.inputStyle, keyPath: \.inputStyle,
-                                 example: model.settings.inputStyle == .englishAuto ? UIStrings.Choice.englishAutoExample : nil, titleWidth: titleWidth,
-                                 label: UIStrings.Choice.label(for:))
+                InputStylePicker(model: model, titleWidth: titleWidth)
                 ExampleToggle(model: model, title: UIStrings.Choice.englishInputLiveConversion, keyPath: \.englishInputLiveConversion,
                               example: UIStrings.Choice.englishInputLiveConversionExample, titleWidth: titleWidth)
-                    .disabled(model.settings.inputStyle != .english)
+                    .disabled(model, unless: \.inputStyle, is: .english)
                 ResettablePicker(model: model, title: UIStrings.Choice.keyboardLayout, keyPath: \.keyboardLayout, label: UIStrings.Choice.label(for:))
             }
             Section(UIStrings.Settings.characters) {
@@ -160,10 +158,22 @@ private struct InputTab: View {
                     SecondsSlider(title: UIStrings.More.modeIndicatorDuration, value: model.binding(\.modeIndicatorDuration),
                                   range: DefaultSettings.modeIndicatorDurationRange)
                 }
-                .disabled(!model.settings.showsModeIndicator)
+                .disabled(model, unless: \.showsModeIndicator)
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// 入力方式を選ぶ項目．英字入力(自動)を選んだときだけ見本を添えるので，選んだ値はこの行が読む
+private struct InputStylePicker: View {
+    @ObservedObject var model: SettingsModel
+    let titleWidth: CGFloat
+
+    var body: some View {
+        ResettablePicker(model: model, title: UIStrings.Choice.inputStyle, keyPath: \.inputStyle,
+                         example: model.settings.inputStyle == .englishAuto ? UIStrings.Choice.englishAutoExample : nil, titleWidth: titleWidth,
+                         label: UIStrings.Choice.label(for:))
     }
 }
 
@@ -178,23 +188,23 @@ private struct ConversionTab: View {
                 ResettablePicker(model: model, title: UIStrings.Choice.initialFocus, keyPath: \.initialFocus, label: UIStrings.Choice.label(for:))
                 ResettablePicker(model: model, title: UIStrings.Choice.suggestionDisplay, keyPath: \.suggestionDisplay, label: UIStrings.Choice.label(for:))
                 ResettableStepper(model: model, title: UIStrings.More.suggestionSkipCount, keyPath: \.suggestionSkipCount, range: DefaultSettings.suggestionSkipCountRange,
-                                  value: UIStrings.More.skipCount(model.settings.suggestionSkipCount))
-                .disabled(model.settings.suggestionDisplay == .off)
+                                  value: UIStrings.More.skipCount)
+                .disabled(model, when: \.suggestionDisplay, is: .off)
                 ResettablePicker(model: model, title: UIStrings.Choice.predictionDisplay, keyPath: \.predictionDisplay, label: UIStrings.Choice.label(for:))
                 ResettableToggle(model: model, title: UIStrings.Choice.predictionPrefersHistory, keyPath: \.predictionPrefersHistory)
-                    .disabled(model.settings.predictionDisplay == .off)
+                    .disabled(model, when: \.predictionDisplay, is: .off)
                 ResettableToggle(model: model, title: UIStrings.Choice.predictionFromCorrection, keyPath: \.predictionFromCorrection)
-                    .disabled(model.settings.predictionDisplay == .off)
+                    .disabled(model, when: \.predictionDisplay, is: .off)
                 ResettableToggle(model: model, title: UIStrings.Choice.variantRow, keyPath: \.showsVariantRow)
                 ResettableToggle(model: model, title: UIStrings.Choice.keyHints, keyPath: \.showsKeyHints)
                 ResettableRow(model: model, keyPath: \.liveConversionDelay) {
                     SecondsSlider(title: UIStrings.More.liveConversionDelay, value: model.binding(\.liveConversionDelay),
                                   range: DefaultSettings.liveConversionDelayRange)
                 }
-                .disabled(!model.settings.liveConversion)
+                .disabled(model, unless: \.liveConversion)
                 ResettableStepper(model: model, title: UIStrings.More.liveConversionSkipLength, keyPath: \.liveConversionSkipLength, range: DefaultSettings.liveConversionSkipLengthRange,
-                                  value: UIStrings.More.skipLength(model.settings.liveConversionSkipLength))
-                .disabled(!model.settings.liveConversion)
+                                  value: UIStrings.More.skipLength)
+                .disabled(model, unless: \.liveConversion)
             }
             Section(UIStrings.Choice.hiddenPredictions) {
                 RuleListEditor(model: model, spec: .hiddenPredictions, labels: .init(
@@ -202,13 +212,11 @@ private struct ConversionTab: View {
                     empty: UIStrings.Choice.hiddenPredictionsEmpty))
             }
             Section(UIStrings.More.candidates) {
-                ResettableStepper(model: model, title: UIStrings.More.branchCandidates, keyPath: \.branchCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange,
-                                  value: "\(model.settings.branchCandidatesPerPage)")
-                ResettableStepper(model: model, title: UIStrings.More.listCandidates, keyPath: \.listCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange,
-                                  value: "\(model.settings.listCandidatesPerPage)")
+                ResettableStepper(model: model, title: UIStrings.More.branchCandidates, keyPath: \.branchCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange)
+                ResettableStepper(model: model, title: UIStrings.More.listCandidates, keyPath: \.listCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange)
                 // 表に広げたときの大きさ(一覧の候補数の行 × 列数)を値に出す
                 ResettableStepper(model: model, title: UIStrings.More.gridColumns, keyPath: \.candidateGridColumns, range: DefaultSettings.candidateGridColumnsRange,
-                                  value: UIStrings.More.gridSize(rows: model.settings.listCandidatesPerPage, columns: model.settings.candidateGridColumns))
+                                  value: { [model] in UIStrings.More.gridSize(rows: model.settings.listCandidatesPerPage, columns: $0) })
                 ResettableToggle(model: model, title: UIStrings.More.expandsGridOnPaging, keyPath: \.expandsGridOnPaging)
                 ResettableToggle(model: model, title: UIStrings.More.contextualSegmentCandidates, keyPath: \.contextualSegmentCandidates)
                 // 見本はこのまとまりに 1 つだけなので名前のすぐ後ろに置く(見出しで区切った「絵文字」の見本とはそろえない)
@@ -218,7 +226,7 @@ private struct ConversionTab: View {
             Section(UIStrings.More.typo) {
                 ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))
                 ResettableStepper(model: model, title: UIStrings.More.englishSkipLength, keyPath: \.englishSkipLength, range: DefaultSettings.englishSkipLengthRange,
-                                  value: UIStrings.More.skipLength(model.settings.englishSkipLength))
+                                  value: UIStrings.More.skipLength)
                 Group {
                     ResettablePicker(model: model, title: UIStrings.More.correctionSensitivity, keyPath: \.correctionSensitivity, label: UIStrings.More.label(for:))
                     ResettableToggle(model: model, title: UIStrings.More.showsSuggestions, keyPath: \.showsSuggestions)
@@ -235,7 +243,7 @@ private struct ConversionTab: View {
                     }
                     ResettableToggle(model: model, title: UIStrings.More.remembersRejectedCorrections, keyPath: \.remembersRejectedCorrections)
                 }
-                .disabled(model.settings.typoCorrection != .standard)
+                .disabled(model, unless: \.typoCorrection, is: .standard)
             }
             Section(UIStrings.Features.notation) {
                 ResettablePicker(model: model, title: UIStrings.Features.okurigana, keyPath: \.okuriganaStyle, label: UIStrings.Features.label(for:))
@@ -261,25 +269,22 @@ private struct ConversionTab: View {
                     ResettableToggle(model: model, title: UIStrings.Settings.numberFormKanji, keyPath: \.numberFormKanji)
                     ResettableToggle(model: model, title: UIStrings.Settings.numberFormRoman, keyPath: \.numberFormRoman)
                 }
-                .disabled(!model.settings.numberFormConversion)
+                .disabled(model, unless: \.numberFormConversion)
             }
             Section(UIStrings.Settings.meaning) {
                 ResettableToggle(model: model, title: UIStrings.Settings.homophoneNotes, keyPath: \.homophoneNotes)
                 Group {
                     ResettablePicker(model: model, title: UIStrings.Settings.meaningPlacement, keyPath: \.meaningPlacement, label: UIStrings.Settings.label(for:))
-                    ResettableStepper(model: model, title: UIStrings.Settings.meaningSenseLimit, keyPath: \.meaningSenseLimit, range: DefaultSettings.meaningSenseLimitRange,
-                                      value: "\(model.settings.meaningSenseLimit)")
+                    ResettableStepper(model: model, title: UIStrings.Settings.meaningSenseLimit, keyPath: \.meaningSenseLimit, range: DefaultSettings.meaningSenseLimitRange)
                     ResettableToggle(model: model, title: UIStrings.Settings.showsPartOfSpeech, keyPath: \.showsPartOfSpeech)
                     ResettableToggle(model: model, title: UIStrings.Settings.showsUsageExamples, keyPath: \.showsUsageExamples)
                     ResettableToggle(model: model, title: UIStrings.Settings.showsHomophones, keyPath: \.showsHomophones)
                 }
-                .disabled(!model.settings.homophoneNotes)
+                .disabled(model, unless: \.homophoneNotes)
             }
             Section(UIStrings.Settings.zenzaiModel) {
                 ResettablePicker(model: model, title: UIStrings.Settings.zenzaiModel, keyPath: \.zenzaiModel, label: UIStrings.Settings.label(for:))
-                if model.settings.zenzaiModel == .combined {
-                    Text(UIStrings.Settings.zenzaiCombinedNote).font(.caption).foregroundStyle(.secondary)
-                }
+                ZenzaiCombinedNote(model: model)
             }
             Section {
                 ResettableToggle(model: model, title: UIStrings.Settings.candidateReranking, keyPath: \.candidateReranking)
@@ -295,6 +300,17 @@ private struct ConversionTab: View {
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Zenzai の 2 つのモデルを合わせて使う設定のときだけ出す注記
+private struct ZenzaiCombinedNote: View {
+    @ObservedObject var model: SettingsModel
+
+    var body: some View {
+        if model.settings.zenzaiModel == .combined {
+            Text(UIStrings.Settings.zenzaiCombinedNote).font(.caption).foregroundStyle(.secondary)
+        }
     }
 }
 

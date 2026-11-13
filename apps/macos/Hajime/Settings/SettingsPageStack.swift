@@ -9,9 +9,8 @@ import SwiftUI
 /// ページごとに別の NSHostingView に入れ，見せないページは isHidden にする．同じ SwiftUI の木に並べると，見せないページも
 /// 切り替えのたびに組み直され(13 ページで 1 回 60〜140 ms)，窓から外すと戻すときに部品を付け直す(1 回 30〜60 ms)ため．
 /// 初めて開くページは，先に「読み込み中」を出してから，次の描画の区切りで組み立てる(押したことがすぐ画面に出るように)．
-/// 残したページも設定を変えるたびに描き直すので，すべてのページを開いたあとは設定を 1 つ変えるのに 65 ms ほどかかる．
-/// 切り替えの速さを優先し，ページは捨てない(5 ページまでに絞ると，設定の変更は 12 ms になるが切り替えが 30〜250 ms に戻る)．
-/// ただし描き直しが特に重いページ(Page.keepsWhenHidden が false)は，ほかのページに移ったら捨てる
+/// 残したページは，そのページに出している設定が変わったときだけ描き直す(ObservedSettings)．ほかのページの設定を変えても描き直さないので，
+/// どのページも捨てずに残す(キー設定のページも，開くたびに 0.3 秒かけて組み立てずに済む)
 struct SettingsPageStack: NSViewRepresentable {
     let current: SettingsView.Page
     let makePage: (SettingsView.Page) -> AnyView
@@ -42,13 +41,6 @@ struct SettingsPageStack: NSViewRepresentable {
             guard page != current else { return }
             current = page
             for (key, view) in pages { view.isHidden = key != page }
-            // 残さないページは，切り替えた画面を描いてから捨てる(捨てるのにも時間がかかるので，切り替えを待たせない)
-            let discarded = pages.keys.filter { $0 != page && !$0.keepsWhenHidden }
-            if !discarded.isEmpty {
-                let views = discarded.compactMap { pages.removeValue(forKey: $0) }
-                afterNextFrame { views.forEach { $0.removeFromSuperview() } }
-            }
-
             guard pages[page] == nil else {
                 loading.isHidden = true
                 return
