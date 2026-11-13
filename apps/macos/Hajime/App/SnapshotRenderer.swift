@@ -46,6 +46,7 @@ enum SnapshotRenderer {
                        to: output, appearance: appearance)
                 render(latticeView(editingLattice(typed: ""), theme: look.theme, appearance: appearance), name: "branch-editing-empty-\(look.name)",
                        to: output, appearance: appearance)
+                render(panelView(editingList, theme: look.theme, appearance: appearance), name: "list-editing-\(look.name)", to: output, appearance: appearance)
                 render(correctionView(theme: look.theme, appearance: appearance), name: "correction-\(look.name)", to: output, appearance: appearance)
                 render(readingCorrectionView(theme: look.theme, appearance: appearance), name: "correction-reading-\(look.name)", to: output, appearance: appearance)
                 render(correctedLatticeView(theme: look.theme, appearance: appearance), name: "branch-correction-\(look.name)", to: output, appearance: appearance)
@@ -862,6 +863,16 @@ enum SnapshotRenderer {
         panel.columns[2].isUncertain = false
         panel.columns[2].shorter = nil
         panel.note = Note(tone: .info, title: "再入力", subject: "中野です", key: "Tab", keyAction: "変換")
+        return panel
+    }
+
+    /// 文節ごとの一覧で，注目している文節をその場で打ち直しているところ．候補は打ち直す前のもので，薄く出して選んでいない形にする
+    private static var editingList: CandidatePanel {
+        var panel = SamplePanels.list
+        panel.isEditing = true
+        panel.selectedEntry = nil
+        panel.homophone = nil
+        panel.note = Note(tone: .info, title: "再入力", subject: "変換", key: "Tab", keyAction: "変換")
         return panel
     }
 
