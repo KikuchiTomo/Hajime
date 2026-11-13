@@ -76,8 +76,9 @@ scene palette 672 palette-emoji:62:c palette-kaomoji:497:c palette-symbol:932:c
 panel handwriting-dark handwriting 85
 scene handwriting 672 handwriting:c:c
 
-for theme in washi neon nordic terminal; do window "branch-$theme" "theme-$theme" 42; done
-scene themes 672 theme-washi:50:24 theme-neon:715:24 theme-nordic:50:340 theme-terminal:715:340
+# 分岐図は，キーの案内を出していない既定の見た目(branch-hold-*)を使う
+for theme in washi neon nordic terminal; do window "branch-hold-$theme" "theme-$theme" 50; done
+scene themes 672 theme-washi:105:22 theme-neon:805:22 theme-nordic:105:346 theme-terminal:805:346
 
 font="/System/Library/Fonts/ヒラギノ角ゴシック W3.ttc"
 # テキストエディットの窓の写真(features/candidate-tree.webp．1400×672)の中身(題の下)を窓の色で塗ったもの．
@@ -87,7 +88,7 @@ magick "$images/features/candidate-tree.webp" -fill 'rgb(30,30,30)' -draw "recta
 width() { magick -font "$font" -pointsize 27 label:"$1" -format %w info:; }
 
 # 分岐図: 入力中の文(選んでいる文節は太い下線)の下に，今の分岐図を置く
-window branch-glass-dark tree 74
+window branch-hold-glass-dark tree 74
 lead="私の名前は"
 focus="中野です"
 from=$((85 + $(width "$lead")))
@@ -125,7 +126,7 @@ magick "$work/typo.png" "$root/tools/site/typo-note.png" -geometry "+83+$(($(lin
 zoom "$work/typo-note.png" "$images/features/typo-correction.webp"
 
 # トップの画像: 窓の中身(題の下)を窓の色で塗り，入力中の文と下線を書いて，分岐図と語の意味を置く
-window homophone-branch-glass-dark hero-branch 74
+window branch-station-hold-glass-dark hero-branch 74
 magick "$images/features/candidate-tree.webp" -fill 'rgb(30,30,30)' -draw "rectangle 74,96 1324,600" \
   -font "$font" -pointsize 27 -fill 'rgb(235,235,235)' -annotate +85+124 "写真を撮る" \
   -fill 'rgb(62,113,214)' -draw "rectangle 85,127 166,128" -draw "rectangle 166,126 220,129" \

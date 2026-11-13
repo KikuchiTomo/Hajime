@@ -28,29 +28,40 @@ impl Preserved {
     }
 }
 
-/// chords を予約し直す．前に予約したキーは外す．登録できないキー(今の配列で打てない文字など)は飛ばす
+/// chords を予約し直す．chords に無くなったキーだけを外し，増えたキーだけを足す(組み立ての始めと終わりに打鍵を待たせない)．
+/// 登録できないキー(今の配列で打てない文字など)は飛ばす
 pub fn replace(
     keystrokes: &ITfKeystrokeMgr,
     client_id: u32,
     current: &mut Vec<Preserved>,
     chords: &[KeyChord],
 ) {
-    if current.len() == chords.len()
-        && current
-            .iter()
-            .zip(chords)
-            .all(|(preserved, chord)| preserved.chord == *chord)
-    {
-        return;
-    }
-    clear(keystrokes, current);
+    let wanted: Vec<&KeyChord> = chords.iter().take(LIMIT).collect();
+    current.retain(|preserved| {
+        let keep = wanted.contains(&&preserved.chord);
+        if !keep {
+            // SAFETY: guid と key は呼び出しのあいだ生きている
+            let _ = unsafe { keystrokes.UnpreserveKey(&preserved.guid, &preserved.key) };
+        }
+        keep
+    });
     // SAFETY: 引数は 0(この入力のスレッド)だけ
     let layout = unsafe { GetKeyboardLayout(0) };
-    for (index, chord) in chords.iter().take(LIMIT).enumerate() {
+    for chord in wanted {
+        if current.iter().any(|preserved| preserved.chord == *chord) {
+            continue;
+        }
         let Some(key) = preserved_key(chord, layout) else {
             continue;
         };
-        let guid = GUID::from_u128(BASE.to_u128() + index as u128);
+        let used: Vec<u128> = current
+            .iter()
+            .map(|preserved| preserved.guid.to_u128())
+            .collect();
+        let Some(index) = free_slot(&used) else {
+            break;
+        };
+        let guid = GUID::from_u128(BASE.to_u128() + index);
         // SAFETY: guid と key は呼び出しのあいだ生きている
         if unsafe { keystrokes.PreserveKey(client_id, &guid, &key, &[]) }.is_ok() {
             current.push(Preserved {
@@ -60,6 +71,11 @@ pub fn replace(
             });
         }
     }
+}
+
+/// 予約に使っていない識別子の番号(BASE からの差)．LIMIT 個を使い切っていれば None
+fn free_slot(used: &[u128]) -> Option<u128> {
+    (0..LIMIT as u128).find(|index| !used.contains(&(BASE.to_u128() + index)))
 }
 
 /// 予約したキーをすべて外す
