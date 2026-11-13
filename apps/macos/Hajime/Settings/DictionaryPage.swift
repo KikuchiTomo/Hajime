@@ -93,7 +93,7 @@ struct TermDictionaryView: View {
                     ResettableToggle(model: model, title: field.name, keyPath: keyPath)
                 }
             }
-            .disabled(!model.settings.termDictionary)
+            .disabled(model, unless: \.termDictionary)
         }
         .formStyle(.grouped)
     }
