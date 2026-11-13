@@ -860,8 +860,10 @@ impl App {
                     .set_chrome(theme.backdrop, look.dark, theme.frame);
                 // 候補を選んでいるあいだ(一覧で選んでいるときと分岐図)は，候補が並び始める辺を動かさない．
                 // 打っているあいだの一覧は入力位置に寄せて置き直す(macOS と同じ)
-                self.window()
+                let placed = self
+                    .window()
                     .place(&anchor, scene, ANCHOR_GAP, is_list && !typing);
+
                 let opacity = self.opacity;
                 let below = self
                     .crossfade
@@ -882,6 +884,12 @@ impl App {
                         .then(|| (scene.clone(), opacity, scale));
                 }
                 self.refresh_bubble(bare.as_ref(), font_size, now);
+                // 候補の窓を置き直すと一番手前に来る．予測の窓と吹き出しを起こしのときと同じ順に付け直し，
+                // 吹き出しを候補の窓の上に戻す(同じ位置の吹き出しは置き直さないので，そのままだと候補の窓の後ろに隠れる)
+                if placed {
+                    self.prediction_window().raise();
+                    self.bubble.raise();
+                }
             }
             _ => {
                 self.hide_bubble();
