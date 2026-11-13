@@ -127,6 +127,13 @@ public final class InputSession {
     private var branchDetailShown = false
     /// 先の枝の，今いる丸の位置(branchStations)．候補にいるあいだは nil．丸の中身に入っているあいだも，入った丸を覚えておく
     private var branchStation: Int?
+    /// 矢印キーで木をたどるとき，今いる所が幹の上(文節)か．false なら候補の上にいる．
+    /// 幹の上では，左右で文節を移り，下で候補へ下り，上で文字種へ上る．候補を移るキー(Space など)を押すと候補へ戻る
+    private var trunkLevel = false
+    /// 矢印キーで木をたどれるか．候補の先の枝へ移るキーが割り当てられているときだけ(ほかのキー設定では，幹の上にいる状態を作らない)
+    private var treeNavigation: Bool {
+        branchStations && !settings.current.keymap.strokes(for: .enterBranch, in: .converting).isEmpty
+    }
     /// 入力文字なしで案内を出したか．出したら次のキーで消す
     private var showsTransientNote = false
     /// 変換中の候補の選択(表記)と文節の区切りの変更．直前の変更の取り消し(KeymapCommand.undoConversionEdit)で戻す
@@ -869,7 +876,8 @@ public final class InputSession {
         if case .association(let list, let origin) = phase, let result = performInAssociation(command, list: list, origin: origin, context: context) {
             return result
         }
-        if let result = performOnBranchStation(command, context: context) { return result }
+        if let result = performOnBranchStation(command, event: event, context: context) { return result }
+        if let result = performOnTrunk(command, event: event, context: context) { return result }
         switch command {
         // IME の機能．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
         case .openSettings: return KeyResult(handled: true, actions: commitAll() + [.openSettings])
@@ -960,8 +968,14 @@ public final class InputSession {
         case .segmentToKatakana: return selectSegmentVariant(.katakana, context: context)
         case .segmentToHalfwidthKatakana: return selectSegmentVariant(.halfwidthKatakana, context: context)
         // 候補
-        case .nextCandidate: return moveCandidate(.next, context: context)
-        case .previousCandidate: return moveCandidate(.previous, context: context)
+        case .nextCandidate:
+            let leavesVariants = leavesVariantsForTrunk(event)
+            let result = moveCandidate(.next, context: context)
+            // 文字種から ↓ で下りたら，幹の上で止まる
+            guard leavesVariants else { return result }
+            trunkLevel = true
+            return KeyResult(handled: true, actions: render(context: context))
+        case .previousCandidate: return climbToTrunk(event: event, context: context) ?? moveCandidate(.previous, context: context)
         case .nextCandidatePage: return moveCandidate(.nextPage, context: context)
         case .previousCandidatePage: return moveCandidate(.previousPage, context: context)
         case .firstCandidate: return moveCandidate(.first, context: context)
@@ -1435,6 +1449,7 @@ public final class InputSession {
     private func enterConversion(recordsUsage: Bool = true) {
         branchDetailShown = false
         branchStation = nil
+        trunkLevel = false
         if recordsUsage { usage?.record(.conversionOpened) }
         conversionHistory.clear()
         heldReading = nil
@@ -2335,6 +2350,8 @@ public final class InputSession {
                 panel.columns[focused].variantKeys = lattice.focused.variants.map(variantKey)
             }
             if branchStations, !splitMode { applyBranch(to: &panel, lattice: lattice) }
+            panel.trunkFocused = trunkLevel && treeNavigation
+            panel.pageSize = latticePerPage
             if settings.current.showsFewerItems { panel = PanelBuilder.reduced(panel, showsDetail: branchDetailShown || branchStation != nil) }
             if let note = commandNote(for: lattice) { panel.note = note }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
@@ -2525,6 +2542,7 @@ public final class InputSession {
                 if move == .previous { return moveCandidate(.previous, context: context) }
             }
         case .lattice(var lattice):
+            trunkLevel = false
             let perPage = latticePerPage
             let before = lattice.focused.choice
             switch move {
@@ -2696,6 +2714,11 @@ public final class InputSession {
                 splitMode = !splitMode && !focusedSplit(lattice).positions.isEmpty
             }
             phase = .lattice(lattice)
+            // 矢印キーで木をたどれるときは，文節を移ったら幹の上にいる(↓ で候補へ下りる)
+            switch move {
+            case .index, .next, .previous, .first, .last, .nextUncertain, .previousUncertain: trunkLevel = treeNavigation && !isSegmentList && !expandedCandidates
+            case .extend, .shrink, .extendToWord, .shrinkToWord, .split: break
+            }
             return KeyResult(handled: true, actions: render(context: context))
         }
     }
@@ -2958,12 +2981,13 @@ public final class InputSession {
         guard count > 0 else { return nil }
         branchStation = branchStation.map { min($0 + 1, count - 1) } ?? 0
         branchDetailShown = true
+        trunkLevel = false
         return KeyResult(handled: true, actions: render(context: context))
     }
 
     /// 先の枝の丸の上にいるあいだのキー．左右で丸を移り，次の候補のキーで丸の中身へ入り，前の候補のキーで候補へ戻る．
     /// ほかのキーは，候補へ戻ってからふつうに行う(nil を返す)
-    private func performOnBranchStation(_ command: KeymapCommand, context: InputContext) -> KeyResult? {
+    private func performOnBranchStation(_ command: KeymapCommand, event: KeyEvent, context: InputContext) -> KeyResult? {
         guard let current = branchStation else { return nil }
         guard let lattice = latticeForBranch() else {
             branchStation = nil
@@ -2974,14 +2998,16 @@ public final class InputSession {
             branchStation = nil
             return nil
         }
-        switch command {
-        case .enterBranch, .nextSegment:
+        // 木をたどるのは矢印キーだけ．同じコマンドでも Space・Tab などは，候補へ戻ってから今までどおりに動く
+        // (丸の上で Space を押して，選ぶつもりのない中身が入ることを避ける)
+        switch (command, event.key) {
+        case (.enterBranch, _):
             branchStation = min(current + 1, stations.count - 1)
-        case .previousSegment:
+        case (.previousSegment, .left):
             branchStation = current > 0 ? current - 1 : nil
-        case .previousCandidate, .associate, .cancel, .undoConversionEdit:
+        case (.previousCandidate, .up), (.associate, _), (.cancel, _), (.undoConversionEdit, _):
             branchStation = nil
-        case .nextCandidate:
+        case (.nextCandidate, .down):
             // 丸の中身(連想の語・マクロの結果)へ入る．意味の丸には中身が無い
             guard let list = stations[current].list else { return KeyResult(handled: true) }
             phase = .association(list, origin: phase)
@@ -2990,6 +3016,51 @@ public final class InputSession {
             return nil
         }
         return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    // MARK: - 幹の上(矢印キーで木をたどる)
+
+    /// 幹の上にいるあいだのキー．→ は次の文節，↓ は候補へ下り(選んでいる候補は変えない)，↑ は文字種へ上る．
+    /// 文節を移るキーはそのまま動き，幹の上に残る．ほかのキーは，候補へ戻ってから今までどおりに動く
+    private func performOnTrunk(_ command: KeymapCommand, event: KeyEvent, context: InputContext) -> KeyResult? {
+        guard trunkLevel else { return nil }
+        guard treeNavigation, case .lattice(var lattice) = phase, inlineEdit == nil, !splitMode, !expandedCandidates, !isSegmentList else {
+            trunkLevel = false
+            return nil
+        }
+        switch (command, event.key) {
+        case (.enterBranch, _):
+            return moveSegment(.next, event: event, context: context)
+        case (.nextCandidate, .down):
+            trunkLevel = false
+            return KeyResult(handled: true, actions: render(context: context))
+        case (.previousCandidate, .up):
+            guard settings.current.showsVariantRow, lattice.selectVariant(at: 0) else { return KeyResult(handled: true) }
+            trunkLevel = false
+            phase = .lattice(lattice)
+            return KeyResult(handled: true, actions: render(context: context))
+        case (.nextSegment, _), (.previousSegment, _), (.firstSegment, _), (.lastSegment, _), (.nextUncertainSegment, _), (.previousUncertainSegment, _),
+             (.jumpToSegment1, _), (.jumpToSegment2, _), (.jumpToSegment3, _), (.jumpToSegment4, _), (.jumpToSegment5, _), (.jumpToSegment6, _),
+             (.jumpToSegment7, _), (.jumpToSegment8, _):
+            return nil
+        default:
+            trunkLevel = false
+            return nil
+        }
+    }
+
+    /// 先頭の候補で ↑ を押したら，幹の上へ上る(文字種へは，幹の上からもう一度 ↑)．矢印キーで木をたどれるときだけ
+    private func climbToTrunk(event: KeyEvent, context: InputContext) -> KeyResult? {
+        guard treeNavigation, event.key == .up, !trunkLevel, case .lattice(let lattice) = phase, inlineEdit == nil, !splitMode, !expandedCandidates,
+              !isSegmentList, case .candidate(0) = lattice.focused.choice else { return nil }
+        trunkLevel = true
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 文字種を選んでいて，↓ で下りるところか(矢印キーで木をたどれるとき)
+    private func leavesVariantsForTrunk(_ event: KeyEvent) -> Bool {
+        guard treeNavigation, event.key == .down, case .lattice(let lattice) = phase, case .variant = lattice.focused.choice else { return false }
+        return true
     }
 
     /// 先の枝の表示を panel に入れる．丸の上にいれば，その丸の中身の先頭のページも入れる(選ぶ前に中身が見える)
@@ -3021,6 +3092,7 @@ public final class InputSession {
         detail.groupCount = list.associations.groups.count
         detail.position = list.indexInGroup - page.selected + 1
         detail.total = list.group.words.count
+        detail.pageSize = settings.current.branchCandidatesPerPage
     }
 
     /// 注目している文節で選んでいる候補に，先の枝に出すもの(語の意味か，連想があることの知らせ)があるか
@@ -3211,6 +3283,7 @@ public final class InputSession {
     private func selectInLattice(_ character: Character, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
         guard let number = numberKey(character), lattice.select(number: number, perPage: latticeNumberPerPage) else { return nil }
         branchStation = nil
+        trunkLevel = false
         // 表から選んだら表を閉じ，分岐図に戻って次の文節へ進む
         expandedCandidates = false
         return KeyResult(handled: true, actions: advance(after: lattice, context: context))
@@ -3252,6 +3325,7 @@ public final class InputSession {
     public func choose(_ target: PointerTarget, context: InputContext) -> [ClientAction] {
         undoableCommit = nil
         branchStation = nil
+        trunkLevel = false
         let baseline = editBaseline(command: nil)
         defer { trackConversionEdit(from: baseline) }
         return pick(target, context: context)

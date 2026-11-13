@@ -310,6 +310,10 @@ public struct LatticePanel: Sendable, Equatable {
     public var associationHint: AssociationHint?
     /// 語の意味(Column.homophone)を候補の枝の右に出すか，下に出すか(設定)
     public var meaningPlacement = MeaningPlacement.side
+    /// 矢印キーで木をたどっていて，今いる所が幹の上(文節)か．描く側は，文節を強い選択にし，選んでいる候補を控えめにする
+    public var trunkFocused = false
+    /// 候補の 1 ページの数(ページの位置を出すのに使う)．分からなければ 0
+    public var pageSize = 0
     /// 選んでいる候補の先の枝(語の意味・連想・変換マクロ)．先の枝を別々の丸として出す作り(InputSession の branchStations)のときだけ入る
     public var detail: BranchDetail?
     /// キーの案内を，修飾キーを押し続けているあいだだけ出すか(設定の「分岐図のキーの案内を常に表示」がオフ)．
@@ -364,6 +368,8 @@ public struct BranchDetail: Sendable, Equatable {
     /// 中身の今のページの先頭が何番目か(1 から)と，まとまりの中の全体の数
     public var position = 1
     public var total = 0
+    /// 中身の 1 ページの数
+    public var pageSize = 0
     /// 中身に入っているあいだの，元の候補(今のページ)と選んでいた位置．候補の列に控えめに出す
     public var candidates: [String] = []
     public var selectedCandidate: Int?

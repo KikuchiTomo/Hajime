@@ -227,6 +227,39 @@ struct AssociationScenarioTests {
         #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
     }
 
+    @Test("矢印で木をたどる: 先頭の候補で ↑ を押すと幹の上へ上り，幹の上の ← → は文節を移り，↓ で候補へ下りる．丸の上の Space は中身に入らず次の候補")
+    func trunkLevel() throws {
+        let two = FakeConverter(["きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil)], "いい": [("良い", nil), ("いい", nil)]])
+        two.words["きょうはいい"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "はいい", readingCount: 3, startsWithParticle: true),
+        ]
+        var settings = makeSettings { $0.conversionMacros = true }
+        settings.initialFocus = .start
+        let harness = Harness(converter: two, settings: settings, branchStations: true)
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.trunkFocused == false)
+        // 先頭の候補で ↑: 幹の上へ．選んでいる候補は変わらない
+        harness.press(.up)
+        #expect(harness.lattice?.trunkFocused == true)
+        #expect(harness.lattice?.columns.first?.selectedAlternative == 0)
+        // 幹の上の → は次の文節(候補の先の枝ではない)
+        harness.press(.right)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        #expect(harness.lattice?.trunkFocused == true && harness.lattice?.detail?.current == nil)
+        // ↓ で候補へ下りる．選んでいる候補は変えない
+        harness.press(.down)
+        #expect(harness.lattice?.trunkFocused == false)
+        #expect(harness.lattice?.columns[1].selectedAlternative == 0)
+        // 候補の上の → は先の枝へ
+        harness.press(.right)
+        #expect(harness.lattice?.detail?.current == 0)
+        // 丸の上の Space は，中身に入らずに候補へ戻って次の候補へ進む(選ぶつもりのない中身を入れない)
+        harness.press(.space)
+        #expect(harness.lattice?.detail?.current == nil && harness.lattice?.association == nil)
+        #expect(harness.lattice?.columns[1].selectedAlternative == 1)
+    }
+
     @Test("先の枝: 丸の中身で Enter を押すと選んだ語で確定する．連想変換のキーでも先の枝へ入れる．先の枝が無ければ → は次の文節")
     func branchCommit() throws {
         let harness = stationHarness()

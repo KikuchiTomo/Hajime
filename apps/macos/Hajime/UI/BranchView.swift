@@ -304,6 +304,9 @@ final class BranchView: NSView {
         var stations: [Station] = []
         var expandX: CGFloat?
         var expandMidY: CGFloat = 0
+        /// 候補のページの位置を示す点(候補の縦の線の下)．1 ページなら出さない
+        var pageDots: PageDots?
+        var itemPageDots: PageDots?
         /// 今いる丸の中身(連想の語・マクロの結果)の行と，その縦の線の x
         var itemRows: [NSRect] = []
         var itemStemX: CGFloat = 0
@@ -349,6 +352,28 @@ final class BranchView: NSView {
     /// 候補を移って文節の字の数が変わっても，丸と枝の位置が動かないようにするため(真ん中に置くと，字の数が変わるたびに枝が左右に動く)
     private func stopOffset(width: CGFloat) -> CGFloat {
         min(width / 2, fontSize + Part.rowPaddingX).rounded()
+    }
+
+    /// ページの位置を示す点の並び．縦の線の下に，ページの数だけ縦に並べる
+    private struct PageDots {
+        var x: CGFloat
+        var top: CGFloat
+        var count: Int
+        var current: Int
+
+        var height: CGFloat { CGFloat(count) * DesignTokens.Size.BranchMap.pageDotPitch }
+    }
+
+    /// ページの数と今のページ．1 ページか，1 ページの数が分からなければ nil
+    private func pages(position: Int, total: Int, pageSize: Int) -> (count: Int, current: Int)? {
+        guard pageSize > 0, total > pageSize else { return nil }
+        return ((total + pageSize - 1) / pageSize, max(position - 1, 0) / pageSize)
+    }
+
+    /// ページが多すぎて点で示せないときの，数字の位置(「3 / 12」)
+    private func pageText(_ pages: (count: Int, current: Int)?) -> String {
+        guard let pages, pages.count > Int(Map.pageDotLimit) else { return "" }
+        return UIStrings.Association.groupPosition(pages.current + 1, pages.count)
     }
 
     /// 幹の文節の幅(文字と左右の余白)
@@ -408,8 +433,9 @@ final class BranchView: NSView {
         let noteWidth = lower.compactMap { $0.note.map { NoteDrawing.tagWidth($0, theme: theme) } }.max() ?? 0
         let rowStart = badgeOffset - Part.rowPaddingX
         // 候補の下の行(案内・辞書の名前・位置)．候補の行の幅に収め，先の枝や語の意味と重ねない
-        // 先の枝の丸の中身に入っているあいだは，位置は中身の下に出す
-        let positionText = lower.isEmpty || !showsPosition(panel) || isInside ? "" : position(of: panel)
+        // ページの位置は，候補の縦の線の下に点で出す．ページが多すぎるときだけ数字にする．先の枝の丸の中身に入っているあいだは，中身の下に出す
+        let candidatePages = lower.isEmpty || !showsPosition(panel) || isInside ? nil : pages(position: panel.position, total: panel.total, pageSize: panel.pageSize)
+        let positionText = pageText(candidatePages)
         let positionWidth = positionText.isEmpty ? 0 : textWidth(positionText, font: labelFont)
         let sourceWidth = column?.sourceName.map { textWidth(UIStrings.Branch.dictionarySource($0), font: labelFont) + Size.paddingX } ?? 0
         let farWidth = positionWidth + sourceWidth
@@ -462,7 +488,8 @@ final class BranchView: NSView {
         let items = itemRows(of: panel)
         let itemStation = stationOffsets.indices.contains(detail?.current ?? -1) ? detail?.current : nil
         let itemLabelText = detail.map(itemLabel) ?? ""
-        let itemPositionText = detail.map { itemPosition($0, count: items.count) } ?? ""
+        let itemPages = detail.flatMap { $0.current == nil || items.isEmpty ? nil : pages(position: $0.position, total: $0.total, pageSize: $0.pageSize) }
+        let itemPositionText = pageText(itemPages)
         let itemHintsWidth = BranchMapDrawing.hintsWidth(hints.items, theme: theme)
         let itemPositionWidth = itemPositionText.isEmpty ? 0 : textWidth(itemPositionText, font: labelFont)
         let itemBottomWidth = itemHintsWidth + (itemHintsWidth > 0 && itemPositionWidth > 0 ? Space.group : 0) + itemPositionWidth
@@ -567,6 +594,11 @@ final class BranchView: NSView {
             y += CGFloat(lower.count) * metrics.rowHeight
         }
         var bottom = y
+        if let pages = candidatePages, pages.count <= Int(Map.pageDotLimit) {
+            let dots = PageDots(x: stemX, top: y + Space.inset, count: pages.count, current: pages.current)
+            result.pageDots = dots
+            bottom = max(bottom, dots.top + dots.height)
+        }
         if hasBottom {
             result.bottomMidY = y + Space.inset + tag / 2
             result.bottomHintsX = minX(badgeOffset, bottomHintsWidth)
@@ -574,7 +606,7 @@ final class BranchView: NSView {
             // 位置は枝の外の端に，辞書の名前はその内側に置く
             result.positionX = direction > 0 ? farX + sourceWidth : farX
             result.sourceX = direction > 0 ? farX : farX + positionWidth + Size.paddingX
-            bottom = y + Space.inset + tag
+            bottom = max(bottom, y + Space.inset + tag)
         }
         if let selectedRow, result.rows.indices.contains(selectedRow) {
             let midY = result.rows[selectedRow].midY.rounded()
@@ -615,6 +647,11 @@ final class BranchView: NSView {
                 }
                 itemY += CGFloat(items.count) * metrics.rowHeight
                 result.itemStemX = lineX
+                if let pages = itemPages, pages.count <= Int(Map.pageDotLimit) {
+                    let dots = PageDots(x: lineX, top: itemY + Space.inset, count: pages.count, current: pages.current)
+                    result.itemPageDots = dots
+                    bottom = max(bottom, dots.top + dots.height)
+                }
                 if itemBottomWidth > 0 {
                     result.itemBottomMidY = itemY + Space.inset + tag / 2
                     result.itemHintsX = itemMinX(badgeOffset, itemHintsWidth)
@@ -883,6 +920,10 @@ final class BranchView: NSView {
                                 avoiding: avoided, in: body, theme: theme)
         BranchMapDrawing.stroke(route, color: theme.selection, width: metrics.lineWidthSelected, avoiding: avoided, in: body, theme: theme)
         BranchMapDrawing.draw(branchStops + senseStops, lineWidth: metrics.lineWidth, theme: theme)
+        // ページの位置を示す点
+        for dots in [layout.pageDots, layout.itemPageDots].compactMap({ $0 }) {
+            BranchMapDrawing.drawPageDots(x: dots.x, top: dots.top, count: dots.count, current: dots.current, theme: theme)
+        }
         // 畳んでいる枝の，続きがある印
         for stub in [layout.variantStub, layout.detailStub].compactMap({ $0 }) {
             // 線の色のままだと透かした先が見えないので，控えめな文字の色から透かす
@@ -936,8 +977,10 @@ final class BranchView: NSView {
             if let midY = layout.itemBottomMidY { drawHints(hints.items, x: layout.itemHintsX, midY: midY, in: panel) }
         }
         if let midY = layout.bottomMidY {
-            if showsPosition(panel), !rows.isEmpty {
-                TextFitting.draw(position(of: panel), attributes: [.font: labelFont, .foregroundColor: theme.textMuted], x: layout.positionX, midY: midY)
+            let text = pageText(showsPosition(panel) && panel.detail?.selectedItem == nil
+                ? pages(position: panel.position, total: panel.total, pageSize: panel.pageSize) : nil)
+            if !text.isEmpty, !rows.isEmpty {
+                TextFitting.draw(text, attributes: [.font: labelFont, .foregroundColor: theme.textMuted], x: layout.positionX, midY: midY)
             }
             if let source = column?.sourceName {
                 // 選んでいる候補が取り込んだ辞書の語なら，その辞書の名前を小さく出す(R-16)
@@ -983,9 +1026,13 @@ final class BranchView: NSView {
             return
         }
         let color: NSColor
+        // 矢印で木をたどっていて幹の上にいるときは，文節を候補と同じ強い選択で見せる(今いる場所)
+        let onTrunk = column.isFocused && panel?.trunkFocused == true
         if theme.isRounded {
-            if column.isFocused { GlassDrawing.fillCapsule(node.insetBy(dx: 0, dy: Glass.selectionInsetY), color: theme.focusTint) }
-            color = theme.text
+            if column.isFocused {
+                GlassDrawing.fillCapsule(node.insetBy(dx: 0, dy: Glass.selectionInsetY), color: onTrunk ? theme.selection : theme.focusTint)
+            }
+            color = onTrunk ? theme.selectionText : theme.text
         } else {
             if column.isFocused {
                 theme.selection.setFill()
@@ -1100,7 +1147,14 @@ final class BranchView: NSView {
 
     /// 候補の列に出す行．先の枝の丸の中身に入っているあいだは，元の候補を控えめに出す(番号は中身に付く)
     private func candidateRows(_ column: LatticePanel.Column, in panel: LatticePanel) -> [Row] {
-        guard let detail = panel.detail else { return lowerRows(column) }
+        guard let detail = panel.detail, !panel.trunkFocused else {
+            // 幹の上にいるあいだは，選んでいる候補の背景を薄くする(今いる場所は文節)
+            return lowerRows(column).map { row in
+                var row = row
+                row.isSoft = panel.trunkFocused
+                return row
+            }
+        }
         guard detail.selectedItem != nil else {
             // 丸の上にいるあいだは，選んでいる候補の背景を薄くする(今いる場所は丸)
             return lowerRows(column).map { row in
@@ -1169,14 +1223,7 @@ final class BranchView: NSView {
         // 番号は番号キーで選べるので，キーキャップの形にする
         let badgeX = direction > 0 ? rect.minX + Part.rowPaddingX : rect.maxX - Part.rowPaddingX - Glass.badgeSize
         let badge = NSRect(x: badgeX.rounded(), y: (rect.midY - Glass.badgeSize / 2).rounded(), width: Glass.badgeSize, height: Glass.badgeSize)
-        if theme.isRounded, !row.isPlain {
-            if solid {
-                theme.selectionText.withAlphaComponent(DesignTokens.Opacity.Badge.selected).setFill()
-                NSBezierPath(roundedRect: badge, xRadius: Glass.keycapRadius, yRadius: Glass.keycapRadius).fill()
-            } else {
-                GlassDrawing.drawKeycap(badge, theme: theme)
-            }
-        }
+        if theme.isRounded, !row.isPlain { BranchMapDrawing.drawBadgeBox(badge, theme: theme, selected: solid) }
         GlassDrawing.drawLabel(row.badge, color: mutedColor, in: badge, theme: theme)
         let line = CandidateDetailDrawing.line(row.text, attributes: [.font: candidateFont, .foregroundColor: textColor], detail: row.detail,
                                                detailAttributes: [.font: labelFont, .foregroundColor: mutedColor])
@@ -1222,7 +1269,7 @@ final class BranchView: NSView {
             let rect = NSRect(x: x(width).rounded(), y: y.rounded(), width: width, height: Meaning.partOfSpeechHeight)
             let stroke = Part.stroke
             let frame = rect.insetBy(dx: stroke / 2, dy: stroke / 2)
-            let path = theme.isRounded ? NSBezierPath(roundedRect: frame, xRadius: Glass.tagRadius, yRadius: Glass.tagRadius) : NSBezierPath(rect: frame)
+            let path = theme.isRounded ? NSBezierPath(roundedRect: frame, xRadius: Map.badgeRadius, yRadius: Map.badgeRadius) : NSBezierPath(rect: frame)
             path.lineWidth = stroke
             theme.line.setStroke()
             path.stroke()

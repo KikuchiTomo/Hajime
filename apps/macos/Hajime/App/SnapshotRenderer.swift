@@ -48,6 +48,9 @@ enum SnapshotRenderer {
                     render(latticeView(panel, theme: look.theme, appearance: appearance), name: "branch-station\(suffix)-\(look.name)", to: output,
                            appearance: appearance)
                 }
+                // 矢印キーで木をたどっていて，幹の上(文節)にいるところ．ページの位置は縦の線の下の点
+                render(latticeView(trunkLattice(), theme: look.theme, appearance: appearance), name: "branch-trunk-\(look.name)", to: output,
+                       appearance: appearance)
                 // キーの案内を，修飾キーを押し続けているあいだだけ出す設定(既定)．押していないとき・Shift・Option
                 for (suffix, modifiers) in [("", NSEvent.ModifierFlags()), ("-shift", .shift), ("-option", .option)] {
                     render(latticeView(heldHintsLattice(), theme: look.theme, appearance: appearance, heldModifiers: modifiers),
@@ -880,6 +883,15 @@ enum SnapshotRenderer {
         var panel = SamplePanels.withKeys(LatticePanel(columns: [.init(text: "写真を", isFocused: false, isUncertain: false), column], position: 1, total: 7))
         if inside { panel.association = AssociationHeading(headword: "撮る", label: "", group: 1, groupCount: 1) }
         panel.detail = detail
+        return panel
+    }
+
+    /// 幹の上にいる分岐図．案内は押し続けて出す設定(既定)，候補は 2 ページ
+    private static func trunkLattice() -> LatticePanel {
+        var panel = SamplePanels.lattice
+        panel.trunkFocused = true
+        panel.hintsOnHold = true
+        panel.pageSize = 4
         return panel
     }
 
