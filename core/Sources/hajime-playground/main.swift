@@ -30,6 +30,7 @@ import HajimeEngine
 //   hajime-playground --words <読み,読み,…>                      読みを変換したときの語の並び
 //   hajime-playground --english-terms <ファイル>                  英語の語の辞書(R-24)の語ごとの読み・語の並び・もっともらしさ・候補の先頭
 //   hajime-playground --startup <同梱の辞書> [--zenzai <モデル>] [--zenzai-fast <xsmall のモデル>] [--jinen <small>] [--jinen-fast <xsmall>]
+//                                                                [--verification-record <ファイル>]
 //                                                                起動(モデルと辞書の確認・エンジン・warmUp)から最初の変換までの時間
 //
 // どの使い方でも --dictionary <ディレクトリ> を付けると，azooKey に同梱の辞書の代わりにその辞書で変換する(辞書を作り直して比べるため)
@@ -47,7 +48,8 @@ MainActor.assumeIsolated {
     if let dictionary = arguments.value(of: "--startup") {
         do {
             try StartupProbe.run(zenzaiPath: arguments.value(of: "--zenzai"), fastZenzaiPath: arguments.value(of: "--zenzai-fast"),
-                                 jinenPath: arguments.value(of: "--jinen"), fastJinenPath: arguments.value(of: "--jinen-fast"), dictionaryPath: dictionary)
+                                 jinenPath: arguments.value(of: "--jinen"), fastJinenPath: arguments.value(of: "--jinen-fast"), dictionaryPath: dictionary,
+                                 recordPath: arguments.value(of: "--verification-record"))
         } catch {
             print("起動できませんでした: \(error)")
             exit(1)

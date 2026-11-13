@@ -356,6 +356,10 @@ public enum DefaultSettings {
     public static let maximumBundledDictionaryManifestBytes = 4 * 1024 * 1024
     /// 同梱の辞書のファイル 1 つの大きさの上限．v0.5.3 でいちばん大きいファイルは約 1MB
     public static let maximumBundledDictionaryFileBytes = 64 * 1024 * 1024
+    /// 起動のときに同梱のモデルと辞書を確かめた結果の記録(ADR 0017)のファイルの名前．利用者ごとの，この端末だけの場所に置く
+    public static let verificationRecordFileName = "verification-record.json"
+    /// 記録のファイルの大きさの上限．確かめるもの 5 つで 2KB ほど
+    public static let maximumVerificationRecordBytes = 64 * 1024
     /// 取り込む辞書のファイルの大きさの上限．大きな辞書(数十万語)を読めて，取り込みで手元のメモリを使い切らない大きさ
     public static let maximumImportedDictionaryBytes = 256 * 1024 * 1024
     /// 同期のフォルダと運ぶ索引のファイルの大きさの上限．索引は品詞を書き足すので，取り込むファイルより大きくなりうる

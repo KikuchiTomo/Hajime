@@ -1,13 +1,16 @@
 import Foundation
 import HajimeDomain
 import HajimeEngine
+import HajimePersistence
 
 /// 起動から最初の変換ができるまでの時間を，アプリの組み立て(macOS の CompositionRoot・hajime-engine-host)と同じ順で測る．
 /// Zenzai モデルと同梱の辞書を確かめ，エンジンを作り，warmUp してから最初の変換をする．
-/// アプリを入れずに，確かめる処理を変えたときの前後を比べるため(CPU 時間は /usr/bin/time などで外から測る)
+/// アプリを入れずに，確かめる処理を変えたときの前後を比べるため(CPU 時間は /usr/bin/time などで外から測る)．
+/// recordPath を渡すと，アプリと同じく確かめた結果をそのファイルに記録し，次からは変わっていないファイルのハッシュを求めない(ADR 0017)
 @MainActor
 enum StartupProbe {
-    static func run(zenzaiPath: String?, fastZenzaiPath: String?, jinenPath: String? = nil, fastJinenPath: String? = nil, dictionaryPath: String) throws {
+    static func run(zenzaiPath: String?, fastZenzaiPath: String?, jinenPath: String? = nil, fastJinenPath: String? = nil, dictionaryPath: String,
+                    recordPath: String? = nil) throws {
         let clock = ContinuousClock()
         let start = clock.now
         let resources = StartupResources.verified(
@@ -15,7 +18,9 @@ enum StartupProbe {
             fastZenzai: fastZenzaiPath.map { URL(fileURLWithPath: $0) },
             jinen: jinenPath.map { URL(fileURLWithPath: $0) },
             fastJinen: fastJinenPath.map { URL(fileURLWithPath: $0) },
-            dictionary: URL(fileURLWithPath: dictionaryPath, isDirectory: true))
+            dictionary: URL(fileURLWithPath: dictionaryPath, isDirectory: true),
+            records: recordPath.map { FileVerificationRecordStore(fileURL: URL(fileURLWithPath: $0)) },
+            appVersion: recordPath == nil ? "" : "hajime-playground")
         let verified = clock.now
         guard let dictionary = try? resources.dictionary?.get() else {
             print("同梱の辞書を確かめられませんでした")
@@ -24,7 +29,8 @@ enum StartupProbe {
         let memory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-startup-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: memory) }
         let engine = try AzooKeyConverterEngine(memoryDirectory: memory, versionString: "hajime-playground", zenzai: try? resources.zenzai?.get(),
-                                                fastZenzai: try? resources.fastZenzai?.get(), dictionaryDirectory: dictionary.url)
+                                                fastZenzai: try? resources.fastZenzai?.get(), jinen: try? resources.jinen?.get(),
+                                                fastJinen: try? resources.fastJinen?.get(), dictionaryDirectory: dictionary.url)
         let created = clock.now
         engine.warmUp()
         let warmed = clock.now

@@ -419,3 +419,10 @@ public protocol SettingsFileHandling: AnyObject {
     func importRuleList(_ list: RuleList, from path: String) async throws(SettingsFileFailure) -> (added: Int, skipped: Int)
     func exportRuleList(_ list: RuleList, to path: String) async throws(SettingsFileFailure)
 }
+
+/// 起動のときに同梱のモデルと辞書を確かめた結果の記録を読み書きするポート(ADR 0017)．
+/// 読めないときは nil を返し，呼ぶ側はすべて確かめ直す．書けなくても起動は続ける
+public protocol VerificationRecordStoring: Sendable {
+    func load() -> VerificationRecord?
+    func save(_ record: VerificationRecord)
+}
