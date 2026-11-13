@@ -138,27 +138,31 @@ private struct InputTab: View {
                 ResettablePicker(model: model, title: UIStrings.Settings.punctuation, keyPath: \.punctuation, label: UIStrings.Settings.label(for:))
                 ResettablePicker(model: model, title: UIStrings.Settings.brackets, keyPath: \.brackets, label: UIStrings.Settings.label(for:))
                 ResettablePicker(model: model, title: UIStrings.Settings.slash, keyPath: \.slash, label: UIStrings.Settings.label(for:))
-                ResettablePicker(model: model, title: UIStrings.Choice.yenKey, keyPath: \.yenKey, label: UIStrings.Choice.label(for:))
-                ResettablePicker(model: model, title: UIStrings.Settings.spaceWidth, keyPath: \.spaceWidth, label: UIStrings.Settings.label(for:))
-                ResettablePicker(model: model, title: UIStrings.Settings.numberWidth, keyPath: \.numberWidth, label: UIStrings.Settings.label(for:))
-                ResettablePicker(model: model, title: UIStrings.More.alphabetWidth, keyPath: \.alphabetWidth, label: UIStrings.Settings.label(for:))
-                ResettableToggle(model: model, title: UIStrings.More.shiftStartsAlphabet, keyPath: \.shiftStartsAlphabet)
-                ResettableToggle(model: model, title: UIStrings.Settings.numberSeparators, keyPath: \.numberSeparators)
-                ResettableToggle(model: model, title: UIStrings.Settings.alphanumericHyphen, keyPath: \.alphanumericHyphen)
-                ResettableToggle(model: model, title: UIStrings.Features.keypadDirect, keyPath: \.keypadDirect)
-                ResettableToggle(model: model, title: UIStrings.Settings.keypadCalculation, keyPath: \.keypadCalculation)
-            }
-            Section(UIStrings.Settings.keys) {
-                ResettableToggle(model: model, title: UIStrings.Settings.punctuationCommits, keyPath: \.punctuationCommits)
-                ResettableToggle(model: model, title: UIStrings.Settings.questionExclamationCommits, keyPath: \.questionExclamationCommits)
-                ResettableToggle(model: model, title: UIStrings.Settings.cyclesLetterCase, keyPath: \.cyclesLetterCase)
-                ResettableToggle(model: model, title: UIStrings.Settings.numberKeySelection, keyPath: \.numberKeySelection)
-                ResettableToggle(model: model, title: UIStrings.Settings.showsModeIndicator, keyPath: \.showsModeIndicator)
-                ResettableRow(model: model, keyPath: \.modeIndicatorDuration) {
-                    SecondsSlider(title: UIStrings.More.modeIndicatorDuration, value: model.binding(\.modeIndicatorDuration),
-                                  range: DefaultSettings.modeIndicatorDurationRange)
+                BuiltLater(stage: 1) {
+                    ResettablePicker(model: model, title: UIStrings.Choice.yenKey, keyPath: \.yenKey, label: UIStrings.Choice.label(for:))
+                    ResettablePicker(model: model, title: UIStrings.Settings.spaceWidth, keyPath: \.spaceWidth, label: UIStrings.Settings.label(for:))
+                    ResettablePicker(model: model, title: UIStrings.Settings.numberWidth, keyPath: \.numberWidth, label: UIStrings.Settings.label(for:))
+                    ResettablePicker(model: model, title: UIStrings.More.alphabetWidth, keyPath: \.alphabetWidth, label: UIStrings.Settings.label(for:))
+                    ResettableToggle(model: model, title: UIStrings.More.shiftStartsAlphabet, keyPath: \.shiftStartsAlphabet)
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberSeparators, keyPath: \.numberSeparators)
+                    ResettableToggle(model: model, title: UIStrings.Settings.alphanumericHyphen, keyPath: \.alphanumericHyphen)
+                    ResettableToggle(model: model, title: UIStrings.Features.keypadDirect, keyPath: \.keypadDirect)
+                    ResettableToggle(model: model, title: UIStrings.Settings.keypadCalculation, keyPath: \.keypadCalculation)
                 }
-                .disabled(model, unless: \.showsModeIndicator)
+            }
+            BuiltLater(stage: 2) {
+                Section(UIStrings.Settings.keys) {
+                    ResettableToggle(model: model, title: UIStrings.Settings.punctuationCommits, keyPath: \.punctuationCommits)
+                    ResettableToggle(model: model, title: UIStrings.Settings.questionExclamationCommits, keyPath: \.questionExclamationCommits)
+                    ResettableToggle(model: model, title: UIStrings.Settings.cyclesLetterCase, keyPath: \.cyclesLetterCase)
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberKeySelection, keyPath: \.numberKeySelection)
+                    ResettableToggle(model: model, title: UIStrings.Settings.showsModeIndicator, keyPath: \.showsModeIndicator)
+                    ResettableRow(model: model, keyPath: \.modeIndicatorDuration) {
+                        SecondsSlider(title: UIStrings.More.modeIndicatorDuration, value: model.binding(\.modeIndicatorDuration),
+                                      range: DefaultSettings.modeIndicatorDurationRange)
+                    }
+                    .disabled(model, unless: \.showsModeIndicator)
+                }
             }
         }
         .formStyle(.grouped)
@@ -195,108 +199,126 @@ private struct ConversionTab: View {
                     .disabled(model, when: \.predictionDisplay, is: .off)
                 ResettableToggle(model: model, title: UIStrings.Choice.predictionFromCorrection, keyPath: \.predictionFromCorrection)
                     .disabled(model, when: \.predictionDisplay, is: .off)
-                ResettableToggle(model: model, title: UIStrings.Choice.variantRow, keyPath: \.showsVariantRow)
-                ResettableToggle(model: model, title: UIStrings.Choice.keyHints, keyPath: \.showsKeyHints)
-                ResettableRow(model: model, keyPath: \.liveConversionDelay) {
-                    SecondsSlider(title: UIStrings.More.liveConversionDelay, value: model.binding(\.liveConversionDelay),
-                                  range: DefaultSettings.liveConversionDelayRange)
-                }
-                .disabled(model, unless: \.liveConversion)
-                ResettableStepper(model: model, title: UIStrings.More.liveConversionSkipLength, keyPath: \.liveConversionSkipLength, range: DefaultSettings.liveConversionSkipLengthRange,
-                                  value: UIStrings.More.skipLength)
-                .disabled(model, unless: \.liveConversion)
-            }
-            Section(UIStrings.Choice.hiddenPredictions) {
-                RuleListEditor(model: model, spec: .hiddenPredictions, labels: .init(
-                    key: UIStrings.Choice.hiddenPredictionPlaceholder, value: nil,
-                    empty: UIStrings.Choice.hiddenPredictionsEmpty))
-            }
-            Section(UIStrings.More.candidates) {
-                ResettableStepper(model: model, title: UIStrings.More.branchCandidates, keyPath: \.branchCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange)
-                ResettableStepper(model: model, title: UIStrings.More.listCandidates, keyPath: \.listCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange)
-                // 表に広げたときの大きさ(一覧の候補数の行 × 列数)を値に出す
-                ResettableStepper(model: model, title: UIStrings.More.gridColumns, keyPath: \.candidateGridColumns, range: DefaultSettings.candidateGridColumnsRange,
-                                  value: { [model] in UIStrings.More.gridSize(rows: model.settings.listCandidatesPerPage, columns: $0) })
-                ResettableToggle(model: model, title: UIStrings.More.expandsGridOnPaging, keyPath: \.expandsGridOnPaging)
-                ResettableToggle(model: model, title: UIStrings.More.contextualSegmentCandidates, keyPath: \.contextualSegmentCandidates)
-                // 見本はこのまとまりに 1 つだけなので名前のすぐ後ろに置く(見出しで区切った「絵文字」の見本とはそろえない)
-                ExampleToggle(model: model, title: UIStrings.More.listSegmentAlternatives, keyPath: \.listSegmentAlternatives,
-                              example: UIStrings.More.listSegmentAlternativesExample)
-            }
-            Section(UIStrings.More.typo) {
-                ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))
-                ResettableStepper(model: model, title: UIStrings.More.englishSkipLength, keyPath: \.englishSkipLength, range: DefaultSettings.englishSkipLengthRange,
-                                  value: UIStrings.More.skipLength)
-                Group {
-                    ResettablePicker(model: model, title: UIStrings.More.correctionSensitivity, keyPath: \.correctionSensitivity, label: UIStrings.More.label(for:))
-                    ResettableToggle(model: model, title: UIStrings.More.showsSuggestions, keyPath: \.showsSuggestions)
-                    ResettableRow(model: model, keyPath: \.correctionDelay) {
-                        SecondsSlider(title: UIStrings.More.correctionDelay, value: model.binding(\.correctionDelay), range: DefaultSettings.correctionDelayRange)
+                BuiltLater(stage: 1) {
+                    ResettableToggle(model: model, title: UIStrings.Choice.variantRow, keyPath: \.showsVariantRow)
+                    ResettableToggle(model: model, title: UIStrings.Choice.keyHints, keyPath: \.showsKeyHints)
+                    ResettableRow(model: model, keyPath: \.liveConversionDelay) {
+                        SecondsSlider(title: UIStrings.More.liveConversionDelay, value: model.binding(\.liveConversionDelay),
+                                      range: DefaultSettings.liveConversionDelayRange)
                     }
-                    ResettableRow(model: model, keyPath: \.reviewCorrectionTimeout) {
-                        SecondsSlider(title: UIStrings.More.reviewCorrectionTimeout, value: model.binding(\.reviewCorrectionTimeout),
-                                      range: DefaultSettings.reviewCorrectionTimeoutRange, step: DefaultSettings.correctionTimeoutStep)
+                    .disabled(model, unless: \.liveConversion)
+                    ResettableStepper(model: model, title: UIStrings.More.liveConversionSkipLength, keyPath: \.liveConversionSkipLength, range: DefaultSettings.liveConversionSkipLengthRange,
+                                      value: UIStrings.More.skipLength)
+                    .disabled(model, unless: \.liveConversion)
+                }
+            }
+            BuiltLater(stage: 1) {
+                Section(UIStrings.Choice.hiddenPredictions) {
+                    RuleListEditor(model: model, spec: .hiddenPredictions, labels: .init(
+                        key: UIStrings.Choice.hiddenPredictionPlaceholder, value: nil,
+                        empty: UIStrings.Choice.hiddenPredictionsEmpty))
+                }
+            }
+            BuiltLater(stage: 2) {
+                Section(UIStrings.More.candidates) {
+                    ResettableStepper(model: model, title: UIStrings.More.branchCandidates, keyPath: \.branchCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange)
+                    ResettableStepper(model: model, title: UIStrings.More.listCandidates, keyPath: \.listCandidatesPerPage, range: DefaultSettings.candidatesPerPageRange)
+                    // 表に広げたときの大きさ(一覧の候補数の行 × 列数)を値に出す
+                    ResettableStepper(model: model, title: UIStrings.More.gridColumns, keyPath: \.candidateGridColumns, range: DefaultSettings.candidateGridColumnsRange,
+                                      value: { [model] in UIStrings.More.gridSize(rows: model.settings.listCandidatesPerPage, columns: $0) })
+                    ResettableToggle(model: model, title: UIStrings.More.expandsGridOnPaging, keyPath: \.expandsGridOnPaging)
+                    ResettableToggle(model: model, title: UIStrings.More.contextualSegmentCandidates, keyPath: \.contextualSegmentCandidates)
+                    // 見本はこのまとまりに 1 つだけなので名前のすぐ後ろに置く(見出しで区切った「絵文字」の見本とはそろえない)
+                    ExampleToggle(model: model, title: UIStrings.More.listSegmentAlternatives, keyPath: \.listSegmentAlternatives,
+                                  example: UIStrings.More.listSegmentAlternativesExample)
+                }
+            }
+            BuiltLater(stage: 3) {
+                Section(UIStrings.More.typo) {
+                    ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))
+                    ResettableStepper(model: model, title: UIStrings.More.englishSkipLength, keyPath: \.englishSkipLength, range: DefaultSettings.englishSkipLengthRange,
+                                      value: UIStrings.More.skipLength)
+                    Group {
+                        ResettablePicker(model: model, title: UIStrings.More.correctionSensitivity, keyPath: \.correctionSensitivity, label: UIStrings.More.label(for:))
+                        ResettableToggle(model: model, title: UIStrings.More.showsSuggestions, keyPath: \.showsSuggestions)
+                        ResettableRow(model: model, keyPath: \.correctionDelay) {
+                            SecondsSlider(title: UIStrings.More.correctionDelay, value: model.binding(\.correctionDelay), range: DefaultSettings.correctionDelayRange)
+                        }
+                        ResettableRow(model: model, keyPath: \.reviewCorrectionTimeout) {
+                            SecondsSlider(title: UIStrings.More.reviewCorrectionTimeout, value: model.binding(\.reviewCorrectionTimeout),
+                                          range: DefaultSettings.reviewCorrectionTimeoutRange, step: DefaultSettings.correctionTimeoutStep)
+                        }
+                        ResettableRow(model: model, keyPath: \.lateCorrectionTimeout) {
+                            SecondsSlider(title: UIStrings.More.lateCorrectionTimeout, value: model.binding(\.lateCorrectionTimeout),
+                                          range: DefaultSettings.lateCorrectionTimeoutRange, step: DefaultSettings.correctionTimeoutStep)
+                        }
+                        ResettableToggle(model: model, title: UIStrings.More.remembersRejectedCorrections, keyPath: \.remembersRejectedCorrections)
                     }
-                    ResettableRow(model: model, keyPath: \.lateCorrectionTimeout) {
-                        SecondsSlider(title: UIStrings.More.lateCorrectionTimeout, value: model.binding(\.lateCorrectionTimeout),
-                                      range: DefaultSettings.lateCorrectionTimeoutRange, step: DefaultSettings.correctionTimeoutStep)
+                    .disabled(model, unless: \.typoCorrection, is: .standard)
+                }
+            }
+            BuiltLater(stage: 4) {
+                Section(UIStrings.Features.notation) {
+                    ResettablePicker(model: model, title: UIStrings.Features.okurigana, keyPath: \.okuriganaStyle, label: UIStrings.Features.label(for:))
+                    ResettableToggle(model: model, title: UIStrings.Features.prefersKatakana, keyPath: \.prefersKatakana)
+                }
+                AssociationSection(model: model)
+            }
+            BuiltLater(stage: 5) {
+                Section(UIStrings.Settings.specialConversion) {
+                    ResettableToggle(model: model, title: UIStrings.Features.calculation, keyPath: \.calculation)
+                    ResettableToggle(model: model, title: UIStrings.Features.postalCode, keyPath: \.postalCodeConversion)
+                    ResettableToggle(model: model, title: UIStrings.Features.handwriting, keyPath: \.handwriting)
+                    ResettableToggle(model: model, title: UIStrings.Settings.dateConversion, keyPath: \.dateConversion)
+                    ResettableToggle(model: model, title: UIStrings.Settings.misuseNotes, keyPath: \.misuseNotes)
+                    ResettableToggle(model: model, title: UIStrings.Settings.proofreading, keyPath: \.proofreading)
+                    ResettableToggle(model: model, title: UIStrings.Settings.symbolConversion, keyPath: \.symbolConversion)
+                    ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
+                }
+            }
+            BuiltLater(stage: 6) {
+                EmojiSection(model: model)
+                Section(UIStrings.Settings.numberForms) {
+                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormConversion, keyPath: \.numberFormConversion)
+                    Group {
+                        ResettableToggle(model: model, title: UIStrings.Settings.numberFormCircled, keyPath: \.numberFormCircled)
+                        ResettableToggle(model: model, title: UIStrings.Settings.numberFormParenthesized, keyPath: \.numberFormParenthesized)
+                        ResettableToggle(model: model, title: UIStrings.Settings.numberFormKanji, keyPath: \.numberFormKanji)
+                        ResettableToggle(model: model, title: UIStrings.Settings.numberFormRoman, keyPath: \.numberFormRoman)
                     }
-                    ResettableToggle(model: model, title: UIStrings.More.remembersRejectedCorrections, keyPath: \.remembersRejectedCorrections)
-                }
-                .disabled(model, unless: \.typoCorrection, is: .standard)
-            }
-            Section(UIStrings.Features.notation) {
-                ResettablePicker(model: model, title: UIStrings.Features.okurigana, keyPath: \.okuriganaStyle, label: UIStrings.Features.label(for:))
-                ResettableToggle(model: model, title: UIStrings.Features.prefersKatakana, keyPath: \.prefersKatakana)
-            }
-            AssociationSection(model: model)
-            Section(UIStrings.Settings.specialConversion) {
-                ResettableToggle(model: model, title: UIStrings.Features.calculation, keyPath: \.calculation)
-                ResettableToggle(model: model, title: UIStrings.Features.postalCode, keyPath: \.postalCodeConversion)
-                ResettableToggle(model: model, title: UIStrings.Features.handwriting, keyPath: \.handwriting)
-                ResettableToggle(model: model, title: UIStrings.Settings.dateConversion, keyPath: \.dateConversion)
-                ResettableToggle(model: model, title: UIStrings.Settings.misuseNotes, keyPath: \.misuseNotes)
-                ResettableToggle(model: model, title: UIStrings.Settings.proofreading, keyPath: \.proofreading)
-                ResettableToggle(model: model, title: UIStrings.Settings.symbolConversion, keyPath: \.symbolConversion)
-                ResettableToggle(model: model, title: UIStrings.Settings.latexConversion, keyPath: \.latexConversion)
-            }
-            EmojiSection(model: model)
-            Section(UIStrings.Settings.numberForms) {
-                ResettableToggle(model: model, title: UIStrings.Settings.numberFormConversion, keyPath: \.numberFormConversion)
-                Group {
-                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormCircled, keyPath: \.numberFormCircled)
-                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormParenthesized, keyPath: \.numberFormParenthesized)
-                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormKanji, keyPath: \.numberFormKanji)
-                    ResettableToggle(model: model, title: UIStrings.Settings.numberFormRoman, keyPath: \.numberFormRoman)
-                }
-                .disabled(model, unless: \.numberFormConversion)
-            }
-            Section(UIStrings.Settings.meaning) {
-                ResettableToggle(model: model, title: UIStrings.Settings.homophoneNotes, keyPath: \.homophoneNotes)
-                Group {
-                    ResettablePicker(model: model, title: UIStrings.Settings.meaningPlacement, keyPath: \.meaningPlacement, label: UIStrings.Settings.label(for:))
-                    ResettableStepper(model: model, title: UIStrings.Settings.meaningSenseLimit, keyPath: \.meaningSenseLimit, range: DefaultSettings.meaningSenseLimitRange)
-                    ResettableToggle(model: model, title: UIStrings.Settings.showsPartOfSpeech, keyPath: \.showsPartOfSpeech)
-                    ResettableToggle(model: model, title: UIStrings.Settings.showsUsageExamples, keyPath: \.showsUsageExamples)
-                    ResettableToggle(model: model, title: UIStrings.Settings.showsHomophones, keyPath: \.showsHomophones)
-                }
-                .disabled(model, unless: \.homophoneNotes)
-            }
-            Section(UIStrings.Settings.zenzaiModel) {
-                ResettablePicker(model: model, title: UIStrings.Settings.zenzaiModel, keyPath: \.zenzaiModel, label: UIStrings.Settings.label(for:))
-                ZenzaiCombinedNote(model: model)
-            }
-            Section {
-                ResettableToggle(model: model, title: UIStrings.Settings.candidateReranking, keyPath: \.candidateReranking)
-            }
-            Section {
-                ResettablePicker(model: model, title: UIStrings.Settings.jinenModel, keyPath: \.jinenModel) { choice in
-                    UIStrings.Settings.label(for: choice, automaticResult: model.automaticJinenModel?())
+                    .disabled(model, unless: \.numberFormConversion)
                 }
             }
-            Section(UIStrings.Settings.learning) {
-                ResettablePicker(model: model, title: UIStrings.Settings.learning, keyPath: \.learning, label: UIStrings.Settings.label(for:))
-                Button(UIStrings.Settings.resetLearning, role: .destructive) { model.resetLearning() }
+            BuiltLater(stage: 7) {
+                Section(UIStrings.Settings.meaning) {
+                    ResettableToggle(model: model, title: UIStrings.Settings.homophoneNotes, keyPath: \.homophoneNotes)
+                    Group {
+                        ResettablePicker(model: model, title: UIStrings.Settings.meaningPlacement, keyPath: \.meaningPlacement, label: UIStrings.Settings.label(for:))
+                        ResettableStepper(model: model, title: UIStrings.Settings.meaningSenseLimit, keyPath: \.meaningSenseLimit, range: DefaultSettings.meaningSenseLimitRange)
+                        ResettableToggle(model: model, title: UIStrings.Settings.showsPartOfSpeech, keyPath: \.showsPartOfSpeech)
+                        ResettableToggle(model: model, title: UIStrings.Settings.showsUsageExamples, keyPath: \.showsUsageExamples)
+                        ResettableToggle(model: model, title: UIStrings.Settings.showsHomophones, keyPath: \.showsHomophones)
+                    }
+                    .disabled(model, unless: \.homophoneNotes)
+                }
+            }
+            BuiltLater(stage: 8) {
+                Section(UIStrings.Settings.zenzaiModel) {
+                    ResettablePicker(model: model, title: UIStrings.Settings.zenzaiModel, keyPath: \.zenzaiModel, label: UIStrings.Settings.label(for:))
+                    ZenzaiCombinedNote(model: model)
+                }
+                Section {
+                    ResettableToggle(model: model, title: UIStrings.Settings.candidateReranking, keyPath: \.candidateReranking)
+                }
+                Section {
+                    ResettablePicker(model: model, title: UIStrings.Settings.jinenModel, keyPath: \.jinenModel) { choice in
+                        UIStrings.Settings.label(for: choice, automaticResult: model.automaticJinenModel?())
+                    }
+                }
+                Section(UIStrings.Settings.learning) {
+                    ResettablePicker(model: model, title: UIStrings.Settings.learning, keyPath: \.learning, label: UIStrings.Settings.label(for:))
+                    Button(UIStrings.Settings.resetLearning, role: .destructive) { model.resetLearning() }
+                }
             }
         }
         .formStyle(.grouped)

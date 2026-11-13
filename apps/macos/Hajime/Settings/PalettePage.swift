@@ -43,29 +43,31 @@ struct PalettePage: View {
                 }
                 .disabled(model, unless: \.palette)
             }
-            Section(UIStrings.Palette.look) {
-                ResettableStepper(model: model, title: UIStrings.Palette.columns, keyPath: \.paletteColumns, range: DefaultSettings.paletteColumnsRange)
-                ResettableStepper(model: model, title: UIStrings.Palette.rows, keyPath: \.paletteRows, range: DefaultSettings.paletteRowsRange)
-                ResettableRow(model: model, keyPath: \.paletteCellSize) {
-                    LabeledContent(UIStrings.Palette.cellSizeValue(Int(cellSize ?? model.settings.paletteCellSize))) {
-                        Slider(value: Binding(get: { cellSize ?? model.settings.paletteCellSize }, set: { cellSize = $0 }),
-                               in: DefaultSettings.paletteCellSizeRange, step: DefaultSettings.paletteCellSizeStep) { isEditing in
-                            guard !isEditing, let value = cellSize else { return }
-                            model.update { $0.paletteCellSize = value }
-                            cellSize = nil
+            BuiltLater(stage: 1) {
+                Section(UIStrings.Palette.look) {
+                    ResettableStepper(model: model, title: UIStrings.Palette.columns, keyPath: \.paletteColumns, range: DefaultSettings.paletteColumnsRange)
+                    ResettableStepper(model: model, title: UIStrings.Palette.rows, keyPath: \.paletteRows, range: DefaultSettings.paletteRowsRange)
+                    ResettableRow(model: model, keyPath: \.paletteCellSize) {
+                        LabeledContent(UIStrings.Palette.cellSizeValue(Int(cellSize ?? model.settings.paletteCellSize))) {
+                            Slider(value: Binding(get: { cellSize ?? model.settings.paletteCellSize }, set: { cellSize = $0 }),
+                                   in: DefaultSettings.paletteCellSizeRange, step: DefaultSettings.paletteCellSizeStep) { isEditing in
+                                guard !isEditing, let value = cellSize else { return }
+                                model.update { $0.paletteCellSize = value }
+                                cellSize = nil
+                            }
                         }
                     }
+                    ResettableStepper(model: model, title: UIStrings.Palette.frequentRows, keyPath: \.paletteFrequentRows, range: DefaultSettings.paletteFrequentRowsRange)
+                        .disabled(model, unless: \.paletteRecordsHistory)
+                    ResettableToggle(model: model, title: UIStrings.Palette.showsPreview, keyPath: \.paletteShowsPreview)
+                    Group {
+                        ResettableToggle(model: model, title: UIStrings.Palette.showsUnicodeName, keyPath: \.paletteShowsUnicodeName)
+                        ResettableToggle(model: model, title: UIStrings.Palette.showsReadings, keyPath: \.paletteShowsReadings)
+                        ResettableToggle(model: model, title: UIStrings.Palette.showsShortcodes, keyPath: \.paletteShowsShortcodes)
+                        ResettableToggle(model: model, title: UIStrings.Palette.showsCodePoints, keyPath: \.paletteShowsCodePoints)
+                    }
+                    .disabled(model, unless: \.paletteShowsPreview)
                 }
-                ResettableStepper(model: model, title: UIStrings.Palette.frequentRows, keyPath: \.paletteFrequentRows, range: DefaultSettings.paletteFrequentRowsRange)
-                    .disabled(model, unless: \.paletteRecordsHistory)
-                ResettableToggle(model: model, title: UIStrings.Palette.showsPreview, keyPath: \.paletteShowsPreview)
-                Group {
-                    ResettableToggle(model: model, title: UIStrings.Palette.showsUnicodeName, keyPath: \.paletteShowsUnicodeName)
-                    ResettableToggle(model: model, title: UIStrings.Palette.showsReadings, keyPath: \.paletteShowsReadings)
-                    ResettableToggle(model: model, title: UIStrings.Palette.showsShortcodes, keyPath: \.paletteShowsShortcodes)
-                    ResettableToggle(model: model, title: UIStrings.Palette.showsCodePoints, keyPath: \.paletteShowsCodePoints)
-                }
-                .disabled(model, unless: \.paletteShowsPreview)
             }
         }
         .formStyle(.grouped)

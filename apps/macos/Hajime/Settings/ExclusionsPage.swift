@@ -5,6 +5,8 @@ import SwiftUI
 /// アプリは /Applications から選んで足し，CSV で読み込み・書き出しできる
 struct ExclusionsPage: View {
     @ObservedObject var model: SettingsModel
+    /// 初めて開くときの組み立ての進み(表の行を少しずつ出す．PageBuild)
+    @Environment(PageBuild.self) private var build: PageBuild?
     @State private var selection = Set<ProfileRule>()
     @State private var newProfile = AppProfile.direct
 
@@ -18,7 +20,7 @@ struct ExclusionsPage: View {
                           leadingInset: DesignTokens.Size.Settings.tablePopupTextInset),
                 ])
                 FormTableHost {
-                    Table(model.settings.profileRules, selection: $selection) {
+                    Table(shownRules, selection: $selection) {
                         TableColumn(UIStrings.More.apps) { rule in
                             Text(rule.applicationPrefix).lineLimit(1).truncationMode(.middle)
                         }
@@ -71,19 +73,30 @@ struct ExclusionsPage: View {
             } footer: {
                 Text(UIStrings.More.exclusionsOrder).font(.caption).foregroundStyle(.secondary)
             }
-            Section {
-                HStack {
-                    Button(UIStrings.More.importCSV) { model.importProfileRules() }
-                    Button(UIStrings.More.exportCSV) { model.exportProfileRules() }
+            BuiltLater(stage: 1) {
+                Section {
+                    HStack {
+                        Button(UIStrings.More.importCSV) { model.importProfileRules() }
+                        Button(UIStrings.More.exportCSV) { model.exportProfileRules() }
+                    }
                 }
-            }
-            Section {
-                ResettableToggle(model: model, title: UIStrings.More.terminalCommands, keyPath: \.terminalCommands)
-                ResettableToggle(model: model, title: UIStrings.Settings.escapeSwitchesToDirect, keyPath: \.escapeSwitchesToDirect)
-                ResettableToggle(model: model, title: UIStrings.More.restrainsLiveConversionInCode, keyPath: \.restrainsLiveConversionInCode)
+                Section {
+                    ResettableToggle(model: model, title: UIStrings.More.terminalCommands, keyPath: \.terminalCommands)
+                    ResettableToggle(model: model, title: UIStrings.Settings.escapeSwitchesToDirect, keyPath: \.escapeSwitchesToDirect)
+                    ResettableToggle(model: model, title: UIStrings.More.restrainsLiveConversionInCode, keyPath: \.restrainsLiveConversionInCode)
+                }
             }
         }
         .formStyle(.grouped)
+    }
+
+    /// 表に見えている行のおおよその数(初めて開くときに，ここまでを少しずつ出す)
+    private static let visibleRows = 8
+
+    /// 表に出す決まり．初めて開くときは少しずつ増やす
+    private var shownRules: [ProfileRule] {
+        let rules = model.settings.profileRules
+        return build?.rowLimit(visibleRows: Self.visibleRows).map { Array(rules.prefix($0)) } ?? rules
     }
 
     /// 選べる扱い．標準はアプリを一覧から消すのと同じなので並べない

@@ -6,6 +6,8 @@ import SwiftUI
 /// キーは押して記録し，状態とコマンドは選ぶ．コマンド名・キーで絞り込み，ひな形を読み込み，重なった行を知らせる
 struct KeymapPage: View {
     @ObservedObject var model: SettingsModel
+    /// 初めて開くときの組み立ての進み(表の行を少しずつ出す．PageBuild)
+    @Environment(PageBuild.self) private var build: PageBuild?
     @State private var query = ""
     @State private var stateFilter: KeymapState?
     /// 押したキーで絞り込むときのキー
@@ -58,8 +60,12 @@ struct KeymapPage: View {
             toolbar
             missingWarning
             composer
-            table(rows, editable: pickerRows)
-            footer(rows)
+            // 初めて開くときは，上の検索の行と表の枠を先に出し，新しい行の選択肢(段 1)，表の行(段 2 から 4 行ずつ)の順に足す
+            table(build?.rowLimit(visibleRows: Self.visibleRows, startingAt: 2).map { Array(rows.prefix($0)) } ?? rows, editable: pickerRows)
+            // 表の下の行も次の段で足す(表はまだ空なので，下の端が動いても目立たない)
+            if build?.includes(1) ?? true {
+                footer(rows)
+            }
         }
         // Form でない画面なので，Form の余白にそろえてほかのページのカードと端を合わせる
         .padding(DesignTokens.Size.Settings.formMargin)
@@ -167,14 +173,19 @@ struct KeymapPage: View {
         GroupBox(Keys.newRow) {
             VStack(alignment: .leading, spacing: DesignTokens.Size.Space.stack) {
                 HStack(spacing: DesignTokens.Size.Space.group) {
-                    statePicker(selected: draft.state, command: nil, select: setDraftState)
-                        .frame(width: DesignTokens.Size.Settings.keymapStateWidth)
-                    KeyField(stroke: draft.stroke, isRecording: recording == .draft,
-                             onRecord: { recording = $0 ? .draft : (recording == .draft ? nil : recording) },
-                             onChange: { draft.stroke = $0 })
-                        .equatable()
-                        .frame(width: DesignTokens.Size.Settings.keymapKeyWidth)
-                    commandPicker(selected: draft.command, state: draft.state) { draft.command = $0 }
+                    // 選択肢(コマンドは 60 ほど)は作るのに時間がかかるので，初めて開くときは「追加」のボタンを先に出し，次の段で足す
+                    if build?.includes(1) ?? true {
+                        statePicker(selected: draft.state, command: nil, select: setDraftState)
+                            .frame(width: DesignTokens.Size.Settings.keymapStateWidth)
+                        KeyField(stroke: draft.stroke, isRecording: recording == .draft,
+                                 onRecord: { recording = $0 ? .draft : (recording == .draft ? nil : recording) },
+                                 onChange: { draft.stroke = $0 })
+                            .equatable()
+                            .frame(width: DesignTokens.Size.Settings.keymapKeyWidth)
+                        commandPicker(selected: draft.command, state: draft.state) { draft.command = $0 }
+                    } else {
+                        Spacer()
+                    }
                     Button(Keys.add) { addDraft() }
                         .disabled(draft.stroke == nil)
                 }
@@ -309,6 +320,9 @@ struct KeymapPage: View {
     private static func preset(matching keymap: Keymap) -> KeymapPreset? {
         presetKeymaps.first { $0.keymap.entries == keymap.entries }?.preset
     }
+
+    /// 表に見えている行のおおよその数(初めて開くときに，ここまでを少しずつ出す)
+    private static let visibleRows = 16
 
     /// 使われない行の濃さ(無効の項目と同じくらいの薄さ)
     private static let hiddenOpacity = 0.45

@@ -136,6 +136,8 @@ struct RuleListEditor: View {
     /// キーボードで選んでいるチップ(書き方)
     @FocusState private var focusedChip: String?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// 初めて開くときの組み立ての進み(表の行を少しずつ出す．PageBuild)
+    @Environment(PageBuild.self) private var build: PageBuild?
 
     private enum Field { case key, value, note }
 
@@ -237,6 +239,15 @@ struct RuleListEditor: View {
         }
         if !sortOrder.isEmpty { result.sort(using: sortOrder) }
         return result
+    }
+
+    /// 表に見えている行のおおよその数(初めて開くときに，ここまでを少しずつ出す)
+    private static let visibleRows = 8
+
+    /// 表に出す行．初めて開くときは少しずつ増やす
+    private var tableItems: [RuleItem] {
+        let items = shownItems
+        return build?.rowLimit(visibleRows: Self.visibleRows).map { Array(items.prefix($0)) } ?? items
     }
 
     var body: some View {
@@ -406,31 +417,31 @@ struct RuleListEditor: View {
     @ViewBuilder
     private var table: some View {
         if setEnabled != nil {
-            decorated(Table(shownItems, selection: $selection, sortOrder: $sortOrder) {
+            decorated(Table(tableItems, selection: $selection, sortOrder: $sortOrder) {
                 enabledColumn
                 keyColumn
                 valueColumn
             })
         } else if kinds != nil, hasNote {
-            decorated(Table(shownItems, selection: $selection, sortOrder: $sortOrder) {
+            decorated(Table(tableItems, selection: $selection, sortOrder: $sortOrder) {
                 keyColumn
                 valueColumn
                 kindColumn
                 noteColumn
             })
         } else if kinds != nil {
-            decorated(Table(shownItems, selection: $selection, sortOrder: $sortOrder) {
+            decorated(Table(tableItems, selection: $selection, sortOrder: $sortOrder) {
                 keyColumn
                 valueColumn
                 kindColumn
             })
         } else if hasValue {
-            decorated(Table(shownItems, selection: $selection, sortOrder: $sortOrder) {
+            decorated(Table(tableItems, selection: $selection, sortOrder: $sortOrder) {
                 keyColumn
                 valueColumn
             })
         } else {
-            decorated(Table(shownItems, selection: $selection, sortOrder: $sortOrder) {
+            decorated(Table(tableItems, selection: $selection, sortOrder: $sortOrder) {
                 keyColumn
             })
         }

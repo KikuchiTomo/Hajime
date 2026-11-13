@@ -28,6 +28,13 @@ struct SettingsPageStack: NSViewRepresentable {
     final class PageStackView: NSView {
         var makePage: ((SettingsView.Page) -> AnyView)?
         private var pages: [SettingsView.Page: NSView] = [:]
+        /// 下の部分をまだ組み立てているページの数
+        private var unfinished = 0
+        /// 組み立ての途中のページがあるか(計測と見本の書き出しで，組み立てが済むのを待つ)
+        var isBuilding: Bool { unfinished > 0 }
+
+        /// ページの最初の部分を組み立てたか
+        func isBuilt(_ page: SettingsView.Page) -> Bool { pages[page] != nil }
         private var current: SettingsView.Page?
         private lazy var loading: NSView = {
             let view = NSHostingView(rootView: ProgressView(UIStrings.Settings.loading).controlSize(.small))
@@ -66,13 +73,30 @@ struct SettingsPageStack: NSViewRepresentable {
 
         private func build(_ page: SettingsView.Page) {
             guard pages[page] == nil, let makePage else { return }
-            let view = NSHostingView(rootView: makePage(page))
+            // 見えている上の部分だけを先に組み立てて出し，下の部分は描画の区切りごとに足す(PageBuild)
+            let progress = PageBuild()
+            let view = NSHostingView(rootView: makePage(page).environment(progress))
             // ページの大きさで窓の大きさを変えない
             view.sizingOptions = []
             add(view)
             pages[page] = view
             view.isHidden = page != current
             if page == current { loading.isHidden = true }
+            unfinished += 1
+            buildRest(progress)
+        }
+
+        /// 今の段を画面に描いてから，次の段を組み立てる．ページが使う段は描いたあとで分かるので，描いてから残りがあるかを見る
+        private func buildRest(_ progress: PageBuild) {
+            afterNextFrame { [weak self] in
+                guard let self else { return }
+                if progress.isFinished {
+                    unfinished -= 1
+                } else {
+                    progress.advance()
+                    buildRest(progress)
+                }
+            }
         }
 
         private func add(_ view: NSView) {
@@ -85,6 +109,58 @@ struct SettingsPageStack: NSViewRepresentable {
         override func layout() {
             super.layout()
             for view in subviews { view.frame = safeAreaRect }
+        }
+    }
+}
+
+/// 初めて開くページの組み立ての進み．
+///
+/// Form(.grouped)は行を見えるまで作らずに済ませる仕組みを持たず，1 行(スイッチやポップアップは AppKit の部品)に 7〜10 ms かかる．
+/// 80 行ある変換のページは，開くのに 0.6 秒かかっていた．ページを段に分け，上の部分(段 0)を先に組み立てて出し，
+/// 続き(BuiltLater・表の行)は描画の区切りごとに 1 段ずつ足す．1 段は 8 行ほどにして，足している間も操作を待たせない．
+/// 組み立て終えたページは残すので，2 回目からは分けない
+@MainActor @Observable
+final class PageBuild {
+    /// ここまでの段を組み立てている(0 は最初に出す部分)
+    private(set) var stage = 0
+    /// ページが使っているいちばん後ろの段
+    @ObservationIgnored private var lastStage = 0
+
+    /// ページのすべての段を組み立てたか
+    var isFinished: Bool { stage >= lastStage }
+
+    func advance() {
+        stage += 1
+    }
+
+    /// stage の段を組み立ててよいか．まだなら，その段まで進んだときに読んだ画面を描き直す
+    func includes(_ stage: Int) -> Bool {
+        lastStage = max(lastStage, stage)
+        return self.stage >= stage
+    }
+
+    /// 表の行を 1 段に何行ずつ増やすか(行ごとにポップアップやボタンを持つ表で，1 行に 15〜20 ms かかる)
+    static let tableRowsPerStage = 4
+
+    /// 表に出す行の数．first の段より前は表の枠だけを出し，first の段から 1 段ごとに tableRowsPerStage 行ずつ増やして，
+    /// 見えている行(visibleRows)が埋まった段ですべての行を出す(nil)．
+    /// 表は見えている行だけを作るので，見えている行を埋めたあとは，まとめて出しても重くならない
+    func rowLimit(visibleRows: Int, startingAt first: Int = 1) -> Int? {
+        let stages = (visibleRows + Self.tableRowsPerStage - 1) / Self.tableRowsPerStage
+        return includes(first + stages - 1) ? nil : Self.tableRowsPerStage * max(0, stage - first + 1)
+    }
+}
+
+/// ページのうち，あとの段(1 以上)で組み立てる部分．Form の Section や行を入れる．
+/// 設定の画面の外で描くとき(見本の書き出し)は，すぐに組み立てる
+struct BuiltLater<Content: View>: View {
+    @Environment(PageBuild.self) private var build: PageBuild?
+    let stage: Int
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        if build?.includes(stage) ?? true {
+            content()
         }
     }
 }
