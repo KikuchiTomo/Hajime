@@ -11,7 +11,7 @@ import HajimePersistence
 /// 使い方: Debug でビルドした "Hajime Debug.app/Contents/MacOS/Hajime Debug" --measure-settings
 /// 設定はサンドボックスの一時ディレクトリに置き，利用者の設定に触れない．
 /// 環境変数 HAJIME_MEASURE_PAGES・HAJIME_MEASURE_ROUNDS・HAJIME_MEASURE_CHANGES で，測るページ・回数・設定を変える回数を選べる(docs/dev/DESIGN-SYSTEM.md)．
-/// HAJIME_MEASURE_INTERACTIONS=1 を付けると，ページの中の操作(スクロール・設定の変更・文字の入力)の時間もページごとに出す．
+/// HAJIME_MEASURE_INTERACTIONS=1 を付けると，ページの中の操作(スクロール・設定の変更・文字の入力・表の行の選択)の時間もページごとに出す．
 /// HAJIME_MEASURE_OPENS に回数を渡すと，ページを初めて開く時間を新しい窓でその回数ずつ測る．
 /// HAJIME_MEASURE_CLOCK=cpu を付けると，経った時間の代わりにメインスレッドが使った CPU の時間を出す(ほかの処理で混んでいても比べられる)
 @MainActor
@@ -100,10 +100,10 @@ enum SettingsBenchmark {
 // MARK: ページの中の操作
 
 extension SettingsBenchmark {
-    /// ページの中の操作(スクロール・設定の変更・文字の入力)にかかる時間を，ページごとに出す．
+    /// ページの中の操作(スクロール・設定の変更・文字の入力・表の行の選択)にかかる時間を，ページごとに出す．
     /// 1 回の操作を画面に映し終わるまでの時間で，16.7 ms を超えると 1 こま(60 Hz)に収まらない
     static func measureInteractions(pages: [SettingsView.Page]) {
-        print("ページ\tスクロール中央値(ms)\tスクロール最大(ms)\t設定の変更(ms)\t入力中央値(ms)\t入力最大(ms)")
+        print("ページ\tスクロール中央値(ms)\tスクロール最大(ms)\tページの設定の変更(ms)\tほかの設定の変更(ms)\t入力中央値(ms)\t入力最大(ms)\t行を選ぶ(ms)")
         for page in pages {
             // そのページだけを開いた窓で測る(ほかのページの描き直しを混ぜない)
             let fixture = SettingsFixture.make(name: "benchmark-page")
@@ -113,11 +113,16 @@ extension SettingsBenchmark {
             SettingsFixture.settle(window)
             SettingsFixture.settle(window)
             let scroll = scrollTimes(window)
-            let change = median((0..<10).map { _ in
-                timed(window) { fixture.model.update { $0.liveConversion.toggle() } }
+            // そのページに出している設定と，ほかのページの設定(統計の記録．統計のページではライブ変換)
+            let own = ownChange(on: page).map { change in median((0..<10).map { _ in timed(window) { fixture.model.update(change) } }) }
+            let other = median((0..<10).map { _ in
+                timed(window) { fixture.model.update { page == .usage ? $0.liveConversion.toggle() : $0.recordsUsage.toggle() } }
             })
             let typing = typingTimes(window)
-            print(String(format: "%@\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f", page.title, median(scroll), scroll.max() ?? 0, change, median(typing), typing.max() ?? 0))
+            let selecting = selectionTimes(window)
+            print(String(format: "%@\t%.1f\t%.1f\t%@\t%.1f\t%.1f\t%.1f\t%@", page.title, median(scroll), scroll.max() ?? 0,
+                         own.map { String(format: "%.1f", $0) } ?? "-", other, median(typing), typing.max() ?? 0,
+                         selecting.isEmpty ? "-" : String(format: "%.1f", median(selecting))))
             window.close()
         }
     }
@@ -141,6 +146,34 @@ extension SettingsBenchmark {
             }
             print(String(format: "%@\t%.1f\t%.1f", page.title, median(times), times.max() ?? 0))
         }
+    }
+
+    /// そのページに出している設定を 1 つ変える操作(ほかの行の使える・使えないも変わる項目を選ぶ)．設定の項目の無いページは nil
+    private static func ownChange(on page: SettingsView.Page) -> ((inout HajimeDomain.Settings) -> Void)? {
+        switch page {
+        case .input: { $0.showsModeIndicator.toggle() }
+        case .conversion: { $0.liveConversion.toggle() }
+        case .correction: { $0.correction.japanese.toggle() }
+        case .language: { $0.englishTermCandidates.toggle() }
+        case .apps: { $0.terminalCommands.toggle() }
+        case .dictionary: { $0.dynamicDictionary.toggle() }
+        case .palette: { $0.paletteShowsPreview.toggle() }
+        case .commands: { $0.conversionMacros.toggle() }
+        case .appearance: { $0.theme = $0.theme == .platinum ? .desk : .platinum }
+        case .usage: { $0.recordsUsage.toggle() }
+        case .romaji, .keys, .symbols, .sync, .backup, .about: nil
+        }
+    }
+
+    /// ページの最初の表の行を上から 1 つずつ選び，1 行ごとの時間を返す．表の無いページは空
+    private static func selectionTimes(_ window: NSWindow) -> [Double] {
+        guard let table = pageViews(window).compactMap({ $0 as? NSTableView }).first(where: { $0.numberOfRows > 1 }) else { return [] }
+        let times = (0..<min(table.numberOfRows, 8)).map { row in
+            timed(window) { table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
+        }
+        table.deselectAll(nil)
+        SettingsFixture.settle(window)
+        return times
     }
 
     private static func median(_ values: [Double]) -> Double {
