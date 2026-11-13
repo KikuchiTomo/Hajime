@@ -310,6 +310,14 @@ public struct LatticePanel: Sendable, Equatable {
     public var associationHint: AssociationHint?
     /// 語の意味(Column.homophone)を候補の枝の右に出すか，下に出すか(設定)
     public var meaningPlacement = MeaningPlacement.side
+    /// 幹に出す文節の範囲．長い文をまとまりに区切って 1 つずつ出すとき，選んでいる文節が入っているまとまり．nil なら全部を出す．
+    /// columns は文の全体のまま(押した文節の位置などは文の全体で数える)．描く側は shownGroup() で範囲だけにして描く
+    public var group: Range<Int>?
+    /// 出している範囲の前と後ろに，文節が続いているか(shownGroup() が入れる)．描く側は幹の線を窓の端まで伸ばし，山形を付ける
+    public var continuesBefore = false
+    public var continuesAfter = false
+    /// 窓の幅を幹の幅のまま変えないか(設定の「分岐図の窓の幅」が固定)．枝が右に入らなければ，左右に反転して左へ出す
+    public var keepsWidth = false
     /// 矢印キーで木をたどっていて，今いる所が幹の上(文節)か．描く側は，文節を強い選択にし，選んでいる候補を控えめにする
     public var trunkFocused = false
     /// 候補の 1 ページの数(ページの位置を出すのに使う)．分からなければ 0
@@ -330,6 +338,21 @@ public struct LatticePanel: Sendable, Equatable {
         self.position = position
         self.total = total
         self.note = note
+    }
+
+    /// 出す範囲(group)の文節だけにした分岐図と，その先頭が文の全体で何番目か．範囲が無いか，文の全体ならそのまま返す
+    public func shownGroup() -> (panel: LatticePanel, offset: Int) {
+        guard let group, !group.isEmpty, group.lowerBound >= 0, group.upperBound <= columns.count, group.count < columns.count else {
+            var panel = self
+            panel.group = nil
+            return (panel, 0)
+        }
+        var panel = self
+        panel.columns = Array(columns[group])
+        panel.group = nil
+        panel.continuesBefore = group.lowerBound > 0
+        panel.continuesAfter = group.upperBound < columns.count
+        return (panel, group.lowerBound)
     }
 }
 

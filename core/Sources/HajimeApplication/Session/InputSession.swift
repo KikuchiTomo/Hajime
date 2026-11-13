@@ -2343,7 +2343,10 @@ public final class InputSession {
                 panel.associationHint = associationHint(text: segment.selected.text, reading: segmentReading)
             }
             // 文節へ移るキーと，文字種にするキーの名前(分岐図の丸の上に出す)
-            for (index, command) in KeymapCommand.segmentJumps.enumerated() where panel.columns.indices.contains(index) {
+            // まとまりに区切って出しているときは，出しているまとまりの中で左から数える
+            applyTrunk(to: &panel, lattice: lattice)
+            let shown = panel.group ?? panel.columns.indices
+            for (command, index) in zip(KeymapCommand.segmentJumps, shown) {
                 panel.columns[index].jumpKey = keyLabel(command, in: .converting)
             }
             if let focused = panel.columns.firstIndex(where: \.isFocused), panel.columns[focused].variants.count == lattice.focused.variants.count {
@@ -2362,6 +2365,20 @@ public final class InputSession {
             panel.hintsOnHold = !settings.current.alwaysShowsBranchHints
             return [.setMarkedText(marked), .showLattice(panel)]
         }
+    }
+
+    /// 選んでいる文節が入っているまとまり(長い文を区切って 1 つずつ出す)．区切らない設定のとき，文節がまとまり 1 つに収まるとき，
+    /// 路線図の形で描かない作り(Windows)では nil
+    private func segmentGroup(of lattice: SegmentLattice) -> Range<Int>? {
+        let size = settings.current.branchSegmentsPerGroup
+        guard branchStations, size > 0, lattice.segments.count > size else { return nil }
+        return SegmentGrouping.group(containing: lattice.focusedIndex, texts: lattice.segments.map(\.selected.text), size: size)
+    }
+
+    /// 幹の出し方(出すまとまりと，窓の幅の決め方)を panel に入れる
+    private func applyTrunk(to panel: inout LatticePanel, lattice: SegmentLattice) {
+        panel.group = segmentGroup(of: lattice)
+        panel.keepsWidth = settings.current.branchWindowWidth == .fixed
     }
 
     /// 文節ごとの一覧で見せるか(分岐図と同じ文節格子を，注目している文節の一覧として見せる)
@@ -2692,10 +2709,11 @@ public final class InputSession {
             // 端で止まると Tab で次の文節に移れない．← → は端で止める(選び終えた文節に戻らないように)
             case .next: lattice.moveFocus(by: 1, wraps: event?.key == .tab)
             case .previous: lattice.moveFocus(by: -1, wraps: event?.key == .tab)
-            case .index(let index):
-                // その位置に文節が無ければ何もしない
-                guard lattice.segments.indices.contains(index) else { return KeyResult(handled: true) }
-                lattice.focusedIndex = index
+            case .index(let position):
+                // 出しているまとまりの中で左から数える．その位置に文節が無ければ何もしない
+                let shown = segmentGroup(of: lattice) ?? lattice.segments.indices
+                guard position >= 0, position < shown.count else { return KeyResult(handled: true) }
+                lattice.focusedIndex = shown.lowerBound + position
             case .first: lattice.focusedIndex = 0
             case .last: lattice.focusedIndex = lattice.segments.count - 1
             case .nextUncertain: lattice.moveToUncertain(forward: true)
@@ -2905,6 +2923,7 @@ public final class InputSession {
             panel.columns[edit.index] = column
         }
         panel.hintsOnHold = !settings.current.alwaysShowsBranchHints
+        applyTrunk(to: &panel, lattice: lattice)
         return [.setMarkedText(MarkedText(segments, caret: caret)), .showLattice(panel)]
     }
 
@@ -3199,6 +3218,7 @@ public final class InputSession {
             }
             var panel = PanelBuilder.associationLatticePanel(for: lattice, list: list, perPage: settings.current.branchCandidatesPerPage)
             panel.hintsOnHold = !settings.current.alwaysShowsBranchHints
+            applyTrunk(to: &panel, lattice: lattice)
             // 先の枝の丸の中身として出す: 丸の並びと，元の候補(候補の列に控えめに出す)を添える
             if branchStations, let current = branchStation, case .lattice(let original) = origin {
                 let stations = stations(for: original)

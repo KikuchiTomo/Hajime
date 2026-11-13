@@ -308,6 +308,9 @@ public enum DefaultSettings {
     /// 使い方の記録のファイルの大きさの上限．回数だけなので小さい
     public static let maximumUsageFileBytes = 16 * 1024
     /// 語の意味の注釈(R-08)に出す意味の数(既定)と，選べる範囲．辞書の順に出す．多いと候補の窓が縦に長くなる
+    /// 分岐図で，1 つのまとまりに出す文節の数の上限．文節へ移るキーが 8 つなので，キーがいつも足りる数にする．0 は区切らない
+    public static let branchSegmentsPerGroup = 8
+    public static let branchSegmentsPerGroupRange = 0...8
     public static let meaningSenseLimit = 3
     public static let meaningSenseLimitRange = 1...5
     /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする
