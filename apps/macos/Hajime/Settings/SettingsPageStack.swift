@@ -74,7 +74,7 @@ struct SettingsPageStack: NSViewRepresentable {
 
         private func build(_ page: SettingsView.Page) {
             guard pages[page] == nil, let makePage else { return }
-            // 見えている上の部分だけを先に組み立てて出し，下の部分は描画の区切りごとに足す(PageBuild)
+            // 窓に見えている範囲までを先に組み立てて出し，見えていない下の部分は描画の区切りごとに足す(PageBuild)
             let progress = PageBuild()
             let view = NSHostingView(rootView: makePage(page).environment(progress))
             // ページの大きさで窓の大きさを変えない
@@ -83,8 +83,33 @@ struct SettingsPageStack: NSViewRepresentable {
             pages[page] = view
             view.isHidden = page != current
             if page == current { loading.isHidden = true }
+            fillVisibleArea(of: view, progress)
             unfinished += 1
             buildRest(progress)
+        }
+
+        /// 窓に見えている範囲が埋まるまで，段を続けて組み立てる(見えている所に，行があとから出てこないように)．
+        /// ページを送る部品の中身の高さが，見えている高さとページの下の余白を超えたら埋まったとみなす．
+        /// 送る部品の無いページ(キー設定)は段に分けていないので，何もしない
+        private func fillVisibleArea(of view: NSView, _ progress: PageBuild) {
+            view.layoutSubtreeIfNeeded()
+            while !progress.isFinished, !coversVisibleArea(view) {
+                progress.advance()
+                view.layoutSubtreeIfNeeded()
+            }
+        }
+
+        private func coversVisibleArea(_ view: NSView) -> Bool {
+            var stack: [NSView] = [view]
+            while let next = stack.popLast() {
+                // 表の中と，Form の中の表(FormTableHost)は，ページを送る部品ではない
+                if next is any FormTableContainer { continue }
+                if let scroll = next as? NSScrollView, let document = scroll.documentView, !(document is NSTableView) {
+                    return document.frame.height >= scroll.contentView.bounds.height + DesignTokens.Size.Settings.formMargin * 2
+                }
+                stack.append(contentsOf: next.subviews)
+            }
+            return true
         }
 
         /// 今の段を画面に描いてから，次の段を組み立てる．ページが使う段は描いたあとで分かるので，描いてから残りがあるかを見る
@@ -117,9 +142,9 @@ struct SettingsPageStack: NSViewRepresentable {
 /// 初めて開くページの組み立ての進み．
 ///
 /// Form(.grouped)は行を見えるまで作らずに済ませる仕組みを持たず，1 行(スイッチやポップアップは AppKit の部品)に 7〜10 ms かかる．
-/// 80 行ある変換のページは，開くのに 0.6 秒かかっていた．ページを段に分け，上の部分(段 0)を先に組み立てて出し，
-/// 続き(BuiltLater・表の行)は描画の区切りごとに 1 段ずつ足す．1 段は 8 行ほどにして，足している間も操作を待たせない．
-/// 組み立て終えたページは残すので，2 回目からは分けない
+/// 80 行ある変換のページは，開くのに 0.6 秒かかっていた．ページを 8 行ほどの段(BuiltLater)に分け，窓に見えている範囲を埋める段までを
+/// 一度に組み立てて出し(PageStackView.fillVisibleArea)，見えていない下の段は描画の区切りごとに 1 段ずつ足す．
+/// 見えている所の行があとから出てくることはなく，足している間も操作を待たせない．組み立て終えたページは残すので，2 回目からは分けない
 @MainActor @Observable
 final class PageBuild {
     /// ここまでの段を組み立てている(0 は最初に出す部分)
@@ -138,17 +163,6 @@ final class PageBuild {
     func includes(_ stage: Int) -> Bool {
         lastStage = max(lastStage, stage)
         return self.stage >= stage
-    }
-
-    /// 表の行を 1 段に何行ずつ増やすか(行ごとにポップアップやボタンを持つ表で，1 行に 15〜20 ms かかる)
-    static let tableRowsPerStage = 4
-
-    /// 表に出す行の数．first の段より前は表の枠だけを出し，first の段から 1 段ごとに tableRowsPerStage 行ずつ増やして，
-    /// 見えている行(visibleRows)が埋まった段ですべての行を出す(nil)．
-    /// 表は見えている行だけを作るので，見えている行を埋めたあとは，まとめて出しても重くならない
-    func rowLimit(visibleRows: Int, startingAt first: Int = 1) -> Int? {
-        let stages = (visibleRows + Self.tableRowsPerStage - 1) / Self.tableRowsPerStage
-        return includes(first + stages - 1) ? nil : Self.tableRowsPerStage * max(0, stage - first + 1)
     }
 }
 
