@@ -862,6 +862,7 @@ pub mod keys {
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
         ("expandCandidates", "候補を表に展開"),
+        ("enterBranch", "候補の先の枝へ移動"),
     ];
     /// コマンドの説明(UIStrings.Keys.help(for:))．名前で分かるコマンドは並べない
     pub const COMMAND_HELP: &[(&str, &str)] = &[
@@ -942,6 +943,7 @@ pub mod keys {
         ("registerWord", "選択中の文字でユーザー辞書の登録を開きます"),
         ("openMenu", "入力メニューを入力位置に表示します"),
         ("expandCandidates", "候補を表に展開します"),
+        ("enterBranch", "選んでいる候補の意味・連想・変換マクロへ移動します"),
     ];
 }
 

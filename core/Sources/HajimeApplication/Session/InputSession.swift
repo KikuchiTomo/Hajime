@@ -124,6 +124,8 @@ public final class InputSession {
     private var expandedCandidates = false
     /// 表示項目を減らす設定で，選んでいる候補の先の枝(語の意味・連想)を開いたか．連想変換のキーで開き，変換を始め直すまで開いたままにする
     private var branchDetailShown = false
+    /// 先の枝の，今いる丸の位置(branchStations)．候補にいるあいだは nil．丸の中身に入っているあいだも，入った丸を覚えておく
+    private var branchStation: Int?
     /// 入力文字なしで案内を出したか．出したら次のキーで消す
     private var showsTransientNote = false
     /// 変換中の候補の選択(表記)と文節の区切りの変更．直前の変更の取り消し(KeymapCommand.undoConversionEdit)で戻す
@@ -168,6 +170,9 @@ public final class InputSession {
     private let associationFinder: AssociationFinder
     /// 候補ウィンドウの案内と注記に出すキーの名前の書き方
     private let keyNames: KeyNameStyle
+    /// 分岐図で，選んでいる候補の先の枝(語の意味・連想・変換マクロ)を別々の丸として出し，矢印キーでたどれるようにするか．
+    /// 候補の窓がその形を描けるアプリ(macOS)だけ true にする．false なら，連想変換のキーで連想と変換マクロを 1 つの一覧に出す
+    private let branchStations: Bool
     /// 絵文字と記号のパレットに使うもの(R-26)．パレットを描けないアプリでは nil で，パレットのキーは何もしない
     private let paletteServices: PaletteServices?
     /// 開いているパレット．開いているあいだのキーはパレットが受ける
@@ -184,6 +189,7 @@ public final class InputSession {
     ///   - fusing: 別のモデルでも変換して合わせるもの(合議．ADR 0016 の案 2)．nil か設定の jinenModel が「使わない」なら合わせない
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
+                branchStations: Bool = false,
                 rejections: (any CorrectionRejectionRecording)? = nil, predictionHiding: (any PredictionHiding)? = nil,
                 usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil, calendar: (any CalendarReading)? = nil,
                 scorer: (any CandidateScoring)? = nil, fusing: (any CandidateFusing)? = nil) {
@@ -193,6 +199,7 @@ public final class InputSession {
         self.predictionHiding = predictionHiding
         self.usageDictionary = usageDictionary
         self.keyNames = keyNames
+        self.branchStations = branchStations
         self.rejections = rejections
         self.converter = converter
         self.lexicon = lexicon
@@ -861,6 +868,7 @@ public final class InputSession {
         if case .association(let list, let origin) = phase, let result = performInAssociation(command, list: list, origin: origin, context: context) {
             return result
         }
+        if let result = performOnBranchStation(command, context: context) { return result }
         switch command {
         // IME の機能．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
         case .openSettings: return KeyResult(handled: true, actions: commitAll() + [.openSettings])
@@ -962,6 +970,7 @@ public final class InputSession {
             expandedCandidates = false
             return associate(context: context)
         case .expandCandidates: return toggleGrid(context: context)
+        case .enterBranch: return enterBranch(context: context) ?? moveSegment(.next, event: event, context: context)
         // 文節
         case .nextSegment: return moveSegment(.next, event: event, context: context)
         case .previousSegment: return moveSegment(.previous, event: event, context: context)
@@ -1424,6 +1433,7 @@ public final class InputSession {
     /// 英単語を補正しているときは，直した英単語を読みの中に確定させてから分岐図にする(打ったままに戻すのは補正の直後の Space)
     private func enterConversion(recordsUsage: Bool = true) {
         branchDetailShown = false
+        branchStation = nil
         if recordsUsage { usage?.record(.conversionOpened) }
         conversionHistory.clear()
         heldReading = nil
@@ -2323,7 +2333,8 @@ public final class InputSession {
             if let focused = panel.columns.firstIndex(where: \.isFocused), panel.columns[focused].variants.count == lattice.focused.variants.count {
                 panel.columns[focused].variantKeys = lattice.focused.variants.map(variantKey)
             }
-            if settings.current.showsFewerItems { panel = PanelBuilder.reduced(panel, showsDetail: branchDetailShown) }
+            if branchStations, !splitMode { applyBranch(to: &panel, lattice: lattice) }
+            if settings.current.showsFewerItems { panel = PanelBuilder.reduced(panel, showsDetail: branchDetailShown || branchStation != nil) }
             if let note = commandNote(for: lattice) { panel.note = note }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
             if splitMode {
@@ -2873,8 +2884,10 @@ public final class InputSession {
     /// 連想変換のキー．入力中なら変換してから，変換中なら選んでいる文節を，連想の一覧に切り替える．
     /// 連想変換を使わない設定のときは，入力中ならふつうに変換する
     private func associate(context: InputContext) -> KeyResult {
+        // 先の枝を丸として出す作りでは，連想変換のキーで先の枝へ入る(連想の語と変換マクロは，それぞれの丸の中に出す)
+        if branchStations, phase != .composing, let result = enterBranch(context: context) { return result }
         // 表示項目を減らす設定の分岐図では，1 回目で選んでいる候補の先の枝(語の意味・連想)を開く．2 回目から連想の一覧に移る
-        if settings.current.showsFewerItems, !branchDetailShown, case .lattice(let lattice) = phase, inlineEdit == nil, !splitMode,
+        if !branchStations, settings.current.showsFewerItems, !branchDetailShown, case .lattice(let lattice) = phase, inlineEdit == nil, !splitMode,
            !expandedCandidates, !isSegmentList, hasBranchDetail(lattice) {
             branchDetailShown = true
             return KeyResult(handled: true, actions: render(context: context))
@@ -2885,11 +2898,117 @@ public final class InputSession {
         if phase == .composing {
             alphabetRun = false
             enterConversion()
+            // 入力中から押したときも，変換してから先の枝へ入る
+            if branchStations, let result = enterBranch(context: context) { return result }
         }
         if !enterAssociation() {
             pendingNote = associationFinder.hasDictionaries ? PanelBuilder.noAssociationNote : PanelBuilder.noAssociationDictionaryNote
         }
         return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    // MARK: - 先の枝(語の意味・連想・変換マクロ)
+
+    /// 先の枝の丸と，その中身(連想の語・マクロの結果)．意味の丸は中身を持たない
+    private struct BranchStation {
+        var station: BranchDetail.Station
+        var list: AssociationList?
+    }
+
+    /// 注目している文節で選んでいる候補の，先の枝の丸．機能ごとに独立していて，使える物だけを並べる
+    private func stations(for lattice: SegmentLattice) -> [BranchStation] {
+        guard branchStations else { return [] }
+        var result: [BranchStation] = []
+        let text = lattice.focused.selected.text
+        let reading = focusedReading(lattice)
+        if settings.current.meaningPlacement == .side, homophone(for: lattice) != nil {
+            result.append(BranchStation(station: .init(kind: .meaning, title: IndicatorLabels.branchMeaningTitle), list: nil))
+        }
+        if let associations = associationFinder.find(text: text, reading: reading, includesMacros: false) {
+            result.append(BranchStation(station: .init(kind: .association, title: IndicatorLabels.branchAssociationTitle), list: AssociationList(associations)))
+        }
+        if let macros = associationFinder.macros(text: text, reading: reading) {
+            result.append(BranchStation(station: .init(kind: .macro, title: IndicatorLabels.branchMacroTitle), list: AssociationList(macros)))
+        }
+        return result
+    }
+
+    /// 分岐図で先の枝を出せる状態か
+    private func latticeForBranch() -> SegmentLattice? {
+        guard branchStations, case .lattice(let lattice) = phase, inlineEdit == nil, !splitMode, !expandedCandidates, !isSegmentList else { return nil }
+        return lattice
+    }
+
+    /// 候補から先の枝へ入る．もう入っていれば次の丸へ移る．先の枝が無ければ nil(呼んだ側が，ほかの動きをする)
+    private func enterBranch(context: InputContext) -> KeyResult? {
+        guard let lattice = latticeForBranch() else { return nil }
+        let count = stations(for: lattice).count
+        guard count > 0 else { return nil }
+        branchStation = branchStation.map { min($0 + 1, count - 1) } ?? 0
+        branchDetailShown = true
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 先の枝の丸の上にいるあいだのキー．左右で丸を移り，次の候補のキーで丸の中身へ入り，前の候補のキーで候補へ戻る．
+    /// ほかのキーは，候補へ戻ってからふつうに行う(nil を返す)
+    private func performOnBranchStation(_ command: KeymapCommand, context: InputContext) -> KeyResult? {
+        guard let current = branchStation else { return nil }
+        guard let lattice = latticeForBranch() else {
+            branchStation = nil
+            return nil
+        }
+        let stations = stations(for: lattice)
+        guard stations.indices.contains(current) else {
+            branchStation = nil
+            return nil
+        }
+        switch command {
+        case .enterBranch, .nextSegment:
+            branchStation = min(current + 1, stations.count - 1)
+        case .previousSegment:
+            branchStation = current > 0 ? current - 1 : nil
+        case .previousCandidate, .associate, .cancel, .undoConversionEdit:
+            branchStation = nil
+        case .nextCandidate:
+            // 丸の中身(連想の語・マクロの結果)へ入る．意味の丸には中身が無い
+            guard let list = stations[current].list else { return KeyResult(handled: true) }
+            phase = .association(list, origin: phase)
+        default:
+            branchStation = nil
+            return nil
+        }
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 先の枝の表示を panel に入れる．丸の上にいれば，その丸の中身の先頭のページも入れる(選ぶ前に中身が見える)
+    private func applyBranch(to panel: inout LatticePanel, lattice: SegmentLattice) {
+        guard let focused = panel.columns.firstIndex(where: \.isFocused) else { return }
+        let stations = stations(for: lattice)
+        guard !stations.isEmpty else {
+            branchStation = nil
+            return
+        }
+        if let current = branchStation, !stations.indices.contains(current) { branchStation = stations.count - 1 }
+        var detail = BranchDetail(stations: stations.map(\.station), current: branchStation)
+        if let current = branchStation {
+            if let list = stations[current].list { fill(&detail, from: list, selects: false) }
+            // 語の意味は，候補にいるあいだと，意味の丸にいるあいだだけ出す
+            if stations[current].station.kind != .meaning { panel.columns[focused].homophone = nil }
+        }
+        panel.associationHint = nil
+        panel.detail = detail
+    }
+
+    /// 丸の中身(今のまとまりの今のページ)を detail に入れる
+    private func fill(_ detail: inout BranchDetail, from list: AssociationList, selects: Bool) {
+        let page = list.page(perPage: settings.current.branchCandidatesPerPage)
+        detail.items = page.words
+        detail.selectedItem = selects ? page.selected : nil
+        detail.label = list.group.label
+        detail.group = list.groupIndex + 1
+        detail.groupCount = list.associations.groups.count
+        detail.position = list.indexInGroup - page.selected + 1
+        detail.total = list.group.words.count
     }
 
     /// 注目している文節で選んでいる候補に，先の枝に出すもの(語の意味か，連想があることの知らせ)があるか
@@ -2918,6 +3037,12 @@ public final class InputSession {
     /// ほかのコマンドは，選んでいる語を元の変換の文節に入れてから，ふつうに行う(nil を返す)
     private func performInAssociation(_ command: KeymapCommand, list: AssociationList, origin: Phase, context: InputContext) -> KeyResult? {
         var list = list
+        // 先の枝の丸の中身にいるとき: 先頭の語で前へ進むか，先頭のまとまりで前のまとまりへ進むと，丸の上へ戻る
+        if branchStations, branchStation != nil,
+           (command == .previousCandidate && list.indexInGroup == 0) || (command == .previousSegment && list.groupIndex == 0) {
+            phase = origin
+            return KeyResult(handled: true, actions: render(context: context))
+        }
         switch command {
         case .nextCandidate: list.move(by: 1)
         case .previousCandidate: list.move(by: -1)
@@ -2926,7 +3051,7 @@ public final class InputSession {
         case .firstCandidate: list.selectFirst()
         case .lastCandidate: list.selectLast()
         // 左右(と迷う文節へ移るキー)で意味のまとまりを移る
-        case .nextSegment, .nextUncertainSegment: list.moveGroup(by: 1)
+        case .nextSegment, .nextUncertainSegment, .enterBranch: list.moveGroup(by: 1)
         case .previousSegment, .previousUncertainSegment: list.moveGroup(by: -1)
         case .cancel, .backToReading, .associate, .undoConversionEdit:
             // 元の変換に戻る
@@ -2934,6 +3059,7 @@ public final class InputSession {
             return KeyResult(handled: true, actions: render(context: context))
         default:
             resolveAssociation()
+            branchStation = nil
             return nil
         }
         phase = .association(list, origin: origin)
@@ -2989,6 +3115,25 @@ public final class InputSession {
             }
             var panel = PanelBuilder.associationLatticePanel(for: lattice, list: list, perPage: settings.current.branchCandidatesPerPage)
             panel.hintsOnHold = !settings.current.alwaysShowsBranchHints
+            // 先の枝の丸の中身として出す: 丸の並びと，元の候補(候補の列に控えめに出す)を添える
+            if branchStations, let current = branchStation, case .lattice(let original) = origin {
+                let stations = stations(for: original)
+                if stations.indices.contains(current) {
+                    var detail = BranchDetail(stations: stations.map(\.station), current: current)
+                    fill(&detail, from: list, selects: true)
+                    let source = PanelBuilder.latticePanel(for: original, perPage: settings.current.branchCandidatesPerPage)
+                    if let column = source.columns.first(where: \.isFocused), let focused = panel.columns.firstIndex(where: \.isFocused) {
+                        detail.candidates = column.alternatives
+                        detail.selectedCandidate = column.selectedAlternative
+                        // 文字種の枝も，候補にいるときと同じに出す(丸の中身へ入っても，幹が上下に動かないように)
+                        panel.columns[focused].variants = column.variants
+                        if column.variants.count == original.focused.variants.count {
+                            panel.columns[focused].variantKeys = original.focused.variants.map(variantKey)
+                        }
+                    }
+                    panel.detail = detail
+                }
+            }
             return [.setMarkedText(marked), .showLattice(panel)]
         case .selecting(let selection):
             let candidate = candidate(in: .selecting(selection))
@@ -3053,6 +3198,7 @@ public final class InputSession {
     /// 番号キーでなければ nil
     private func selectInLattice(_ character: Character, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
         guard let number = numberKey(character), lattice.select(number: number, perPage: latticeNumberPerPage) else { return nil }
+        branchStation = nil
         // 表から選んだら表を閉じ，分岐図に戻って次の文節へ進む
         expandedCandidates = false
         return KeyResult(handled: true, actions: advance(after: lattice, context: context))
@@ -3093,6 +3239,7 @@ public final class InputSession {
     /// 押した対象が今の状態に無ければ何もしない
     public func choose(_ target: PointerTarget, context: InputContext) -> [ClientAction] {
         undoableCommit = nil
+        branchStation = nil
         let baseline = editBaseline(command: nil)
         defer { trackConversionEdit(from: baseline) }
         return pick(target, context: context)

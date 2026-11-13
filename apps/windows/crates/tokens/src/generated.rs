@@ -735,8 +735,8 @@ pub mod motion {
         pub const APPEAR: f32 = 80.0;
     }
     pub mod branch_map {
-        pub const HINT_HOLD: f32 = 250.0;
-        pub const HINT_FADE: f32 = 100.0;
+        pub const HINT_HOLD: f32 = 100.0;
+        pub const HINT_FADE: f32 = 50.0;
     }
     pub mod candidate_rest {
         pub const FADE_IN: f32 = 250.0;

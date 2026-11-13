@@ -42,6 +42,12 @@ enum SnapshotRenderer {
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
                 render(latticeView(fewerItemsLattice(), theme: look.theme, appearance: appearance), name: "branch-fewer-\(look.name)", to: output,
                        appearance: appearance)
+                // 先の枝(語の意味・連想・変換マクロ)．候補にいるとき・連想の丸の上・マクロの丸の中身
+                for (suffix, panel) in [("", stationLattice(current: nil, inside: false)), ("-association", stationLattice(current: 1, inside: false)),
+                                        ("-macro", stationLattice(current: 2, inside: true))] {
+                    render(latticeView(panel, theme: look.theme, appearance: appearance), name: "branch-station\(suffix)-\(look.name)", to: output,
+                           appearance: appearance)
+                }
                 // キーの案内を，修飾キーを押し続けているあいだだけ出す設定(既定)．押していないとき・Shift・Option
                 for (suffix, modifiers) in [("", NSEvent.ModifierFlags()), ("-shift", .shift), ("-option", .option)] {
                     render(latticeView(heldHintsLattice(), theme: look.theme, appearance: appearance, heldModifiers: modifiers),
@@ -845,6 +851,35 @@ enum SnapshotRenderer {
         panel.associationHint = nil
         panel.collapsesVariants = true
         panel.collapsesDetail = true
+        return panel
+    }
+
+    /// 先の枝を丸として出した分岐図(core の InputSession.applyBranch と同じ形)．current は今いる丸，inside なら丸の中身を選んでいる
+    private static func stationLattice(current: Int?, inside: Bool) -> LatticePanel {
+        var column = LatticePanel.Column(text: "撮る", alternatives: ["取る", "撮る", "とる", "採る"], selectedAlternative: 1, variants: ["とる", "トル", "ﾄﾙ"],
+                                         isFocused: true, isUncertain: true)
+        var detail = BranchDetail(stations: [.init(kind: .meaning, title: "意味"), .init(kind: .association, title: "連想"), .init(kind: .macro, title: "マクロ")],
+                                  current: current)
+        if current == 1 {
+            detail.items = ["撮影する", "写す", "収める"]
+            detail.label = "写真に収める"
+            detail.groupCount = 2
+            detail.total = 3
+        } else if current == 2 {
+            detail.items = ["「撮る」", "【撮る】", "撮る（とる）", "**撮る**"]
+            detail.total = 4
+        }
+        if current == nil || current == 0 { column.homophone = SamplePanels.homophone }
+        if inside {
+            detail.selectedItem = 1
+            detail.candidates = column.alternatives
+            detail.selectedCandidate = 1
+            column.text = detail.items[1]
+            column.alternatives = detail.items
+        }
+        var panel = SamplePanels.withKeys(LatticePanel(columns: [.init(text: "写真を", isFocused: false, isUncertain: false), column], position: 1, total: 7))
+        if inside { panel.association = AssociationHeading(headword: "撮る", label: "", group: 1, groupCount: 1) }
+        panel.detail = detail
         return panel
     }
 

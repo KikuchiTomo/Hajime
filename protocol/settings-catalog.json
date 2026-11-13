@@ -203,6 +203,9 @@
       "converting",
       "direct"
     ],
+    "enterBranch" : [
+      "converting"
+    ],
     "expandCandidates" : [
       "converting"
     ],

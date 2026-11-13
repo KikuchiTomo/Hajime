@@ -131,16 +131,27 @@ final class BranchView: NSView {
         var candidates: [KeyHint] = []
         /// 先の枝の先(展開)
         var expand: KeyHint?
+        /// 先の枝の丸の中身の下(選択・意味の切り替え・戻る)
+        var items: [KeyHint] = []
     }
 
     private func hints(for panel: LatticePanel) -> Hints {
         guard showsHints else { return Hints() }
-        if panel.association != nil { return Hints(candidates: UIStrings.Association.hints(for: keys)) }
+        if panel.association != nil {
+            // 先の枝の丸の中身として出しているときは，中身の下に置く
+            let hints = UIStrings.Association.hints(for: keys)
+            return panel.detail == nil ? Hints(candidates: hints) : Hints(items: hints)
+        }
         if let split = panel.columns.first(where: \.isFocused)?.split {
             return Hints(boundary: UIStrings.Branch.splitHints(count: split.pieces.count - 1))
         }
         // 先の枝を畳んでいるとき(表示項目を減らす設定)は，開くキー(連想変換のキー)を案内する
-        let expand = panel.collapsesDetail ? UIStrings.Branch.expandHint(for: keys) : panel.associationHint?.key.map(UIStrings.Branch.expandHint(key:))
+        // 先の枝へ入るキー．候補にいるあいだ(と，先の枝を畳んでいるあいだ)だけ出す
+        let expand: KeyHint? = if panel.collapsesDetail || (panel.detail != nil && panel.detail?.current == nil) {
+            UIStrings.Branch.expandHint(for: keys)
+        } else {
+            panel.associationHint?.key.map(UIStrings.Branch.expandHint(key:))
+        }
         return Hints(boundary: UIStrings.Branch.boundaryHints(for: keys), variant: UIStrings.Branch.variantHint(for: keys),
                      candidates: UIStrings.Branch.candidateHints(for: keys), expand: expand)
     }
@@ -293,6 +304,17 @@ final class BranchView: NSView {
         var stations: [Station] = []
         var expandX: CGFloat?
         var expandMidY: CGFloat = 0
+        /// 今いる丸の中身(連想の語・マクロの結果)の行と，その縦の線の x
+        var itemRows: [NSRect] = []
+        var itemStemX: CGFloat = 0
+        /// 中身の説明(連想のまとまりの意味と位置)
+        var itemLabel: (text: String, x: CGFloat, midY: CGFloat)?
+        /// 中身の下の行(案内と位置)
+        var itemBottomMidY: CGFloat?
+        var itemHintsX: CGFloat = 0
+        var itemPosition: (text: String, x: CGFloat)?
+        /// 語の意味を下げる丸の位置
+        var meaningStation: Int?
         /// 畳んでいる枝の，続きがある印の線(表示項目を減らす設定)．文字種は文節の上へ，先の枝は選んでいる候補の行の先へ
         var variantStub: (from: NSPoint, to: NSPoint)?
         var detailStub: (from: NSPoint, to: NSPoint)?
@@ -376,15 +398,18 @@ final class BranchView: NSView {
         let trunkRight = panel.columns.isEmpty ? metrics.inset : x - nodeGap
         let focus = panel.columns.firstIndex(where: \.isFocused)
         let column = focus.map { panel.columns[$0] }
-        let lower = column.map(lowerRows) ?? []
+        let lower = column.map { candidateRows($0, in: panel) } ?? []
         let selectedRow = lower.firstIndex(where: \.isSelected)
+        let detail = panel.detail
+        let isInside = detail?.selectedItem != nil
 
         // 候補の枝．縦の線から外へ向かう距離で決める(枝を左右に反転しても同じ距離を使う)
         let textOffset = badgeOffset + lead
         let noteWidth = lower.compactMap { $0.note.map { NoteDrawing.tagWidth($0, theme: theme) } }.max() ?? 0
         let rowStart = badgeOffset - Part.rowPaddingX
         // 候補の下の行(案内・辞書の名前・位置)．候補の行の幅に収め，先の枝や語の意味と重ねない
-        let positionText = lower.isEmpty || !showsPosition(panel) ? "" : position(of: panel)
+        // 先の枝の丸の中身に入っているあいだは，位置は中身の下に出す
+        let positionText = lower.isEmpty || !showsPosition(panel) || isInside ? "" : position(of: panel)
         let positionWidth = positionText.isEmpty ? 0 : textWidth(positionText, font: labelFont)
         let sourceWidth = column?.sourceName.map { textWidth(UIStrings.Branch.dictionarySource($0), font: labelFont) + Size.paddingX } ?? 0
         let farWidth = positionWidth + sourceWidth
@@ -399,10 +424,19 @@ final class BranchView: NSView {
         // 先の枝(意味・連想)．候補を選んでいるときだけ出す
         var titles: [String] = []
         var meaning: MeaningText?
-        if let column, selectedRow != nil, panel.association == nil, !column.isEditing {
+        var meaningStation: Int?
+        if let detail, let column, selectedRow != nil, !column.isEditing {
+            // 丸は core が決める(語の意味・連想・変換マクロのうち，使える物)
+            titles = detail.stations.map(\.title)
+            if panel.meaningPlacement == .side, let note = column.homophone, let index = detail.stations.firstIndex(where: { $0.kind == .meaning }) {
+                meaning = meaningText(note)
+                meaningStation = index
+            }
+        } else if let column, selectedRow != nil, panel.association == nil, !column.isEditing {
             if panel.meaningPlacement == .side, let note = column.homophone {
                 titles.append(UIStrings.Branch.meaningTitle)
                 meaning = meaningText(note)
+                meaningStation = 0
             }
             if let hint = panel.associationHint { titles.append(hint.label) }
         }
@@ -416,12 +450,25 @@ final class BranchView: NSView {
         var expandOffset: CGFloat?
         if !titles.isEmpty {
             reach = cursor - Map.stationGap
-            if let expand = hints.expand, panel.associationHint != nil {
+            if let expand = hints.expand, panel.associationHint != nil || detail != nil {
                 expandOffset = reach + Space.group
                 reach += Space.group + BranchMapDrawing.hintWidth(expand, theme: theme)
             }
         }
-        if let meaning, let first = stationOffsets.first { reach = max(reach, first + Map.meaningIndent + meaning.width) }
+        if let meaning, let meaningStation, stationOffsets.indices.contains(meaningStation) {
+            reach = max(reach, stationOffsets[meaningStation] + Map.meaningIndent + meaning.width)
+        }
+        // 今いる丸の中身(連想の語・マクロの結果)．丸から下へ，候補と同じ形で並べる
+        let items = itemRows(of: panel)
+        let itemStation = stationOffsets.indices.contains(detail?.current ?? -1) ? detail?.current : nil
+        let itemLabelText = detail.map(itemLabel) ?? ""
+        let itemPositionText = detail.map { itemPosition($0, count: items.count) } ?? ""
+        let itemHintsWidth = BranchMapDrawing.hintsWidth(hints.items, theme: theme)
+        let itemPositionWidth = itemPositionText.isEmpty ? 0 : textWidth(itemPositionText, font: labelFont)
+        let itemBottomWidth = itemHintsWidth + (itemHintsWidth > 0 && itemPositionWidth > 0 ? Space.group : 0) + itemPositionWidth
+        let itemRowEnd = max(textOffset + (items.map { textWidth($0.text, font: candidateFont) }.max() ?? 0) + Part.rowPaddingX * 2,
+                             badgeOffset + itemBottomWidth, badgeOffset + textWidth(itemLabelText, font: labelFont))
+        if let itemStation, !items.isEmpty { reach = max(reach, stationOffsets[itemStation] + itemRowEnd) }
         // 先の枝を畳んでいるとき: 候補の行の先に，続きがある印の線と開くキーの案内
         let showsDetailStub = panel.collapsesDetail && selectedRow != nil && column?.isEditing == false
         if showsDetailStub {
@@ -453,7 +500,8 @@ final class BranchView: NSView {
         let notesWidth = [column?.usageNote.map { textWidth($0, font: labelFont) }, panel.note.map { NoteDrawing.width($0, theme: theme) },
                           panel.meaningPlacement == .below && column?.homophone != nil ? Meaning.listWidth : nil]
             .compactMap { $0.map { $0 + Part.rowPaddingX * 2 } }.max() ?? 0
-        let headingWidth = panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + textInset * 2 } ?? 0
+        let showsHeading = panel.association != nil && panel.detail == nil
+        let headingWidth = showsHeading ? panel.association.map { AssociationHeadingDrawing.width($0, font: labelFont, emphasis: labelFont) + textInset * 2 } ?? 0 : 0
         // 境目の案内は，文節から上へ伸びる線の右に置く
         let boundaryStart = badgeOffset
         var width = max(Size.minWidth, trunkRight + metrics.inset, focusCenter + max(reach, kindsReach) + metrics.inset,
@@ -483,7 +531,7 @@ final class BranchView: NSView {
         // 縦の並び．上から，見出し(連想)・文字種・境目の案内・幹の文節・幹の線・候補・候補の下の行
         let tag = Glass.tagHeight
         var y = metrics.inset
-        if panel.association != nil {
+        if showsHeading {
             result.heading = NSRect(x: textInset, y: y, width: width - textInset * 2, height: metrics.noteHeight)
             y += metrics.noteHeight + gap * 2 + Size.frameWidth
         }
@@ -502,7 +550,7 @@ final class BranchView: NSView {
             result.twigEndX = twigDirection > 0 ? labelsEnd : (result.kinds.first?.label.minX ?? focusX)
             if variantHintWidth > 0 { result.variantHintX = twigDirection > 0 ? labelsEnd + Space.group : focusX - kindsReach }
         }
-        if focus != nil, panel.association == nil {
+        if focus != nil, !showsHeading {
             result.boundaryMidY = y + tag / 2
             y += tag + Space.inset
         }
@@ -544,11 +592,38 @@ final class BranchView: NSView {
                 let from = direction > 0 ? stemX + rowEnd : stemX - rowEnd
                 result.detailStub = (NSPoint(x: from, y: midY), NSPoint(x: from + direction * Map.stubLength, y: midY))
             }
-            if let meaning, let station = result.stations.first {
+            if let meaning, let meaningStation, result.stations.indices.contains(meaningStation) {
+                let station = result.stations[meaningStation]
                 let top = midY + Map.stopSize / 2 + Space.inset
                 result.meaning = SideMeaning(text: meaning, lineX: station.stop.x, top: top,
                                              textX: direction > 0 ? station.stop.x + Map.meaningIndent : station.stop.x - Map.meaningIndent)
+                result.meaningStation = meaningStation
                 bottom = max(bottom, top + meaning.height)
+            }
+            if let itemStation, !items.isEmpty {
+                // 丸の縦の線を，候補の縦の線と同じように使う(線から外への距離は候補と同じ)
+                let lineX = result.stations[itemStation].stop.x
+                func itemMinX(_ start: CGFloat, _ width: CGFloat) -> CGFloat { direction > 0 ? lineX + start : lineX - start - width }
+                var itemY = midY + Map.stopSize / 2 + Space.inset
+                if !itemLabelText.isEmpty {
+                    result.itemLabel = (itemLabelText, itemMinX(badgeOffset, textWidth(itemLabelText, font: labelFont)), itemY + tag / 2)
+                    itemY += tag
+                }
+                for index in items.indices {
+                    result.itemRows.append(NSRect(x: itemMinX(rowStart, itemRowEnd - rowStart), y: itemY + CGFloat(index) * metrics.rowHeight,
+                                                  width: itemRowEnd - rowStart, height: metrics.rowHeight))
+                }
+                itemY += CGFloat(items.count) * metrics.rowHeight
+                result.itemStemX = lineX
+                if itemBottomWidth > 0 {
+                    result.itemBottomMidY = itemY + Space.inset + tag / 2
+                    result.itemHintsX = itemMinX(badgeOffset, itemHintsWidth)
+                    if !itemPositionText.isEmpty {
+                        result.itemPosition = (itemPositionText, itemMinX(itemRowEnd - itemPositionWidth, itemPositionWidth))
+                    }
+                    itemY += Space.inset + tag
+                }
+                bottom = max(bottom, itemY)
             }
         }
         // 候補の下の語の意味: 窓の中身の幅いっぱい
@@ -625,6 +700,10 @@ final class BranchView: NSView {
         // 区切っているあいだ(⇧↓)は番号キーで区切る位置を選ぶので，枝は押せない
         guard let focus = layout.focus, panel.columns[focus].split == nil else { return nil }
         let column = panel.columns[focus]
+        if panel.detail?.selectedItem != nil {
+            let index = layout.itemRows.indices.first { layout.itemRows[$0].contains(point) }
+            return index.flatMap { column.alternatives.indices.contains($0) ? .alternative($0) : nil }
+        }
         if let index = layout.rows.indices.first(where: { rowArea(layout.rows[$0], in: layout).contains(point) }), column.alternatives.indices.contains(index) {
             // コメントのタグは行の中にあるので，行より先に調べる(タグを押すと候補の代わりにコメントを入れる)
             if let comment = column.comment(at: index) {
@@ -681,8 +760,11 @@ final class BranchView: NSView {
             NSRect(x: metrics.inset, y: row.maxY + gap, width: body.width - metrics.inset * 2, height: Size.frameWidth).fill()
         }
         let column = layout.focus.map { panel.columns[$0] }
-        let rows = column.map(lowerRows) ?? []
+        let rows = column.map { candidateRows($0, in: panel) } ?? []
         let selectedRow = rows.firstIndex(where: \.isSelected)
+        let items = itemRows(of: panel)
+        let selectedItem = items.firstIndex(where: \.isSelected)
+        let currentStation = panel.detail?.current
         let stale: CGFloat = column?.isEditing == true ? Opacity.editingStale : 1
 
         // 丸．線は丸の内側を通さない
@@ -699,7 +781,15 @@ final class BranchView: NSView {
             let passed = column?.selectedVariant.map { layout.twigDirection > 0 ? index < $0 : index > $0 } ?? false
             branchStops.append(Stop(center: kind.stop, state: index == column?.selectedVariant ? .selected : passed ? .passed : .plain, opacity: stale))
         }
-        branchStops += layout.stations.map { Stop(center: $0.stop) }
+        for (index, station) in layout.stations.enumerated() {
+            // 今いる丸は塗り，そこまでに通る丸は選択の色の輪にする
+            let state: Stop.State = index == currentStation ? .selected : currentStation.map { index < $0 } == true ? .passed : .plain
+            branchStops.append(Stop(center: station.stop, state: state))
+        }
+        for (index, row) in layout.itemRows.enumerated() {
+            let state: Stop.State = index == selectedItem ? .selected : selectedItem.map { index < $0 } == true ? .passed : .plain
+            branchStops.append(Stop(center: NSPoint(x: layout.itemStemX, y: row.midY.rounded()), state: state))
+        }
         var senseStops: [Stop] = []
         if let meaning = layout.meaning {
             var y = meaning.top + (meaning.text.tag == nil ? 0 : Meaning.partOfSpeechHeight + Space.stack)
@@ -774,8 +864,20 @@ final class BranchView: NSView {
             let row = layout.rows[selectedRow]
             lines.append(Line(points: [NSPoint(x: layout.direction > 0 ? row.maxX : row.minX, y: last.stop.y), last.stop]))
         }
-        if let meaning = layout.meaning, let last = senseStops.last, let station = layout.stations.first {
-            lines.append(Line(points: [station.stop, NSPoint(x: meaning.lineX, y: last.center.y)]))
+        if let meaning = layout.meaning, let last = senseStops.last, let index = layout.meaningStation, layout.stations.indices.contains(index) {
+            lines.append(Line(points: [layout.stations[index].stop, NSPoint(x: meaning.lineX, y: last.center.y)]))
+        }
+        // 今いる丸とその中身: 選んだ候補から丸までと，丸から選んだ中身までを，選んだ道すじにする
+        if let currentStation, layout.stations.indices.contains(currentStation), let selectedRow, layout.rows.indices.contains(selectedRow) {
+            let row = layout.rows[selectedRow]
+            let station = layout.stations[currentStation].stop
+            route.append(Line(points: [NSPoint(x: layout.direction > 0 ? row.maxX : row.minX, y: station.y), station]))
+            if let last = layout.itemRows.last {
+                lines.append(Line(points: [station, NSPoint(x: layout.itemStemX, y: last.midY.rounded())]))
+            }
+            if let selectedItem, layout.itemRows.indices.contains(selectedItem) {
+                route.append(Line(points: [station, NSPoint(x: layout.itemStemX, y: layout.itemRows[selectedItem].midY.rounded())]))
+            }
         }
         BranchMapDrawing.stroke(lines, color: theme.line.withAlphaComponent(theme.line.alphaComponent * stale), width: metrics.lineWidth,
                                 avoiding: avoided, in: body, theme: theme)
@@ -798,8 +900,18 @@ final class BranchView: NSView {
                 drawKind(column.variants[index], key: keys[index], in: kind.label, selected: index == column.selectedVariant, opacity: stale)
             }
         }
-        for station in layout.stations {
-            TextFitting.draw(station.title, attributes: [.font: labelFont, .foregroundColor: theme.textMuted], x: station.titleX, midY: station.titleMidY)
+        for (index, station) in layout.stations.enumerated() {
+            let color = index == currentStation ? theme.text : theme.textMuted
+            TextFitting.draw(station.title, attributes: [.font: labelFont, .foregroundColor: color], x: station.titleX, midY: station.titleMidY)
+        }
+        for (index, row) in layout.itemRows.enumerated() where items.indices.contains(index) {
+            drawRow(items[index], in: row, direction: layout.direction)
+        }
+        if let label = layout.itemLabel {
+            TextFitting.draw(label.text, attributes: [.font: labelFont, .foregroundColor: theme.textMuted], x: label.x, midY: label.midY)
+        }
+        if let midY = layout.itemBottomMidY, let position = layout.itemPosition {
+            TextFitting.draw(position.text, attributes: [.font: labelFont, .foregroundColor: theme.textMuted], x: position.x, midY: midY)
         }
         if let meaning = layout.meaning { drawMeaning(meaning, direction: layout.direction) }
 
@@ -821,6 +933,7 @@ final class BranchView: NSView {
                 BranchMapDrawing.drawHint(hint, x: x, midY: layout.expandMidY, theme: theme)
             }
             if let midY = layout.bottomMidY { drawHints(hints.candidates, x: layout.bottomHintsX, midY: midY, in: panel) }
+            if let midY = layout.itemBottomMidY { drawHints(hints.items, x: layout.itemHintsX, midY: midY, in: panel) }
         }
         if let midY = layout.bottomMidY {
             if showsPosition(panel), !rows.isEmpty {
@@ -979,6 +1092,47 @@ final class BranchView: NSView {
         var command: LauncherCommand.Kind?
         /// 文字のすぐあとに控えめに添える説明(絵文字の名前)
         var detail: String?
+        /// 番号をキーキャップにしない(番号キーが，この行ではなく先の枝の中身を選ぶあいだ)
+        var isPlain = false
+        /// 選択の背景を薄くする(選んだままだが，今は先の枝の丸か中身にいる)
+        var isSoft = false
+    }
+
+    /// 候補の列に出す行．先の枝の丸の中身に入っているあいだは，元の候補を控えめに出す(番号は中身に付く)
+    private func candidateRows(_ column: LatticePanel.Column, in panel: LatticePanel) -> [Row] {
+        guard let detail = panel.detail else { return lowerRows(column) }
+        guard detail.selectedItem != nil else {
+            // 丸の上にいるあいだは，選んでいる候補の背景を薄くする(今いる場所は丸)
+            return lowerRows(column).map { row in
+                var row = row
+                row.isSoft = detail.current != nil
+                return row
+            }
+        }
+        return detail.candidates.enumerated().map { index, text in
+            Row(text: text, badge: "\(index + 1)", isSelected: index == detail.selectedCandidate, opacity: 1, isPlain: true, isSoft: true)
+        }
+    }
+
+    /// 今いる丸の中身(連想の語・マクロの結果)の行
+    private func itemRows(of panel: LatticePanel) -> [Row] {
+        guard let detail = panel.detail, detail.current != nil else { return [] }
+        return detail.items.enumerated().map { index, text in
+            Row(text: text, badge: "\(index + 1)", isSelected: index == detail.selectedItem, opacity: 1, isPlain: detail.selectedItem == nil)
+        }
+    }
+
+    /// 中身の説明．連想のまとまりの意味と，まとまりが 2 つ以上あればその位置
+    private func itemLabel(_ detail: BranchDetail) -> String {
+        guard detail.current != nil, !detail.items.isEmpty else { return "" }
+        let group = detail.groupCount > 1 ? UIStrings.Association.groupPosition(detail.group, detail.groupCount) : ""
+        return [detail.label, group].filter { !$0.isEmpty }.joined(separator: "  ")
+    }
+
+    /// 中身の位置．1 ページに入りきらないときだけ出す
+    private func itemPosition(_ detail: BranchDetail, count: Int) -> String {
+        guard detail.current != nil, detail.total > count, count > 0 else { return "" }
+        return UIStrings.Branch.position(first: detail.position, last: detail.position + count - 1, total: detail.total)
     }
 
     /// 下の枝(変換の候補)．第 1 候補はすぐに濃く出す
@@ -999,21 +1153,24 @@ final class BranchView: NSView {
 
     /// 候補の行．縦の線に近い側から，番号・文字・添え書きの順に並べる(枝を左右に反転したときは右から)
     private func drawRow(_ row: Row, in rect: NSRect, direction: CGFloat) {
-        let textColor = (row.isSelected ? theme.selectionText : theme.text).withAlphaComponent(row.isSelected ? 1 : row.opacity)
-        let mutedColor = (row.isSelected ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
+        // 薄い選択(今は先の枝にいる)は，文節と同じ薄い背景にして，文字はふつうの色のままにする
+        let solid = row.isSelected && !row.isSoft
+        let textColor = (solid ? theme.selectionText : theme.text).withAlphaComponent(row.isSelected ? 1 : row.opacity)
+        let mutedColor = (solid ? theme.selectionText : theme.textMuted).withAlphaComponent(row.isSelected ? 1 : row.opacity)
         if row.isSelected {
+            let fill = solid ? theme.selection : theme.focusTint
             if theme.isRounded {
-                GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: Glass.selectionInsetY), color: theme.selection)
+                GlassDrawing.fillCapsule(rect.insetBy(dx: 0, dy: Glass.selectionInsetY), color: fill)
             } else {
-                theme.selection.setFill()
+                fill.setFill()
                 rect.fill()
             }
         }
         // 番号は番号キーで選べるので，キーキャップの形にする
         let badgeX = direction > 0 ? rect.minX + Part.rowPaddingX : rect.maxX - Part.rowPaddingX - Glass.badgeSize
         let badge = NSRect(x: badgeX.rounded(), y: (rect.midY - Glass.badgeSize / 2).rounded(), width: Glass.badgeSize, height: Glass.badgeSize)
-        if theme.isRounded {
-            if row.isSelected {
+        if theme.isRounded, !row.isPlain {
+            if solid {
                 theme.selectionText.withAlphaComponent(DesignTokens.Opacity.Badge.selected).setFill()
                 NSBezierPath(roundedRect: badge, xRadius: Glass.keycapRadius, yRadius: Glass.keycapRadius).fill()
             } else {
@@ -1028,11 +1185,11 @@ final class BranchView: NSView {
         let contentX = direction > 0 ? badge.maxX + Glass.badgeGap : badge.minX - Glass.badgeGap - contentWidth
         if let kind = row.command {
             // コマンドの候補は，文字の前に種類のアイコンを置く
-            CommandDrawing.drawIcon(kind, x: contentX, midY: rect.midY, theme: theme, selected: row.isSelected, opacity: row.isSelected ? 1 : row.opacity)
+            CommandDrawing.drawIcon(kind, x: contentX, midY: rect.midY, theme: theme, selected: solid, opacity: row.isSelected ? 1 : row.opacity)
         }
         CandidateDetailDrawing.draw(line, x: contentX + icon, in: rect)
         if let note = row.note {
-            NoteDrawing.drawTag(note, maxX: tagMaxX(note, in: rect, direction: direction), midY: rect.midY, theme: theme, selected: row.isSelected,
+            NoteDrawing.drawTag(note, maxX: tagMaxX(note, in: rect, direction: direction), midY: rect.midY, theme: theme, selected: solid,
                                 command: row.command != nil)
         }
     }
