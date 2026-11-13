@@ -105,7 +105,8 @@ public final class InputSession {
     private var splitMode = false
     /// 分岐図で，その場で読みを打ち直している文節の位置と，打った読み(editSegment)．
     /// 分岐図は出したままにし，文節を移るキー・Space・Enter で打ち直した読みに替えて変換する
-    private var inlineEdit: (index: Int, typed: Composition)?
+    /// direct は，打ち直しているあいだだけの英数入力(入力モードを切り替えるキーで替える．打った字をそのまま入れる)
+    private var inlineEdit: (index: Int, typed: Composition, direct: Bool)?
     /// 英字入力の Tab で日本語にした語の英字．分岐図で Esc を押したら英字に戻す
     private var convertedFromEnglish: String?
     /// 再変換している元の文字．Esc で読みに戻さず，この文字のまま確定して元に戻す
@@ -2767,7 +2768,7 @@ public final class InputSession {
     private func beginInlineEdit(context: InputContext) -> KeyResult {
         guard case .lattice(let lattice) = phase else { return KeyResult(handled: true) }
         splitMode = false
-        inlineEdit = (lattice.focusedIndex, newComposition())
+        inlineEdit = (lattice.focusedIndex, newComposition(), false)
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -2780,7 +2781,18 @@ public final class InputSession {
             return nil
         }
         let typesText = !event.modifiers.contains(.command) && !event.modifiers.contains(.control) && !event.modifiers.contains(.option)
+        // 入力モードを切り替えるキー(かな・英数・半角/全角 など)は，打ち直しを終えずに，打ち直しているあいだの入力だけを切り替える．
+        // 文節の中に英字を打てるようにするため．変換と分岐図はそのまま続け，組み立て全体の入力モードは変えない
+        if let command = lookUp(event), [.japaneseMode, .directMode, .toggleMode].contains(command) {
+            edit.direct = command == .directMode || (command == .toggleMode && !edit.direct)
+            inlineEdit = edit
+            return KeyResult(handled: true, actions: render(context: context) + modeIndicator(edit.direct ? .direct : .japanese))
+        }
         switch event.key {
+        case .character(let character) where typesText && edit.direct:
+            edit.typed.insertLiteral(String(character), rawKey: character.isNumber ? character : nil)
+            inlineEdit = edit
+            return KeyResult(handled: true, actions: render(context: context))
         case .character(let character) where typesText:
             if settings.current.inputStyle == .kana,
                 let kana = event.keyLabel.flatMap({ KanaLayout.text(forKey: $0, shift: event.modifiers.contains(.shift), settings: settings.current) }) {
