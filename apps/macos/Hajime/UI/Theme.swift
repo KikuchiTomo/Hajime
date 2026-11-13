@@ -101,12 +101,11 @@ struct ResolvedTheme {
     /// 標準のテーマの書体(ヒラギノ丸ゴ)．標準のテーマは枝を直線で描く
     static let standardFontName = "HiraMaruProN-W4"
 
-    /// 標準のテーマ．暗い背景に青い選択と赤い補正，丸い書体と直線の枝(色は tokens.json の theme.standard)．
+    /// 標準のテーマ．暗い背景に青い選択と赤い補正，丸い書体(色は tokens.json の theme.standard)．枝の曲がり角は，選択の背景と同じ丸みにする．
     /// カスタムテーマと同じく，角丸の描き方に色・書体・形を重ねる．ライトとダークで色を変えない
     private static func standard(increaseContrast: Bool) -> ResolvedTheme {
         var theme = rounded(DesignTokens.Palette.standard, kind: .nordic, typeface: .rounded, increaseContrast: increaseContrast)
         theme.cornerRadius = DesignTokens.Size.StandardTheme.cornerRadius
-        theme.straightBranches = true
         theme.customFontName = standardFontName
         return theme
     }

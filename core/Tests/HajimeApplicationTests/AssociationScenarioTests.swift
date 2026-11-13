@@ -177,6 +177,117 @@ struct AssociationScenarioTests {
         #expect(harness.marked.text == "美しい")
     }
 
+    /// 先の枝を丸として出す作り(macOS の分岐図)の試し．変換マクロもオンにする
+    private func stationHarness(_ change: (inout Settings) -> Void = { _ in }) -> Harness {
+        let converter = FakeConverter(["うつくしい": [("美しい", nil), ("美しき", nil)]], clauses: ["うつくしい": [("美しい", 5), ("美しき", 5)]])
+        let lookup = FakeAssociationLookup([Self.dictionary.id: ["美しい": Self.groups]])
+        let settings = makeSettings {
+            $0.conversionMacros = true
+            change(&$0)
+        }
+        return Harness(converter: converter, settings: settings, associations: lookup, branchStations: true)
+    }
+
+    @Test("先の枝: 連想と変換マクロは別々の丸になる．→ で候補から丸へ入り，→ ← で丸を移り，↓ で丸の中身へ入り，↑ で戻る")
+    func branchStations() throws {
+        let harness = stationHarness()
+        harness.type("utukusii")
+        harness.press(.space)
+        // 候補にいるあいだ: 丸は並ぶが，どの丸にも入っていない．連想の語と変換マクロは混ざらない
+        var detail = try #require(harness.lattice?.detail)
+        #expect(detail.stations.map(\.kind) == [.association, .macro])
+        #expect(detail.stations.map(\.title) == ["連想", "マクロ"])
+        #expect(detail.current == nil && detail.items.isEmpty)
+        // → で最初の丸(連想)へ．丸の上では中身の先頭のページが見えるが，まだ選んでいない
+        harness.press(.right)
+        detail = try #require(harness.lattice?.detail)
+        #expect(detail.current == 0 && detail.selectedItem == nil)
+        #expect(detail.items == Self.groups[0].words)
+        #expect(harness.lattice?.association == nil)
+        #expect(harness.marked.text == "美しい")
+        // → で次の丸(マクロ)へ．中身は変換マクロの結果だけ
+        harness.press(.right)
+        detail = try #require(harness.lattice?.detail)
+        #expect(detail.current == 1)
+        #expect(!detail.items.isEmpty && Set(detail.items).isDisjoint(with: Self.groups.flatMap(\.words)))
+        let macro = try #require(detail.items.first)
+        // ↓ で丸の中身へ入る．先頭の結果を選び，入力欄に入る．元の候補は控えめに出すために残す
+        harness.press(.down)
+        detail = try #require(harness.lattice?.detail)
+        #expect(detail.current == 1 && detail.selectedItem == 0)
+        #expect(detail.candidates == ["美しい", "美しき"] && detail.selectedCandidate == 0)
+        #expect(harness.marked.text == macro)
+        // ↑ で丸の上へ戻り，元の語に戻る．← で前の丸へ，もう一度 ← で候補へ戻る
+        harness.press(.up)
+        #expect(harness.lattice?.detail?.current == 1 && harness.lattice?.detail?.selectedItem == nil)
+        #expect(harness.marked.text == "美しい")
+        harness.press(.left)
+        #expect(harness.lattice?.detail?.current == 0)
+        harness.press(.left)
+        #expect(harness.lattice?.detail?.current == nil)
+        // 候補にいるときの ← は，今までどおり前の文節(文節が 1 つなので動かない)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+    }
+
+    @Test("矢印で木をたどる: 先頭の候補で ↑ を押すと幹の上へ上り，幹の上の ← → は文節を移り，↓ で候補へ下りる．丸の上の Space は中身に入らず次の候補")
+    func trunkLevel() throws {
+        let two = FakeConverter(["きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil)], "いい": [("良い", nil), ("いい", nil)]])
+        two.words["きょうはいい"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "はいい", readingCount: 3, startsWithParticle: true),
+        ]
+        var settings = makeSettings { $0.conversionMacros = true }
+        settings.initialFocus = .start
+        let harness = Harness(converter: two, settings: settings, branchStations: true)
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.trunkFocused == false)
+        // 先頭の候補で ↑: 幹の上へ．選んでいる候補は変わらない
+        harness.press(.up)
+        #expect(harness.lattice?.trunkFocused == true)
+        #expect(harness.lattice?.columns.first?.selectedAlternative == 0)
+        // 幹の上の → は次の文節(候補の先の枝ではない)
+        harness.press(.right)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        #expect(harness.lattice?.trunkFocused == true && harness.lattice?.detail?.current == nil)
+        // ↓ で候補へ下りる．選んでいる候補は変えない
+        harness.press(.down)
+        #expect(harness.lattice?.trunkFocused == false)
+        #expect(harness.lattice?.columns[1].selectedAlternative == 0)
+        // 候補の上の → は先の枝へ
+        harness.press(.right)
+        #expect(harness.lattice?.detail?.current == 0)
+        // 丸の上の Space は，中身に入らずに候補へ戻って次の候補へ進む(選ぶつもりのない中身を入れない)
+        harness.press(.space)
+        #expect(harness.lattice?.detail?.current == nil && harness.lattice?.association == nil)
+        #expect(harness.lattice?.columns[1].selectedAlternative == 1)
+    }
+
+    @Test("先の枝: 丸の中身で Enter を押すと選んだ語で確定する．連想変換のキーでも先の枝へ入れる．先の枝が無ければ → は次の文節")
+    func branchCommit() throws {
+        let harness = stationHarness()
+        harness.type("utukusii")
+        harness.press(.space)
+        harness.press(.up, .shift)
+        #expect(harness.lattice?.detail?.current == 0)
+        harness.press(.down)
+        harness.press(.down)
+        #expect(harness.lattice?.detail?.selectedItem == 1)
+        harness.press(.enter)
+        #expect(harness.committed == Self.groups[0].words[1])
+
+        // 連想も変換マクロも語の意味も無い語では，丸が無い．→ は今までどおり次の文節へ移る
+        let two = FakeConverter(["きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil)], "いい": [("良い", nil), ("いい", nil)]])
+        two.words["きょうはいい"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "はいい", readingCount: 3, startsWithParticle: true),
+        ]
+        let plain = Harness(converter: two, settings: makeSettings { $0.association = false }, branchStations: true)
+        plain.type("kyouhaii")
+        plain.press(.space)
+        #expect(plain.lattice?.detail == nil)
+        plain.press(.right)
+        #expect(plain.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+    }
+
     @Test("表示項目を減らす設定では，文字種の枝は文字種を選んでいるあいだだけ，候補の先の枝は連想変換のキーで開いたあとだけ出す")
     func fewerItems() {
         let harness = harness(makeSettings { $0.showsFewerItems = true })

@@ -320,9 +320,10 @@ enum PanelBuilder {
             panel.columns[focused].variantKeys = []
             panel.collapsesVariants = true
         }
-        if !showsDetail, panel.columns[focused].homophone != nil || panel.associationHint != nil {
+        if !showsDetail, panel.columns[focused].homophone != nil || panel.associationHint != nil || panel.detail != nil {
             panel.columns[focused].homophone = nil
             panel.associationHint = nil
+            panel.detail = nil
             panel.collapsesDetail = true
         }
         return panel

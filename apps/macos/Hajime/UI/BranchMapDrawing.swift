@@ -170,7 +170,7 @@ enum BranchMapDrawing {
         let rect = NSRect(x: x.rounded(), y: (midY - Glass.tagHeight / 2).rounded(), width: width, height: Glass.tagHeight)
         (selected ? theme.selection : theme.hintFill).setFill()
         if theme.isRounded {
-            NSBezierPath(roundedRect: rect, xRadius: Glass.tagRadius, yRadius: Glass.tagRadius).fill()
+            NSBezierPath(roundedRect: rect, xRadius: Map.badgeRadius, yRadius: Map.badgeRadius).fill()
         } else {
             rect.fill()
         }
@@ -190,15 +190,6 @@ enum BranchMapDrawing {
         TextFitting.draw(hint.label, attributes: labelAttributes(theme, color: ink), x: partX - Glass.keycapPartGap + Space.inline, midY: rect.midY)
     }
 
-    /// 案内を左から並べて描く
-    static func drawHints(_ hints: [KeyHint], x: CGFloat, midY: CGFloat, theme: ResolvedTheme) {
-        var x = x
-        for hint in hints {
-            drawHint(hint, x: x, midY: midY, theme: theme)
-            x += hintWidth(hint, theme: theme) + Glass.hintGap
-        }
-    }
-
     // MARK: - キーだけの印
 
     /// 文字種の前に置く，キーだけの印の幅．候補の番号と同じキーキャップの形
@@ -210,16 +201,7 @@ enum BranchMapDrawing {
     static func drawKey(_ key: String, x: CGFloat, midY: CGFloat, theme: ResolvedTheme, selected: Bool) {
         let hint = KeyHint(key: key, label: "")
         let rect = NSRect(x: x.rounded(), y: (midY - Glass.tagHeight / 2).rounded(), width: keyWidth(key, theme: theme), height: Glass.tagHeight)
-        if selected {
-            theme.selectionText.withAlphaComponent(DesignTokens.Opacity.Badge.selected).setFill()
-            if theme.isRounded {
-                NSBezierPath(roundedRect: rect, xRadius: Glass.keycapRadius, yRadius: Glass.keycapRadius).fill()
-            } else {
-                rect.fill()
-            }
-        } else {
-            GlassDrawing.drawKeycap(rect, theme: theme)
-        }
+        drawBadgeBox(rect, theme: theme, selected: selected)
         let ink = selected ? theme.selectionText : theme.textMuted
         var partX = rect.midX - keyWidth(hint, theme: theme) / 2
         for (index, parts) in hint.keycaps.enumerated() {
@@ -229,6 +211,40 @@ enum BranchMapDrawing {
                 GlassDrawing.drawPart(part, in: NSRect(x: partX, y: rect.minY, width: partWidth, height: rect.height), theme: theme, color: ink)
                 partX += partWidth + Glass.keycapPartGap
             }
+        }
+    }
+
+    /// 候補の番号と，キーだけの印の面．番号キー・キーで選べる物の印なので，キーキャップの形にする．
+    /// 角の丸みは，候補の行と同じ比率(size.branch-map.badge-radius)．選んでいる行の上では，選択の文字の色を薄く敷く
+    static func drawBadgeBox(_ rect: NSRect, theme: ResolvedTheme, selected: Bool) {
+        guard theme.isRounded else {
+            if !selected { GlassDrawing.drawKeycap(rect, theme: theme) }
+            return
+        }
+        let stroke = Part.stroke
+        let path = NSBezierPath(roundedRect: rect.insetBy(dx: stroke / 2, dy: stroke / 2), xRadius: Map.badgeRadius, yRadius: Map.badgeRadius)
+        if selected {
+            theme.selectionText.withAlphaComponent(DesignTokens.Opacity.Badge.selected).setFill()
+            path.fill()
+        } else {
+            theme.badge.setFill()
+            path.fill()
+            theme.line.setStroke()
+            path.lineWidth = stroke
+            path.stroke()
+        }
+    }
+
+    // MARK: - ページの位置
+
+    /// ページの位置を示す点．縦の線の下に，ページの数だけ縦に並べる．今のページの点は選択の色，ほかは線の色
+    static func drawPageDots(x: CGFloat, top: CGFloat, count: Int, current: Int, theme: ResolvedTheme) {
+        let size = Map.pageDotSize
+        for index in 0..<count {
+            let midY = top + Map.pageDotPitch * CGFloat(index) + Map.pageDotPitch / 2
+            let rect = NSRect(x: (x - size / 2).rounded(), y: (midY - size / 2).rounded(), width: size, height: size)
+            (index == current ? theme.selection : theme.line).setFill()
+            (theme.isRounded ? NSBezierPath(ovalIn: rect) : NSBezierPath(rect: rect)).fill()
         }
     }
 

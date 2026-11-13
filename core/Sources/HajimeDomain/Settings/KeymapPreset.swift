@@ -117,7 +117,7 @@ public enum KeymapPreset: String, Sendable, Equatable, CaseIterable {
         converting\tSpace\tnextCandidate
         converting\tHenkan\tnextCandidate
         converting\tShift Space\tpreviousCandidate
-        converting\tRight\tnextSegment
+        converting\tRight\tenterBranch
         converting\tLeft\tpreviousSegment
         converting\tTab\tnextSegment
         converting\tShift Tab\tpreviousSegment
