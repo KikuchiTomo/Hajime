@@ -69,23 +69,14 @@ final class CandidatePanelController {
         branchView.theme = ResolvedTheme.resolve(theme)
         branchView.fontSize = CGFloat(fontSize)
         branchView.maximumWidth = Self.maximumWidth(caret: caret)
-        let arrived = shownLattice.map { shown in
-            shown != panel && shown.columns.map(\.text) == panel.columns.map(\.text)
-                && shown.columns.firstIndex(where: \.isFocused) == panel.columns.firstIndex(where: \.isFocused)
-                && shown.columns.map(\.selectedAlternative) == panel.columns.map(\.selectedAlternative)
-        } ?? false
         shownLattice = panel
         shownList = nil
         branchView.panel = panel
-        let frame = present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, crossfades: arrived, holdsEdges: true)
-        if panel.meaningPlacement == .side, let column = panel.columns.first(where: \.isFocused), let note = column.homophone,
-           let row = branchView.selectedRowRect() {
-            bubble.show(note, others: BranchView.others(of: note, in: column), theme: branchView.theme, row: Self.screenRect(row, in: frame),
-                        anchor: frame, obstacles: branchView.bubbleObstacles().map { Self.screenRect($0, in: frame) } + [Self.caretLine(caret)],
-                        screen: FloatingPanel.visibleFrame(for: caret), parent: window)
-        } else {
-            bubble.hide()
-        }
+        // 分岐図は動かさない．キーで起きる変化(候補・文節を移る，枝の反転，幹の送り，窓の幅の変化)も，あとから届いた中身も，その瞬間に差し替える
+        // (文字の位置が変わる変化を動かすと，読めない時間ができる．動くのは，修飾キーを押し続けて出す案内だけ)
+        present(branchView, size: branchView.fittingSize(for: panel), caret: caret, theme: branchView.theme, animatesFrame: false, holdsEdges: true)
+        // 分岐図の語の意味は，選んでいる候補の先の枝として窓の中に描く(BranchView)．吹き出しは一覧だけで使う
+        bubble.hide()
         if let focused = panel.columns.first(where: \.isFocused) {
             // コマンドの候補を選んでいれば，その名前を「コマンド」と続けて読む(幹の文字には印が付いている)
             let command = focused.selectedAlternative.flatMap { index in
@@ -180,7 +171,67 @@ final class CandidatePanelController {
         return frame
     }
 
+    // MARK: - 押し続けて出すキーの案内
+
+    private var hintHoldTimer: Timer?
+    private var hintFadeTimer: Timer?
+
+    /// 修飾キーの押し方が変わった．分岐図を出しているあいだ，修飾キーを決まった時間(motion.branch-map.hint-hold)押し続けたら，
+    /// その修飾キーを使うキーの案内を出す(BranchView．案内を常に出す設定では，始めから出ている)．
+    /// キーを組み合わせて押しただけでは出さない．離したら，すぐに消す(離すのは次の操作の始まりなので待たせない)
+    /// 出している分岐図が，候補と先の枝を左へ出しているか(BranchView.isMirrored)．分岐図を出していなければ false
+    var isBranchMirrored: Bool { window.isVisible && shownLattice != nil && branchView.isMirrored }
+
+    func modifiersChanged(_ flags: NSEvent.ModifierFlags) {
+        let modifiers = flags.intersection([.shift, .option, .control, .command])
+        hintHoldTimer?.invalidate()
+        hintHoldTimer = nil
+        guard !modifiers.isEmpty, window.isVisible, shownLattice != nil else {
+            hideHeldHints()
+            return
+        }
+        // すでに出しているときに修飾キーを足した・減らしたら，待たずに出す案内を替える
+        guard branchView.heldModifiers.isEmpty else {
+            branchView.heldModifiers = modifiers
+            return
+        }
+        hintHoldTimer = Timer.scheduledTimer(withTimeInterval: DesignTokens.Motion.BranchMap.hintHold / 1000, repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated { self?.revealHeldHints(modifiers) }
+        }
+    }
+
+    /// 案内を，位置を変えずに濃くしながら出す(不透明度だけの変化なので「視差効果を減らす」でも同じ)
+    private func revealHeldHints(_ modifiers: NSEvent.ModifierFlags) {
+        hintHoldTimer = nil
+        hintFadeTimer?.invalidate()
+        branchView.hintOpacity = 0
+        branchView.heldModifiers = modifiers
+        let duration = DesignTokens.Motion.BranchMap.hintFade / 1000
+        let start = Date()
+        hintFadeTimer = Timer.scheduledTimer(withTimeInterval: Self.frameInterval, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                let progress = min(Date().timeIntervalSince(start) / duration, 1)
+                self.branchView.hintOpacity = CGFloat(progress)
+                if progress >= 1 {
+                    self.hintFadeTimer?.invalidate()
+                    self.hintFadeTimer = nil
+                }
+            }
+        }
+    }
+
+    private func hideHeldHints() {
+        hintHoldTimer?.invalidate()
+        hintHoldTimer = nil
+        hintFadeTimer?.invalidate()
+        hintFadeTimer = nil
+        branchView.heldModifiers = []
+        branchView.hintOpacity = 1
+    }
+
     func hide() {
+        hideHeldHints()
         fadeTimer?.invalidate()
         fadeTimer = nil
         lastAnnounced = nil
@@ -219,9 +270,9 @@ final class CandidatePanelController {
         }
     }
 
+    /// 一覧の 2 番目からの候補の濃さ．分岐図は動かさないので，分岐図には渡さない
     private func setRestOpacity(_ value: CGFloat) {
         view.restOpacity = value
-        branchView.restOpacity = value
     }
 
     /// VoiceOver が動いているときだけ，選んでいる候補を読み上げる

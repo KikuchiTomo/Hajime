@@ -20,6 +20,8 @@ import HajimeEngine
 //                                                                打ち間違いの補正(直した・示した・直さなかった)．
 //                                                                --typing-interval を付けると，その間隔で打ったときのように打鍵の合間に訂正を前もって求める
 //   hajime-playground --evaluate-language <TSV> [--zenzai <モデル>] 英字入力(自動)で英語と日本語を見分けた結果
+//   hajime-playground --language-key-times <TSV> [--line <行>] [--idle] [--settle] [--zenzai <モデル>] 英字入力(自動)で 1 行を 1 キーずつ打った時間．
+//                                                                --idle でキーごとに打鍵の合間の処理，--settle で打鍵が止まったときの処理の時間も出す(打った文字は出さない)
 //   hajime-playground --typo-candidates <キー> [--zenzai <モデル>] 打ったキーの訂正の候補と点数
 //   hajime-playground --correction-features <TSV> [--zenzai <モデル>] 訂正の候補ごとの材料(重みと境目を決めるため)
 //   hajime-playground --split <読み,読み,…>                      文節を区切るときに区切れる位置
@@ -29,7 +31,8 @@ import HajimeEngine
 //                                                                --no-context で文節の候補の前後の文脈での並べ替えを切る
 //   hajime-playground --words <読み,読み,…>                      読みを変換したときの語の並び
 //   hajime-playground --english-terms <ファイル>                  英語の語の辞書(R-24)の語ごとの読み・語の並び・もっともらしさ・候補の先頭
-//   hajime-playground --startup <同梱の辞書> [--zenzai <モデル>] [--zenzai-fast <xsmall のモデル>]
+//   hajime-playground --startup <同梱の辞書> [--zenzai <モデル>] [--zenzai-fast <xsmall のモデル>] [--jinen <small>] [--jinen-fast <xsmall>]
+//                                                                [--verification-record <ファイル>]
 //                                                                起動(モデルと辞書の確認・エンジン・warmUp)から最初の変換までの時間
 //
 // どの使い方でも --dictionary <ディレクトリ> を付けると，azooKey に同梱の辞書の代わりにその辞書で変換する(辞書を作り直して比べるため)
@@ -46,7 +49,9 @@ MainActor.assumeIsolated {
     let arguments = Arguments()
     if let dictionary = arguments.value(of: "--startup") {
         do {
-            try StartupProbe.run(zenzaiPath: arguments.value(of: "--zenzai"), fastZenzaiPath: arguments.value(of: "--zenzai-fast"), dictionaryPath: dictionary)
+            try StartupProbe.run(zenzaiPath: arguments.value(of: "--zenzai"), fastZenzaiPath: arguments.value(of: "--zenzai-fast"),
+                                 jinenPath: arguments.value(of: "--jinen"), fastJinenPath: arguments.value(of: "--jinen-fast"), dictionaryPath: dictionary,
+                                 recordPath: arguments.value(of: "--verification-record"))
         } catch {
             print("起動できませんでした: \(error)")
             exit(1)
@@ -106,6 +111,10 @@ MainActor.assumeIsolated {
         } else if let file = arguments.value(of: "--evaluate-typo") {
             try Evaluation.typo(file: file, engine: playground.engine, service: playground.typoService,
                                 typingInterval: arguments.value(of: "--typing-interval").flatMap(Double.init))
+        } else if let file = arguments.value(of: "--language-key-times") {
+            try Evaluation.languageKeyTimes(file: file, line: arguments.value(of: "--line").flatMap(Int.init) ?? 1,
+                                            idles: CommandLine.arguments.contains("--idle"), settles: CommandLine.arguments.contains("--settle"),
+                                            engine: playground.engine)
         } else if let file = arguments.value(of: "--evaluate-language") {
             try Evaluation.language(file: file, engine: playground.engine)
         } else if let file = arguments.value(of: "--correction-features") {

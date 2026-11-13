@@ -95,15 +95,15 @@ enum SamplePanels {
     /// 設定の画面の絵文字の見本．位置・数・名前の設定を変えると，その場で並びが変わる．
     /// 「文節を絵文字に変換」がオンなら「ねこ」の文節全体の絵文字を，オフなら「ねこが」の語を絵文字にした候補を並べる．どちらもオフなら nil．
     /// 位置と数がわかる範囲(絵文字の後ろのふだんの候補 1 つまで．1 ページに収まる分)だけを出す
-    static func emojiPlacement(_ settings: HajimeDomain.Settings) -> CandidatePanel? {
-        guard let placement = settings.emojiPlacement else { return nil }
-        let tail = settings.emojiConversion ? "" : emojiPlacementParticle
+    static func emojiPlacement(_ placement: EmojiPlacement?, convertsWholeReading: Bool, candidatesPerPage: Int, showsNames: Bool) -> CandidatePanel? {
+        guard let placement else { return nil }
+        let tail = convertsWholeReading ? "" : emojiPlacementParticle
         let emoji = emojiPlacementEmoji.prefix(placement.count).map { (text: $0.emoji + tail, name: $0.name) }
         let names = Dictionary(uniqueKeysWithValues: emoji.map { ($0.text, $0.name) })
         let texts = placement.placed(emojiPlacementWords.map { $0 + tail } + emoji.map(\.text)) { names[$0] != nil }
         return CandidatePanel(
             variants: [], selectedVariant: nil,
-            entries: texts.prefix(min(settings.listCandidatesPerPage, placement.index + placement.count + 1)).map { .init(text: $0, annotation: nil, detail: settings.showsEmojiNames ? names[$0] : nil) },
+            entries: texts.prefix(min(candidatesPerPage, placement.index + placement.count + 1)).map { .init(text: $0, annotation: nil, detail: showsNames ? names[$0] : nil) },
             selectedEntry: 0, focus: .candidate, position: 1, total: texts.count, note: nil
         )
     }
@@ -144,12 +144,29 @@ enum SamplePanels {
         return LatticePanel(columns: [column, .init(text: "かわいい", isFocused: false, isUncertain: false)], position: 1, total: 11)
     }()
 
-    static let lattice = LatticePanel(columns: [
+    static let lattice = withKeys(LatticePanel(columns: [
         .init(text: "私の", isFocused: false, isUncertain: false),
         .init(text: "名前は", isFocused: false, isUncertain: false, isDecided: true),
         .init(text: "中野です", alternatives: ["中のです", "中野です", "仲のです", "那珂のです"], selectedAlternative: 1,
               variants: ["なかのです", "ナカノデス", "ﾅｶﾉﾃﾞｽ"], isFocused: true, isUncertain: true, shorter: "中野で", longer: nil),
-    ], position: 1, total: 8)
+    ], position: 1, total: 8))
+
+    /// 標準のキー設定の，文節へ移るキーと文字種にするキーを入れた見本(core の InputSession が入れるものと同じ)
+    static func withKeys(_ panel: LatticePanel) -> LatticePanel {
+        var panel = panel
+        panel.pageSize = DefaultSettings.latticeCandidatesPerSegment
+        let keymap = KeymapPreset.standard.keymap
+        for (index, command) in KeymapCommand.segmentJumps.enumerated() where panel.columns.indices.contains(index) {
+            panel.columns[index].jumpKey = keymap.strokes(for: command, in: .converting).first.map(UIStrings.Keys.name(of:))
+        }
+        let variantCommands: [KeymapCommand] = [.segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana]
+        if let focused = panel.columns.firstIndex(where: \.isFocused) {
+            panel.columns[focused].variantKeys = panel.columns[focused].variants.indices.map { index in
+                variantCommands.indices.contains(index) ? keymap.strokes(for: variantCommands[index], in: .converting).first.map(UIStrings.Keys.name(of:)) : nil
+            }
+        }
+        return panel
+    }
 }
 
 /// 見本のパレット(R-26)．設定の画面の外観のプレビューと，見本の画像(SnapshotRenderer)で使う

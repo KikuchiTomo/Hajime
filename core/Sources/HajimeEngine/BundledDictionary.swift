@@ -43,6 +43,20 @@ public struct BundledDictionary: Sendable, Equatable {
 
     /// 確かめる値を渡せる形．テストで小さな辞書を使って確かめるため
     static func verified(at directory: URL, expectedManifestSHA256: String) throws(VerificationError) -> BundledDictionary {
+        try verified(at: directory, expectedManifestSHA256: expectedManifestSHA256, previous: nil, recording: false).dictionary
+    }
+
+    /// 前回の記録(ADR 0017)と同じファイルなら，ファイルごとのハッシュを求めずに使う(StartupResources)．
+    /// recording なら，合ったときにこの辞書の記録を返す
+    static func verified(at directory: URL, previous: VerificationRecord.Entry?, recording: Bool)
+        throws(VerificationError) -> (dictionary: BundledDictionary, record: VerificationRecord.Entry?) {
+        try verified(at: directory, expectedManifestSHA256: expectedManifestSHA256, previous: previous, recording: recording)
+    }
+
+    /// 一覧は記録に頼らず毎回読んで確かめる(小さく，記録と比べるファイルの並びを決めるため)．
+    /// 一覧にあるすべてのファイルの大きさ・更新日時・ファイル ID が前回の記録と同じなら，ファイルごとのハッシュは求めない
+    static func verified(at directory: URL, expectedManifestSHA256: String, previous: VerificationRecord.Entry?, recording: Bool)
+        throws(VerificationError) -> (dictionary: BundledDictionary, record: VerificationRecord.Entry?) {
         let manifestURL = directory.appendingPathComponent(manifestName, isDirectory: false)
         guard let (handle, _) = FileDigest.openRegularFile(at: manifestURL) else { throw .manifestNotFound }
         // 一度だけ開いて読み，読んだ中身でハッシュを確かめてから解釈する(確かめてから読み直すあいだに差し替えられないように)
@@ -51,13 +65,34 @@ public struct BundledDictionary: Sendable, Equatable {
         guard let text = String(data: data, encoding: .utf8) else { throw .malformedManifest }
         let entries = try parse(text)
         guard entries.contains(where: { $0.path == requiredFile }) else { throw .malformedManifest }
-        // ファイルは数千あり，起動のたびにすべて確かめるので，コアの数だけ並べて確かめる．
-        // どれか 1 つでも合わなければ使わない．理由は一覧の順で最初に見つかったものにする(並べ方で変わらないように)
-        let failures = ConcurrentWork.map(entries.map(Entry.init)) { entry in check(entry, in: directory) }
-        if let failure = failures.lazy.compactMap({ $0 }).first { throw failure }
+        let record = recording || previous != nil
+            ? self.record(of: entries.map(Entry.init), in: directory, expectedManifestSHA256: expectedManifestSHA256) : nil
+        if record == nil || record != previous {
+            // ファイルは数千あり，確かめ直すときはすべて読むので，コアの数だけ並べて確かめる．
+            // どれか 1 つでも合わなければ使わない．理由は一覧の順で最初に見つかったものにする(並べ方で変わらないように)
+            let failures = ConcurrentWork.map(entries.map(Entry.init)) { entry in check(entry, in: directory) }
+            if let failure = failures.lazy.compactMap({ $0 }).first { throw failure }
+        }
         let terms = entries.contains { $0.path == DefaultSettings.termDictionaryFileName }
             ? directory.appendingPathComponent(DefaultSettings.termDictionaryFileName, isDirectory: false) : nil
-        return BundledDictionary(url: directory, termDictionaryURL: terms)
+        return (BundledDictionary(url: directory, termDictionaryURL: terms), recording ? record : nil)
+    }
+
+    /// 一覧にあるすべてのファイルの属性をまとめた記録．属性を読めないファイルがあれば nil(記録を使わずに確かめる)．
+    /// 属性はハッシュを求める前に得る．読んでいるあいだに書き換えられたら更新日時が変わるので，次の起動で確かめ直す
+    private static func record(of entries: [Entry], in directory: URL, expectedManifestSHA256: String) -> VerificationRecord.Entry? {
+        let stamps = FileDigest.stamps(of: entries.map(\.path), in: directory)
+        var named: [(name: String, stamp: FileStamp)] = []
+        named.reserveCapacity(entries.count)
+        for (entry, stamp) in zip(entries, stamps) {
+            guard let stamp else { return nil }
+            named.append((entry.path, stamp))
+        }
+        return VerificationRecord.Entry(location: directory.path, expectedSHA256: expectedManifestSHA256, files: FileStamp.digest(of: named))
+    }
+
+    private static func url(of path: String, in directory: URL) -> URL {
+        path.split(separator: "/").reduce(directory) { $0.appendingPathComponent(String($1)) }
     }
 
     /// 一覧の 1 行(並べた仕事に渡すため Sendable にする)
@@ -73,8 +108,7 @@ public struct BundledDictionary: Sendable, Equatable {
 
     /// 一覧の 1 つのファイルを，ふつうのファイルとして 1 度だけ開いて読み，大きさの上限を守ってハッシュを比べる．合わなければ理由を返す
     private static func check(_ entry: Entry, in directory: URL) -> VerificationError? {
-        let url = entry.path.split(separator: "/").reduce(directory) { $0.appendingPathComponent(String($1)) }
-        guard let (file, _) = FileDigest.openRegularFile(at: url) else { return .fileNotFound }
+        guard let (file, _) = FileDigest.openRegularFile(at: url(of: entry.path, in: directory)) else { return .fileNotFound }
         let digest: String
         do {
             digest = try FileDigest.sha256(of: file, maximumBytes: DefaultSettings.maximumBundledDictionaryFileBytes)

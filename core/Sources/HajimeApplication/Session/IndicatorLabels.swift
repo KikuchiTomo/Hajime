@@ -44,7 +44,12 @@ public enum IndicatorLabels {
 
         /// 変換中に first(キーが無ければ fallback)と second に割り当てた最初のキー
         public func strokes(in keymap: Keymap) -> (first: KeyStroke?, second: KeyStroke?) {
-            func stroke(_ command: KeymapCommand?) -> KeyStroke? { command.flatMap { keymap.strokes(for: $0, in: .converting).first } }
+            func stroke(_ command: KeymapCommand?) -> KeyStroke? {
+                guard let command else { return nil }
+                // 次の文節へのキーは，候補の先の枝へ移るキー(標準は →)があればそれを案内する．先の枝が無い所(一覧・表・文字種の行)では，そのキーで次へ移る
+                if command == .nextSegment, let branch = keymap.strokes(for: .enterBranch, in: .converting).first { return branch }
+                return keymap.strokes(for: command, in: .converting).first
+            }
             return (stroke(first) ?? stroke(fallback), stroke(second))
         }
     }
@@ -64,6 +69,34 @@ public enum IndicatorLabels {
         Hint(.editSegment, "再入力"),
         Hint(.expandCandidates, "表形式"),
     ]
+
+    // 分岐図で，操作する場所に置く案内(macOS．足元には並べない)．矢印で移る操作(候補・文節)は，線のつながりで分かるので案内しない
+
+    /// 選んでいる文節の境目の上に置く案内．文節の長さを変える操作と，区切る操作
+    public static let branchBoundaryHints: [Hint] = [
+        Hint(.shrinkSegment, .extendSegment, "区切り"),
+        Hint(.splitSegment, "分割"),
+    ]
+
+    /// 文字種の枝の先に置く案内
+    public static let branchVariantHint = Hint(.previousCandidate, "文字種")
+
+    /// 候補の下に置く案内．どの候補も違ったときの操作
+    public static let branchCandidateHints: [Hint] = [
+        Hint(.editSegment, "再入力"),
+        Hint(.expandCandidates, "表形式"),
+    ]
+
+    /// 候補の先の小さな幹(意味・連想)の先に置く案内の言葉．キーは連想変換のキー
+    public static let branchExpandLabel = "展開"
+
+    /// 候補から先の枝へ入る案内(畳んでいる先の枝を開く案内も同じ)．先の枝へ移るキーが無ければ，連想変換のキー
+    public static let branchExpandHint = Hint(.associate, branchExpandLabel, fallback: .enterBranch)
+
+    /// 候補の先の小さな幹の，語の意味・連想・変換マクロの見出し
+    public static let branchMeaningTitle = "意味"
+    public static let branchAssociationTitle = "連想"
+    public static let branchMacroTitle = "マクロ"
 
     /// 連想の一覧の足元の案内
     public static let associationHints: [Hint] = [

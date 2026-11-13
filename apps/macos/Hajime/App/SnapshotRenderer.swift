@@ -27,7 +27,7 @@ enum SnapshotRenderer {
             (ThemeChoice(.automatic, custom: sample), .darkAqua, "custom"),
             (ThemeChoice(.automatic), .aqua, "glass-light"), (ThemeChoice(.automatic), .darkAqua, "glass-dark"), (ThemeChoice(.platinum), .aqua, "platinum"), (ThemeChoice(.desk), .darkAqua, "desk"),
             (ThemeChoice(.washi), .aqua, "washi"), (ThemeChoice(.neon), .darkAqua, "neon"), (ThemeChoice(.terminal), .darkAqua, "terminal"), (ThemeChoice(.nordic), .aqua, "nordic"),
-            (ThemeChoice(.contrast), .darkAqua, "contrast"),
+            (ThemeChoice(.contrast), .darkAqua, "contrast"), (ThemeChoice(.indigo), .aqua, "indigo"), (ThemeChoice(.indigoNight), .darkAqua, "indigo-night"),
         ]
         checkPointerTargets()
         checkGridPointerTargets()
@@ -40,7 +40,34 @@ enum SnapshotRenderer {
                 render(suggestionView(theme: look.theme, appearance: appearance), name: "suggestion-\(look.name)", to: output, appearance: appearance)
                 render(latticeView(theme: look.theme, appearance: appearance), name: "branch-\(look.name)", to: output, appearance: appearance)
                 render(previewView(theme: look.theme, appearance: appearance), name: "branch-preview-\(look.name)", to: output, appearance: appearance)
+                render(latticeView(fewerItemsLattice(), theme: look.theme, appearance: appearance), name: "branch-fewer-\(look.name)", to: output,
+                       appearance: appearance)
+                // 先の枝(語の意味・連想・変換マクロ)．候補にいるとき・連想の丸の上・マクロの丸の中身
+                for (suffix, panel) in [("", stationLattice(current: nil, inside: false)), ("-association", stationLattice(current: 1, inside: false)),
+                                        ("-macro", stationLattice(current: 2, inside: true))] {
+                    render(latticeView(panel, theme: look.theme, appearance: appearance), name: "branch-station\(suffix)-\(look.name)", to: output,
+                           appearance: appearance)
+                }
+                // 先の枝を，キーの案内を押し続けているあいだだけ出す設定(既定)で．公式サイトのトップの画像に使う
+                var quietStations = stationLattice(current: nil, inside: false)
+                quietStations.hintsOnHold = true
+                render(latticeView(quietStations, theme: look.theme, appearance: appearance), name: "branch-station-hold-\(look.name)", to: output,
+                       appearance: appearance)
+                // 矢印キーで木をたどっていて，幹の上(文節)にいるところ．ページの位置は縦の線の下の点
+                render(latticeView(trunkLattice(), theme: look.theme, appearance: appearance), name: "branch-trunk-\(look.name)", to: output,
+                       appearance: appearance)
+                // キーの案内を，修飾キーを押し続けているあいだだけ出す設定(既定)．押していないとき・Shift・Option
+                for (suffix, modifiers) in [("", NSEvent.ModifierFlags()), ("-shift", .shift), ("-option", .option)] {
+                    render(latticeView(heldHintsLattice(), theme: look.theme, appearance: appearance, heldModifiers: modifiers),
+                           name: "branch-hold\(suffix)-\(look.name)", to: output, appearance: appearance)
+                }
                 render(splitView(theme: look.theme, appearance: appearance), name: "branch-split-\(look.name)", to: output, appearance: appearance)
+                // 文節をその場で打ち直しているところ(⇧⌫)．読みを打っている途中と，まだ何も打っていないところ
+                render(latticeView(editingLattice(typed: "なかの"), theme: look.theme, appearance: appearance), name: "branch-editing-\(look.name)",
+                       to: output, appearance: appearance)
+                render(latticeView(editingLattice(typed: ""), theme: look.theme, appearance: appearance), name: "branch-editing-empty-\(look.name)",
+                       to: output, appearance: appearance)
+                render(panelView(editingList, theme: look.theme, appearance: appearance), name: "list-editing-\(look.name)", to: output, appearance: appearance)
                 render(correctionView(theme: look.theme, appearance: appearance), name: "correction-\(look.name)", to: output, appearance: appearance)
                 render(readingCorrectionView(theme: look.theme, appearance: appearance), name: "correction-reading-\(look.name)", to: output, appearance: appearance)
                 render(correctedLatticeView(theme: look.theme, appearance: appearance), name: "branch-correction-\(look.name)", to: output, appearance: appearance)
@@ -109,7 +136,14 @@ enum SnapshotRenderer {
             (appearance ?? NSAppearance(named: .aqua)!).performAsCurrentDrawingAppearance {
                 for focus in [0, 6, 13] {
                     render(longLatticeView(theme: look.theme, appearance: appearance, focus: focus), name: "branch-long-\(focus)-\(look.name)", to: output, appearance: appearance)
+                    // 長い文をまとまりに区切って出す(1 つのまとまりは 5 文節まで)．最初・途中・最後のまとまり
+                    render(groupLatticeView(theme: look.theme, appearance: appearance, focus: focus), name: "branch-group-\(focus)-\(look.name)", to: output,
+                           appearance: appearance)
                 }
+                // 窓の幅を固定する設定．最後の文節の枝が右に入らないので，左右に反転して左へ出す
+                var fixed = SamplePanels.withKeys(SamplePanels.lattice)
+                fixed.keepsWidth = true
+                render(latticeView(fixed, theme: look.theme, appearance: appearance), name: "branch-fixed-\(look.name)", to: output, appearance: appearance)
                 render(longListView(theme: look.theme, appearance: appearance), name: "list-long-\(look.name)", to: output, appearance: appearance)
                 render(gridView(longGrid, theme: look.theme, appearance: appearance), name: "list-grid-long-\(look.name)", to: output, appearance: appearance)
             }
@@ -778,13 +812,28 @@ enum SnapshotRenderer {
         view.maximumWidth = DesignTokens.Size.Candidate.maxWidth
         // 前の文節から順に注目を移したときの幹のずれを再現する
         for index in 0...focus {
-            view.panel = LatticePanel(columns: longSentence.enumerated().map { column, text in
+            view.panel = SamplePanels.withKeys(LatticePanel(columns: longSentence.enumerated().map { column, text in
                 column == index ? .init(text: text, alternatives: [text, text + "候補", "ひらがなの" + text], selectedAlternative: 0, isFocused: true, isUncertain: false)
                     : .init(text: text, isFocused: false, isUncertain: false)
-            }, position: 1, total: 3)
+            }, position: 1, total: 3))
         }
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: view.panel!))
         return backdropped(view)
+    }
+
+    /// 長い文をまとまりに区切って出す分岐図(core の InputSession が入れるものと同じ)．文節へ移るキーは，出しているまとまりの中で数える
+    private static func groupLatticeView(theme: ThemeChoice, appearance: NSAppearance?, focus: Int) -> NSView {
+        var panel = LatticePanel(columns: longSentence.enumerated().map { column, text in
+            column == focus ? .init(text: text, alternatives: [text, text + "候補", "ひらがなの" + text], selectedAlternative: 0, isFocused: true, isUncertain: false)
+                : .init(text: text, isFocused: false, isUncertain: false)
+        }, position: 1, total: 3)
+        panel.pageSize = DefaultSettings.latticeCandidatesPerSegment
+        panel.group = SegmentGrouping.group(containing: focus, texts: longSentence, size: 5)
+        let keymap = KeymapPreset.standard.keymap
+        for (command, index) in zip(KeymapCommand.segmentJumps, panel.group ?? panel.columns.indices) {
+            panel.columns[index].jumpKey = keymap.strokes(for: command, in: .converting).first.map(UIStrings.Keys.name(of:))
+        }
+        return latticeView(panel, theme: theme, appearance: appearance)
     }
 
     /// 候補を表に広げた一覧．窓の幅は表の上限まで広げる
@@ -822,10 +871,70 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    private static func latticeView(_ panel: LatticePanel = SamplePanels.lattice, theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
+    /// 表示項目を減らす設定の分岐図．文字種の枝と候補の先の枝を畳み，続きがある印だけを出す(core の PanelBuilder.reduced と同じ形)
+    private static func fewerItemsLattice() -> LatticePanel {
+        var panel = SamplePanels.lattice
+        if let focused = panel.columns.firstIndex(where: \.isFocused) {
+            panel.columns[focused].variants = []
+            panel.columns[focused].homophone = nil
+        }
+        panel.associationHint = nil
+        panel.collapsesVariants = true
+        panel.collapsesDetail = true
+        return panel
+    }
+
+    /// 先の枝を丸として出した分岐図(core の InputSession.applyBranch と同じ形)．current は今いる丸，inside なら丸の中身を選んでいる
+    private static func stationLattice(current: Int?, inside: Bool) -> LatticePanel {
+        var column = LatticePanel.Column(text: "撮る", alternatives: ["取る", "撮る", "とる", "採る"], selectedAlternative: 1, variants: ["とる", "トル", "ﾄﾙ"],
+                                         isFocused: true, isUncertain: true)
+        var detail = BranchDetail(stations: [.init(kind: .meaning, title: "意味"), .init(kind: .association, title: "連想"), .init(kind: .macro, title: "マクロ")],
+                                  current: current)
+        if current == 1 {
+            detail.items = ["撮影する", "写す", "収める"]
+            detail.label = "写真に収める"
+            detail.groupCount = 2
+            detail.total = 3
+        } else if current == 2 {
+            detail.items = ["「撮る」", "【撮る】", "撮る（とる）", "**撮る**"]
+            detail.total = 4
+        }
+        if current == nil || current == 0 { column.homophone = SamplePanels.homophone }
+        if inside {
+            detail.selectedItem = 1
+            detail.candidates = column.alternatives
+            detail.selectedCandidate = 1
+            column.text = detail.items[1]
+            column.alternatives = detail.items
+        }
+        var panel = SamplePanels.withKeys(LatticePanel(columns: [.init(text: "写真を", isFocused: false, isUncertain: false), column], position: 1, total: 7))
+        if inside { panel.association = AssociationHeading(headword: "撮る", label: "", group: 1, groupCount: 1) }
+        panel.detail = detail
+        return panel
+    }
+
+    /// 幹の上にいる分岐図．案内は押し続けて出す設定(既定)，候補は 2 ページ
+    private static func trunkLattice() -> LatticePanel {
+        var panel = SamplePanels.lattice
+        panel.trunkFocused = true
+        panel.hintsOnHold = true
+        panel.pageSize = 4
+        return panel
+    }
+
+    /// キーの案内を押し続けているあいだだけ出す設定の分岐図(core の InputSession が入れるものと同じ)
+    private static func heldHintsLattice() -> LatticePanel {
+        var panel = SamplePanels.lattice
+        panel.hintsOnHold = true
+        return panel
+    }
+
+    private static func latticeView(_ panel: LatticePanel = SamplePanels.lattice, theme: ThemeChoice, appearance: NSAppearance?,
+                                    heldModifiers: NSEvent.ModifierFlags = []) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
         view.fillsSurface = true
+        view.heldModifiers = heldModifiers
         view.panel = panel
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
         return backdropped(view)
@@ -858,6 +967,28 @@ enum SnapshotRenderer {
     }
 
     /// 文節を区切っているところ(⇧↓)．注目している文節の読みの文字のあいだに番号を挟む
+    /// 見本の分岐図で，注目している文節(中野です)をその場で打ち直しているところ．幹は打っている読み，枝は打ち直す前の候補
+    private static func editingLattice(typed: String) -> LatticePanel {
+        var panel = SamplePanels.lattice
+        panel.columns[2].text = typed
+        panel.columns[2].isEditing = true
+        panel.columns[2].selectedAlternative = nil
+        panel.columns[2].isUncertain = false
+        panel.columns[2].shorter = nil
+        panel.note = Note(tone: .info, title: "再入力", subject: "中野です", key: "Tab", keyAction: "変換")
+        return panel
+    }
+
+    /// 文節ごとの一覧で，注目している文節をその場で打ち直しているところ．候補は打ち直す前のもので，薄く出して選んでいない形にする
+    private static var editingList: CandidatePanel {
+        var panel = SamplePanels.list
+        panel.isEditing = true
+        panel.selectedEntry = nil
+        panel.homophone = nil
+        panel.note = Note(tone: .info, title: "再入力", subject: "変換", key: "Tab", keyAction: "変換")
+        return panel
+    }
+
     private static func splitView(theme: ThemeChoice, appearance: NSAppearance?) -> NSView {
         let view = BranchView()
         view.theme = ResolvedTheme.resolve(theme, appearance: appearance)
@@ -959,8 +1090,8 @@ enum SnapshotRenderer {
         return backdropped(view)
     }
 
-    /// 同音異義語の使い分けを分岐図で出したところ．既定では候補の窓の横の吹き出しにし，三角で選んでいる枝の行を指す．
-    /// 同音語のタグには枝に出ていない語だけを出す．selected を意味の無い候補にすると，吹き出しを出さない
+    /// 同音異義語の使い分けを分岐図で出したところ．既定では，選んでいる候補の先の枝(意味の丸の下)に出す．
+    /// 候補の下に出す設定では，同音語のタグに枝に出ていない語だけを出す．selected を意味の無い候補にすると，意味を出さない
     private static func homophoneBranchView(theme: ThemeChoice, appearance: NSAppearance?, placement: MeaningPlacement = .side, selected: Int = 1,
                                             note: HomophoneNote? = nil) -> NSView {
         let view = BranchView()
@@ -978,9 +1109,7 @@ enum SnapshotRenderer {
             view.panel = panel
         }
         view.frame = NSRect(origin: .zero, size: view.fittingSize(for: panel))
-        guard placement == .side, let note = panel.columns[1].homophone else { return backdropped(view) }
-        return withBubble(view, note: note, others: BranchView.others(of: note, in: panel.columns[1]), row: view.selectedRowRect(),
-                          obstacles: view.bubbleObstacles(), theme: view.theme)
+        return backdropped(view)
     }
 
     /// コマンドの候補(R-22)を一覧で出したところ．selected は選んでいる行

@@ -3,6 +3,7 @@
 #[cfg(test)]
 mod bench;
 pub mod fonts;
+mod hold;
 pub mod preview;
 pub(crate) mod render;
 #[cfg(debug_assertions)]
@@ -38,8 +39,9 @@ type Inbox = Arc<Mutex<VecDeque<UiCommand>>>;
 
 enum Content {
     Hidden,
-    Candidates(ipc::CandidateList),
-    BranchMap(ipc::BranchMap),
+    Candidates(Box<ipc::CandidateList>),
+    /// 一覧と分岐図は大きいので箱に入れる
+    BranchMap(Box<ipc::BranchMap>),
     Note(ipc::Note),
     /// モード表示の文字
     Mode(String),
@@ -80,6 +82,13 @@ struct App {
     on_glass: bool,
     /// 押した候補をエンジンに知らせる口．初めて押したときにつなぐ
     engine: Option<EngineClient>,
+    /// エンジンに最後に知らせた，分岐図の候補と先の枝を左へ出しているか(BranchLayout)
+    reported_mirrored: bool,
+    /// 押し続けて出すキーの案内と，修飾キーを読む時計が動いているか
+    hint_hold: hold::HintHold,
+    hold_polling: bool,
+    /// 前のコマで案内を濃くしている途中だったか
+    hint_fading: bool,
     scene: Option<Scene>,
     theme: Option<ResolvedTheme>,
     rest_opacity: f32,
@@ -177,6 +186,10 @@ pub fn run() {
             anchor: None,
             on_glass: false,
             engine: None,
+            reported_mirrored: false,
+            hint_hold: hold::HintHold::default(),
+            hold_polling: false,
+            hint_fading: false,
             scene: None,
             theme: None,
             rest_opacity: 1.0,
@@ -264,6 +277,7 @@ fn on_timer(timer: Timer) {
         Timer::Mode => app.mode_elapsed(),
         Timer::Fade => app.step_fade(),
         Timer::Motion => app.step_motion(),
+        Timer::Hold => app.step_hold(),
     });
 }
 
@@ -275,13 +289,29 @@ impl App {
         let Some(target) = scene.target_at(x as f32 / scale, y as f32 / scale) else {
             return;
         };
+        self.send(RequestBody::ChooseCandidate { target });
+    }
+
+    /// エンジンに知らせる．初めて知らせるときにつなぐ
+    fn send(&mut self, body: RequestBody) {
         if self.engine.is_none() {
             self.engine = pipe_name("engine")
                 .ok()
                 .and_then(|name| EngineClient::start(name).ok());
         }
         if let Some(engine) = &self.engine {
-            let _ = engine.send(RequestBody::ChooseCandidate { target });
+            let _ = engine.send(body);
+        }
+    }
+
+    /// 分岐図の候補と先の枝を左へ出しているかが変わったら，エンジンに知らせる(矢印キーを表示の向きに効かせるため．
+    /// エンジンは次のキーから InputSession.branchMirrored に入れる)
+    fn report_layout(&mut self) {
+        let mirrored = matches!(self.content, Content::BranchMap(_))
+            && self.scene.as_ref().is_some_and(|scene| scene.mirrored);
+        if mirrored != self.reported_mirrored {
+            self.reported_mirrored = mirrored;
+            self.send(RequestBody::BranchLayout { mirrored });
         }
     }
 
@@ -353,12 +383,16 @@ impl App {
             UiCommand::SetPresentation { presentation } => self.presentation = presentation,
             UiCommand::ShowCandidates { list, anchor } => {
                 self.arrived = matches!(&self.content, Content::Candidates(shown) if motion::arrived_list(shown, &list));
-                self.content = Content::Candidates(list);
+                self.content = Content::Candidates(Box::new(list));
                 self.anchor = anchor.or(self.anchor.take());
             }
             UiCommand::ShowBranchMap { map, anchor } => {
-                self.arrived = matches!(&self.content, Content::BranchMap(shown) if motion::arrived_branch(shown, &map));
-                self.content = Content::BranchMap(map);
+                // 修飾キーを押しているあいだに分岐図が変わったら，ほかのキーと組み合わせて押した(⇧→ など)．離すまで案内は出さない
+                if !matches!(&self.content, Content::BranchMap(shown) if **shown == map) {
+                    self.hint_hold.other_key();
+                }
+                self.arrived = false;
+                self.content = Content::BranchMap(Box::new(map));
                 self.anchor = anchor.or(self.anchor.take());
             }
             UiCommand::ShowNote { note, anchor } => {
@@ -432,8 +466,14 @@ impl App {
             }
         }
         let is_list = matches!(self.content, Content::Candidates(_) | Content::BranchMap(_));
-        if is_list && !was_list {
+        // 分岐図は出した瞬間から濃く出す(キーで起きる変化はその瞬間に終える．macOS #566 と同じ)
+        if is_list && !was_list && !matches!(self.content, Content::BranchMap(_)) {
             self.start_rest_fade();
+        } else if matches!(self.content, Content::BranchMap(_))
+            && matches!(self.fade, Fade::Rest(_))
+        {
+            self.rest_opacity = 1.0;
+            self.fade = Fade::None;
         }
     }
 
@@ -794,6 +834,7 @@ impl App {
         self.refresh_prediction(&theme, look.dark, &measure);
         let mut style = Look::new(&theme, font_size);
         style.rest_opacity = self.rest_opacity;
+        (style.held, style.hint_opacity) = self.hint_hold.shown(Instant::now());
         style.pixel_scale = self.window().scale();
         let build = |content: &Content, style: &Look| match content {
             Content::Hidden => None,
@@ -809,11 +850,13 @@ impl App {
         // 打っているあいだの候補(どれも選んでいない一覧)は打つたびに中身が変わるので，枠線を動かさずにすぐ変える(macOS と同じ)
         let typing =
             matches!(&self.content, Content::Candidates(list) if list.selected_entry.is_none());
+        // 分岐図は，窓の大きさと中身をその瞬間に替える(動いているあいだは候補を読めないため．macOS #566 と同じ)
+        let instant = typing || matches!(self.content, Content::BranchMap(_));
         let natural = scene.as_ref().map(|scene| (scene.width, scene.height));
-        if typing {
+        if instant {
             self.resize = None;
         }
-        if let (true, false, Some(natural)) = (is_list, typing, natural) {
+        if let (true, false, Some(natural)) = (is_list, instant, natural) {
             if let Some(size) = self.moving_size(natural, now) {
                 scene = build(
                     &self.content,
@@ -824,7 +867,7 @@ impl App {
                 );
             }
             self.shown_size = scene.as_ref().map(|scene| (scene.width, scene.height));
-        } else if typing {
+        } else if instant {
             self.shown_size = natural;
         } else {
             self.shown_size = None;
@@ -833,9 +876,12 @@ impl App {
         // 吹き出しの三角で指す行は，影を足す前の場面(本体が原点)の座標で探す
         let bare = scene.clone();
         let scene = scene.map(|scene| scene::surround(scene, &theme, Surround::Shadow));
-        // あとから届いた中身は，前の中身の上に重ねて濃くしていく
-        if std::mem::take(&mut self.arrived) && is_list {
+        // あとから届いた中身は，前の中身の上に重ねて濃くしていく(一覧だけ．分岐図はその瞬間に差し替える)
+        let branch = matches!(self.content, Content::BranchMap(_));
+        if std::mem::take(&mut self.arrived) && is_list && !branch {
             self.crossfade = self.scene.clone().map(|shown| (shown, now));
+        } else if branch {
+            self.crossfade = None;
         }
         if self
             .crossfade
@@ -854,6 +900,8 @@ impl App {
             self.drawn = None;
             self.window().stop_timer(Timer::Fade);
             self.window().stop_timer(Timer::Mode);
+            self.window().stop_timer(Timer::Hold);
+            self.hold_polling = false;
             self.on_glass = on_glass;
             if !matches!(self.fade, Fade::None) {
                 self.window().start_timer(Timer::Fade, FRAME_MILLISECONDS);
@@ -917,5 +965,36 @@ impl App {
         self.announce();
         self.scene = scene;
         self.theme = Some(theme);
+        self.report_layout();
+        self.sync_hold();
+    }
+
+    /// 案内を押し続けて出す分岐図を出しているあいだだけ，修飾キーを読む時計を動かす(出していないときは何も読まない)
+    fn sync_hold(&mut self) {
+        let needs = self.scene.is_some()
+            && self.anchor.is_some()
+            && matches!(&self.content, Content::BranchMap(map) if map.hints_on_hold == Some(true));
+        if needs && !self.hold_polling {
+            self.window().start_timer(Timer::Hold, FRAME_MILLISECONDS);
+        } else if !needs && self.hold_polling {
+            self.window().stop_timer(Timer::Hold);
+            self.hint_hold.reset();
+        }
+        self.hold_polling = needs;
+    }
+
+    /// 修飾キーを読み，出す案内が変わるか，濃くしている途中なら描き直す
+    fn step_hold(&mut self) {
+        if !self.hold_polling {
+            self.window().stop_timer(Timer::Hold);
+            return;
+        }
+        let now = Instant::now();
+        let changed = self.hint_hold.update(window::held_modifiers(), now);
+        // 濃くしている途中は毎コマ描き，濃くし終えたコマも 1 回描く(最後のコマを途中の濃さのまま残さない)
+        let fading = self.hint_hold.is_fading(now);
+        if changed || fading || std::mem::replace(&mut self.hint_fading, fading) {
+            self.refresh();
+        }
     }
 }

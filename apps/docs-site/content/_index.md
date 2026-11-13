@@ -38,7 +38,7 @@ layout: hextra-home
 </div>
 
 <figure class="hajime-showcase">
-  <img src="images/hero.webp" alt="テキストエディットで「写真を撮る」と入力し，分岐図の候補の「撮る」の横に，意味・使い方の例・同音語が表示されている" width="1400" height="672" />
+  <img src="images/hero.webp" alt="テキストエディットで「写真を撮る」と入力し，分岐図の候補の「撮る」の先に，意味と使い方の例が線でつながって表示されている" width="1400" height="672" />
 </figure>
 
 {{< hajime/features title="主な機能" >}}
@@ -121,7 +121,7 @@ layout: hextra-home
   >}}
   {{< hajime/feature
     title="候補ウィンドウのテーマ"
-    subtitle="和紙・北欧・ネオン・端末など 8 つのテーマのほか，色・角の丸み・枝の形・書体を自分で決めたテーマも作れます．"
+    subtitle="和紙・北欧・ネオン・端末など 10 のテーマのほか，色・角の丸み・枝の形・書体を自分で決めたテーマも作れます．"
     link="docs/settings/#外観"
     image="images/features/themes.webp"
     alt="和紙・ネオン・北欧・端末の 4 つのテーマで描いた候補ウィンドウ"

@@ -12,11 +12,11 @@ struct CorrectionPage: View {
                 // 種類を選べるかは「タイプミスの修正」(変換のページと同じ設定)で決まるので，ここでも切り替えられるようにする
                 ResettablePicker(model: model, title: UIStrings.Choice.typoCorrection, keyPath: \.typoCorrection, label: UIStrings.Choice.label(for:))
                 ResettableToggle(model: model, title: UIStrings.Features.correctsEnglish, keyPath: \.correction.english)
-                    .disabled(model.settings.typoCorrection == .off)
+                    .disabled(model, when: \.typoCorrection, is: .off)
                 ResettableToggle(model: model, title: UIStrings.Features.correctsJapanese, keyPath: \.correction.japanese)
-                    .disabled(model.settings.typoCorrection != .standard)
+                    .disabled(model, unless: \.typoCorrection, is: .standard)
                 ResettableToggle(model: model, title: UIStrings.Features.correctsRepeatedKeys, keyPath: \.correction.repeatedKeys)
-                    .disabled(!correctsJapanese)
+                    .disabled(model, unless: \.correctsJapaneseTypos)
                 ResettableToggle(model: model, title: UIStrings.Features.misreadings, keyPath: \.misreadings)
                 ExampleToggle(model: model, title: UIStrings.Extras.looseReadings, keyPath: \.looseReadings,
                               example: UIStrings.Extras.looseReadingsExample, titleWidth: exampleTitleWidth)
@@ -26,17 +26,21 @@ struct CorrectionPage: View {
             Section {
                 ExampleToggle(model: model, title: UIStrings.Extras.handShift, keyPath: \.handShiftCorrection,
                               example: UIStrings.Extras.handShiftExample, titleWidth: exampleTitleWidth)
-                    .disabled(!correctsJapanese)
+                    .disabled(model, unless: \.correctsJapaneseTypos)
             }
-            Section(UIStrings.Features.rules) {
-                RuleListEditor(model: model, spec: .correctionRules, labels: .init(
-                    key: UIStrings.Features.typed, value: UIStrings.Features.replacement,
-                    empty: UIStrings.Features.rulesEmpty))
+            BuiltLater(stage: 1) {
+                Section(UIStrings.Features.rules) {
+                    RuleListEditor(model: model, spec: .correctionRules, labels: .init(
+                        key: UIStrings.Features.typed, value: UIStrings.Features.replacement,
+                        empty: UIStrings.Features.rulesEmpty))
+                }
             }
-            Section(UIStrings.Features.exceptions) {
-                RuleListEditor(model: model, spec: .exceptions, labels: .init(
-                    key: UIStrings.Features.exceptionPlaceholder, value: nil,
-                    empty: UIStrings.Features.exceptionsEmpty))
+            BuiltLater(stage: 2) {
+                Section(UIStrings.Features.exceptions) {
+                    RuleListEditor(model: model, spec: .exceptions, labels: .init(
+                        key: UIStrings.Features.exceptionPlaceholder, value: nil,
+                        empty: UIStrings.Features.exceptionsEmpty))
+                }
             }
         }
         .formStyle(.grouped)
@@ -46,9 +50,11 @@ struct CorrectionPage: View {
     private var exampleTitleWidth: CGFloat {
         ExampleToggle.titleWidth([UIStrings.Extras.looseReadings, UIStrings.Extras.phoneticSpelling, UIStrings.Extras.handShift])
     }
+}
 
+private extension HajimeDomain.Settings {
     /// 日本語のタイプミスを直すか(同じキーの重なりと手のずれは，その中の種類)
-    private var correctsJapanese: Bool {
-        model.settings.typoCorrection == .standard && model.settings.correction.japanese
+    var correctsJapaneseTypos: Bool {
+        typoCorrection == .standard && correction.japanese
     }
 }

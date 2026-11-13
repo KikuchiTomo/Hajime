@@ -52,12 +52,18 @@ final class UnavailableEnglishLexicon: EnglishLexicon {
 func loadStartupResources() -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, jinen: JinenModel?, fastJinen: JinenModel?, dictionary: BundledDictionary?) {
     let models = HostPaths.installation.appendingPathComponent("Zenzai", isDirectory: true)
     let jinen = HostPaths.installation.appendingPathComponent("Jinen", isDirectory: true)
+    // 前回確かめて合ったファイルが変わっていなければ，ハッシュを求め直さない(ADR 0017)．記録はこの PC の本人だけの場所に置く．
+    // エンジンはアプリのバージョンを持たないので，実行ファイル自身を見分ける値を使う(入れ直せば変わる)．読めなければ記録を使わない
+    let executable = Bundle.main.executableURL ?? URL(fileURLWithPath: CommandLine.arguments[0])
+    let version = StartupResources.executableIdentity(at: executable)
     let resources = StartupResources.verified(
         zenzai: models.appendingPathComponent(ZenzaiModel.Variant.small.fileName),
         fastZenzai: models.appendingPathComponent(ZenzaiModel.Variant.xsmall.fileName),
         jinen: jinen.appendingPathComponent(JinenModel.Variant.small.fileName),
         fastJinen: jinen.appendingPathComponent(JinenModel.Variant.xsmall.fileName),
-        dictionary: HostPaths.installation.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true))
+        dictionary: HostPaths.installation.appendingPathComponent(BundledDictionary.directoryName, isDirectory: true),
+        records: version.map { _ in FileVerificationRecordStore(fileURL: HostPaths.local.appendingPathComponent(DefaultSettings.verificationRecordFileName)) },
+        appVersion: version ?? "")
     return (accepted(resources.zenzai, name: "Zenzai(small)"), accepted(resources.fastZenzai, name: "Zenzai(xsmall)"),
             accepted(resources.jinen, name: "jinen(small)"), accepted(resources.fastJinen, name: "jinen(xsmall)"),
             accepted(resources.dictionary, name: "同梱の辞書"))
@@ -240,6 +246,15 @@ func run() -> Int32 {
     let emoji = engine
     let resetPaletteHistory: () -> Void = {}
     #endif
+    // 長い文のまとまりと先の枝の丸を描けるのは Windows の候補ウィンドウだけ(Linux のアドオンはどちらも描かないので，
+    // 区切ると文節へ移るキーが見えている並びとずれ，丸を出すと見えない丸に入る)．macOS でホストを動かすとき(テスト)も false のまま
+    #if os(Windows)
+    let groupsBranchSegments = true
+    let branchStations = true
+    #else
+    let groupsBranchSegments = false
+    let branchStations = false
+    #endif
     let service = EngineService(
         makeSession: {
             // エンジンのセッションは，候補を文脈で並べ替える採点(検証木)も受け持つ．合議はこのプロセスの中で行う(ADR 0016)
@@ -247,7 +262,7 @@ func run() -> Int32 {
             return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
                                                                  terms: terms, emoji: emoji, lexicon: lexicon, englishTerms: englishTerms),
                                 lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                                keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
+                                keyNames: .windows, branchStations: branchStations, groupsBranchSegments: groupsBranchSegments, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
                                 palette: palette, calendar: calendar, scorer: engineSession, fusing: engineSession)
         },
         settings: settings,
@@ -262,6 +277,7 @@ func run() -> Int32 {
         },
         hints: { FooterHints.make(for: $0, settings: $1) },
         listHints: { FooterHints.make(for: $0, settings: $1) },
+        placedHints: { FooterHints.placed(for: $0, settings: $1) },
         typoService: typoService,
         sync: sync,
         files: files,

@@ -53,11 +53,6 @@ extension SettingsView {
             }
         }
 
-        /// 見せていないあいだも作ったまま残すか(SettingsPageStack)．残したページは設定を変えるたびに描き直すので，
-        /// 描き直しが重いページは残さない．キー設定の表は 1 回の描き直しに 200 ms ほどかかり，残すとほかのページで設定を
-        /// 変えるたびに遅くなるため，開くたびに組み立てる(組み立てに 2 秒ほどかかる)
-        var keepsWhenHidden: Bool { self != .keys }
-
         /// SF Symbols の名前．文字の形の記号(textformat.abc など)は言語によって「あいう」に変わり，ほかの絵と揃わないので使わない
         var symbol: String {
             switch self {

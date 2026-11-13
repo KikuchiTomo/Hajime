@@ -37,6 +37,72 @@ enum FileDigest {
         #endif
     }
 
+    /// 中身を読まずに，ふつうのファイルの大きさ・更新日時・ファイル ID を得る．前回確かめたファイルと同じかを見分けるため(ADR 0017)．
+    /// 無いか，ふつうのファイルでなければ nil
+    static func stamp(at url: URL) -> FileStamp? {
+        #if os(Windows)
+        guard let path = url.withUnsafeFileSystemRepresentation({ $0.map { String(cString: $0) } }) else { return nil }
+        var stamp = hajime_file_stamp()
+        guard path.withCString(encodedAs: UTF16.self, { hajime_file_stamp_of($0, &stamp) }) == 0 else { return nil }
+        return FileStamp(size: Int64(bitPattern: stamp.size), modified: stamp.modified, volume: stamp.volume, file: stamp.file)
+        #else
+        var status = stat()
+        guard stat(url.path, &status) == 0, (status.st_mode & S_IFMT) == S_IFREG else { return nil }
+        #if canImport(Darwin)
+        let modified = Int64(status.st_mtimespec.tv_sec) * 1_000_000_000 + Int64(status.st_mtimespec.tv_nsec)
+        #else
+        let modified = Int64(status.st_mtim.tv_sec) * 1_000_000_000 + Int64(status.st_mtim.tv_nsec)
+        #endif
+        return FileStamp(size: Int64(status.st_size), modified: modified, volume: UInt64(truncatingIfNeeded: status.st_dev),
+                         file: UInt64(truncatingIfNeeded: status.st_ino))
+        #endif
+    }
+
+    /// directory の中の paths(区切りは /)のファイルの属性を，渡した順に返す．無いかふつうのファイルでなければ nil．
+    /// Windows はファイルごとに開くと数千のファイル(同梱の辞書)で数百ミリ秒かかるので，ディレクトリごとに一度だけ読む
+    static func stamps(of paths: [String], in directory: URL) -> [FileStamp?] {
+        #if os(Windows)
+        var listed: [String: [String: FileStamp]] = [:]
+        return paths.map { path in
+            let parts = path.split(separator: "/", omittingEmptySubsequences: false)
+            let parent = parts.dropLast().joined(separator: "/")
+            if listed[parent] == nil {
+                let url = parts.dropLast().reduce(directory) { $0.appendingPathComponent(String($1), isDirectory: true) }
+                listed[parent] = stamps(inDirectory: url) ?? [:]
+            }
+            return parts.last.flatMap { listed[parent]?[String($0)] }
+        }
+        #else
+        return ConcurrentWork.map(paths) { path in stamp(at: path.split(separator: "/").reduce(directory) { $0.appendingPathComponent(String($1)) }) }
+        #endif
+    }
+
+    #if os(Windows)
+    /// ディレクトリのすぐ下のふつうのファイルの属性を名前ごとに返す．読めなければ nil
+    private static func stamps(inDirectory url: URL) -> [String: FileStamp]? {
+        guard let path = url.withUnsafeFileSystemRepresentation({ $0.map { String(cString: $0) } }) else { return nil }
+        let found = DirectoryStamps()
+        let context = Unmanaged.passUnretained(found).toOpaque()
+        let result = withExtendedLifetime(found) {
+            path.withCString(encodedAs: UTF16.self) { directory in
+                hajime_directory_stamps(directory, context) { context, name, length, stamp in
+                    guard let context, let name, let stamp else { return }
+                    let found = Unmanaged<DirectoryStamps>.fromOpaque(context).takeUnretainedValue()
+                    let text = String(decoding: UnsafeBufferPointer(start: name, count: Int(length)), as: UTF16.self)
+                    found.values[text] = FileStamp(size: Int64(bitPattern: stamp.pointee.size), modified: stamp.pointee.modified,
+                                                   volume: stamp.pointee.volume, file: stamp.pointee.file)
+                }
+            }
+        }
+        return result == 0 ? found.values : nil
+    }
+
+    /// C の口から呼ばれる visitor が見つけたファイルをためる入れ物(呼ぶスレッドの中だけで使う)
+    private final class DirectoryStamps {
+        var values: [String: FileStamp] = [:]
+    }
+    #endif
+
     /// 中身をすべて読む．決まった大きさを超えたら読むのをやめる
     static func read(_ handle: FileHandle, maximumBytes: Int) throws(TooLarge) -> Data {
         var data = Data()
@@ -68,7 +134,7 @@ enum FileDigest {
     }
 
     /// その OS で速い SHA-256．macOS は CryptoKit，Windows は OS の CNG(開けなければ自前の SHA256Digest)，ほかは自前の SHA256Digest．
-    /// 起動のたびに同梱の辞書と Zenzai モデル(合わせて 280MB ほど)を確かめるので，CPU の SHA の命令を使える OS の実装を使う
+    /// 同梱の辞書とモデル(合わせて 480MB ほど)を確かめる(初めての起動と，ファイルかアプリが変わったあと．ADR 0017)ので，CPU の SHA の命令を使える OS の実装を使う
     private struct Hasher {
         #if canImport(CryptoKit)
         private var digest = SHA256()

@@ -36,6 +36,11 @@ pub fn position(first: u32, last: u32, total: u32) -> String {
     }
 }
 
+/// まとまりの中の位置(分岐図のページが多いときの「3 / 12」．macOS の UIStrings.Association.groupPosition)
+pub fn group_position(index: u32, total: u32) -> String {
+    format!("{index} / {total}")
+}
+
 /// 文字種の行を選んでいるときの位置
 pub fn variants_position(index: u32, total: u32) -> String {
     format!("文字種 {index} / {total}")

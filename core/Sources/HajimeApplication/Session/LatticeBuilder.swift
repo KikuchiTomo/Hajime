@@ -72,41 +72,110 @@ struct LatticeBuilder {
         return result
     }
 
+    /// 上の枝(字種)と同じ表記の候補を除く(第 1 候補は残す)．前後の文脈での並べ替えをあとに回すときも，候補はすぐこの形で見せる
+    static func withoutVariantDuplicates(_ segment: SegmentLattice.Segment) -> SegmentLattice.Segment {
+        let variantTexts = Set(segment.variants.map(\.text))
+        var result = segment
+        result.candidates = segment.candidates.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
+        result.choice = choice(of: segment, in: result.candidates)
+        return result
+    }
+
+    /// 点数での並べ替えを，その場で求めるか(now)，前もって求めた点数があるときだけにして無ければあとに回すか(later)
+    enum ScoringTiming {
+        case now
+        case later
+    }
+
     /// 文節の 2 番目から先の候補を，前後の語とのつながりで並べ替える(文節の読みだけの候補は前後を知らないため)．
     /// 並べ替えは前後の語を含めた変換を求めるので，文節を作るたびには行わず，候補を見せる文節だけに行う
     /// (打鍵が止まったあいだに分岐図を前もって作る 1 歩と，文節の長さの下見を遅くしないため)．
     /// 枝を見せるか・自動で選ぶ文節かの計算(isConfident・confidenceGap)は変えない．選んでいる候補は並べ替えたあとも選んだまま．
-    /// 採点するもの(scorer)があれば，そのあとで 2 番目から後ろを，前後の文節の幹の文字(context)を左右の文脈にした検証木の点数の順にする
-    func rankedByContext(_ segment: SegmentLattice.Segment, reading: String, context: SegmentContext) -> SegmentLattice.Segment {
+    /// 採点するもの(scorer)があれば，そのあとで 2 番目から後ろを，前後の文節の幹の文字(context)を左右の文脈にした検証木の点数の順にする．
+    /// scoring が later なら，前もって求めた点数が無いときは採点を待たずに返し，awaitsScoring を付ける(あとで scored で並べ替える)
+    func rankedByContext(_ segment: SegmentLattice.Segment, reading: String, context: SegmentContext,
+                         scoring: ScoringTiming = .now) -> SegmentLattice.Segment {
         guard contextRanker != nil || scorer != nil, !segment.isPending, !segment.isContextRanked else { return segment }
         var result = segment
         let variantTexts = Set(segment.variants.map(\.text))
-        var candidates = contextRanker?.ranked(segment.candidates, start: segment.readingStart, length: segment.readingLength, reading: reading, fixed: 1)
+        // 利用者が候補を動かしたあとなら，選んでいる候補とそれより前は動かさない(あとから並べ替えるとき)
+        var fixed = 1
+        if case .candidate(let selected) = segment.choice { fixed = max(1, selected + 1) }
+        let ranked = contextRanker?.ranked(segment.candidates, start: segment.readingStart, length: segment.readingLength, reading: reading, fixed: fixed)
             ?? segment.candidates
-        if let scorer {
-            let slice = String(reading.dropFirst(segment.readingStart).prefix(segment.readingLength))
-            let texts = CandidateReranking.textsToScore(candidates, adding: [], readingCount: segment.readingLength)
-            let values = texts.isEmpty ? nil : usesPrecomputedScoresOnly
-                ? scorer.cachedScores(of: texts, reading: slice, before: context.before, after: context.after)
-                : scorer.scores(of: texts, reading: slice, before: context.before, after: context.after)
-            if let values {
-                let table = Dictionary(zip(texts, values), uniquingKeysWith: { first, _ in first })
-                candidates = CandidateReranking.reranked(candidates, adding: [], readingCount: segment.readingLength) { table[$0] ?? nil }
-            }
-        }
-        result.candidates = candidates.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
-        // 並べ替えで第 1 候補が変わったら，その語と合わなくなった絵文字を除き(家に帰る → 🐸 を出さない)，
-        // 押し下げた絵文字を置き場所に置き直す(上の枝と重なる候補を除いたあとの位置で数える)
-        if let emojiPlacement {
-            let slice = String(reading.dropFirst(segment.readingStart).prefix(segment.readingLength))
-            result.candidates = emojiPlacement.placed(converter.keepingRelevantEmoji(result.candidates, reading: slice))
-        }
-        if case .candidate(let index) = segment.choice, segment.candidates.indices.contains(index),
-            let moved = result.candidates.firstIndex(where: { $0.text == segment.candidates[index].text }) {
-            result.choice = .candidate(moved)
-        }
+        // 上の枝(字種)と同じ表記は除いてから採点する(あとから採点するときと同じ問いにし，打鍵の合間に求めた点数を使えるようにする)
+        result.candidates = ranked.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
         result.isContextRanked = true
+        result.awaitsScoring = scorer != nil
+        result = reranked(result, reading: reading, context: context, computes: scoring == .now)
+        result.candidates = placingEmoji(result.candidates, segment: result, reading: reading)
+        result.choice = Self.choice(of: segment, in: result.candidates)
         return result
+    }
+
+    /// あとに回した点数での並べ替え(awaitsScoring)をする(InputSession.followUps)．前もって求めた点数があれば使い，無ければ求める
+    func scored(_ segment: SegmentLattice.Segment, reading: String, context: SegmentContext) -> SegmentLattice.Segment {
+        guard segment.awaitsScoring else { return segment }
+        var result = reranked(segment, reading: reading, context: context, computes: true)
+        result.candidates = placingEmoji(result.candidates, segment: result, reading: reading)
+        result.choice = Self.choice(of: segment, in: result.candidates)
+        return result
+    }
+
+    /// 2 番目から後ろを点数の順にする．前もって求めた点数があれば使い，無ければ computes のときだけ求める．
+    /// 並べ替えたか，並べ替えをあきらめたら awaitsScoring を外す．採点が遅い環境(usesPrecomputedScoresOnly)では求めず，
+    /// 前もって求めた点数が無ければあきらめる
+    private func reranked(_ segment: SegmentLattice.Segment, reading: String, context: SegmentContext, computes: Bool) -> SegmentLattice.Segment {
+        guard segment.awaitsScoring else { return segment }
+        var result = segment
+        guard let scorer else {
+            result.awaitsScoring = false
+            return result
+        }
+        let slice = String(reading.dropFirst(segment.readingStart).prefix(segment.readingLength))
+        let texts = CandidateReranking.textsToScore(segment.candidates, adding: [], readingCount: segment.readingLength)
+        let values: [Double?]
+        if texts.isEmpty {
+            result.awaitsScoring = false
+            return result
+        } else if let cached = scorer.cachedScores(of: texts, reading: slice, before: context.before, after: context.after) {
+            values = cached
+        } else if usesPrecomputedScoresOnly {
+            result.awaitsScoring = false
+            return result
+        } else if computes {
+            values = scorer.scores(of: texts, reading: slice, before: context.before, after: context.after)
+        } else {
+            return result
+        }
+        let table = Dictionary(zip(texts, values), uniquingKeysWith: { first, _ in first })
+        let score: (String) -> Double? = { table[$0] ?? nil }
+        if case .candidate(let selected) = segment.choice, selected > 0, segment.candidates.indices.contains(selected) {
+            // 利用者が候補を動かしたあとなら，選んでいる候補とそれより前は動かさず，後ろだけを並べ替える
+            let tail = CandidateReranking.reranked(Array(segment.candidates[selected...]), adding: [], readingCount: segment.readingLength, score: score)
+            result.candidates = Array(segment.candidates[..<selected]) + tail
+        } else {
+            result.candidates = CandidateReranking.reranked(segment.candidates, adding: [], readingCount: segment.readingLength, score: score)
+        }
+        result.awaitsScoring = false
+        return result
+    }
+
+    /// 並べ替えで第 1 候補が変わったら，その語と合わなくなった絵文字を除き(家に帰る → 🐸 を出さない)，
+    /// 押し下げた絵文字を置き場所に置き直す(上の枝と重なる候補を除いたあとの位置で数える)
+    private func placingEmoji(_ candidates: [Candidate], segment: SegmentLattice.Segment, reading: String) -> [Candidate] {
+        guard let emojiPlacement else { return candidates }
+        let slice = String(reading.dropFirst(segment.readingStart).prefix(segment.readingLength))
+        return emojiPlacement.placed(converter.keepingRelevantEmoji(candidates, reading: slice))
+    }
+
+    /// 選んでいた候補を，並べ替えたあとの並びでも選ぶ
+    private static func choice(of segment: SegmentLattice.Segment, in candidates: [Candidate]) -> SegmentLattice.Segment.Choice {
+        if case .candidate(let index) = segment.choice, segment.candidates.indices.contains(index),
+            let moved = candidates.firstIndex(where: { $0.text == segment.candidates[index].text }) {
+            return .candidate(moved)
+        }
+        return segment.choice
     }
 
     /// 文節を作る位置と長さと幹の文字(build が文節ごとに使う)

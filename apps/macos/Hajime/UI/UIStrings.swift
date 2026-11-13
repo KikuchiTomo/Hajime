@@ -329,18 +329,31 @@ enum UIStrings {
         static let corrected = "修正"
         /// 選んでいる候補の取り込んだ辞書
         static func dictionarySource(_ name: String) -> String { "辞書: \(name)" }
-        /// 足元の案内．キーはキー設定の表で，変換中にそのコマンドに割り当てた最初のキーを出す(R-17)
-        /// 文節の長さを変えるキーは「区切り調整」とまとめて出す
-        static func hints(for keymap: Keymap) -> [KeyHint] {
-            KeyHint.make(IndicatorLabels.branchHints, keymap: keymap)
+        /// 選んでいる文節の境目の上に置く案内(区切り・分割)
+        static func boundaryHints(for keymap: Keymap) -> [KeyHint] {
+            KeyHint.make(IndicatorLabels.branchBoundaryHints, keymap: keymap)
         }
+        /// 文字種の枝の先に置く案内
+        static func variantHint(for keymap: Keymap) -> KeyHint? {
+            KeyHint.make([IndicatorLabels.branchVariantHint], keymap: keymap).first
+        }
+        /// 候補の下に置く案内(再入力・表形式)
+        static func candidateHints(for keymap: Keymap) -> [KeyHint] {
+            KeyHint.make(IndicatorLabels.branchCandidateHints, keymap: keymap)
+        }
+        /// 候補の先の小さな幹の先に置く案内．key は連想変換のキーの名前
+        static func expandHint(key: String) -> KeyHint { KeyHint(key: key, label: IndicatorLabels.branchExpandLabel) }
+        /// 畳んでいる先の枝(表示項目を減らす設定)を開く案内．連想変換のキーが割り当てられていなければ nil
+        static func expandHint(for keymap: Keymap) -> KeyHint? {
+            KeyHint.make([IndicatorLabels.branchExpandHint], keymap: keymap).first
+        }
+        /// 候補の先の小さな幹の，語の意味の見出し
+        static let meaningTitle = IndicatorLabels.branchMeaningTitle
         /// 文節を区切っているときの足元の案内．数字で区切る位置を選び，Esc でやめる(InputSession.handleSplit)．
         /// count は区切れる位置の数
         static func splitHints(count: Int) -> [KeyHint] {
             IndicatorLabels.splitHints(count: count).map { KeyHint(key: $0.key, label: $0.label) }
         }
-        /// 上の枝(文字種)の丸に入れる印
-        static let variantBadge = "↑"
         static func position(first: Int, last: Int, total: Int) -> String {
             first == last ? "\(first) / \(total)" : "\(first)–\(last) / \(total)"
         }
@@ -422,12 +435,21 @@ enum UIStrings {
             case .lastCandidate: "末尾の候補"
             case .associate: "連想変換"
             case .expandCandidates: "候補を表に展開"
+            case .enterBranch: "候補の先の枝へ移動"
             case .nextSegment: "右の文節"
             case .previousSegment: "左の文節"
             case .firstSegment: "先頭の文節"
             case .lastSegment: "末尾の文節"
             case .nextUncertainSegment: "誤りやすい次の文節"
             case .previousUncertainSegment: "誤りやすい前の文節"
+            case .jumpToSegment1: "1 番目の文節"
+            case .jumpToSegment2: "2 番目の文節"
+            case .jumpToSegment3: "3 番目の文節"
+            case .jumpToSegment4: "4 番目の文節"
+            case .jumpToSegment5: "5 番目の文節"
+            case .jumpToSegment6: "6 番目の文節"
+            case .jumpToSegment7: "7 番目の文節"
+            case .jumpToSegment8: "8 番目の文節"
             case .extendSegment: "文節を伸ばす"
             case .shrinkSegment: "文節を縮める"
             case .extendSegmentToWord: "文節を単語単位で伸ばす"
@@ -472,6 +494,7 @@ enum UIStrings {
             case .nextCandidate: "入力中は変換を始めます"
             case .previousCandidate: "入力中は変換を始め、文字種を選択します"
             case .nextUncertainSegment, .previousUncertainSegment: "誤変換の多い文節に移動します"
+            case .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8: "分岐図の，その位置の文節に移動します"
             case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを単語の切れ目まで動かします"
             case .splitSegment: "切れ目の番号を数字キーで選んで区切ります"
             case .editSegment: "選択中の文節の読みを打ち直します"
@@ -492,6 +515,7 @@ enum UIStrings {
             case .registerWord: "選択中の文字でユーザー辞書の登録を開きます"
             case .openMenu: "入力メニューを入力位置に表示します"
             case .expandCandidates: "候補を表に展開します"
+            case .enterBranch: "選んでいる候補の意味・連想・変換マクロへ移動します"
             case .englishAutoStyle: "zoom dekaigi → zoom で会議"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
@@ -848,8 +872,7 @@ enum UIStrings {
 
         // g. 機能の紹介
         static let featuresTitle = "便利な機能"
-        static let extrasTitle = "試験的な機能"
-        static let extrasDetail = "既定ではオフの機能です。"
+        static let extrasTitle = "そのほかの機能"
         static let macros = "変換マクロ"
         static let macrosDetail = "連想変換と同じ Shift + Space で、選択中の単語を「」で囲む・ルビを付けるなどして表示します。"
         static let dynamicDictionary = "書式の展開"
@@ -908,6 +931,18 @@ enum UIStrings {
 
         static let variantRow = "候補の上に文字種の行を表示"
         static let keyHints = "キーの案内を表示"
+        static let fewerItems = "表示項目を減らす"
+        static let branchHintsAlways = "分岐図のキーの案内を常に表示"
+        static let branchSegments = "分岐図に一度に表示する文節数"
+        static func branchSegmentCount(_ value: Int) -> String { value == 0 ? "すべて" : "\(value) 文節" }
+        static let branchWindowWidth = "分岐図の窓の幅"
+
+        static func label(for width: BranchWindowWidth) -> String {
+            switch width {
+            case .fit: "内容に合わせる"
+            case .fixed: "固定"
+            }
+        }
         static let typoCorrection = "タイプミスの修正"
         static let yenKey = "¥ キーで入力する文字"
         static let theme = "テーマ"
@@ -963,7 +998,7 @@ enum UIStrings {
         }
 
         /// 選べる外観．native は標準と同じ見た目なので並べない(古い設定のファイルにあっても標準として読む)
-        static let themes: [ThemePreference] = [.automatic, .washi, .nordic, .neon, .terminal, .contrast, .platinum, .desk]
+        static let themes: [ThemePreference] = [.automatic, .indigo, .indigoNight, .washi, .nordic, .neon, .terminal, .contrast, .platinum, .desk]
 
         static func label(for theme: ThemePreference) -> String {
             switch theme {
@@ -975,6 +1010,8 @@ enum UIStrings {
             case .terminal: "ターミナル"
             case .nordic: "北欧"
             case .contrast: "高コントラスト"
+            case .indigo: "インディゴ"
+            case .indigoNight: "夜のインディゴ"
             }
         }
     }
@@ -1281,7 +1318,7 @@ extension UIStrings {
             "showsPartOfSpeech": UIStrings.Settings.showsPartOfSpeech, "showsUsageExamples": UIStrings.Settings.showsUsageExamples,
             "showsHomophones": UIStrings.Settings.showsHomophones,
             "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
-            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "numberKeySelection": UIStrings.Settings.numberKeySelection,
+            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "showsFewerItems": Choice.fewerItems, "branchSegmentsPerGroup": Choice.branchSegments, "branchWindowWidth": Choice.branchWindowWidth, "alwaysShowsBranchHints": Choice.branchHintsAlways, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
             "emojiConversion": UIStrings.Settings.emojiConversion, "emojiWordConversion": UIStrings.Settings.emojiWordConversion,
             "emojiCandidatePosition": UIStrings.Settings.emojiCandidatePosition,

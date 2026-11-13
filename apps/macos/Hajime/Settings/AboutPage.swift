@@ -54,7 +54,9 @@ struct AboutPage: View {
             }
             Section {
                 if let acknowledgements = model.acknowledgements {
-                    ForEach(acknowledgements) { AcknowledgementRow(item: $0) }
+                    ForEach(Array(acknowledgements.enumerated()), id: \.element.id) { index, item in
+                        BuiltLater(stage: index / 8) { AcknowledgementRow(item: item) }
+                    }
                 } else {
                     Text(UIStrings.More.noticesMissing).foregroundStyle(.secondary)
                 }

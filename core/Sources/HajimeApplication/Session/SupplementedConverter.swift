@@ -402,7 +402,9 @@ public final class SupplementedConverter: KanaKanjiConverting {
 
     /// うろ覚えの読みを組み替えた読みのうち，辞書の 1 語になるものの語．元の読みが 1 語になるなら探さない(正しく打っている)
     private func looseReadingWords(for reading: String) -> [String] {
-        guard reading.unicodeScalars.allSatisfy({ (0x3041...0x3096).contains($0.value) || $0 == "ー" }), dictionaryWord(for: reading) == nil else { return [] }
+        // 長さを先に見る．外来語 1 語より長い読み(文)では辞書を引かない(長い文の変換を待たせない)
+        guard (DefaultSettings.minimumLooseReadingLength...DefaultSettings.maximumLooseReadingLength).contains(reading.count),
+              reading.unicodeScalars.allSatisfy({ (0x3041...0x3096).contains($0.value) || $0 == "ー" }), dictionaryWord(for: reading) == nil else { return [] }
         var words: [String] = []
         for variant in LooseReadings.variants(of: reading) {
             if let word = dictionaryWord(for: variant), !words.contains(word) { words.append(word) }
@@ -421,7 +423,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
 
     /// 読みをローマ字に直した綴り(「ふぉと」→ foto)の音を変えない置き換えのうち，英単語の辞書にあるもの
     private func phoneticWords(for reading: String) -> [String] {
-        guard let lexicon, let keys = KanaRomanizer.keys(for: reading) else { return [] }
+        // 英単語 1 語より長い読み(文)は調べない(かな 1 字はローマ字 1 字以上になる)
+        guard reading.count <= DefaultSettings.maximumPhoneticWordLength, let lexicon, let keys = KanaRomanizer.keys(for: reading) else { return [] }
         if lexicon.isWord(keys) { return [] }
         return Array(PhoneticSpelling.variants(of: keys).lazy.filter { lexicon.isWord($0) }.prefix(DefaultSettings.maximumPhoneticWords))
     }

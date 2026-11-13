@@ -28,8 +28,10 @@ try {
     Invoke-WebRequest -Uri $url -OutFile $archive
     $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
     if ($actual -ne $expected) { throw "辞書の SHA-256 が一致しません: $actual" }
-    # Windows 10 以降に入っている tar(bsdtar)で展開する
-    tar -xzf $archive -C $work
+    # Windows 10 以降に入っている tar(bsdtar)で展開する．PATH の tar は使わない(Git for Windows の usr\bin が先にあると GNU tar が呼ばれ，
+    # C:\... を接続先のホストとして読んで展開できない)
+    $tar = Join-Path $env:SystemRoot 'System32\tar.exe'
+    & $tar -xzf $archive -C $work
     if ($LASTEXITCODE -ne 0) { throw '辞書を展開できません' }
     $extracted = Join-Path $work "hajime-dictionary-$version"
     $extractedSums = Join-Path $extracted 'Dictionary\SHA256SUMS'

@@ -116,7 +116,10 @@ struct InputExtrasScenarioTests {
 
     @Test("R-22: コマンドを使わない設定と，使わないコマンドは出さない")
     func commandsOff() throws {
-        let off = harness(.listPresentation) { $0.commands = [Self.claude] }
+        let off = harness(.listPresentation) {
+            $0.commands = [Self.claude]
+            $0.launcherCommands = false
+        }
         off.type("kuro-do")
         off.press(.space)
         #expect(try #require(off.panel).entries.allSatisfy { $0.command == nil && $0.text != Self.claude.title })
@@ -179,6 +182,7 @@ struct InputExtrasScenarioTests {
         let off = harness(.listPresentation, table: [:]) {
             $0.userDictionary = [entry]
             $0.dateConversion = false
+            $0.dynamicDictionary = false
         }
         off.type("nitiji")
         off.press(.space)
@@ -329,7 +333,10 @@ struct InputExtrasScenarioTests {
 
     @Test("R-22: 変換マクロも連想変換も使わない設定なら，連想変換のキーはふつうの変換になる")
     func macrosOff() {
-        let harness = harness(table: ["とうきょう": [("東京", nil)]]) { $0.association = false }
+        let harness = harness(table: ["とうきょう": [("東京", nil)]]) {
+            $0.association = false
+            $0.conversionMacros = false
+        }
         harness.type("toukyou")
         harness.press(.space, .shift)
         #expect(harness.lattice?.association == nil)

@@ -38,7 +38,7 @@ let package = Package(
             // Zenzai は llama.cpp(C++)を使うので，エンジンを読み込むターゲットは C++ との相互運用を有効にする
             swiftSettings: [.interoperabilityMode(.Cxx, .when(traits: ["Zenzai"]))]
         ),
-        // Windows の CNG(BCrypt)で SHA-256 を求める C の口(同梱の辞書と Zenzai モデルの確認)．Windows のほかでは何もしない
+        // Windows の CNG(BCrypt)で SHA-256 を求め，ファイルの属性を読む C の口(同梱の辞書とモデルの確認と，その記録．ADR 0017)．Windows のほかでは何もしない
         .target(name: "CWindowsHash", linkerSettings: [.linkedLibrary("bcrypt", .when(platforms: [.windows]))]),
         // Windows のスペルチェッカー(ISpellChecker)を呼ぶ C の口．Windows のほかでは何もしない
         .target(name: "CWindowsSpellCheck", linkerSettings: [.linkedLibrary("ole32", .when(platforms: [.windows]))]),
