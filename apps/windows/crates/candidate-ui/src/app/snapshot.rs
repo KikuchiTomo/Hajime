@@ -162,6 +162,12 @@ fn render_all(output: &Path) -> Result<()> {
             pixel_scale: tokens::size::snapshot::SCALE,
             ..Look::new(&theme, font_size)
         };
+        // 修飾キーを押し続けて，案内を出し終えたところ
+        let held = |held: scene::Held| Look {
+            held,
+            hint_opacity: 1.0,
+            ..look
+        };
         // 候補の右(吹き出し)に出す設定の語の意味は，候補の窓の横の吹き出しに並べて写す(描く層は別の窓に出す)
         let with_list_bubble = |list: &ipc::CandidateList| {
             let window = scene::candidate_list(list, &look, &measure);
@@ -185,7 +191,7 @@ fn render_all(output: &Path) -> Result<()> {
                 None => window,
             }
         };
-        let scenes: [(&str, Scene); 30] = [
+        let scenes: [(&str, Scene); 33] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "list-grid",
@@ -233,6 +239,33 @@ fn render_all(output: &Path) -> Result<()> {
                 scene::candidate_list(&correction(), &look, &measure),
             ),
             ("branch", scene::branch_map(&lattice(), &look, &measure)),
+            // キーの案内を押し続けて出す設定(既定)．押していないとき・Shift・Alt
+            (
+                "branch-hold",
+                scene::branch_map(&scene::sample::held_branch(), &look, &measure),
+            ),
+            (
+                "branch-hold-shift",
+                scene::branch_map(
+                    &scene::sample::held_branch(),
+                    &held(scene::Held {
+                        shift: true,
+                        ..Default::default()
+                    }),
+                    &measure,
+                ),
+            ),
+            (
+                "branch-hold-alt",
+                scene::branch_map(
+                    &scene::sample::held_branch(),
+                    &held(scene::Held {
+                        alt: true,
+                        ..Default::default()
+                    }),
+                    &measure,
+                ),
+            ),
             (
                 "emoji-list",
                 scene::candidate_list(&emoji_list(), &look, &measure),

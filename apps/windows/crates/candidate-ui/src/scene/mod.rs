@@ -403,6 +403,34 @@ pub struct Look<'a> {
     pub pixel_scale: f32,
     /// 候補の一覧の足元の行(案内と位置)を出すか．設定の画面の見本では出さない
     pub shows_footer: bool,
+    /// 押し続けている修飾キー．押し続けて出す設定の分岐図(BranchMap.hints_on_hold)では，この修飾キーを使うキーの案内だけを出す
+    pub held: Held,
+    /// 押し続けて出す案内の濃さ(出し始めに 0 から 1 へ)
+    pub hint_opacity: f32,
+}
+
+/// 押し続けている修飾キー(案内を出すかを決めるのに使う)
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Held {
+    pub shift: bool,
+    pub control: bool,
+    pub alt: bool,
+}
+
+impl Held {
+    pub fn is_empty(self) -> bool {
+        !(self.shift || self.control || self.alt)
+    }
+
+    /// キーの名前(「Shift+↑」「Alt+S」など．Windows の書き方)が，押している修飾キーのどれかを使うか
+    pub fn uses(self, keys: &str) -> bool {
+        keys.split(['+', ' ']).any(|part| match part {
+            "Shift" => self.shift,
+            "Ctrl" => self.control,
+            "Alt" => self.alt,
+            _ => false,
+        })
+    }
 }
 
 impl<'a> Look<'a> {
@@ -417,6 +445,8 @@ impl<'a> Look<'a> {
             size: None,
             pixel_scale: 1.0,
             shows_footer: true,
+            held: Held::default(),
+            hint_opacity: 1.0,
         }
     }
 
