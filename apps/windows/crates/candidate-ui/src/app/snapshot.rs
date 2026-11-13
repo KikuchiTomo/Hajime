@@ -191,7 +191,7 @@ fn render_all(output: &Path) -> Result<()> {
                 None => window,
             }
         };
-        let scenes: [(&str, Scene); 32] = [
+        let scenes: [(&str, Scene); 33] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "list-grid",
@@ -302,6 +302,10 @@ fn render_all(output: &Path) -> Result<()> {
             (
                 "branch-station-association",
                 scene::branch_map(&station_branch(Some(1), false), &look, &measure),
+            ),
+            (
+                "branch-station-mirrored",
+                scene::branch_map(&mirrored_station_branch(), &look, &measure),
             ),
             (
                 "branch-station-macro",
@@ -667,6 +671,20 @@ fn meaning_empty_list() -> CandidateList {
 
 /// 同音異義語の使い分けを分岐図で出したところ(macOS の homophoneBranchView)．既定では選んでいる候補の先に線を伸ばしてカードをつなぐ．
 /// 同音語のタグには枝に出ていない語だけを出す．selected を意味の無い候補(2)にすると，カードの場所を空けたままにする
+/// 文の終わりの文節を選んでいて，先の枝が窓の右に入らず左右に反転して左へ出している分岐図(連想の丸の上)
+fn mirrored_station_branch() -> BranchMap {
+    let mut map = station_branch(Some(1), false);
+    let before = ["今日は", "公園で", "友達と", "一緒に", "記念の"].map(column);
+    map.columns.splice(0..0, before);
+    // 文節へ移るキーは，足した文節を含めて左から付け直す
+    for (index, column) in map.columns.iter_mut().enumerate() {
+        column.jump_key = scene::sample::JUMP_KEYS
+            .get(index)
+            .map(|key| (*key).to_string());
+    }
+    map
+}
+
 /// 先の枝を丸として出した分岐図(macOS の stationLattice．core の InputSession.applyBranch と同じ形)．
 /// current は今いる丸，inside なら丸の中身を選んでいる
 fn station_branch(current: Option<u32>, inside: bool) -> BranchMap {
