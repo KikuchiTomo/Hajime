@@ -121,7 +121,7 @@ layout: hextra-home
   >}}
   {{< hajime/feature
     title="候補ウィンドウのテーマ"
-    subtitle="和紙・北欧・ネオン・端末など 8 つのテーマのほか，色・角の丸み・枝の形・書体を自分で決めたテーマも作れます．"
+    subtitle="和紙・北欧・ネオン・端末など 10 のテーマのほか，色・角の丸み・枝の形・書体を自分で決めたテーマも作れます．"
     link="docs/settings/#外観"
     image="images/features/themes.webp"
     alt="和紙・ネオン・北欧・端末の 4 つのテーマで描いた候補ウィンドウ"

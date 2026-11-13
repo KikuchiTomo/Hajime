@@ -27,7 +27,7 @@ enum SnapshotRenderer {
             (ThemeChoice(.automatic, custom: sample), .darkAqua, "custom"),
             (ThemeChoice(.automatic), .aqua, "glass-light"), (ThemeChoice(.automatic), .darkAqua, "glass-dark"), (ThemeChoice(.platinum), .aqua, "platinum"), (ThemeChoice(.desk), .darkAqua, "desk"),
             (ThemeChoice(.washi), .aqua, "washi"), (ThemeChoice(.neon), .darkAqua, "neon"), (ThemeChoice(.terminal), .darkAqua, "terminal"), (ThemeChoice(.nordic), .aqua, "nordic"),
-            (ThemeChoice(.contrast), .darkAqua, "contrast"),
+            (ThemeChoice(.contrast), .darkAqua, "contrast"), (ThemeChoice(.indigo), .aqua, "indigo"), (ThemeChoice(.indigoNight), .darkAqua, "indigo-night"),
         ]
         checkPointerTargets()
         checkGridPointerTargets()

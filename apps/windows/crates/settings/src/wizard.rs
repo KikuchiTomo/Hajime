@@ -343,8 +343,10 @@ const CHARACTERS: &[(&str, &str, &[Choice])] = &[
 ];
 
 /// テーマのカードの並び(core の ThemePreference の並びから，標準と同じ見た目の native を除いたもの．macOS と同じ)
-pub const THEME_ORDER: [&str; 8] = [
+pub const THEME_ORDER: [&str; 10] = [
     "automatic",
+    "indigo",
+    "indigoNight",
     "platinum",
     "desk",
     "washi",

@@ -748,6 +748,10 @@ public struct ProfileRule: Sendable, Equatable, Codable, Hashable {
 public enum ThemePreference: String, Sendable, Equatable, Codable, CaseIterable {
     /// 標準(すりガラス．ライトとダークに合わせる)
     case automatic
+    /// 白い面に藍色の選択
+    case indigo
+    /// indigo の暗いほう
+    case indigoNight
     case platinum
     case desk
     /// 以前の値．標準と同じに読む
