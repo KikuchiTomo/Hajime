@@ -729,6 +729,7 @@ pub mod motion {
     }
     pub mod settings {
         pub const DISCLOSURE: f32 = 167.0;
+        pub const SELECTION_SETTLE: f32 = 100.0;
     }
     pub mod settings_windows {
         pub const PAGE_ENTER: f32 = 167.0;

@@ -93,7 +93,7 @@ struct WordLanguagePage: View {
                 RuleListEditor(model: model, spec: .englishTerms, labels: .init(
                     key: UIStrings.Extras.englishTermPlaceholder, value: nil, keyPrompt: UIStrings.Extras.englishTermPrompt,
                     empty: UIStrings.Extras.englishTermsEmpty))
-                    .disabled(!model.settings.englishTermCandidates)
+                    .disabled(model, unless: \.englishTermCandidates)
             } header: {
                 Text(UIStrings.Extras.englishTerms)
             }

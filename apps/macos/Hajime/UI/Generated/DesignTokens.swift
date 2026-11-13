@@ -590,6 +590,7 @@ enum DesignTokens {
         }
         enum Settings {
             static let disclosure: Double = 167
+            static let selectionSettle: Double = 100
         }
         enum SettingsWindows {
             static let pageEnter: Double = 167

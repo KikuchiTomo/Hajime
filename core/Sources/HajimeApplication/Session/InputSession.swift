@@ -330,7 +330,13 @@ public final class InputSession {
     public var awaitsSettle: Bool {
         // ライブ変換がオフでも，打鍵が止まったことは覚える．覚えないと打ち間違いの見直し(awaitsReview)が始まらず，
         // 直すことも「もしかして」と示すこともなくなる．ライブ変換がオフのときの表示は読みのまま変わらない
-        !composition.isEmpty && phase == .composing && !isSettled
+        (!composition.isEmpty && phase == .composing && !isSettled) || settlingEnglishInput != nil
+    }
+
+    /// 英字入力(自動)で，打鍵が止まったら英語と日本語に分けた結果を見せ直す並びを組み立てている入力方式(EnglishInput.awaitsSettle)
+    private var settlingEnglishInput: EnglishInput? {
+        guard composition.isEmpty, let english = styleHandlers[settings.current.inputStyle] as? EnglishInput, english.awaitsSettle else { return nil }
+        return english
     }
 
     private func switchToDirectPassingEscape(actions: [ClientAction]) -> KeyResult {
@@ -507,17 +513,29 @@ public final class InputSession {
     }
 
     /// 打鍵の合間に追いかけて求める変換があるか(Zenzai が遅い環境で，入力中の表示を Zenzai なしで求めたとき)
+    /// 英字入力(自動)で，空白を挟まずに打った英語と日本語を分け終えていないときも，打鍵の合間に 1 歩ずつ分ける(EnglishInput)
     public var awaitsDeferredConversion: Bool {
-        phase == .composing && !composition.isEmpty && converter.hasDeferredConversion
+        (phase == .composing && !composition.isEmpty && converter.hasDeferredConversion) || splittingEnglishInput != nil
     }
 
     /// 打鍵の合間に，入力中の表示で済ませなかった Zenzai の変換を求めておく．表示は変えない(止まったときに出す)
     public func performDeferredConversion() {
+        if let english = splittingEnglishInput {
+            english.performDeferredSplit()
+            return
+        }
         converter.performDeferredConversion()
+    }
+
+    /// 英字入力(自動)で，英語と日本語を分け終えていない並びを組み立てている入力方式
+    private var splittingEnglishInput: EnglishInput? {
+        guard composition.isEmpty, let english = styleHandlers[settings.current.inputStyle] as? EnglishInput, english.awaitsMixedSplit else { return nil }
+        return english
     }
 
     /// 打鍵が止まった(DefaultSettings.liveConversionSettleDelay)．かなのまま見せていた語も変換して見せる
     public func settle(context: InputContext) -> [ClientAction] {
+        if let english = settlingEnglishInput { return english.settle() }
         guard awaitsSettle else { return [] }
         isSettled = true
         let typed = composition

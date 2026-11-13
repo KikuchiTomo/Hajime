@@ -10,6 +10,7 @@ mod keyboard;
 mod langbar;
 mod launch;
 mod phonetic;
+mod preserved;
 mod registration;
 mod text_service;
 mod timer;
