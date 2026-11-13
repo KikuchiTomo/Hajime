@@ -131,7 +131,7 @@ extension SettingsBenchmark {
     /// ページを初めて開く時間を，新しい窓で count 回ずつ測る(1 つの窓では 1 回しか測れないため)
     @inline(never)
     static func measureFirstOpens(pages: [SettingsView.Page], count: Int) {
-        print("ページ\t初めて開く中央値(ms)\t最大(ms)")
+        print("ページ\t最初の表示まで中央値(ms)\t最大(ms)\t組み立て終わるまで中央値(ms)\t最大(ms)")
         for page in pages {
             let times = (0..<count).map { _ in
                 // いちばん軽いページを開いた窓から切り替える
@@ -142,11 +142,24 @@ extension SettingsBenchmark {
                 window.orderFrontRegardless()
                 SettingsFixture.settle(window)
                 SettingsFixture.settle(window)
-                let time = timed(window) { navigation.page = page }
+                // 押してから，ページの上の部分が画面に出るまでと，下の部分まで組み立て終わるまで
+                let start = now()
+                navigation.page = page
+                let stack = SettingsFixture.pageStack(in: window)
+                var rest = 400
+                while stack?.isBuilt(page) != true, rest > 0 {
+                    SettingsFixture.step(window)
+                    rest -= 1
+                }
+                SettingsFixture.step(window)
+                let shown = (now() - start) * 1000
+                SettingsFixture.settle(window)
+                let finished = (now() - start) * 1000
                 window.close()
-                return time
+                return (shown: shown, finished: finished)
             }
-            print(String(format: "%@\t%.1f\t%.1f", page.title, median(times), times.max() ?? 0))
+            print(String(format: "%@\t%.1f\t%.1f\t%.1f\t%.1f", page.title, median(times.map(\.shown)), times.map(\.shown).max() ?? 0,
+                         median(times.map(\.finished)), times.map(\.finished).max() ?? 0))
         }
     }
 
@@ -278,12 +291,32 @@ struct SettingsFixture {
     /// 切り替えを画面に映し終わるまで回す．SwiftUI は実行ループの区切りで描き直すので，実行ループを回してから描く．
     /// 初めて開くページは「読み込み中」を出した次の区切りで組み立てるので，何度か回す
     static func settle(_ window: NSWindow) {
-        for _ in 0..<8 {
-            RunLoop.main.run(mode: .default, before: Date())
-            window.contentView?.layoutSubtreeIfNeeded()
-            window.displayIfNeeded()
-            CATransaction.flush()
+        for _ in 0..<8 { step(window) }
+        // 初めて開くページは下の部分を描画の区切りごとに足すので，足し終わるまで回す
+        let stack = pageStack(in: window)
+        var rest = 400
+        while stack?.isBuilding == true, rest > 0 {
+            step(window)
+            rest -= 1
         }
+    }
+
+    /// 実行ループを 1 回まわして描く
+    static func step(_ window: NSWindow) {
+        RunLoop.main.run(mode: .default, before: Date())
+        window.contentView?.layoutSubtreeIfNeeded()
+        window.displayIfNeeded()
+        CATransaction.flush()
+    }
+
+    /// 窓の中の，ページを並べる部品
+    static func pageStack(in window: NSWindow) -> SettingsPageStack.PageStackView? {
+        var stack: [NSView] = window.contentView.map { [$0] } ?? []
+        while let view = stack.popLast() {
+            if let found = view as? SettingsPageStack.PageStackView { return found }
+            stack.append(contentsOf: view.subviews)
+        }
+        return nil
     }
 }
 #endif

@@ -9,6 +9,7 @@ import SwiftUI
 /// ページごとに別の NSHostingView に入れ，見せないページは isHidden にする．同じ SwiftUI の木に並べると，見せないページも
 /// 切り替えのたびに組み直され(13 ページで 1 回 60〜140 ms)，窓から外すと戻すときに部品を付け直す(1 回 30〜60 ms)ため．
 /// 初めて開くページは，先に「読み込み中」を出してから，次の描画の区切りで組み立てる(押したことがすぐ画面に出るように)．
+/// 組み立ては，上の部分を先に出し，続きを描画の区切りごとに足す(PageBuild)．
 /// 残したページは，そのページに出している設定が変わったときだけ描き直す(ObservedSettings)．ほかのページの設定を変えても描き直さないので，
 /// どのページも捨てずに残す(キー設定のページも，開くたびに 0.3 秒かけて組み立てずに済む)
 struct SettingsPageStack: NSViewRepresentable {
@@ -28,6 +29,13 @@ struct SettingsPageStack: NSViewRepresentable {
     final class PageStackView: NSView {
         var makePage: ((SettingsView.Page) -> AnyView)?
         private var pages: [SettingsView.Page: NSView] = [:]
+        /// 下の部分をまだ組み立てているページの数
+        private var unfinished = 0
+        /// 組み立ての途中のページがあるか(計測と見本の書き出しで，組み立てが済むのを待つ)
+        var isBuilding: Bool { unfinished > 0 }
+
+        /// ページの最初の部分を組み立てたか
+        func isBuilt(_ page: SettingsView.Page) -> Bool { pages[page] != nil }
         private var current: SettingsView.Page?
         private lazy var loading: NSView = {
             let view = NSHostingView(rootView: ProgressView(UIStrings.Settings.loading).controlSize(.small))
@@ -66,13 +74,55 @@ struct SettingsPageStack: NSViewRepresentable {
 
         private func build(_ page: SettingsView.Page) {
             guard pages[page] == nil, let makePage else { return }
-            let view = NSHostingView(rootView: makePage(page))
+            // 窓に見えている範囲までを先に組み立てて出し，見えていない下の部分は描画の区切りごとに足す(PageBuild)
+            let progress = PageBuild()
+            let view = NSHostingView(rootView: makePage(page).environment(progress))
             // ページの大きさで窓の大きさを変えない
             view.sizingOptions = []
             add(view)
             pages[page] = view
             view.isHidden = page != current
             if page == current { loading.isHidden = true }
+            fillVisibleArea(of: view, progress)
+            unfinished += 1
+            buildRest(progress)
+        }
+
+        /// 窓に見えている範囲が埋まるまで，段を続けて組み立てる(見えている所に，行があとから出てこないように)．
+        /// ページを送る部品の中身の高さが，見えている高さとページの下の余白を超えたら埋まったとみなす．
+        /// 送る部品の無いページ(キー設定)は段に分けていないので，何もしない
+        private func fillVisibleArea(of view: NSView, _ progress: PageBuild) {
+            view.layoutSubtreeIfNeeded()
+            while !progress.isFinished, !coversVisibleArea(view) {
+                progress.advance()
+                view.layoutSubtreeIfNeeded()
+            }
+        }
+
+        private func coversVisibleArea(_ view: NSView) -> Bool {
+            var stack: [NSView] = [view]
+            while let next = stack.popLast() {
+                // 表の中と，Form の中の表(FormTableHost)は，ページを送る部品ではない
+                if next is any FormTableContainer { continue }
+                if let scroll = next as? NSScrollView, let document = scroll.documentView, !(document is NSTableView) {
+                    return document.frame.height >= scroll.contentView.bounds.height + DesignTokens.Size.Settings.formMargin * 2
+                }
+                stack.append(contentsOf: next.subviews)
+            }
+            return true
+        }
+
+        /// 今の段を画面に描いてから，次の段を組み立てる．ページが使う段は描いたあとで分かるので，描いてから残りがあるかを見る
+        private func buildRest(_ progress: PageBuild) {
+            afterNextFrame { [weak self] in
+                guard let self else { return }
+                if progress.isFinished {
+                    unfinished -= 1
+                } else {
+                    progress.advance()
+                    buildRest(progress)
+                }
+            }
         }
 
         private func add(_ view: NSView) {
@@ -85,6 +135,47 @@ struct SettingsPageStack: NSViewRepresentable {
         override func layout() {
             super.layout()
             for view in subviews { view.frame = safeAreaRect }
+        }
+    }
+}
+
+/// 初めて開くページの組み立ての進み．
+///
+/// Form(.grouped)は行を見えるまで作らずに済ませる仕組みを持たず，1 行(スイッチやポップアップは AppKit の部品)に 7〜10 ms かかる．
+/// 80 行ある変換のページは，開くのに 0.6 秒かかっていた．ページを 8 行ほどの段(BuiltLater)に分け，窓に見えている範囲を埋める段までを
+/// 一度に組み立てて出し(PageStackView.fillVisibleArea)，見えていない下の段は描画の区切りごとに 1 段ずつ足す．
+/// 見えている所の行があとから出てくることはなく，足している間も操作を待たせない．組み立て終えたページは残すので，2 回目からは分けない
+@MainActor @Observable
+final class PageBuild {
+    /// ここまでの段を組み立てている(0 は最初に出す部分)
+    private(set) var stage = 0
+    /// ページが使っているいちばん後ろの段
+    @ObservationIgnored private var lastStage = 0
+
+    /// ページのすべての段を組み立てたか
+    var isFinished: Bool { stage >= lastStage }
+
+    func advance() {
+        stage += 1
+    }
+
+    /// stage の段を組み立ててよいか．まだなら，その段まで進んだときに読んだ画面を描き直す
+    func includes(_ stage: Int) -> Bool {
+        lastStage = max(lastStage, stage)
+        return self.stage >= stage
+    }
+}
+
+/// ページのうち，あとの段(1 以上)で組み立てる部分．Form の Section や行を入れる．
+/// 設定の画面の外で描くとき(見本の書き出し)は，すぐに組み立てる
+struct BuiltLater<Content: View>: View {
+    @Environment(PageBuild.self) private var build: PageBuild?
+    let stage: Int
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        if build?.includes(stage) ?? true {
+            content()
         }
     }
 }

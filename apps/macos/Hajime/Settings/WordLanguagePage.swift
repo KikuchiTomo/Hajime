@@ -43,59 +43,65 @@ struct WordLanguagePage: View {
             }
             wordList(title: UIStrings.Features.englishWords, language: .english,
                      empty: UIStrings.Features.englishWordsEmpty)
-            wordList(title: UIStrings.Features.japaneseWords, language: .japanese,
-                     empty: UIStrings.Features.japaneseWordsEmpty)
-            Section {
-                HStack {
-                    TextField(UIStrings.Features.languageRuleWord, text: $ruleWord, prompt: Text(UIStrings.Features.languageRuleWord))
-                        .textFieldStyle(.roundedBorder)
-                        .onSubmit(addRule)
-                    Text(UIStrings.Features.languageRuleContext).foregroundStyle(.secondary)
-                    Picker(UIStrings.Features.languageRuleContext, selection: $ruleContext) {
-                        ForEach(WordLanguageContext.allCases, id: \.self) { Text(UIStrings.Features.label(for: $0)).tag($0) }
-                    }
-                    .fixedSize()
-                    Image(systemName: "arrow.right").foregroundStyle(.secondary).accessibilityHidden(true)
-                    Picker(UIStrings.Features.languageRuleResult, selection: $ruleLanguage) {
-                        ForEach(WordLanguage.allCases, id: \.self) { Text(UIStrings.Features.label(for: $0)).tag($0) }
-                    }
-                    .labelsHidden()
-                    .fixedSize()
-                    Button(UIStrings.Settings.add, action: addRule)
-                        .disabled(ruleWord.trimmingCharacters(in: .whitespaces).isEmpty)
-                }
-                // ほかの一覧の足す行と同じく，部品の名前は Form の名前の列に出さない(出すと欄が潰れる)．「前」は欄の後ろの文字で示す
-                .labelsHidden()
-                ForEach(settings.rules, id: \.self) { rule in
+            BuiltLater(stage: 1) {
+                wordList(title: UIStrings.Features.japaneseWords, language: .japanese,
+                         empty: UIStrings.Features.japaneseWordsEmpty)
+            }
+            BuiltLater(stage: 2) {
+                Section {
                     HStack {
-                        Text(rule.word).monospaced()
-                        Spacer()
-                        Text("\(UIStrings.Features.languageRuleContext)：\(UIStrings.Features.label(for: rule.context))").foregroundStyle(.secondary)
+                        TextField(UIStrings.Features.languageRuleWord, text: $ruleWord, prompt: Text(UIStrings.Features.languageRuleWord))
+                            .textFieldStyle(.roundedBorder)
+                            .onSubmit(addRule)
+                        Text(UIStrings.Features.languageRuleContext).foregroundStyle(.secondary)
+                        Picker(UIStrings.Features.languageRuleContext, selection: $ruleContext) {
+                            ForEach(WordLanguageContext.allCases, id: \.self) { Text(UIStrings.Features.label(for: $0)).tag($0) }
+                        }
+                        .fixedSize()
                         Image(systemName: "arrow.right").foregroundStyle(.secondary).accessibilityHidden(true)
-                        Picker(UIStrings.Features.languageRuleResult, selection: ruleBinding(rule)) {
+                        Picker(UIStrings.Features.languageRuleResult, selection: $ruleLanguage) {
                             ForEach(WordLanguage.allCases, id: \.self) { Text(UIStrings.Features.label(for: $0)).tag($0) }
                         }
                         .labelsHidden()
                         .fixedSize()
-                        removeButton { $0.wordLanguage.rules.removeAll { $0 == rule } }
+                        Button(UIStrings.Settings.add, action: addRule)
+                            .disabled(ruleWord.trimmingCharacters(in: .whitespaces).isEmpty)
                     }
+                    // ほかの一覧の足す行と同じく，部品の名前は Form の名前の列に出さない(出すと欄が潰れる)．「前」は欄の後ろの文字で示す
+                    .labelsHidden()
+                    ForEach(settings.rules, id: \.self) { rule in
+                        HStack {
+                            Text(rule.word).monospaced()
+                            Spacer()
+                            Text("\(UIStrings.Features.languageRuleContext)：\(UIStrings.Features.label(for: rule.context))").foregroundStyle(.secondary)
+                            Image(systemName: "arrow.right").foregroundStyle(.secondary).accessibilityHidden(true)
+                            Picker(UIStrings.Features.languageRuleResult, selection: ruleBinding(rule)) {
+                                ForEach(WordLanguage.allCases, id: \.self) { Text(UIStrings.Features.label(for: $0)).tag($0) }
+                            }
+                            .labelsHidden()
+                            .fixedSize()
+                            removeButton { $0.wordLanguage.rules.removeAll { $0 == rule } }
+                        }
+                    }
+                } header: {
+                    Text(UIStrings.Features.languageRules)
                 }
-            } header: {
-                Text(UIStrings.Features.languageRules)
             }
-            Section {
-                ExampleToggle(model: model, title: UIStrings.Extras.englishTermCandidates, keyPath: \.englishTermCandidates,
-                              example: UIStrings.Extras.englishTermCandidatesExample)
-            } header: {
-                Text(UIStrings.Extras.englishTermsSection)
-            }
-            Section {
-                RuleListEditor(model: model, spec: .englishTerms, labels: .init(
-                    key: UIStrings.Extras.englishTermPlaceholder, value: nil, keyPrompt: UIStrings.Extras.englishTermPrompt,
-                    empty: UIStrings.Extras.englishTermsEmpty))
-                    .disabled(model, unless: \.englishTermCandidates)
-            } header: {
-                Text(UIStrings.Extras.englishTerms)
+            BuiltLater(stage: 3) {
+                Section {
+                    ExampleToggle(model: model, title: UIStrings.Extras.englishTermCandidates, keyPath: \.englishTermCandidates,
+                                  example: UIStrings.Extras.englishTermCandidatesExample)
+                } header: {
+                    Text(UIStrings.Extras.englishTermsSection)
+                }
+                Section {
+                    RuleListEditor(model: model, spec: .englishTerms, labels: .init(
+                        key: UIStrings.Extras.englishTermPlaceholder, value: nil, keyPrompt: UIStrings.Extras.englishTermPrompt,
+                        empty: UIStrings.Extras.englishTermsEmpty))
+                        .disabled(model, unless: \.englishTermCandidates)
+                } header: {
+                    Text(UIStrings.Extras.englishTerms)
+                }
             }
         }
         .formStyle(.grouped)

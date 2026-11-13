@@ -10,7 +10,9 @@ struct SymbolsPage: View {
     var body: some View {
         Form {
             section(.sequence)
-            section(.reading)
+            BuiltLater(stage: 1) {
+                section(.reading)
+            }
         }
         .formStyle(.grouped)
     }
