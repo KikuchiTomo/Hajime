@@ -1,4 +1,4 @@
-/// jinen のモデルを「自動」にしたときの測定の途中の状態(AzooKeyConverterEngine.advanceAutomaticJinenDecision)．
+/// Jinen モデルを「自動」にしたときの測定の途中の状態(AzooKeyConverterEngine.advanceAutomaticJinenDecision)．
 /// 打鍵の合間に 1 歩ずつ進めるので，測ることを 1 歩ずつの単位(units)に分けて持つ
 @MainActor
 final class AutomaticJinenProbe {

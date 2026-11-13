@@ -1,4 +1,4 @@
-﻿# Zenzai と jinen のモデル(それぞれ small と xsmall)を取得し，SHA-256 を確かめる(tools/models/fetch_zenzai.sh の Windows 版)．
+﻿# Zenzai モデルと Jinen モデル(それぞれ small と xsmall)を取得し，SHA-256 を確かめる(tools/models/fetch_zenzai.sh の Windows 版)．
 # 取得元とハッシュは fetch_zenzai.sh・core/Sources/HajimeEngine/ZenzaiModel.swift・JinenModel.swift と同じ値にする．
 #
 # 使い方: tools/windows/fetch_zenzai.ps1 -Output <置く場所>
@@ -35,7 +35,7 @@ Get-Model 'zenz-v3.2-small-Q5_K_M.gguf' `
     'https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf/resolve/c67e03e07d215c869f591b274c1631170d3e11fe/ggml-model-Q5_K_M.gguf' `
     'https://github.com/KikuchiTomo/Hajime/releases/download/models%2Fzenz-v3.2-small-c67e03e/zenz-v3.2-small-Q5_K_M.gguf' `
     '29c223d4c23327b80fd13ebb5ab2555057a46317997d5da391584ffbef0db673'
-# Miwa-Keita/zenz-v3.2-xsmall-gguf(Apache-2.0)．設定の「Zenzai のモデル」で速さを優先するときと併用するときに使う
+# Miwa-Keita/zenz-v3.2-xsmall-gguf(Apache-2.0)．設定の「Zenzai モデル」で速さを優先するときと併用するときに使う
 Get-Model 'zenz-v3.2-xsmall-Q5_K_M.gguf' `
     'https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf/resolve/4f5423f0fad41a73b1242eb96fe5c12ae4fdca83/ggml-model-Q5_K_M.gguf' `
     'https://github.com/KikuchiTomo/Hajime/releases/download/models%2Fzenz-v3.2-xsmall-4f5423f/zenz-v3.2-xsmall-Q5_K_M.gguf' `

@@ -6,7 +6,7 @@ import HajimePersistence
 import HajimeTestSupport
 import Testing
 
-/// Zenzai のモデルの場所(手のずれの直しを確かめるときに要る．make test-zenzai)
+/// Zenzai モデルの場所(手のずれの直しを確かめるときに要る．make test-zenzai)
 private let zenzaiPath = ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"]
 /// 同梱の辞書の場所．あればアプリと同じ辞書で確かめ，無ければ azooKey の辞書で確かめる(make test-zenzai は同梱の辞書で動かす)
 private let bundledDictionaryPath = ProcessInfo.processInfo.environment["HAJIME_BUNDLED_DICTIONARY"]
@@ -29,7 +29,7 @@ struct SettingsExampleTests {
 
     private func setup(words: [String] = [], _ change: (inout Settings) -> Void = { _ in }) async throws -> Setup {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-examples-\(UUID().uuidString)")
-        // Zenzai のモデルがあれば，アプリと同じく Zenzai でも変換する(手のずれの直しは Zenzai の訂正を使う)
+        // Zenzai モデルがあれば，アプリと同じく Zenzai でも変換する(手のずれの直しは Zenzai の訂正を使う)
         let zenzai = try zenzaiPath.map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
         let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "Hajime tests", zenzai: zenzai,
                                                 dictionaryDirectory: bundledDictionaryPath.map { URL(fileURLWithPath: $0) })

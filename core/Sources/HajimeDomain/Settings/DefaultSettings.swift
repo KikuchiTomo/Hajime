@@ -275,7 +275,7 @@ public enum DefaultSettings {
     public static let fusionMargin = 2.0
     /// 合議で 2 つの表記を主のモデル(Zenzai)で比べるときの，検証木のトークンの数の上限．長い文の 2 つの表記が入る数にする
     public static let fusionScoringTokenLimit = 256
-    /// jinen のモデルを「自動」にしたとき，起動のあとに測った合議の 1 歩の p95 が，Zenzai だけの 1 歩の p95 にこれ(秒)を足した値以下なら，その大きさを使う．
+    /// Jinen モデルを「自動」にしたとき，起動のあとに測った合議の 1 歩の p95 が，Zenzai だけの 1 歩の p95 にこれ(秒)を足した値以下なら，その大きさを使う．
     /// 打鍵が止まったあとに次のキーが待つのは 1 歩ぶんなので，1 歩で決める．small から試し，超えれば xsmall，それも超えれば使わない．
     /// 測ると，1 歩の最大は Mac(Metal)で Zenzai だけ 27ms・small 46ms，Windows(i7-12700F の CPU)で 29ms・34ms だった
     public static let jinenAutomaticStepMargin = 0.015
@@ -477,7 +477,7 @@ public enum DefaultSettings {
     public static let updateDownloadBaseURL = "https://haji.men/download/"
     /// latest.json の大きさの上限(バイト)．変更点を 10 バージョン分載せても収まる
     public static let maximumUpdateManifestBytes = 256 * 1024
-    /// 配布物の大きさの上限(バイト)．今の配布物は Zenzai のモデルと辞書を入れて 160MB ほど
+    /// 配布物の大きさの上限(バイト)．今の配布物は Zenzai モデルと辞書を入れて 160MB ほど
     public static let maximumUpdatePackageBytes = 1024 * 1024 * 1024
     /// latest.json を取るときの待ち時間の上限(秒)
     public static let updateManifestTimeout = 30.0

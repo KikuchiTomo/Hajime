@@ -138,7 +138,7 @@ public enum LearningMode: String, Sendable, Equatable, Codable, CaseIterable {
     case disabled
 }
 
-/// かな漢字変換に使う Zenzai のモデル．xsmall のモデルが無い環境では，どれを選んでも small で変換する
+/// かな漢字変換に使う Zenzai モデル．xsmall のモデルが無い環境では，どれを選んでも small で変換する
 public enum ZenzaiModelChoice: String, Sendable, Equatable, Codable, CaseIterable {
     /// small のモデルだけを使う．精度を優先する
     case accurate
@@ -148,7 +148,7 @@ public enum ZenzaiModelChoice: String, Sendable, Equatable, Codable, CaseIterabl
     case combined
 }
 
-/// 合議(ADR 0016 の案 2)に使う jinen のモデル．jinen でも変換し，読みにそろえてから Zenzai の結果と合わせる
+/// 合議(ADR 0016 の案 2)に使う Jinen モデル．jinen でも変換し，読みにそろえてから Zenzai の結果と合わせる
 public enum JinenModelChoice: String, Sendable, Equatable, Codable, CaseIterable {
     /// 起動のあとに 1 回だけ測った 1 文の時間で決める．速ければ small，遅ければ xsmall
     case automatic

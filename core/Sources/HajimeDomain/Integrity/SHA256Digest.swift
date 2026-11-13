@@ -1,6 +1,6 @@
 /// SHA-256(FIPS 180-4)を少しずつ求める．
 ///
-/// CryptoKit の無い OS(Windows)で，Zenzai のモデルや取り込んだ辞書の索引の中身を確かめるために使う．
+/// CryptoKit の無い OS(Windows)で，Zenzai モデルや取り込んだ辞書の索引の中身を確かめるために使う．
 /// 依存を足さないために自前で持つ．CryptoKit のある OS では CryptoKit を使い，テストで両者の値が同じことを確かめる
 public struct SHA256Digest: Sendable {
     private var state: [UInt32] = [
@@ -22,7 +22,7 @@ public struct SHA256Digest: Sendable {
     }
 
     public mutating func update(_ bytes: some Sequence<UInt8>) {
-        // 続いたメモリにあるもの(Data，Array)は写さずに読む．起動のたびに同梱の辞書と Zenzai のモデル(合わせて 280MB ほど)を確かめるので
+        // 続いたメモリにあるもの(Data，Array)は写さずに読む．起動のたびに同梱の辞書と Zenzai モデル(合わせて 280MB ほど)を確かめるので
         let done: Void? = bytes.withContiguousStorageIfAvailable { absorb(UnsafeRawBufferPointer($0)) }
         if done == nil {
             Array(bytes).withUnsafeBytes { absorb($0) }

@@ -1,5 +1,5 @@
 // Windows の暗号の機能(CNG の BCrypt．OS の機能)で SHA-256 を求めるための薄い口．
-// 起動のたびに確かめる同梱の辞書と Zenzai のモデル(合わせて 280MB ほど)のハッシュに使う．CPU の SHA の命令を使うので自前の実装より速い．
+// 起動のたびに確かめる同梱の辞書と Zenzai モデル(合わせて 280MB ほど)のハッシュに使う．CPU の SHA の命令を使うので自前の実装より速い．
 // Windows のほかでは何もせず，使えないと答える(NULL を返す)
 #ifndef HAJIME_HASH_H
 #define HAJIME_HASH_H

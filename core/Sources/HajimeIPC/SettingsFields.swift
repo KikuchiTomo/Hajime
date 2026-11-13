@@ -22,7 +22,7 @@ public enum SettingsFields {
         return try text(of: Dictionary(uniqueKeysWithValues: wanted.map { ($0, all[$0] ?? .null) }))
     }
 
-    /// 設定の画面が読む，設定のファイルに無い項目の名前．jinen のモデルを「自動」にしたときにエンジンが決めた大きさ．
+    /// 設定の画面が読む，設定のファイルに無い項目の名前．Jinen モデルを「自動」にしたときにエンジンが決めた大きさ．
     /// jinenModel を名前で頼んだときにだけ添える(すべての項目を読むときと，書き込みでは扱わない)
     public static let automaticJinenModelName = "automaticJinenModel"
 

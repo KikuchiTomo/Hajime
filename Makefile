@@ -1,6 +1,6 @@
 # 入口はすべてここ．中身はまだ検査だけ(core と apps を作ったら build と test を足す)
 PYTHON ?= python3 -I
-# Zenzai のモデルの置き場所．既定は tools/models/fetch_zenzai.sh と同じリポジトリの 1 つ上の models/
+# Zenzai モデルの置き場所．既定は tools/models/fetch_zenzai.sh と同じリポジトリの 1 つ上の models/
 MODELS_DIR ?= $(abspath $(CURDIR)/../models)
 ZENZAI_MODEL ?= $(MODELS_DIR)/zenz-v3.2-small-Q5_K_M.gguf
 JINEN_MODEL ?= $(MODELS_DIR)/jinen-v2-small-Q5_K_M.gguf
@@ -14,7 +14,7 @@ EVALUATION_DIR ?= $(abspath $(CURDIR)/../evaluation)
 setup:
 	mise install
 
-# Zenzai のモデルとかな漢字変換の辞書を取得してハッシュを確かめる(docs/dev/adr/0006-zenzai.md)
+# Zenzai モデルとかな漢字変換の辞書を取得してハッシュを確かめる(docs/dev/adr/0006-zenzai.md)
 fetch-models:
 	tools/models/fetch_zenzai.sh "$(MODELS_DIR)"
 	tools/dictionary/fetch_dictionary.sh "$(MODELS_DIR)"
@@ -39,7 +39,7 @@ test: test-debug
 		$(MAKE) --no-print-directory test-zenzai; \
 	else \
 		swift test --package-path core -c release --filter LatencyProbeTests && \
-		printf '\n注意: Zenzai のモデルが無いので，本物の Zenzai のテストを飛ばし，処理時間は Zenzai なしで測りました\n  モデルの場所: %s\n  make fetch-models で取得してから make test を動かし直してください\n\n' "$(ZENZAI_MODEL)" >&2; \
+		printf '\n注意: Zenzai モデルが無いので，本物の Zenzai のテストを飛ばし，処理時間は Zenzai なしで測りました\n  モデルの場所: %s\n  make fetch-models で取得してから make test を動かし直してください\n\n' "$(ZENZAI_MODEL)" >&2; \
 	fi
 
 # Debug ビルドのテスト．本物の Zenzai のテストはデバッグビルドでは遅すぎるので，ここでは飛ばして test-zenzai で動かす
@@ -48,7 +48,7 @@ test-debug:
 
 # 本物の Zenzai のテストと処理時間(R-01)を Release で動かす．モデルが無ければ失敗する(CI はこちらを使う)
 test-zenzai:
-	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai のモデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
+	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai モデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
 	@dictionary=; if [ -d "$(BUNDLED_DICTIONARY)" ]; then dictionary="HAJIME_BUNDLED_DICTIONARY=$(abspath $(BUNDLED_DICTIONARY))"; fi; \
 	jinen=; if [ -f "$(JINEN_MODEL)" ]; then jinen="HAJIME_JINEN_MODEL=$(abspath $(JINEN_MODEL))"; fi; \
 	env HAJIME_ZENZAI_MODEL="$(abspath $(ZENZAI_MODEL))" $$dictionary $$jinen swift test --package-path core -c release --filter HajimeEngineTests
@@ -99,7 +99,7 @@ fetch-evaluation:
 	tools/evaluation/fetch_ajimee.sh "$(EVALUATION_DIR)"
 	tools/evaluation/fetch_tatoeba.sh "$(EVALUATION_DIR)"
 
-# かな漢字変換の正解率・上位の候補に正解が入った割合・MinCER を，文(conversion-basic・conversion-everyday・AJIMEE-Bench・Tatoeba)と語彙(vocabulary-*)で測る．Zenzai のモデルがあれば使う．DICTIONARY=<ディレクトリ> で辞書を差し替えられる．llama.cpp のログで結果が埋もれるので，実行時の標準エラーは捨てる
+# かな漢字変換の正解率・上位の候補に正解が入った割合・MinCER を，文(conversion-basic・conversion-everyday・AJIMEE-Bench・Tatoeba)と語彙(vocabulary-*)で測る．Zenzai モデルがあれば使う．DICTIONARY=<ディレクトリ> で辞書を差し替えられる．llama.cpp のログで結果が埋もれるので，実行時の標準エラーは捨てる
 evaluate:
 	@test -f "$(EVALUATION_DIR)/ajimee.tsv" || { echo "評価用のデータがありません: $(EVALUATION_DIR)/ajimee.tsv．make fetch-evaluation で取得してください" >&2; exit 1; }
 	swift build --package-path core -c release --product hajime-playground
@@ -118,7 +118,7 @@ release-metrics:
 	EVALUATION_DIR="$(EVALUATION_DIR)" MODELS_DIR="$(MODELS_DIR)" tools/evaluation/release_metrics.sh "$(BASE)" build/release-metrics
 
 # 期待する文に着くまでの操作(↓ ← → ⇧← ⇧→)の数と，着いた割合を，文(conversion-basic と AJIMEE-Bench)で測る(R-25)．
-# 候補の出し方ごとに，同梱の辞書と Zenzai のモデルで測る．PRESENTATION=automatic,segmentList,list で出し方を選べる．
+# 候補の出し方ごとに，同梱の辞書と Zenzai モデルで測る．PRESENTATION=automatic,segmentList,list で出し方を選べる．
 # ZENZAI_MODEL に xsmall のモデルを渡すときは ZENZAI_VARIANT=xsmall も付ける
 PRESENTATION ?= automatic,segmentList,list
 ZENZAI_VARIANT ?= small
@@ -139,7 +139,7 @@ evaluate-operations:
 ZENZAI_FAST_MODEL ?= $(MODELS_DIR)/zenz-v3.2-xsmall-Q5_K_M.gguf
 evaluate-engines:
 	@test -f "$(EVALUATION_DIR)/ajimee.tsv" || { echo "評価用のデータがありません: $(EVALUATION_DIR)/ajimee.tsv．make fetch-evaluation で取得してください" >&2; exit 1; }
-	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai のモデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
+	@test -f "$(ZENZAI_MODEL)" || { echo "Zenzai モデルがありません: $(ZENZAI_MODEL)．make fetch-models で取得してください" >&2; exit 1; }
 	swift build --package-path core -c release --product hajime-playground
 	@out="$(EVALUATION_DIR)/engines"; mkdir -p "$$out"; \
 	dictionary=$${DICTIONARY:-$(BUNDLED_DICTIONARY)}; options=; if [ -d "$$dictionary" ]; then options="--dictionary $$(cd "$$dictionary" && pwd)"; fi; \

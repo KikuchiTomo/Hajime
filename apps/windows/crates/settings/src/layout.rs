@@ -1694,7 +1694,7 @@ mod tests {
     fn 注記は前の行の説明にする() {
         let page = sections(Page::Conversion).unwrap();
         let layout = layout(&page, 800.0, |_| true, |_| true, &Estimate);
-        // Zenzai のモデルの行に，併用のときの注記(次の行)が付く
+        // Zenzai モデルの行に，併用のときの注記(次の行)が付く
         let (section, placed) = page
             .iter()
             .zip(&layout.sections)

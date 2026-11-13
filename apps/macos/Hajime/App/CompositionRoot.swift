@@ -106,7 +106,7 @@ final class CompositionRoot {
         installed = root
     }
 
-    /// アプリに入れた Zenzai と jinen のモデルとかな漢字変換の辞書を，同時に確かめて読む．
+    /// アプリに入れた Zenzai モデルと Jinen モデルとかな漢字変換の辞書を，同時に確かめて読む．
     /// 無いか，ハッシュが合わないものは使わずに動く(small が無ければ Zenzai なし，jinen が無ければ合議なし，辞書が無ければ azooKey に同梱の辞書)
     private static func loadStartupResources()
         -> (zenzai: ZenzaiModel?, fastZenzai: ZenzaiModel?, jinen: JinenModel?, fastJinen: JinenModel?, dictionary: BundledDictionary?) {

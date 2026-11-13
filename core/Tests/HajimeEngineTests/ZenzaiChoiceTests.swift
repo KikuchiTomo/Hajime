@@ -3,9 +3,9 @@ import HajimeDomain
 @testable import HajimeEngine
 import Testing
 
-/// 設定の「Zenzai のモデル」で，打鍵が止まったとき・変換と，打っている間の表示に使うモデルが決まることを確かめる．
+/// 設定の「Zenzai モデル」で，打鍵が止まったとき・変換と，打っている間の表示に使うモデルが決まることを確かめる．
 /// モデルのファイルは読まない(どのモデルを選ぶかだけを見る)
-@Suite("Zenzai のモデルの選び方")
+@Suite("Zenzai モデルの選び方")
 @MainActor
 struct ZenzaiChoiceTests {
     private let small = ZenzaiModel(url: URL(fileURLWithPath: "/models/\(ZenzaiModel.Variant.small.fileName)"))

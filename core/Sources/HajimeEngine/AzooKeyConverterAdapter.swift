@@ -33,7 +33,7 @@ public final class AzooKeyConverterEngine {
     private var zenzaiCost: Double?
     /// 合議に使う別のモデル(jinen)の small と xsmall．確かめ済み．どちらも無ければ合議しない
     private let jinenModels: [JinenModel.Variant: JinenModel]
-    /// 設定で選んだ jinen のモデル(apply(_:) で入れ替える)
+    /// 設定で選んだ Jinen モデル(apply(_:) で入れ替える)
     private var jinenChoice = JinenModelChoice.automatic
     /// 「自動」で決めた結果(small・xsmall・使わない)．起動のあと，打鍵の合間に 1 歩ずつ測って決める(advanceAutomaticJinenDecision)．まだ決めていなければ nil
     private var automaticJinenChoice: JinenModelChoice?
@@ -59,11 +59,11 @@ public final class AzooKeyConverterEngine {
     /// - Parameters:
     ///   - memoryDirectory: 学習データとユーザー辞書を置くディレクトリ．本人だけが読み書きできる権限で作る
     ///   - versionString: エンジンに渡すアプリのバージョンの文字列
-    ///   - zenzai: 確かめ済みの Zenzai のモデル(small)．nil なら Zenzai を使わない
-    ///   - fastZenzai: 確かめ済みの速さを優先する Zenzai のモデル(xsmall)．nil なら設定にかかわらず zenzai だけを使う
+    ///   - zenzai: 確かめ済みの Zenzai モデル(small)．nil なら Zenzai を使わない
+    ///   - fastZenzai: 確かめ済みの速さを優先する Zenzai モデル(xsmall)．nil なら設定にかかわらず zenzai だけを使う
     ///   - dictionaryDirectory: かな漢字変換の辞書(louds/・cb/・p/・mm.binary を持つディレクトリ)．nil なら azooKey に同梱の辞書を使う
-    ///   - jinen: 確かめ済みの jinen のモデル(small)．jinen と fastJinen の両方が nil なら合議しない(ADR 0016 の案 2)
-    ///   - fastJinen: 確かめ済みの jinen のモデル(xsmall)
+    ///   - jinen: 確かめ済みの Jinen モデル(small)．jinen と fastJinen の両方が nil なら合議しない(ADR 0016 の案 2)
+    ///   - fastJinen: 確かめ済みの Jinen モデル(xsmall)
     public init(memoryDirectory: URL, versionString: String, zenzai: ZenzaiModel? = nil, fastZenzai: ZenzaiModel? = nil,
                 jinen: JinenModel? = nil, fastJinen: JinenModel? = nil, dictionaryDirectory: URL? = nil) throws {
         // 辞書の場所を誤ると，エンジンは何も言わずに語の無い状態で動き，変換がほぼすべて読みのままになる．作る前に止める
@@ -120,7 +120,7 @@ public final class AzooKeyConverterEngine {
                                 typingSessionID: converter.createSession(), restSessionID: converter.createSession())
     }
 
-    /// 最初の変換で Zenzai のモデルの準備が走るので，起動時に一度変換しておく．入力内容は使わない
+    /// 最初の変換で Zenzai モデルの準備が走るので，起動時に一度変換しておく．入力内容は使わない
     /// 入力中の表示で Zenzai を使わないか．Zenzai の変換が 1 キーの時間に収まらない環境(GPU の無い Windows など)だけ true
     var skipsZenzaiWhileTyping: Bool {
         !waitsForModels && Self.exceedsTypingBudget(zenzaiCost)
@@ -200,7 +200,7 @@ public final class AzooKeyConverterEngine {
         return current
     }
 
-    /// jinen のモデルを「自動」にしたときに決めた結果(small・xsmall・使わない)．まだ決めていなければ nil．設定の画面に出す
+    /// Jinen モデルを「自動」にしたときに決めた結果(small・xsmall・使わない)．まだ決めていなければ nil．設定の画面に出す
     public var automaticJinenModel: JinenModelChoice? {
         automaticJinenChoice
     }

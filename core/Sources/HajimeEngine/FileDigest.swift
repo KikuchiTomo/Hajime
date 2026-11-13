@@ -6,7 +6,7 @@ import CWindowsHash
 #endif
 import HajimeDomain
 
-/// 外から取得して置いたファイル(Zenzai のモデル・同梱の辞書)を，ふつうのファイルとして開いてハッシュを求める．
+/// 外から取得して置いたファイル(Zenzai モデル・同梱の辞書)を，ふつうのファイルとして開いてハッシュを求める．
 ///
 /// 開いた時点で止まるファイル(FIFO)や終わらないファイル(/dev/zero)に差し替えられても止まらないよう，
 /// 開き方と読む量の上限をここにまとめる(docs/dev/SECURITY-MODEL.md)
@@ -68,7 +68,7 @@ enum FileDigest {
     }
 
     /// その OS で速い SHA-256．macOS は CryptoKit，Windows は OS の CNG(開けなければ自前の SHA256Digest)，ほかは自前の SHA256Digest．
-    /// 起動のたびに同梱の辞書と Zenzai のモデル(合わせて 280MB ほど)を確かめるので，CPU の SHA の命令を使える OS の実装を使う
+    /// 起動のたびに同梱の辞書と Zenzai モデル(合わせて 280MB ほど)を確かめるので，CPU の SHA の命令を使える OS の実装を使う
     private struct Hasher {
         #if canImport(CryptoKit)
         private var digest = SHA256()

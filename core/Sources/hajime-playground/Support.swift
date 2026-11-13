@@ -59,9 +59,9 @@ struct PlaygroundEngine {
 
     /// - Parameters:
     ///   - fastZenzaiPath: 速さを優先するモデル(xsmall)の場所．併用(zenzaiChoice)を試すときに渡す
-    ///   - zenzaiChoice: 設定の「Zenzai のモデル」．渡したときだけ既定の設定にこれを入れてエンジンに渡す(渡さなければ今までどおり設定を渡さない)
+    ///   - zenzaiChoice: 設定の「Zenzai モデル」．渡したときだけ既定の設定にこれを入れてエンジンに渡す(渡さなければ今までどおり設定を渡さない)
     @MainActor
-    ///   - jinenPath: 合議(ADR 0016 の案 2)に使う jinen のモデルの場所．渡したときだけ合議する
+    ///   - jinenPath: 合議(ADR 0016 の案 2)に使う Jinen モデルの場所．渡したときだけ合議する
     init(zenzaiPath: String?, zenzaiVariant: ZenzaiModel.Variant = .small, fastZenzaiPath: String? = nil, zenzaiChoice: ZenzaiModelChoice? = nil,
          jinenPath: String? = nil, jinenVariant: JinenModel.Variant = .small, dictionaryPath: String?, usesTerms: Bool = true) throws {
         memory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-playground-\(UUID().uuidString)")

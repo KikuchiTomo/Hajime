@@ -333,7 +333,7 @@ struct EngineServiceTests {
         #expect(read == ["liveConversion": .bool(false), "listCandidatesPerPage": .number(Double(DefaultSettings.settings.listCandidatesPerPage))])
         #expect(fields(.readSettingsFields(names: ["liveConversion"], defaults: true), from: id) == ["liveConversion": .bool(true)])
         #expect(fields(.readSettingsFields(names: [], defaults: false), from: id)?.keys.count == Settings.fieldNames.count)
-        // jinen のモデルを名前で頼んだときだけ，「自動」で決めた大きさを添える(まだ決めていなければ null)
+        // Jinen モデルを名前で頼んだときだけ，「自動」で決めた大きさを添える(まだ決めていなければ null)
         #expect(fields(.readSettingsFields(names: ["jinenModel"], defaults: false), from: id)
                 == ["jinenModel": .string("automatic"), SettingsFields.automaticJinenModelName: .null])
         let unknown = service.handle(WireRequest(id: 21, body: .readSettingsFields(names: ["password"], defaults: false)), from: id)

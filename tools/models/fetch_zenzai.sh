@@ -1,5 +1,5 @@
 #!/bin/sh
-# Zenzai のモデル(small と xsmall)と，合議(ADR 0016 の案 2)に使う jinen のモデル(small と xsmall)を取得し，SHA-256 を確かめる．
+# Zenzai モデル(small と xsmall)と，合議(ADR 0016 の案 2)に使う Jinen モデル(small と xsmall)を取得し，SHA-256 を確かめる．
 # リポジトリには入れず，リポジトリの外に置く．
 # 取得元とバージョンを変えるときは，core/Sources/HajimeEngine/ZenzaiModel.swift・JinenModel.swift の値・tools/windows/fetch_zenzai.ps1・
 # docs/dev/adr/0006-zenzai.md・0016-reading-aligned-fusion.md を一緒に変える．
@@ -35,7 +35,7 @@ fetch "zenz-v3.2-small-Q5_K_M.gguf" \
   "https://huggingface.co/Miwa-Keita/zenz-v3.2-small-gguf/resolve/c67e03e07d215c869f591b274c1631170d3e11fe/ggml-model-Q5_K_M.gguf" \
   "https://github.com/KikuchiTomo/Hajime/releases/download/models%2Fzenz-v3.2-small-c67e03e/zenz-v3.2-small-Q5_K_M.gguf" \
   "29c223d4c23327b80fd13ebb5ab2555057a46317997d5da391584ffbef0db673"
-# Miwa-Keita/zenz-v3.2-xsmall-gguf(Apache-2.0)．設定の「Zenzai のモデル」で速さを優先するときと併用するときに使う
+# Miwa-Keita/zenz-v3.2-xsmall-gguf(Apache-2.0)．設定の「Zenzai モデル」で速さを優先するときと併用するときに使う
 fetch "zenz-v3.2-xsmall-Q5_K_M.gguf" \
   "https://huggingface.co/Miwa-Keita/zenz-v3.2-xsmall-gguf/resolve/4f5423f0fad41a73b1242eb96fe5c12ae4fdca83/ggml-model-Q5_K_M.gguf" \
   "https://github.com/KikuchiTomo/Hajime/releases/download/models%2Fzenz-v3.2-xsmall-4f5423f/zenz-v3.2-xsmall-Q5_K_M.gguf" \

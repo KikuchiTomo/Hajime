@@ -11,7 +11,7 @@ import HajimeEngine
 //                                                                文ごとの候補(上位 20)と時間を JSON Lines で出す(tools/evaluation/complementarity.py が読む)．
 //                                                                --score を付けると，Zenzai を使わない変換の候補も合わせて検証木で採点した点数も出す
 //   hajime-playground --bench-scoring <TSV> --zenzai <モデル> [--repeat 5] 検証木の採点 1 回の時間(文ごとに繰り返した最小と中央値)
-//   hajime-playground --bench-jinen <TSV> --zenzai <モデル> --jinen <jinen のモデル> [--jinen-variant xsmall] jinen だけで 1 文を変換した時間と正解の数
+//   hajime-playground --bench-jinen <TSV> --zenzai <モデル> --jinen <Jinen モデル> [--jinen-variant xsmall] jinen だけで 1 文を変換した時間と正解の数
 //   hajime-playground --evaluate-live <TSV> [--zenzai <モデル>]   打っている途中の表示の誤り
 //   hajime-playground --evaluate-operations <TSV> [--presentation automatic,segmentList,list] [--shard k/n] [--warm-before-space] [--zenzai <モデル>]
 //                                                                期待する文に着くまでの操作(↓ ← → ⇧← ⇧→)の数と，着いた割合．
@@ -35,8 +35,8 @@ import HajimeEngine
 // どの使い方でも --dictionary <ディレクトリ> を付けると，azooKey に同梱の辞書の代わりにその辞書で変換する(辞書を作り直して比べるため)
 // --tree-tokens <数> を付けると，検証木の採点で評価するトークンの数をその数に決める(アプリは採点の時間で増減させる．評価の結果を負荷で変えないため)
 // --zenzai-variant xsmall を付けると，--zenzai に渡したモデルを zenz-v3.2-xsmall として確かめて使う．
-// --zenzai-fast <xsmall のモデル> と --zenzai-model accurate|fast|combined で，設定の「Zenzai のモデル」を試す
-// --jinen <jinen のモデル> [--jinen-variant small|xsmall] で，別のモデル(jinen)との合議を試す(ADR 0016 の案 2)．--evaluate と --evaluate-operations で使う
+// --zenzai-fast <xsmall のモデル> と --zenzai-model accurate|fast|combined で，設定の「Zenzai モデル」を試す
+// --jinen <Jinen モデル> [--jinen-variant small|xsmall] で，別のモデル(jinen)との合議を試す(ADR 0016 の案 2)．--evaluate と --evaluate-operations で使う
 // --wait-for-models を付けると，時間による切り替え(入力中に Zenzai を使わない・採点と合議を Space で待たない)をやめ，結果を必ず待つ
 // --dictionary の辞書に専門用語の辞書(terms.tsv．R-29)があれば，アプリと同じく既定の設定(すべての分野)で使う．--no-terms を付けると使わない
 // 絵文字の候補は，アプリと同じくパレットの表(data/palette/palette.tsv)から引く．--emoji-source azookey で azooKey の絵文字の辞書から引き(Linux と同じ)，

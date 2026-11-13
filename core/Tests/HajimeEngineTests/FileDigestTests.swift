@@ -3,7 +3,7 @@ import HajimeDomain
 @testable import HajimeEngine
 import Testing
 
-/// 同梱の辞書と Zenzai のモデルを確かめる SHA-256(macOS は CryptoKit，Windows は OS の CNG)が，自前の SHA256Digest と同じ値になること
+/// 同梱の辞書と Zenzai モデルを確かめる SHA-256(macOS は CryptoKit，Windows は OS の CNG)が，自前の SHA256Digest と同じ値になること
 @Suite("ファイルの SHA-256")
 struct FileDigestTests {
     private func bytes(_ count: Int) -> [UInt8] {

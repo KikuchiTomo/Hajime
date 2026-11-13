@@ -164,7 +164,7 @@ layout: hextra-home
     {{< hajime/catalog-item title="送り仮名" link="docs/settings/#変換" >}}送り仮名を本則・許容から選べます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="学習" link="docs/settings/#変換" >}}選んだ語は次から先に出るようになり，不要な学習は Control+Backspace で削除できます．{{< /hajime/catalog-item >}}
     {{< hajime/catalog-item title="予測の管理" link="docs/usage/#入力中の候補と予測" >}}不要な予測は登録して出ないようにでき，確定した直後なら Backspace で補う前の読みに戻せます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="Zenzai のモデル" link="docs/settings/#変換" >}}精度を優先・速さを優先・併用から選べ，併用では打っている間だけ小さなモデルで速く表示します．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="Zenzai モデル" link="docs/settings/#変換" >}}精度を優先・速さを優先・併用から選べ，併用では打っている間だけ小さなモデルで速く表示します．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="補正" >}}
     {{< hajime/catalog-item title="キーの二重入力" link="docs/settings/#補正" >}}「koonnnitiha」を「こんにちは」に補正します．{{< /hajime/catalog-item >}}
