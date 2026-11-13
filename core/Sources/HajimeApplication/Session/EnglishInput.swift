@@ -9,7 +9,10 @@ import HajimeDomain
 /// - 英字入力(自動)(behavior が automatic): 語ごとに英語か日本語かを見分け(WordLanguageClassifier)，日本語にする語は日本語にして見せる．
 ///   「kyouhaiitenki」は日本語に，「hello」は英語のまま．英語にも読める語(「make」)は前の語で見分ける．
 ///   空白を挟まずに続けて打った並び(「kyouhazoomdekaigi」)は，ローマ字として読めない英単語のところで語に分けて(MixedWordSplit)
-///   語ごとに見分ける(「今日はzoomで会議」)．英単語で読めなくなった並びを丸ごと英語にすると，後ろの日本語まで英語のままになるため
+///   語ごとに見分ける(「今日はzoomで会議」)．英単語で読めなくなった並びを丸ごと英語にすると，後ろの日本語まで英語のままになるため．
+///   分けるのは変換を伴って重いので，打鍵では求めない．打鍵の合間(InputSession.performDeferredConversion)に 1 歩(変換 1 回)ずつ進め，
+///   打っているあいだは前に分け終えた結果に打ち足した英字をつないで見せる(打鍵を待たせない)．打鍵が止まったとき(InputSession.settle)に
+///   残りを求めて表示を差し替える．確定するときは残りを求めてから確定する
 ///
 /// 日本語にして見せているときは，Space と Enter で日本語を確定し(Space は入れない)，Esc で英字に戻す．
 /// 英字を見せているときは，Space・Enter・記号は英語の入力と同じに動く(打った英字を確定し，キーはアプリに渡す)．
@@ -34,8 +37,24 @@ final class EnglishInput: InputStyleHandling {
     private var context = WordLanguageContext.sentenceStart
     /// 前に確定した語の言語．入力位置の前の文字列を読めないアプリで，前の手がかりに使う
     private var lastLanguage: WordLanguage?
-    /// 分けた語を求めた結果．打鍵ごとに何度も変換しない
+    /// 最後に分け終えた結果
     private var mixedCache: (typed: String, context: WordLanguageContext, words: [MixedWord]?)?
+    /// 分けている途中の並び．1 歩ずつ進める
+    private var mixedProgress: MixedProgress?
+    /// 打鍵が止まって分けた結果を見せた並び
+    private var settledMixed: (typed: String, context: WordLanguageContext)?
+    /// 語と前の手がかりごとに見分けた結果．打ち足しても前の語を見分け直さない(打ち終えるまで覚える)
+    private var mixedDecisions: [String: MixedWord] = [:]
+
+    /// 分けている途中の並び
+    private struct MixedProgress {
+        var typed: String
+        var context: WordLanguageContext
+        /// 分けた語．まだ分けていなければ nil
+        var pieces: [MixedWordSplit.Piece]?
+        /// 見分け終えた語
+        var words: [MixedWord] = []
+    }
 
     /// 空白を挟まずに打った並びを分けた 1 語．japanese が nil なら英字のまま入れる
     struct MixedWord {
@@ -102,37 +121,123 @@ final class EnglishInput: InputStyleHandling {
     }
 
     /// 英字入力(自動)で，空白を挟まずに続けて打った英語と日本語を語に分けたもの．並び全体がローマ字として読めるか，
-    /// 分けられないか，どの語も日本語にしないなら nil(並び全体で見分ける)．Esc で英字に戻した並びは分けない
+    /// 分けられないか，どの語も日本語にしないなら nil(並び全体で見分ける)．Esc で英字に戻した並びは分けない．
+    /// 分け終えていなければ残りを今求める(確定するとき)
     var mixedWords: [MixedWord]? {
-        guard behavior == .automatic, override == nil, typed.count >= DefaultSettings.minimumEnglishInputSuggestionLength,
-              WordLanguageClassifier.reading(of: typed) == nil else { return nil }
-        if let mixedCache, mixedCache.typed == typed, mixedCache.context == context { return mixedCache.words }
-        let words = splitMixedWords()
-        mixedCache = (typed, context, words)
-        return words
+        guard splitsMixedWords else { return nil }
+        while advanceMixedSplit() {}
+        guard let mixedCache, mixedCache.typed == typed, mixedCache.context == context else { return nil }
+        return mixedCache.words
     }
 
-    /// 語に分け，ローマ字として読める語を前の語で見分ける．英単語に続けて打った語は，読みが短ければ(英単語にしない文字数以下．
-    /// 「githubni」の に)英単語に付けた助詞などなので前が日本語として，長ければ前が英語として見分ける
-    /// (「pushnotification」の notification は英語のまま，「zoomdekaigi」の でかいぎ は英語の辞書になく日本語らしいので日本語)
-    private func splitMixedWords() -> [MixedWord]? {
-        guard let pieces = MixedWordSplit.split(typed, isEnglishWord: { self.classifier.isEnglishWord($0) }) else { return nil }
-        var words: [MixedWord] = []
-        var previousIsEnglish = false
-        for (index, piece) in pieces.enumerated() {
-            var japanese: Candidate?
-            if !piece.isEnglishWord, let reading = WordLanguageClassifier.reading(of: piece.keys) {
-                let attached: WordLanguageContext = reading.count <= settings.current.englishSkipLength ? .afterJapanese : .afterEnglish
-                let previous = index == 0 ? context : previousIsEnglish ? attached : .afterJapanese
-                if classifier.language(of: piece.keys, context: previous, mode: .englishFirst) == .japanese {
-                    japanese = converter.candidates(for: reading).first { $0.readingCount == reading.count }
-                        ?? Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))
-                }
+    /// 英語と日本語に分ける並びか．並び全体がローマ字として読めるなら分けない(並び全体で見分ける)
+    private var splitsMixedWords: Bool {
+        behavior == .automatic && override == nil && typed.count >= DefaultSettings.minimumEnglishInputSuggestionLength
+            && WordLanguageClassifier.reading(of: typed) == nil
+    }
+
+    /// 今の並びをまだ分け終えていないか(InputSession.awaitsDeferredConversion)
+    var awaitsMixedSplit: Bool {
+        guard splitsMixedWords else { return false }
+        guard let mixedCache else { return true }
+        return mixedCache.typed != typed || mixedCache.context != context
+    }
+
+    /// 打鍵が止まったら，分けた結果を見せ直す並びがあるか(InputSession.awaitsSettle)
+    var awaitsSettle: Bool {
+        guard splitsMixedWords else { return false }
+        guard let settledMixed else { return true }
+        return settledMixed.typed != typed || settledMixed.context != context
+    }
+
+    /// 打鍵の合間に，分ける処理を 1 歩進める．表示は変えない(次の打鍵か，打鍵が止まったときに見せる)
+    func performDeferredSplit() {
+        advanceMixedSplit()
+    }
+
+    /// 打鍵が止まった．残りを求め，今の並びを分けた結果で表示を差し替える
+    func settle() -> [ClientAction] {
+        guard awaitsSettle else { return [] }
+        _ = mixedWords
+        settledMixed = (typed, context)
+        return render()
+    }
+
+    /// 見せる語．求めはしない．分け終えた並びに打ち足したなら，打ち足した英字を英字のまま後ろにつなぐ
+    private var shownMixedWords: [MixedWord]? {
+        guard splitsMixedWords, let mixedCache, mixedCache.context == context, let words = mixedCache.words,
+              typed.hasPrefix(mixedCache.typed) else { return nil }
+        let tail = String(typed.dropFirst(mixedCache.typed.count))
+        return tail.isEmpty ? words : words + [MixedWord(keys: tail, japanese: nil)]
+    }
+
+    /// 分ける処理を 1 歩進める．1 歩は語に分けること(英語の辞書を引く)か，ローマ字として読める語を 1 つ見分けて変換すること．
+    /// 見分けたことのある語は歩数に数えずに続ける．進めることが無ければ false
+    @discardableResult
+    private func advanceMixedSplit() -> Bool {
+        guard awaitsMixedSplit else { return false }
+        var progress = mixedProgress.flatMap { $0.typed == typed && $0.context == context ? $0 : nil }
+            ?? MixedProgress(typed: typed, context: context)
+        guard let pieces = progress.pieces else {
+            progress.pieces = MixedWordSplit.split(typed, isEnglishWord: { self.classifier.isEnglishWord($0) })
+            if progress.pieces == nil {
+                finishMixedSplit(nil)
+            } else {
+                mixedProgress = progress
             }
-            words.append(MixedWord(keys: piece.keys, japanese: japanese))
-            previousIsEnglish = japanese == nil
+            return true
         }
-        return words.contains { $0.japanese != nil } ? words : nil
+        var decided = false
+        while progress.words.count < pieces.count {
+            let piece = pieces[progress.words.count]
+            let previous = mixedContext(of: piece, index: progress.words.count, after: progress.words.last)
+            let key = "\(previous.rawValue):\(piece.keys)"
+            if let word = mixedDecisions[key] {
+                progress.words.append(word)
+                continue
+            }
+            // 変換するのは 1 歩に 1 語まで
+            guard !decided else { break }
+            let word = decideMixedWord(piece, context: previous)
+            if !piece.isEnglishWord {
+                decided = true
+                if mixedDecisions.count >= DefaultSettings.maximumWordLanguageCache { mixedDecisions = [:] }
+                mixedDecisions[key] = word
+            }
+            progress.words.append(word)
+        }
+        if progress.words.count == pieces.count {
+            finishMixedSplit(progress.words.contains { $0.japanese != nil } ? progress.words : nil)
+        } else {
+            mixedProgress = progress
+        }
+        return true
+    }
+
+    private func finishMixedSplit(_ words: [MixedWord]?) {
+        mixedCache = (typed, context, words)
+        mixedProgress = nil
+    }
+
+    /// 語を見分けるときの前の手がかり．英単語に続けて打った語は，読みが短ければ(英単語にしない文字数以下．「githubni」の に)
+    /// 英単語に付けた助詞などなので前が日本語として，長ければ前が英語として見分ける
+    /// (「pushnotification」の notification は英語のまま，「zoomdekaigi」の でかいぎ は英語の辞書になく日本語らしいので日本語)
+    private func mixedContext(of piece: MixedWordSplit.Piece, index: Int, after previous: MixedWord?) -> WordLanguageContext {
+        guard index > 0 else { return context }
+        guard previous?.japanese == nil else { return .afterJapanese }
+        let length = WordLanguageClassifier.reading(of: piece.keys)?.count ?? .max
+        return length <= settings.current.englishSkipLength ? .afterJapanese : .afterEnglish
+    }
+
+    /// 語を見分け，日本語にする語は変換する
+    private func decideMixedWord(_ piece: MixedWordSplit.Piece, context previous: WordLanguageContext) -> MixedWord {
+        guard !piece.isEnglishWord, let reading = WordLanguageClassifier.reading(of: piece.keys),
+              classifier.language(of: piece.keys, context: previous, mode: .englishFirst) == .japanese else {
+            return MixedWord(keys: piece.keys, japanese: nil)
+        }
+        let japanese = converter.candidates(for: reading).first { $0.readingCount == reading.count }
+            ?? Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))
+        return MixedWord(keys: piece.keys, japanese: japanese)
     }
 
     func commit() -> [ClientAction] {
@@ -143,6 +248,7 @@ final class EnglishInput: InputStyleHandling {
     /// 分けた語を，日本語にする語は日本語で，ほかは英字のままつないで確定する
     private func commitMixed(_ words: [MixedWord]) -> [ClientAction] {
         for candidate in words.compactMap(\.japanese) where candidate.isFromEngine { converter.didCommit(candidate) }
+        mixedDecisions = [:]
         typed = ""
         override = nil
         lastLanguage = words.last?.japanese == nil ? .english : .japanese
@@ -173,7 +279,7 @@ final class EnglishInput: InputStyleHandling {
 
     func render() -> [ClientAction] {
         guard isComposing else { return [.setMarkedText(.empty), .hideCandidates] }
-        if let words = mixedWords {
+        if let words = shownMixedWords {
             // 日本語にした語と英字のままの語をつないで見せ，打った英字を候補に添える
             var panel = CandidatePanel(variants: [], selectedVariant: nil, entries: [.init(text: typed, annotation: nil)],
                                        selectedEntry: nil, focus: .candidate, position: 1, total: 1, note: PanelBuilder.englishInputJapaneseNote)
@@ -228,7 +334,7 @@ final class EnglishInput: InputStyleHandling {
         case .escape:
             // 組み立てていなければふつうの処理(Escape で英数にする設定)に回す
             guard isComposing else { return nil }
-            if showsJapanese || mixedWords != nil {
+            if showsJapanese || shownMixedWords != nil {
                 // 日本語にして見せていたら英字に戻す
                 override = .english
                 return .handled(KeyResult(handled: true, actions: render()))
