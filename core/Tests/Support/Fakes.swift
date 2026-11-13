@@ -49,6 +49,23 @@ public final class FakeConverter: KanaKanjiConverting {
 
     public func setTyping(_ typing: Bool) {
         self.typing = typing
+        // 入力中の表示を求めた(Zenzai なしで済ませた)ことにする
+        if typing, defersWhileTyping { deferredPending = true }
+    }
+
+    /// 入力中の表示を Zenzai なしで求めたことにし，打鍵の合間の変換(performDeferredConversion)を待たせる
+    public var defersWhileTyping = false
+    /// 打鍵の合間の変換を求めたときに呼ぶ(テストで時計を進めて，長くかかったことにする)
+    public var onDeferredConversion: (() -> Void)?
+    public private(set) var deferredConversionCount = 0
+    private var deferredPending = false
+
+    public var hasDeferredConversion: Bool { deferredPending }
+
+    public func performDeferredConversion() {
+        deferredPending = false
+        deferredConversionCount += 1
+        onDeferredConversion?()
     }
 
     public func candidates(for reading: String) -> [Candidate] {

@@ -467,6 +467,12 @@ fn lattice(columns: &[(&str, &[&str])], focus: usize, uncertain: Option<usize>) 
         association_hint: None,
         association_key: None,
         meaning_placement: None,
+        collapses_variants: None,
+        collapses_detail: None,
+        placed_hints: None,
+        trunk_focused: None,
+        page_size: None,
+        hints_on_hold: None,
     }
 }
 

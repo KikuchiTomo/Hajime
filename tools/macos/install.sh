@@ -27,7 +27,7 @@ cd "$root/apps/macos"
 xcodegen generate --quiet
 # 入力メニューに出す名前を変えるときは HAJIME_NAME に入れる(make install-macos NAME=…)
 set --
-[ -n "${HAJIME_NAME:-}" ] && set -- HAJIME_DISPLAY_NAME="$HAJIME_NAME"
+[ -n "${HAJIME_NAME:-}" ] && set -- HAJIME_DISPLAY_NAME="$HAJIME_NAME" HAJIME_JAPANESE_MODE_NAME="$HAJIME_NAME" HAJIME_ROMAN_MODE_NAME="$HAJIME_NAME"
 xcodebuild -project Hajime.xcodeproj -scheme Hajime -configuration "$configuration" -destination "generic/platform=macOS" -derivedDataPath build build -quiet "$@"
 built="build/Build/Products/$configuration/$app_name.app"
 if [ "$identity" != "-" ]; then
