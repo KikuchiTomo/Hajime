@@ -356,6 +356,7 @@ pub mod size {
         pub const MEANING_INDENT: f32 = 8.0;
         pub const MEANING_WIDTH: f32 = 240.0;
         pub const GRIP_SIZE: f32 = 3.0;
+        pub const MORE_SIZE: f32 = 4.0;
         pub const BADGE_RADIUS: f32 = 5.0;
         pub const PAGE_DOT_SIZE: f32 = 4.0;
         pub const PAGE_DOT_PITCH: f32 = 8.0;
