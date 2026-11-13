@@ -3136,8 +3136,10 @@ public final class InputSession {
                 phase = .lattice(lattice)
                 return done()
             case .down:
-                // 幹の上へ戻る(候補は先頭に戻る)
-                _ = moveCandidate(.next, context: context)
+                // 幹の上へ戻る(候補は先頭に戻る)．どの文字種からでも 1 回で戻る
+                // (次の候補へ進む操作は，文字種を 1 つずつ下りるので使わない)
+                lattice.selectCandidate(at: 0)
+                phase = .lattice(lattice)
                 trunkLevel = true
                 return done()
             case .up:
