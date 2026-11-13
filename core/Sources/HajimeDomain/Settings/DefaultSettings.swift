@@ -467,6 +467,10 @@ public enum DefaultSettings {
     public static let latticeWarmingPollInterval = 0.01
     /// 入力中の表示を Zenzai なしで求めたとき，打鍵の合間に Zenzai の変換を求めるまでの間(秒)．Windows では DLL に来てもらう(wake)間隔
     public static let deferredConversionPollInterval = 0.005
+    /// 打鍵の合間の Zenzai の変換にかけてよい時間(秒．Windows)．これより長くかかったら，その入力のあいだは打鍵の合間に求めず，
+    /// 打鍵が止まったとき(liveConversionDelay)に求める．CPU で推論すると，読みが長いほど 1 回の変換が打鍵の間隔より長くなり(120 字で約 0.5 秒)，
+    /// 合間に求めていると次の打鍵がその変換を待つため．速く打つ人の打鍵の間隔(約 0.1 秒)にする
+    public static let deferredConversionBudget = 0.1
     /// キーのあとで，画面を出してから 1 つずつ求めて足す処理(InputSession.followUps)のために，Windows で DLL に来てもらう間隔(秒)．
     /// 待たせずに次を求めたいので短くする(来るまでのあいだに次のキーが来れば，そのキーを先に処理する)
     public static let followUpPollInterval = 0.001
