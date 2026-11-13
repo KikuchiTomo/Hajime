@@ -18,8 +18,8 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
     # IME の本体と補助のアプリ(更新・入力ソースの登録)で同じバージョンにする(tools/release/bump_version.sh が書き換える)
-    MARKETING_VERSION: "0.3.1"
-    CURRENT_PROJECT_VERSION: "27"
+    MARKETING_VERSION: "0.3.2"
+    CURRENT_PROJECT_VERSION: "28"
 packages:
   HajimeCore:
     path: ../../core
