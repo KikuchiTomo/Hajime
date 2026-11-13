@@ -270,6 +270,25 @@ enum BranchMapDrawing {
         path.stroke()
     }
 
+    // MARK: - 前後のまとまり
+
+    /// 前後にまとまりが続く側の山形．幹の線の端に重ね，先を続きのある向きへ向ける．色は控えめな文字の色(選択の色は選んだ道すじだけに使う)
+    static func drawMore(tipX: CGFloat, midY: CGFloat, pointsLeft: Bool, lineWidth: CGFloat, theme: ResolvedTheme) {
+        let size = Map.moreSize
+        let back = tipX + (pointsLeft ? size : -size)
+        let path = NSBezierPath()
+        path.move(to: NSPoint(x: back, y: midY - size))
+        path.line(to: NSPoint(x: tipX, y: midY))
+        path.line(to: NSPoint(x: back, y: midY + size))
+        path.lineWidth = lineWidth
+        if theme.isRounded {
+            path.lineCapStyle = .round
+            path.lineJoinStyle = .round
+        }
+        theme.textMuted.setStroke()
+        path.stroke()
+    }
+
     // MARK: - はみ出した幹
 
     /// body を描き，left・right の側を端へ向けて透かす．幹が窓からはみ出していることを見せる
