@@ -88,6 +88,44 @@ struct EnglishAutoScenarioTests {
         #expect(harness.marked.text == "kathio")
     }
 
+    @Test("R-05: 英字入力(自動)で空白を挟まずに英単語を打っても，英単語の後ろの日本語は日本語に戻す")
+    func automaticRecoversAfterEnglishWord() {
+        let converter = FakeConverter([
+            "きょうは": [("今日は", nil)],
+            "でかいぎ": [("で会議", nil)],
+            "に": [("に", nil)],
+        ])
+        let harness = harness(.englishAuto, converter: converter, lexicon: ["zoom", "github", "push", "notification"])
+        harness.type("kyouhazoom")
+        #expect(harness.marked.text == "今日はzoom")
+        harness.type("dekaigi")
+        #expect(harness.marked.text == "今日はzoomで会議")
+        #expect(harness.panel?.entries.map(\.text) == ["kyouhazoomdekaigi"])
+        harness.press(.enter)
+        #expect(harness.committed == "今日はzoomで会議")
+        #expect(harness.lastResult.handled)
+        // 確定したあとも英語のままにならない
+        harness.type("githubni")
+        #expect(harness.marked.text == "githubに")
+        harness.press(.space)
+        #expect(harness.committed == "今日はzoomで会議githubに")
+        // 英単語だけを続けた並びは英語のまま
+        harness.type("pushnotification")
+        #expect(harness.marked.text == "pushnotification")
+    }
+
+    @Test("R-05: 英語と日本語に分けて見せた並びも，Esc で英字に戻す")
+    func automaticMixedEscape() {
+        let converter = FakeConverter(["でかいぎ": [("で会議", nil)]])
+        let harness = harness(.englishAuto, converter: converter, lexicon: ["zoom"])
+        harness.type("zoomdekaigi")
+        #expect(harness.marked.text == "zoomで会議")
+        harness.press(.escape)
+        #expect(harness.marked.text == "zoomdekaigi")
+        harness.press(.enter)
+        #expect(harness.committed == "zoomdekaigi")
+    }
+
     @Test("R-02: 英語にも日本語にも読める語(「make」)は，前が英語なら英語，前が日本語なら日本語", arguments: [
         ("Let's ", "make"),
         ("試合に", "負け"),

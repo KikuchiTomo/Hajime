@@ -352,7 +352,7 @@ enum Evaluation {
         let lines = try String(contentsOfFile: file, encoding: .utf8).split(whereSeparator: \.isNewline).filter { !$0.hasPrefix("#") && !$0.isEmpty }
         var settings = DefaultSettings.settings
         settings.inputStyle = .englishAuto
-        let lexicon = WordListLexicon()
+        let lexicon = languageEvaluationLexicon()
         var passed = 0
         for line in lines {
             let columns = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)

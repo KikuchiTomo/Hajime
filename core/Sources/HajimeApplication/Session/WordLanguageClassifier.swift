@@ -9,6 +9,8 @@ final class WordLanguageClassifier {
     private let settings: any SettingsReading
     /// 調べた結果．同じ語を打鍵ごとに何度も調べない．多くなったら捨てる
     private var cache: [String: WordLanguageJudge.Evidence] = [:]
+    /// 英語の辞書にあるかを調べた結果．英語と日本語に分けるとき(MixedWordSplit)に，同じ並びを打鍵ごとに何度も調べない
+    private var wordCache: [String: Bool] = [:]
 
     init(lexicon: any EnglishLexicon, converter: any KanaKanjiConverting, settings: any SettingsReading) {
         self.lexicon = lexicon
@@ -18,6 +20,15 @@ final class WordLanguageClassifier {
 
     func language(of keys: String, context: WordLanguageContext, mode: WordLanguageJudge.Mode) -> WordLanguage {
         WordLanguageJudge(settings: settings.current.wordLanguage, mode: mode, japaneseReadingLength: settings.current.englishSkipLength).decide(evidence(for: keys), context: context)
+    }
+
+    /// 英語の辞書にある語か
+    func isEnglishWord(_ keys: String) -> Bool {
+        if let cached = wordCache[keys] { return cached }
+        let value = lexicon.isWord(keys)
+        if wordCache.count >= DefaultSettings.maximumEnglishWordCache { wordCache = [:] }
+        wordCache[keys] = value
+        return value
     }
 
     /// ローマ字として読めれば，その読み
