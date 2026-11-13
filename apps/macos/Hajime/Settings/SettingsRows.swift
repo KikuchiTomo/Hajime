@@ -12,7 +12,7 @@ struct ResettableRow<Value: Equatable, Content: View>: View {
         // 部品と「既定に戻す」は押し間違えないようにまとまりの間だけ離す
         HStack(spacing: DesignTokens.Size.Space.group) {
             content()
-            if model.settings[keyPath: keyPath] != DefaultSettings.settings[keyPath: keyPath] {
+            if model.settings[keyPath] != DefaultSettings.settings[keyPath: keyPath] {
                 Button {
                     model.update { $0[keyPath: keyPath] = DefaultSettings.settings[keyPath: keyPath] }
                 } label: {
@@ -34,18 +34,49 @@ struct ResettableStepper: View {
     let keyPath: WritableKeyPath<HajimeDomain.Settings, Int>
     let range: ClosedRange<Int>
     var step = 1
-    /// 今の値を書いた文字(「4 番目」「2 文字以下」)
-    let value: String
+    /// 今の値を書いた文字(「4 番目」「2 文字以下」)．値はこの行が読んで渡す(ページの全体が値を見張らないように)
+    var value: (Int) -> String = { "\($0)" }
 
     var body: some View {
         ResettableRow(model: model, keyPath: keyPath) {
             LabeledContent(title) {
                 HStack {
-                    Text(value).monospacedDigit()
+                    Text(value(model.settings[keyPath])).monospacedDigit()
                     Stepper(title, value: model.binding(keyPath), in: range, step: step).labelsHidden()
                 }
             }
         }
+    }
+}
+
+/// 設定の項目の値で，中の部品を使えなくする．ページの全体でなく，この部品だけがその項目を見張るので，
+/// 項目を変えてもページのほかの行は描き直さない
+private struct DisabledBySetting<Value: Equatable>: ViewModifier {
+    @ObservedObject var model: SettingsModel
+    let keyPath: KeyPath<HajimeDomain.Settings, Value>
+    let value: Value
+    /// 項目が value のときに使えなくするか(false なら value でないときに使えなくする)
+    let disablesOnMatch: Bool
+
+    func body(content: Content) -> some View {
+        content.disabled((model.settings[keyPath] == value) == disablesOnMatch)
+    }
+}
+
+extension View {
+    /// 設定の項目が value のあいだ使えなくする
+    func disabled<Value: Equatable>(_ model: SettingsModel, when keyPath: KeyPath<HajimeDomain.Settings, Value>, is value: Value) -> some View {
+        modifier(DisabledBySetting(model: model, keyPath: keyPath, value: value, disablesOnMatch: true))
+    }
+
+    /// 設定の項目が value でないあいだ使えなくする
+    func disabled<Value: Equatable>(_ model: SettingsModel, unless keyPath: KeyPath<HajimeDomain.Settings, Value>, is value: Value) -> some View {
+        modifier(DisabledBySetting(model: model, keyPath: keyPath, value: value, disablesOnMatch: false))
+    }
+
+    /// オン・オフの項目がオフのあいだ使えなくする
+    func disabled(_ model: SettingsModel, unless keyPath: KeyPath<HajimeDomain.Settings, Bool>) -> some View {
+        disabled(model, unless: keyPath, is: true)
     }
 }
 

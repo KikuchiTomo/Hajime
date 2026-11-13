@@ -414,6 +414,9 @@ pub mod size {
         pub const KEYCAP_PADDING_Y: f32 = 3.0;
         pub const KEYCAP_HEIGHT: f32 = 16.0;
         pub const HINT_GAP: f32 = 8.0;
+        pub const EDITING_CARET_WIDTH: f32 = 2.0;
+        pub const EDITING_MIN_WIDTH: f32 = 16.0;
+        pub const HINT_LINE_GAP: f32 = 4.0;
         pub const FOOTER_HEIGHT: f32 = 28.0;
         pub const TRUNK_GAP: f32 = 8.0;
         pub const BRANCH_INDENT: f32 = 28.0;
@@ -726,6 +729,7 @@ pub mod motion {
     }
     pub mod settings {
         pub const DISCLOSURE: f32 = 167.0;
+        pub const SELECTION_SETTLE: f32 = 100.0;
     }
     pub mod settings_windows {
         pub const PAGE_ENTER: f32 = 167.0;
@@ -823,5 +827,6 @@ pub mod opacity {
     }
     pub mod candidate {
         pub const UNSELECTABLE_NUMBER: f32 = 0.4;
+        pub const EDITING_STALE: f32 = 0.35;
     }
 }

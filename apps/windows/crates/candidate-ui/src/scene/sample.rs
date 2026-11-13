@@ -8,6 +8,7 @@ use ipc::{BranchColumn, BranchMap, CandidateEntry, CandidateFocus, CandidateList
 /// 枝を出していない文節
 pub fn column(text: &str) -> BranchColumn {
     BranchColumn {
+        is_editing: None,
         text: text.into(),
         alternatives: vec![],
         selected_alternative: None,
@@ -134,6 +135,7 @@ pub fn emoji_placement(settings: EmojiSettings) -> CandidateList {
             .map(|(_, name)| (*name).to_string())
     };
     CandidateList {
+        is_editing: None,
         variants: vec![],
         selected_variant: None,
         entries: texts

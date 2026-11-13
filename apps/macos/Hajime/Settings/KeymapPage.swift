@@ -11,6 +11,8 @@ struct KeymapPage: View {
     /// 押したキーで絞り込むときのキー
     @State private var keyFilter: KeyStroke?
     @State private var selection = Set<Int>()
+    /// 選択肢(状態とコマンドのポップアップ)を出している行．選んだ行に少し遅れて追いつく(body の task)
+    @State private var editable = Set<Int>()
     /// キーを記録しているところ．同時に 1 か所だけ
     @State private var recording: RecordingTarget?
     @State private var draft = Draft()
@@ -47,12 +49,17 @@ struct KeymapPage: View {
     }
 
     var body: some View {
+        // 絞り込んだ行は 1 回だけ求め，表と下の件数で使う
+        let rows = rows
+        // 表のセルは body のあとで作られる．選択肢を出す行はここで読んで渡し，変わったら表を描き直す．
+        // 選択を外した行の選択肢はすぐに消す(選んでいる行だけが選択肢を持つ)
+        let pickerRows = editable.intersection(selection)
         VStack(alignment: .leading, spacing: DesignTokens.Size.Space.section) {
             toolbar
             missingWarning
             composer
-            table
-            footer
+            table(rows, editable: pickerRows)
+            footer(rows)
         }
         // Form でない画面なので，Form の余白にそろえてほかのページのカードと端を合わせる
         .padding(DesignTokens.Size.Settings.formMargin)
@@ -68,6 +75,13 @@ struct KeymapPage: View {
             Button(Keys.cancel, role: .cancel) {}
         } message: {
             Text(Keys.restoreMessage)
+        }
+        // 行を選んだら，先に行の強調を描き，選択が落ち着いてからその行の選択肢を作る．
+        // 1 行ぶんの選択肢を作るのに 0.17 秒かかり，選ぶのと同時に作ると，押してから強調が出るまでと，矢印キーで行を移るたびに引っかかる
+        .task(id: selection) {
+            try? await Task.sleep(for: .milliseconds(DesignTokens.Motion.Settings.selectionSettle))
+            guard !Task.isCancelled else { return }
+            editable = selection
         }
         .onChange(of: stateFilter) { _, state in
             // 状態で絞り込んでいるときは，新しい行もその状態にする
@@ -119,7 +133,7 @@ struct KeymapPage: View {
                     }
                 }
             } label: {
-                Text(Keys.currentPreset(KeymapPreset.matching(keymap).map(Keys.label(for:)) ?? Keys.customPreset))
+                Text(Keys.currentPreset(Self.preset(matching: keymap).map(Keys.label(for:)) ?? Keys.customPreset))
             }
             .fixedSize()
         }
@@ -153,13 +167,14 @@ struct KeymapPage: View {
         GroupBox(Keys.newRow) {
             VStack(alignment: .leading, spacing: DesignTokens.Size.Space.stack) {
                 HStack(spacing: DesignTokens.Size.Space.group) {
-                    statePicker(selection: Binding(get: { draft.state }, set: setDraftState), command: nil)
+                    statePicker(selected: draft.state, command: nil, select: setDraftState)
                         .frame(width: DesignTokens.Size.Settings.keymapStateWidth)
                     KeyField(stroke: draft.stroke, isRecording: recording == .draft,
                              onRecord: { recording = $0 ? .draft : (recording == .draft ? nil : recording) },
                              onChange: { draft.stroke = $0 })
+                        .equatable()
                         .frame(width: DesignTokens.Size.Settings.keymapKeyWidth)
-                    commandPicker(selection: $draft.command, state: draft.state)
+                    commandPicker(selected: draft.command, state: draft.state) { draft.command = $0 }
                     Button(Keys.add) { addDraft() }
                         .disabled(draft.stroke == nil)
                 }
@@ -203,13 +218,13 @@ struct KeymapPage: View {
 
     // MARK: 表
 
-    private var table: some View {
+    private func table(_ rows: [Row], editable: Set<Int>) -> some View {
         Table(rows, selection: $selection) {
             // 選んでいる行だけ選択肢を出し，ほかの行は文字で見せる．行ごとに選択肢(60 ほどのコマンド)を作ると開くのに数秒かかる
             TableColumn(Keys.state) { row in
                 Group {
-                    if selection.contains(row.id) {
-                        statePicker(selection: Binding(get: { row.entry.state }, set: { state in change(row.id) { $0.state = state } }), command: row.entry.command)
+                    if editable.contains(row.id) {
+                        statePicker(selected: row.entry.state, command: row.entry.command) { state in change(row.id) { $0.state = state } }
                     } else {
                         Text(Keys.label(for: row.entry.state))
                     }
@@ -218,17 +233,18 @@ struct KeymapPage: View {
             }
             .width(DesignTokens.Size.Settings.keymapStateWidth)
             TableColumn(Keys.key) { row in
+                // 行を選ぶ・絞り込むたびにすべての行のキーの欄(ボタンとメニュー)を作り直さないよう，キーと記録の状態が同じなら描き直さない
                 KeyField(stroke: row.entry.stroke, isRecording: recording == .row(row.id),
                          onRecord: { recording = $0 ? .row(row.id) : (recording == .row(row.id) ? nil : recording) },
                          onChange: { stroke in change(row.id) { $0.stroke = stroke } })
+                    .equatable()
                     .opacity(dimming(row))
             }
             .width(DesignTokens.Size.Settings.keymapKeyWidth)
             TableColumn(Keys.command) { row in
                 Group {
-                    if selection.contains(row.id) {
-                        commandPicker(selection: Binding(get: { row.entry.command }, set: { command in change(row.id) { $0.command = command } }),
-                                      state: row.entry.state)
+                    if editable.contains(row.id) {
+                        commandPicker(selected: row.entry.command, state: row.entry.state) { command in change(row.id) { $0.command = command } }
                     } else {
                         Text(Keys.label(for: row.entry.command)).help(Keys.help(for: row.entry.command) ?? "")
                     }
@@ -286,6 +302,14 @@ struct KeymapPage: View {
     /// 既定の表．描くたびにひな形の行を読み直さないよう，一度だけ作る
     private static let standardKeymap = KeymapPreset.standard.keymap
 
+    /// ひな形の表．描くたびに 6 つのひな形の行を読み直さないよう，一度だけ作る
+    private static let presetKeymaps = KeymapPreset.allCases.map { (preset: $0, keymap: $0.keymap) }
+
+    /// 今の表と同じひな形(KeymapPreset.matching と同じ判断)．利用者が変えていれば nil
+    private static func preset(matching keymap: Keymap) -> KeymapPreset? {
+        presetKeymaps.first { $0.keymap.entries == keymap.entries }?.preset
+    }
+
     /// 使われない行の濃さ(無効の項目と同じくらいの薄さ)
     private static let hiddenOpacity = 0.45
 
@@ -301,35 +325,66 @@ struct KeymapPage: View {
     // MARK: 状態とコマンドを選ぶ
 
     /// 状態を選ぶ．command を渡したときは，そのコマンドが効く状態だけを並べる
-    private func statePicker(selection: Binding<KeymapState>, command: KeymapCommand?) -> some View {
-        Picker(Keys.state, selection: selection) {
-            ForEach(KeymapState.allCases.filter { command?.isAvailable(in: $0) ?? true }, id: \.self) {
-                Text(Keys.label(for: $0)).tag($0)
-            }
-        }
-        // 名前は Picker の名前(見せない)を VoiceOver が読む．accessibilityLabel を重ねると「状態、状態」と 2 回読む
-        .labelsHidden()
+    private func statePicker(selected: KeymapState, command: KeymapCommand?, select: @escaping (KeymapState) -> Void) -> some View {
+        StatePicker(selected: selected, command: command, select: select).equatable()
     }
 
     /// コマンドを選ぶ．状態で効くコマンドだけを，まとまりごとに並べる
-    private func commandPicker(selection: Binding<KeymapCommand>, state: KeymapState) -> some View {
-        Picker(Keys.command, selection: selection) {
-            ForEach(KeymapCommand.Group.allCases, id: \.self) { group in
-                let commands = KeymapCommand.allCases.filter { $0.group == group && $0.isAvailable(in: state) }
-                if !commands.isEmpty {
-                    Section(Keys.label(for: group)) {
-                        ForEach(commands, id: \.self) { Text(Keys.label(for: $0)).tag($0) }
+    private func commandPicker(selected: KeymapCommand, state: KeymapState, select: @escaping (KeymapCommand) -> Void) -> some View {
+        CommandPicker(selected: selected, state: state, select: select).equatable()
+    }
+
+    /// 状態の選択肢．選んでいる値と並べる状態が同じなら描き直さない(選択肢を作り直すのは重い)．
+    /// select は欄の場所(表の行・新しい行)で決まり，同じ場所では同じ動きをするので比べない
+    private struct StatePicker: View, Equatable {
+        let selected: KeymapState
+        let command: KeymapCommand?
+        let select: (KeymapState) -> Void
+
+        nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.selected == rhs.selected && lhs.command == rhs.command
+        }
+
+        var body: some View {
+            Picker(Keys.state, selection: Binding(get: { selected }, set: select)) {
+                ForEach(KeymapState.allCases.filter { command?.isAvailable(in: $0) ?? true }, id: \.self) {
+                    Text(Keys.label(for: $0)).tag($0)
+                }
+            }
+            // 名前は Picker の名前(見せない)を VoiceOver が読む．accessibilityLabel を重ねると「状態、状態」と 2 回読む
+            .labelsHidden()
+        }
+    }
+
+    /// コマンドの選択肢(60 ほど)．選んでいる値と状態が同じなら描き直さない
+    private struct CommandPicker: View, Equatable {
+        let selected: KeymapCommand
+        let state: KeymapState
+        let select: (KeymapCommand) -> Void
+
+        nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+            lhs.selected == rhs.selected && lhs.state == rhs.state
+        }
+
+        var body: some View {
+            Picker(Keys.command, selection: Binding(get: { selected }, set: select)) {
+                ForEach(KeymapCommand.Group.allCases, id: \.self) { group in
+                    let commands = KeymapCommand.allCases.filter { $0.group == group && $0.isAvailable(in: state) }
+                    if !commands.isEmpty {
+                        Section(Keys.label(for: group)) {
+                            ForEach(commands, id: \.self) { Text(Keys.label(for: $0)).tag($0) }
+                        }
                     }
                 }
             }
+            .labelsHidden()
+            .help(Keys.help(for: selected) ?? Keys.label(for: selected))
         }
-        .labelsHidden()
-        .help(Keys.help(for: selection.wrappedValue) ?? Keys.label(for: selection.wrappedValue))
     }
 
     // MARK: 下の操作
 
-    private var footer: some View {
+    private func footer(_ rows: [Row]) -> some View {
         VStack(alignment: .leading, spacing: DesignTokens.Size.Space.stack) {
             HStack {
                 Button(Keys.remove) { remove(selection) }
@@ -383,7 +438,7 @@ struct KeymapPage: View {
 
     /// 利用者が変えた表は，読み込む前に確かめる(変えていなければすぐ読み込む)
     private func requestLoad(_ preset: KeymapPreset) {
-        if KeymapPreset.matching(keymap) == nil {
+        if Self.preset(matching: keymap) == nil {
             pendingPreset = preset
         } else {
             load(preset)
@@ -396,13 +451,19 @@ struct KeymapPage: View {
     }
 }
 
-/// キーの欄．押すと記録を始め，次に押したキーを入れる．押しにくいキー(Windows のキーなど)と修飾キーはメニューから選べる
-struct KeyField: View {
+/// キーの欄．押すと記録を始め，次に押したキーを入れる．押しにくいキー(Windows のキーなど)と修飾キーはメニューから選べる．
+/// キーと記録の状態が同じなら同じとみなし(.equatable())，表のほかの行を選んだときなどに描き直さない．
+/// onRecord と onChange は欄の場所(表の行・新しい行)で決まり，同じ場所では同じ動きをするので比べない
+struct KeyField: View, Equatable {
     let stroke: KeyStroke?
     let isRecording: Bool
     /// 記録を始める(true)・やめる(false)
     let onRecord: (Bool) -> Void
     let onChange: (KeyStroke) -> Void
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.stroke == rhs.stroke && lhs.isRecording == rhs.isRecording
+    }
 
     private typealias Keys = UIStrings.Keys
 

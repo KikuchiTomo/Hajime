@@ -17,16 +17,16 @@ struct PalettePage: View {
     var body: some View {
         Form {
             Section {
-                PalettePreview(choice: ThemeChoice(model.settings), settings: model.settings, cellSize: cellSize ?? model.settings.paletteCellSize)
+                PaletteSample(model: model, cellSize: cellSize)
                     .padding(DesignTokens.Size.Settings.previewPadding)
                     .frame(maxWidth: .infinity)
             }
             Section(UIStrings.Palette.behavior) {
                 ResettableToggle(model: model, title: UIStrings.Palette.enabled, keyPath: \.palette)
                 Group {
-                    LabeledContent(UIStrings.Palette.emojiKey, value: keys(for: .emojiPalette))
-                    LabeledContent(UIStrings.Palette.symbolKey, value: keys(for: .symbolPalette))
-                    LabeledContent(UIStrings.Palette.kaomojiKey, value: keys(for: .kaomojiPalette))
+                    PaletteKeyRow(model: model, title: UIStrings.Palette.emojiKey, command: .emojiPalette)
+                    PaletteKeyRow(model: model, title: UIStrings.Palette.symbolKey, command: .symbolPalette)
+                    PaletteKeyRow(model: model, title: UIStrings.Palette.kaomojiKey, command: .kaomojiPalette)
                     if let navigation {
                         Button(UIStrings.Palette.openKeys) { navigation.page = .keys }
                     }
@@ -41,58 +41,74 @@ struct PalettePage: View {
                             }
                     }
                 }
-                .disabled(!model.settings.palette)
+                .disabled(model, unless: \.palette)
             }
-            Section(UIStrings.Palette.look) {
-                ResettableStepper(model: model, title: UIStrings.Palette.columns, keyPath: \.paletteColumns, range: DefaultSettings.paletteColumnsRange,
-                                  value: "\(model.settings.paletteColumns)")
-                ResettableStepper(model: model, title: UIStrings.Palette.rows, keyPath: \.paletteRows, range: DefaultSettings.paletteRowsRange,
-                                  value: "\(model.settings.paletteRows)")
-                ResettableRow(model: model, keyPath: \.paletteCellSize) {
-                    LabeledContent(UIStrings.Palette.cellSizeValue(Int(cellSize ?? model.settings.paletteCellSize))) {
-                        Slider(value: Binding(get: { cellSize ?? model.settings.paletteCellSize }, set: { cellSize = $0 }),
-                               in: DefaultSettings.paletteCellSizeRange, step: DefaultSettings.paletteCellSizeStep) { isEditing in
-                            guard !isEditing, let value = cellSize else { return }
-                            model.update { $0.paletteCellSize = value }
-                            cellSize = nil
+            BuiltLater(stage: 1) {
+                Section(UIStrings.Palette.look) {
+                    ResettableStepper(model: model, title: UIStrings.Palette.columns, keyPath: \.paletteColumns, range: DefaultSettings.paletteColumnsRange)
+                    ResettableStepper(model: model, title: UIStrings.Palette.rows, keyPath: \.paletteRows, range: DefaultSettings.paletteRowsRange)
+                    ResettableRow(model: model, keyPath: \.paletteCellSize) {
+                        LabeledContent(UIStrings.Palette.cellSizeValue(Int(cellSize ?? model.settings.paletteCellSize))) {
+                            Slider(value: Binding(get: { cellSize ?? model.settings.paletteCellSize }, set: { cellSize = $0 }),
+                                   in: DefaultSettings.paletteCellSizeRange, step: DefaultSettings.paletteCellSizeStep) { isEditing in
+                                guard !isEditing, let value = cellSize else { return }
+                                model.update { $0.paletteCellSize = value }
+                                cellSize = nil
+                            }
                         }
                     }
+                    ResettableStepper(model: model, title: UIStrings.Palette.frequentRows, keyPath: \.paletteFrequentRows, range: DefaultSettings.paletteFrequentRowsRange)
+                        .disabled(model, unless: \.paletteRecordsHistory)
+                    ResettableToggle(model: model, title: UIStrings.Palette.showsPreview, keyPath: \.paletteShowsPreview)
+                    Group {
+                        ResettableToggle(model: model, title: UIStrings.Palette.showsUnicodeName, keyPath: \.paletteShowsUnicodeName)
+                        ResettableToggle(model: model, title: UIStrings.Palette.showsReadings, keyPath: \.paletteShowsReadings)
+                        ResettableToggle(model: model, title: UIStrings.Palette.showsShortcodes, keyPath: \.paletteShowsShortcodes)
+                        ResettableToggle(model: model, title: UIStrings.Palette.showsCodePoints, keyPath: \.paletteShowsCodePoints)
+                    }
+                    .disabled(model, unless: \.paletteShowsPreview)
                 }
-                ResettableStepper(model: model, title: UIStrings.Palette.frequentRows, keyPath: \.paletteFrequentRows, range: DefaultSettings.paletteFrequentRowsRange,
-                                  value: "\(model.settings.paletteFrequentRows)")
-                .disabled(!model.settings.paletteRecordsHistory)
-                ResettableToggle(model: model, title: UIStrings.Palette.showsPreview, keyPath: \.paletteShowsPreview)
-                Group {
-                    ResettableToggle(model: model, title: UIStrings.Palette.showsUnicodeName, keyPath: \.paletteShowsUnicodeName)
-                    ResettableToggle(model: model, title: UIStrings.Palette.showsReadings, keyPath: \.paletteShowsReadings)
-                    ResettableToggle(model: model, title: UIStrings.Palette.showsShortcodes, keyPath: \.paletteShowsShortcodes)
-                    ResettableToggle(model: model, title: UIStrings.Palette.showsCodePoints, keyPath: \.paletteShowsCodePoints)
-                }
-                .disabled(!model.settings.paletteShowsPreview)
             }
         }
         .formStyle(.grouped)
     }
 
-    /// コマンドに割り当てたキー(キー設定の表から引く)．割り当てていなければ「なし」
-    private func keys(for command: KeymapCommand) -> String {
+}
+
+/// パレットを開くキーの行．コマンドに割り当てたキーをキー設定の表から引く．割り当てていなければ「なし」
+private struct PaletteKeyRow: View {
+    @ObservedObject var model: SettingsModel
+    let title: String
+    let command: KeymapCommand
+
+    var body: some View {
         let strokes = model.settings.keymap.strokes(for: command, in: .idle)
-        return strokes.isEmpty ? UIStrings.Palette.noKey : strokes.map(UIStrings.Keys.name(of:)).joined(separator: "、")
+        LabeledContent(title, value: strokes.isEmpty ? UIStrings.Palette.noKey : strokes.map(UIStrings.Keys.name(of:)).joined(separator: "、"))
+    }
+}
+
+/// 設定のとおりの列数・行数・説明の項目で並べたパレットの見本．見本にかかわる項目はこの部品が読む
+private struct PaletteSample: View {
+    @ObservedObject var model: SettingsModel
+    /// マスの大きさを動かしているあいだの値(無ければ設定の値)
+    let cellSize: Double?
+
+    var body: some View {
+        let settings = model.settings
+        let panel = SamplePalettes.preview(columns: settings.paletteColumns, rows: settings.paletteRows,
+                                           frequentRows: settings.paletteRecordsHistory ? settings.paletteFrequentRows : 0,
+                                           showsPreview: settings.paletteShowsPreview,
+                                           previewFields: PalettePanel.PreviewFields(unicodeName: settings.paletteShowsUnicodeName, readings: settings.paletteShowsReadings,
+                                                                                     shortcodes: settings.paletteShowsShortcodes, codePoints: settings.paletteShowsCodePoints))
+        PalettePreview(choice: ThemeChoice(settings), panel: panel, cellSize: cellSize ?? settings.paletteCellSize)
     }
 }
 
 /// 設定のとおりの列数・行数・マスの大きさで，パレットの見本をテーマに合わせて描く．欄より広いときは見本ごと縮める
 struct PalettePreview: NSViewRepresentable {
     let choice: ThemeChoice
-    let settings: HajimeDomain.Settings
+    let panel: PalettePanel
     let cellSize: Double
-
-    private var panel: PalettePanel {
-        SamplePalettes.preview(columns: settings.paletteColumns, rows: settings.paletteRows, frequentRows: settings.paletteRecordsHistory ? settings.paletteFrequentRows : 0,
-                               showsPreview: settings.paletteShowsPreview,
-                               previewFields: PalettePanel.PreviewFields(unicodeName: settings.paletteShowsUnicodeName, readings: settings.paletteShowsReadings,
-                                                                         shortcodes: settings.paletteShowsShortcodes, codePoints: settings.paletteShowsCodePoints))
-    }
 
     func makeNSView(context: Context) -> ScaledPalette {
         ScaledPalette()

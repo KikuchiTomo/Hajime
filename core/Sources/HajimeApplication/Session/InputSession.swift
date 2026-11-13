@@ -330,7 +330,13 @@ public final class InputSession {
     public var awaitsSettle: Bool {
         // ライブ変換がオフでも，打鍵が止まったことは覚える．覚えないと打ち間違いの見直し(awaitsReview)が始まらず，
         // 直すことも「もしかして」と示すこともなくなる．ライブ変換がオフのときの表示は読みのまま変わらない
-        !composition.isEmpty && phase == .composing && !isSettled
+        (!composition.isEmpty && phase == .composing && !isSettled) || settlingEnglishInput != nil
+    }
+
+    /// 英字入力(自動)で，打鍵が止まったら英語と日本語に分けた結果を見せ直す並びを組み立てている入力方式(EnglishInput.awaitsSettle)
+    private var settlingEnglishInput: EnglishInput? {
+        guard composition.isEmpty, let english = styleHandlers[settings.current.inputStyle] as? EnglishInput, english.awaitsSettle else { return nil }
+        return english
     }
 
     private func switchToDirectPassingEscape(actions: [ClientAction]) -> KeyResult {
@@ -392,6 +398,14 @@ public final class InputSession {
                     return rerender(context: context)
                 }]
             } ?? []
+            // 注目している文節の点数での並べ替えをあとに回していれば，まずそれを求めて出し直す(見ている候補なので先に)
+            let scoring: [@MainActor () -> [ClientAction]] = lattice.focused.awaitsScoring ? [{ [self] in
+                guard case .lattice(var current) = phase, composition.conversionReading == reading, current.focused.awaitsScoring else { return [] }
+                current.segments[current.focusedIndex] = latticeBuilder.scored(current.focused, reading: reading,
+                                                                               context: LatticeBuilder.context(in: current, at: current.focusedIndex))
+                phase = .lattice(current)
+                return rerender(context: context)
+            }] : []
             let preview: @MainActor () -> [ClientAction] = { [self] in
                 guard case .lattice(let current) = phase, composition.conversionReading == reading, inlineEdit == nil else { return [] }
                 let key = resizePreviewKey(current)
@@ -399,7 +413,7 @@ public final class InputSession {
                 resizePreviews[key] = latticeBuilder.resizePreview(current, reading: reading)
                 return rerender(context: context)
             }
-            return rest + fills + [preview]
+            return scoring + rest + fills + [preview]
         case .selecting where listSubstitutionPending == composition.conversionReading:
             // 一覧を出したときにまだ求めていなかった文節の候補を 1 文節ずつ求め，迷う文節から順に前後の語を含めた変換を 1 文節ずつ求める．
             // 最後に，文節を入れ替えた文を足して(並べ替えて)出し直す．選んでいる候補は，並びが変わっても同じ候補のままにする
@@ -507,17 +521,29 @@ public final class InputSession {
     }
 
     /// 打鍵の合間に追いかけて求める変換があるか(Zenzai が遅い環境で，入力中の表示を Zenzai なしで求めたとき)
+    /// 英字入力(自動)で，空白を挟まずに打った英語と日本語を分け終えていないときも，打鍵の合間に 1 歩ずつ分ける(EnglishInput)
     public var awaitsDeferredConversion: Bool {
-        phase == .composing && !composition.isEmpty && converter.hasDeferredConversion
+        (phase == .composing && !composition.isEmpty && converter.hasDeferredConversion) || splittingEnglishInput != nil
     }
 
     /// 打鍵の合間に，入力中の表示で済ませなかった Zenzai の変換を求めておく．表示は変えない(止まったときに出す)
     public func performDeferredConversion() {
+        if let english = splittingEnglishInput {
+            english.performDeferredSplit()
+            return
+        }
         converter.performDeferredConversion()
+    }
+
+    /// 英字入力(自動)で，英語と日本語を分け終えていない並びを組み立てている入力方式
+    private var splittingEnglishInput: EnglishInput? {
+        guard composition.isEmpty, let english = styleHandlers[settings.current.inputStyle] as? EnglishInput, english.awaitsMixedSplit else { return nil }
+        return english
     }
 
     /// 打鍵が止まった(DefaultSettings.liveConversionSettleDelay)．かなのまま見せていた語も変換して見せる
     public func settle(context: InputContext) -> [ClientAction] {
+        if let english = settlingEnglishInput { return english.settle() }
         guard awaitsSettle else { return [] }
         isSettled = true
         let typed = composition
@@ -2236,10 +2262,11 @@ public final class InputSession {
                 fillPendingSegments(only: lattice.focusedIndex)
                 if case .lattice(let filled) = phase { lattice = filled }
             }
-            // 注目している文節の候補を前後の文脈で並べ替える(候補を見せる文節だけ．設定の contextualSegmentCandidates)
+            // 注目している文節の候補を前後の文脈で並べ替える(候補を見せる文節だけ．設定の contextualSegmentCandidates)．
+            // 点数(検証木)での並べ替えは，前もって求めた点数が無ければ待たずに出し，続く処理(followUps)で求めて出し直す
             if !lattice.focused.isContextRanked {
                 let ranked = latticeBuilder.rankedByContext(lattice.focused, reading: composition.conversionReading,
-                                                            context: LatticeBuilder.context(in: lattice, at: lattice.focusedIndex))
+                                                            context: LatticeBuilder.context(in: lattice, at: lattice.focusedIndex), scoring: .later)
                 if ranked.isContextRanked {
                     lattice.segments[lattice.focusedIndex] = ranked
                     phase = .lattice(lattice)
@@ -2745,7 +2772,9 @@ public final class InputSession {
         return true
     }
 
-    /// 打ち直しているあいだの表示．打ち直す文節の位置に打った読みを入れ，分岐図は打ち直す前のまま出しておく
+    /// 打ち直しているあいだの表示．打ち直す文節の位置に打った読みを入れる．分岐図は幹のその文節を打っている読みに差し替えて
+    /// 打ち直していると分かる形にし(isEditing)，その文節の枝は打ち直す前の候補を薄く出す．文節ごとの一覧は候補を薄く出す．
+    /// 1 打鍵ごとには変換しない(候補は Space・Tab・Enter で変換したときに出す)
     private func renderInlineEdit(_ lattice: SegmentLattice) -> [ClientAction] {
         guard let edit = inlineEdit else { return [] }
         let segments: [MarkedText.Segment] = lattice.segments.enumerated().map { index, segment in
@@ -2757,11 +2786,31 @@ public final class InputSession {
             var panel = PanelBuilder.segmentListPanel(for: lattice, perPage: latticePerPage, showsVariants: settings.current.showsVariantRow,
                                                       reading: composition.conversionReading, detail: emojiName)
             panel.note = note
+            panel.isEditing = true
+            panel.selectedEntry = nil
+            panel.homophone = nil
+            panel.associationHint = nil
             return [.setMarkedText(MarkedText(segments, caret: caret)), .showCandidates(panel)]
         }
         var panel = PanelBuilder.latticePanel(for: lattice, perPage: settings.current.branchCandidatesPerPage,
                                               showsVariants: settings.current.showsVariantRow, corrected: nil, detail: emojiName)
         panel.note = note
+        panel.associationHint = nil
+        if panel.columns.indices.contains(edit.index) {
+            var column = panel.columns[edit.index]
+            column.text = edit.typed.displayReading
+            column.isEditing = true
+            column.selectedAlternative = nil
+            column.selectedVariant = nil
+            column.isUncertain = false
+            column.isCorrected = false
+            column.preview = nil
+            column.usageNote = nil
+            column.homophone = nil
+            column.sourceName = nil
+            column.split = nil
+            panel.columns[edit.index] = column
+        }
         return [.setMarkedText(MarkedText(segments, caret: caret)), .showLattice(panel)]
     }
 

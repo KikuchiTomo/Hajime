@@ -87,6 +87,14 @@ public enum DefaultSettings {
     public static let maximumWordLanguageWordLength = 32
     /// 英語か日本語かを調べた結果を覚えておく語の数
     public static let maximumWordLanguageCache = 256
+    /// 英字入力(自動)で，空白を挟まずに続けて打った英語と日本語(「kyouhazoomdekaigi」)から切り出す英単語の長さ(R-05)．
+    /// 2 文字までの語(「m」「bn」)は切り出さない．英語の辞書には略語が多く，辞書にない英単語(「github」)を「githu」+「bn」+「i」のように
+    /// 削って後ろを日本語にしてしまうため．空白を挟まずに日本語に続ける英単語は，たいてい 3 文字以上の名詞や動詞(「zoom」「push」)
+    public static let mixedWordEnglishLength = 3...24
+    /// 英字入力(自動)で英語と日本語に分ける並びの長さ(英字の数)の上限．打鍵ごとに分け直すので，長い並びは分けない(R-01)
+    public static let maximumMixedWordKeys = 64
+    /// 英字入力(自動)で，英語の辞書にあるかを調べた結果を覚えておく並びの数
+    public static let maximumEnglishWordCache = 4_096
     /// 設定の画面の「試す」で見分ける語の数の上限
     public static let maximumWordLanguagePreviewWords = 20
     /// 綴りの補正で許す編集距離

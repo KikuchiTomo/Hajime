@@ -74,6 +74,64 @@ struct KeymapScenarioTests {
         #expect(harness.committed == "今日は仮名")
     }
 
+    @Test("打ち直しているあいだ，分岐図の幹のその文節は打っている読みに追従し，打ち直していると分かる形になる．枝は選んでいない形にする")
+    func editSegmentFollowsReading() throws {
+        let harness = editingSecondSegment()
+        var column = try #require(harness.lattice?.columns[1])
+        #expect(column.isEditing)
+        #expect(column.text == "")
+        #expect(column.selectedAlternative == nil)
+        #expect(column.homophone == nil)
+        // ほかの文節はそのまま
+        #expect(harness.lattice?.columns[0].text == "今日は")
+        #expect(harness.lattice?.columns[0].isEditing == false)
+        harness.type("k")
+        #expect(harness.lattice?.columns[1].text == "k")
+        harness.type("a")
+        #expect(harness.lattice?.columns[1].text == "か")
+        harness.type("na")
+        column = try #require(harness.lattice?.columns[1])
+        #expect(column.text == "かな")
+        #expect(column.isEditing)
+        // Tab で変換すると，打ち直しの形を外して候補を出す
+        harness.press(.tab)
+        column = try #require(harness.lattice?.columns[1])
+        #expect(!column.isEditing)
+        #expect(column.text == "仮名")
+    }
+
+    @Test("打ち直しを Esc でやめると，幹のその文節は打ち直す前の語に戻り，打ち直しの形を外す")
+    func editSegmentEscapeRestores() throws {
+        let harness = editingSecondSegment()
+        harness.type("kana")
+        harness.press(.escape)
+        let column = try #require(harness.lattice?.columns[1])
+        #expect(!column.isEditing)
+        #expect(column.text == "いい" || column.text == "良い")
+        #expect(harness.marked.text == "今日はいい")
+    }
+
+    @Test("文節ごとの一覧で打ち直しているあいだは，候補を選んでいない形にして打ち直していると知らせる")
+    func editSegmentInSegmentList() {
+        let converter = twoSegments()
+        converter.table["かな"] = [("仮名", nil)]
+        var settings = settings()
+        settings.initialFocus = .start
+        settings.candidatePresentation = .segmentList
+        let harness = Harness(converter: converter, settings: settings)
+        harness.type("kyouhaii")
+        harness.press(.space)
+        harness.press(.right)
+        harness.press(.backspace, .shift)
+        harness.type("kana")
+        #expect(harness.marked.text == "今日はかな")
+        #expect(harness.panel?.isEditing == true)
+        #expect(harness.panel?.selectedEntry == nil)
+        harness.press(.tab)
+        #expect(harness.panel?.isEditing == false)
+        #expect(harness.marked.text == "今日は仮名")
+    }
+
     @Test("打ち直しているあいだの Enter は，打ち直した読みを変換して確定する")
     func editSegmentThenCommit() {
         let harness = editingSecondSegment()

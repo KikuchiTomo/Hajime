@@ -155,6 +155,7 @@ mod tests {
 
     fn list(focus: CandidateFocus) -> CandidateList {
         CandidateList {
+            is_editing: None,
             association: None,
             association_hint: None,
             association_key: None,
@@ -253,6 +254,7 @@ mod tests {
     #[test]
     fn 分岐図は注目している文節を読む() {
         let column = |text: &str, focused: bool| BranchColumn {
+            is_editing: None,
             text: text.into(),
             alternatives: vec![],
             selected_alternative: None,
@@ -327,6 +329,7 @@ mod tests {
     #[test]
     fn 分岐図で選んでいる枝にコメントがあれば続けて読む() {
         let mut column = BranchColumn {
+            is_editing: None,
             text: "ピヨ株式会社".into(),
             alternatives: vec!["会社".into(), "ピヨ株式会社".into()],
             selected_alternative: Some(1),
