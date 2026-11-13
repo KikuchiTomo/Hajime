@@ -651,9 +651,10 @@ pub fn choose_files(owner: HWND, filter_name: &str, pattern: &str) -> Vec<String
     }
 }
 
-/// ポインターの位置に項目を選ぶメニューを出し，選んだ項目の番号を返す．選ばずに閉じたら None
-/// (英語と日本語の試した結果のタグを押したとき．macOS は SwiftUI のボタンのメニュー)
-pub fn choose_menu(owner: HWND, items: &[&str]) -> Option<usize> {
+/// 項目を選ぶメニューを出し，選んだ項目の番号を返す．選ばずに閉じたら None
+/// (英語と日本語の試した結果のタグを押したとき．macOS は SwiftUI のボタンのメニュー)．
+/// anchor(画面の座標)があればそこを左上に，無ければポインターの位置に出す(キーボードで開いたときは部品の下に出すため)
+pub fn choose_menu(owner: HWND, items: &[&str], anchor: Option<(i32, i32)>) -> Option<usize> {
     // SAFETY: メニューはこの関数の中で作って壊す．文字列は AppendMenuW の呼び出しのあいだ生きている．owner はこのスレッドの窓
     unsafe {
         let menu = CreatePopupMenu().ok()?;
@@ -662,7 +663,12 @@ pub fn choose_menu(owner: HWND, items: &[&str]) -> Option<usize> {
             let _ = AppendMenuW(menu, MF_STRING, index + 1, &text);
         }
         let mut point = POINT::default();
-        let _ = GetCursorPos(&mut point);
+        match anchor {
+            Some((x, y)) => point = POINT { x, y },
+            None => {
+                let _ = GetCursorPos(&mut point);
+            }
+        }
         // 窓を前に出しておかないと，メニューの外を押しても閉じない
         let _ = SetForegroundWindow(owner);
         let chosen = TrackPopupMenuEx(
