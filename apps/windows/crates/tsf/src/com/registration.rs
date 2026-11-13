@@ -1,5 +1,7 @@
 use super::ids::{CLSID_TEXT_SERVICE, GUID_PROFILE, LANGID_JAPANESE, SERVICE_NAME};
+use std::os::windows::ffi::OsStrExt;
 use windows::Win32::Foundation::{ERROR_FILE_NOT_FOUND, HMODULE};
+use windows::Win32::Storage::FileSystem::{MoveFileExW, MOVEFILE_DELAY_UNTIL_REBOOT};
 use windows::Win32::System::Com::{CoCreateInstance, CLSCTX_INPROC_SERVER};
 use windows::Win32::System::Com::{CoInitializeEx, CoUninitialize, COINIT_APARTMENTTHREADED};
 use windows::Win32::System::LibraryLoader::{GetModuleFileNameW, GetModuleHandleExW};
@@ -124,6 +126,64 @@ fn is_default_profile() -> bool {
 fn is_text_service(value: &str) -> bool {
     let trimmed = value.trim().trim_start_matches('{').trim_end_matches('}');
     trimmed.eq_ignore_ascii_case(&format!("{CLSID_TEXT_SERVICE:?}"))
+}
+
+/// 前の版の DLL を置いたフォルダ(インストール先\tsf\<前のバージョン>)を消す．動いているアプリが読み込んでいて消せないファイルは，
+/// 次の再起動で消えるよう頼む(MoveFileEx の MOVEFILE_DELAY_UNTIL_REBOOT．管理者の権限で呼ぶ)．
+/// 上書きで古い版の DLL を Windows Installer に消させると，ほぼすべてのアプリが読み込んでいるので「アプリを終了する必要があります」の窓が出る．
+/// それを避けるため，古い版の DLL は Windows Installer の消す対象から外し(hajime.wxs)，ここで消す．消すのはこの DLL と同じ tsf の下だけ
+pub fn remove_old_versions() -> Result<()> {
+    let module = std::path::PathBuf::from(module_path()?);
+    let Some((tsf, current)) = crate::install::version_folder(&module) else {
+        return Ok(());
+    };
+    let names: Vec<String> = std::fs::read_dir(&tsf)
+        .map_err(|_| windows_core::Error::from_thread())?
+        .filter_map(|entry| entry.ok())
+        .filter(|entry| entry.file_type().is_ok_and(|kind| kind.is_dir()))
+        .filter_map(|entry| entry.file_name().to_str().map(str::to_string))
+        .collect();
+    for name in crate::install::stale_versions(&names, &current) {
+        let folder = tsf.join(name);
+        if std::fs::remove_dir_all(&folder).is_err() {
+            remove_at_reboot(&folder);
+        }
+    }
+    Ok(())
+}
+
+/// folder の中のファイルとフォルダを，消せるものは今消し，消せないものは次の再起動で消えるよう頼む(中から順に)
+fn remove_at_reboot(folder: &std::path::Path) {
+    let Ok(entries) = std::fs::read_dir(folder) else {
+        return;
+    };
+    for entry in entries.filter_map(|entry| entry.ok()) {
+        let path = entry.path();
+        // リンクはたどらない(指す先を消さない)
+        let Ok(kind) = entry.file_type() else {
+            continue;
+        };
+        if kind.is_dir() && !kind.is_symlink() {
+            remove_at_reboot(&path);
+        } else if std::fs::remove_file(&path).is_err() {
+            delete_at_reboot(&path);
+        }
+    }
+    if std::fs::remove_dir(folder).is_err() {
+        delete_at_reboot(folder);
+    }
+}
+
+fn delete_at_reboot(path: &std::path::Path) {
+    let wide: Vec<u16> = path.as_os_str().encode_wide().chain(Some(0)).collect();
+    // SAFETY: wide は 0 で終わる文字列で，呼び出しのあいだ生きている．消す先(2 つ目)は無し(再起動で消す)
+    let _ = unsafe {
+        MoveFileExW(
+            PCWSTR(wide.as_ptr()),
+            PCWSTR::null(),
+            MOVEFILE_DELAY_UNTIL_REBOOT,
+        )
+    };
 }
 
 pub fn unregister() -> Result<()> {
