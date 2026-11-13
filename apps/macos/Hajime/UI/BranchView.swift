@@ -147,7 +147,8 @@ final class BranchView: NSView {
         if panel.association != nil {
             // 先の枝の丸の中身として出しているときは，中身の下に置く
             let hints = UIStrings.Association.hints(for: keys)
-            return panel.detail == nil ? Hints(candidates: hints) : Hints(items: hints)
+            // 丸の中身では，矢印だけで移る操作(まとまりの切り替え)は案内しない(線のつながりで分かる．矢印は表示の向きに効く)
+            return panel.detail == nil ? Hints(candidates: hints) : Hints(items: hints.filter { !Self.isArrowOnly($0.key) })
         }
         if let split = panel.columns.first(where: \.isFocused)?.split {
             return Hints(boundary: UIStrings.Branch.splitHints(count: split.pieces.count - 1))
@@ -159,8 +160,9 @@ final class BranchView: NSView {
         } else {
             panel.associationHint?.key.map(UIStrings.Branch.expandHint(key:))
         }
+        // 矢印だけで入れるときは案内しない(線のつながりで分かる)．修飾キー付きのキー(連想変換のキー)があれば，それを出す
         return Hints(boundary: UIStrings.Branch.boundaryHints(for: keys), variant: UIStrings.Branch.variantHint(for: keys),
-                     candidates: UIStrings.Branch.candidateHints(for: keys), expand: expand)
+                     candidates: UIStrings.Branch.candidateHints(for: keys), expand: expand.flatMap { Self.isArrowOnly($0.key) ? nil : $0 })
     }
 
     /// 今，この案内を出すか．常に出す設定ならすべて出し，押し続けて出す設定なら，押し続けている修飾キーを使うキーの案内だけを出す
@@ -307,6 +309,8 @@ final class BranchView: NSView {
         var twigY: CGFloat = 0
         /// 文字種の線の，文節から遠い側の端
         var twigEndX: CGFloat = 0
+        /// 文字種の枝を入る位置まで寄せたときの，横の線の左の端．寄せていなければ nil(文節の上で曲がって始まる)
+        var twigStartX: CGFloat?
         var variantHintX: CGFloat?
         /// 文節の境目の上の案内の行
         var boundaryMidY: CGFloat?
@@ -567,7 +571,12 @@ final class BranchView: NSView {
         if focusX + reach > right { direction = focusX - reach >= left || focusX > width / 2 ? -1 : 1 }
         let edge = Map.stopSizeSelected / 2
         let stemX = (direction > 0 ? max(min(focusX, right - reach), left + edge) : min(max(focusX, left + reach), right - edge)).rounded()
-        let twigDirection: CGFloat = focusX + kindsReach <= right || focusX - kindsReach < left ? 1 : -1
+        // 文字種の枝の向き．右に入れば右，入らなければ左．どちらにも入らなければ，窓の右の端にそろえて置き，文節から上へ伸びる線と T 字でつなぐ
+        // (文字種の並びは，どの向きでも左から右のまま)
+        let twigFitsRight = focusX + kindsReach <= right
+        let twigFitsLeft = focusX - kindsReach >= left
+        let twigDirection: CGFloat = twigFitsRight || !twigFitsLeft ? 1 : -1
+        let twigShift = twigFitsRight || twigFitsLeft ? 0 : max(min(focusX + kindsReach - right, focusX + kindStart - left), 0)
         /// 縦の線から外へ start の距離に置く，幅 width の物の左の端
         func minX(_ start: CGFloat, _ width: CGFloat) -> CGFloat { direction > 0 ? stemX + start : stemX - start - width }
 
@@ -583,7 +592,7 @@ final class BranchView: NSView {
             y += tag + Space.inset
             result.twigY = (y + Map.stopSize / 2).rounded()
             y += Map.stopSize + Space.inset
-            var kindX = twigDirection > 0 ? focusX + kindStart : focusX - kindsReach + (variantHintWidth > 0 ? variantHintWidth + Space.group : 0)
+            var kindX = twigDirection > 0 ? focusX + kindStart - twigShift : focusX - kindsReach + (variantHintWidth > 0 ? variantHintWidth + Space.group : 0)
             for kindWidth in kindWidths {
                 let label = NSRect(x: kindX.rounded(), y: labelY, width: kindWidth, height: tag)
                 result.kinds.append(Kind(stop: NSPoint(x: label.minX + Part.rowPaddingX + Map.stopSize / 2, y: result.twigY), label: label))
@@ -591,6 +600,8 @@ final class BranchView: NSView {
             }
             let labelsEnd = kindX - Map.stationGap
             result.twigEndX = twigDirection > 0 ? labelsEnd : (result.kinds.first?.label.minX ?? focusX)
+            // 寄せたときは，線の左の端が文節より左に来る
+            if twigShift > 0 { result.twigStartX = result.kinds.first?.stop.x }
             if variantHintWidth > 0 { result.variantHintX = twigDirection > 0 ? labelsEnd + Space.group : focusX - kindsReach }
         }
         if focus != nil, !showsHeading {
@@ -734,6 +745,23 @@ final class BranchView: NSView {
         trunkOffset = max(offset, 0)
     }
 
+    /// キーの名前が矢印だけか(← → ↑ ↓ と，その組み合わせ)
+    private static func isArrowOnly(_ key: String) -> Bool {
+        let arrows: Set<Character> = ["←", "→", "↑", "↓", "↔", "↕", " "]
+        return !key.isEmpty && key.allSatisfy(arrows.contains)
+    }
+
+    /// キーの名前の中の左右の矢印を入れ替える
+    private static func mirroredArrows(_ key: String) -> String {
+        String(key.map { $0 == "→" ? "←" : $0 == "←" ? "→" : $0 })
+    }
+
+    /// 候補と先の枝を，左右に反転して左へ出しているか．矢印キーを表示の向きに効かせるために，キーを渡す前にコアへ知らせる
+    var isMirrored: Bool {
+        guard let panel else { return false }
+        return layout(for: panel).direction < 0
+    }
+
     func fittingSize(for panel: LatticePanel) -> NSSize {
         let size = layout(for: panel.shownGroup().panel).size
         return NSSize(width: size.width + dropShadowOffset, height: size.height + dropShadowOffset)
@@ -841,7 +869,13 @@ final class BranchView: NSView {
         }
         for (index, kind) in layout.kinds.enumerated() {
             // 文節に近い側の丸ほど，選んだ道すじの途中になる
-            let passed = column?.selectedVariant.map { layout.twigDirection > 0 ? index < $0 : index > $0 } ?? false
+            let passed: Bool
+            if let selected = column?.selectedVariant, layout.kinds.indices.contains(selected) {
+                let span = min(layout.focusX, layout.kinds[selected].stop.x)...max(layout.focusX, layout.kinds[selected].stop.x)
+                passed = index != selected && span.contains(kind.stop.x)
+            } else {
+                passed = false
+            }
             branchStops.append(Stop(center: kind.stop, state: index == column?.selectedVariant ? .selected : passed ? .passed : .plain, opacity: stale))
         }
         for (index, station) in layout.stations.enumerated() {
@@ -920,9 +954,16 @@ final class BranchView: NSView {
             if !layout.kinds.isEmpty {
                 let top = NSPoint(x: layout.focusX, y: node.minY + metrics.rowInset)
                 let corner = NSPoint(x: layout.focusX, y: layout.twigY)
-                lines.append(Line(points: [top, corner, NSPoint(x: layout.twigEndX, y: layout.twigY)], radius: metrics.turnRadius))
+                if let start = layout.twigStartX {
+                    // 寄せた枝: 横の線を端から端まで引き，文節から上へ伸びる線を T 字でつなぐ
+                    lines.append(Line(points: [NSPoint(x: start, y: layout.twigY), NSPoint(x: layout.twigEndX, y: layout.twigY)]))
+                    lines.append(Line(points: [top, corner]))
+                } else {
+                    lines.append(Line(points: [top, corner, NSPoint(x: layout.twigEndX, y: layout.twigY)], radius: metrics.turnRadius))
+                }
                 if let selected = column?.selectedVariant, layout.kinds.indices.contains(selected) {
-                    route.append(Line(points: [top, corner, NSPoint(x: layout.kinds[selected].stop.x, y: layout.twigY)], radius: metrics.turnRadius))
+                    route.append(Line(points: [top, corner, NSPoint(x: layout.kinds[selected].stop.x, y: layout.twigY)],
+                                      radius: layout.twigStartX == nil ? metrics.turnRadius : 0))
                 }
             }
         }
@@ -1000,7 +1041,9 @@ final class BranchView: NSView {
                 BranchMapDrawing.drawHint(hint, x: x, midY: label.midY, theme: theme)
             }
             if let x = layout.expandX, let hint = hints.expand, isShown(hint, in: panel) {
-                BranchMapDrawing.drawHint(hint, x: x, midY: layout.expandMidY, theme: theme)
+                // 先の枝を左へ出しているときは，入る矢印も左になる(矢印キーは表示の向きに効く)
+                let shown = layout.direction < 0 ? KeyHint(key: Self.mirroredArrows(hint.key), label: hint.label) : hint
+                BranchMapDrawing.drawHint(shown, x: x, midY: layout.expandMidY, theme: theme)
             }
             if let midY = layout.bottomMidY { drawHints(hints.candidates, x: layout.bottomHintsX, midY: midY, in: panel) }
             if let midY = layout.itemBottomMidY { drawHints(hints.items, x: layout.itemHintsX, midY: midY, in: panel) }

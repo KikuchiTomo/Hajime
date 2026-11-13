@@ -152,6 +152,9 @@ final class ClientActionPresenter {
         }
     }
 
+    /// 出している分岐図が，候補と先の枝を左へ出しているか．矢印キーを表示の向きに効かせるために，キーを渡す前にコアへ知らせる
+    var isBranchMirrored: Bool { candidatePanel.isBranchMirrored }
+
     /// 修飾キーの押し方が変わった(分岐図のキーの案内を，押し続けているあいだだけ出す)
     func modifiersChanged(_ flags: NSEvent.ModifierFlags) {
         candidatePanel.modifiersChanged(flags)
