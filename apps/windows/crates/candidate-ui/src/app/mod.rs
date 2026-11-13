@@ -38,8 +38,8 @@ type Inbox = Arc<Mutex<VecDeque<UiCommand>>>;
 
 enum Content {
     Hidden,
-    Candidates(ipc::CandidateList),
-    /// 分岐図(先の枝の中身などで大きいので，箱に入れる)
+    Candidates(Box<ipc::CandidateList>),
+    /// 一覧と分岐図は大きいので箱に入れる
     BranchMap(Box<ipc::BranchMap>),
     Note(ipc::Note),
     /// モード表示の文字
@@ -373,7 +373,7 @@ impl App {
             UiCommand::SetPresentation { presentation } => self.presentation = presentation,
             UiCommand::ShowCandidates { list, anchor } => {
                 self.arrived = matches!(&self.content, Content::Candidates(shown) if motion::arrived_list(shown, &list));
-                self.content = Content::Candidates(list);
+                self.content = Content::Candidates(Box::new(list));
                 self.anchor = anchor.or(self.anchor.take());
             }
             UiCommand::ShowBranchMap { map, anchor } => {
