@@ -136,6 +136,40 @@ pub(super) fn focused(map: &BranchMap) -> Option<(usize, &BranchColumn)> {
         .find(|(_, column)| column.is_focused)
 }
 
+/// ページの数と今のページ(0 から)．1 ページか，1 ページの数が分からなければ None
+fn pages(map: &BranchMap) -> Option<(u32, u32)> {
+    let size = map.page_size.filter(|size| *size > 0)?;
+    (map.total > size).then(|| {
+        (
+            map.total.div_ceil(size),
+            map.position.saturating_sub(1) / size,
+        )
+    })
+}
+
+/// 候補の下の行に出す位置の文字．ページの位置は縦の線の下の点で示すので，点で示せないほどページが多いときだけ「3 / 12」と出す．
+/// 1 ページの数を知らせない前の版のエンジンでは，今までどおり「1–4 / 8」と出す
+fn position_text(map: &BranchMap) -> String {
+    if map.page_size.is_none() {
+        return position(map);
+    }
+    match pages(map) {
+        Some((count, current)) if count as f32 > map::PAGE_DOT_LIMIT => {
+            strings::group_position(current + 1, count)
+        }
+        _ => String::new(),
+    }
+}
+
+/// ページの位置を示す点の並び．縦の線の下に，ページの数だけ縦に並べる
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct PageDots {
+    x: f32,
+    top: f32,
+    count: u32,
+    current: u32,
+}
+
 /// 何番目の候補か．区切っているときは候補を出さないので出さない
 fn position(map: &BranchMap) -> String {
     match focused(map) {
@@ -362,6 +396,8 @@ struct Layout {
     bottom_hints_x: f32,
     position_x: f32,
     source_x: f32,
+    /// ページの位置を示す点
+    page_dots: Option<PageDots>,
     /// 候補の下に出す語の意味のカード
     slot: Option<Slot>,
     card: Option<Frame>,
@@ -406,10 +442,11 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         .fold(0.0, f32::max);
     let row_start = BADGE_OFFSET - part::ROW_PADDING_X;
     // 候補の下の行(案内・辞書の名前・位置)．候補の行の幅に収め，先の枝と重ねない
-    let position_text = if lower.is_empty() {
-        String::new()
+    let shows_pages = !lower.is_empty() && column.is_some_and(|column| column.split.is_none());
+    let position_text = if shows_pages {
+        position_text(map)
     } else {
-        position(map)
+        String::new()
     };
     let position_width = if position_text.is_empty() {
         0.0
@@ -684,6 +721,18 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         y += lower.len() as f32 * metrics.row_height;
     }
     let mut bottom = y;
+    if let Some((count, current)) = pages(map).filter(|_| shows_pages) {
+        if count as f32 <= map::PAGE_DOT_LIMIT {
+            let dots = PageDots {
+                x: stem_x,
+                top: y + space::INSET,
+                count,
+                current,
+            };
+            bottom = bottom.max(dots.top + count as f32 * map::PAGE_DOT_PITCH);
+            result.page_dots = Some(dots);
+        }
+    }
     if has_bottom {
         result.bottom_mid_y = Some(y + space::INSET + tag / 2.0);
         result.bottom_hints_x = min_x(BADGE_OFFSET, bottom_hints_width);
@@ -699,7 +748,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         } else {
             far_x + position_width + candidate::PADDING_X
         };
-        bottom = y + space::INSET + tag;
+        bottom = bottom.max(y + space::INSET + tag);
     }
     if let Some(row) = selected_row.and_then(|index| result.rows.get(index)) {
         let mid_y = row.mid_y().round();
@@ -868,6 +917,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         painter.separator(row.max_y() + GAP, metrics.inset, body.width - metrics.inset);
     }
     let column = layout.focus.map(|index| &map.columns[index]);
+    let on_trunk = map.trunk_focused == Some(true);
     let rows = column.map_or_else(Vec::new, |column| lower_rows(column, look.rest_opacity));
     let selected_row = rows.iter().position(|row| row.selected);
     let stale = if column.is_some_and(editing) {
@@ -1001,7 +1051,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         for (index, column) in map.columns.iter().enumerate() {
             let node = layout.nodes[index];
             if node.max_x() >= 0.0 && node.x <= body.max_x() {
-                trunk_node(&mut painter, column, node);
+                trunk_node(&mut painter, column, node, on_trunk);
             }
         }
         // 文節へ移るキーを，文節の丸の上に重ねる(区切っているあいだは，番号キーが別の意味になるので出さない)
@@ -1093,6 +1143,9 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         metrics.pixel_scale,
     );
     route::draw_stops(&mut painter, &branch_stops, metrics.line_width);
+    if let Some(dots) = layout.page_dots {
+        route::page_dots(&mut painter, dots.x, dots.top, dots.count, dots.current);
+    }
     // 畳んでいる枝の，続きがある印．線の色のままだと透かした先が見えないので，控えめな文字の色から透かす
     for (from, to) in [layout.variant_stub, layout.detail_stub]
         .into_iter()
@@ -1109,7 +1162,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
 
     // 候補・文字種・先の枝の見出し
     for (index, row) in layout.rows.iter().enumerate().take(rows.len()) {
-        draw_row(&mut painter, &rows[index], *row, layout.direction);
+        draw_row(&mut painter, &rows[index], *row, layout.direction, on_trunk);
     }
     if let Some(column) = column {
         let keys = variant_keys(map, Some(column));
@@ -1174,7 +1227,7 @@ pub fn branch_map(map: &BranchMap, look: &Look, measure: &dyn Measure) -> Scene 
         let row = Frame::new(0.0, mid_y - glass::TAG_HEIGHT / 2.0, 0.0, glass::TAG_HEIGHT);
         if !rows.is_empty() {
             painter.text(
-                &position(map),
+                &position_text(map),
                 Font::Label,
                 theme.text_muted,
                 layout.position_x,
@@ -1326,21 +1379,28 @@ fn editing_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
     );
 }
 
-fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame) {
+/// on_trunk は，矢印で木をたどっていて幹の上(文節)にいるか．そのときは文節を候補と同じ強い選択で見せる(今いる場所)
+fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame, on_trunk: bool) {
     if editing(column) && column.split.is_none() {
         editing_node(painter, column, node);
         return;
     }
     let theme = painter.theme;
     let rounded = theme.is_rounded();
+    let strong = column.is_focused && (on_trunk || !rounded);
     if column.is_focused {
         if rounded {
-            painter.capsule(node.inset(0.0, glass::SELECTION_INSET_Y), theme.focus_tint);
+            let fill = if on_trunk {
+                theme.selection
+            } else {
+                theme.focus_tint
+            };
+            painter.capsule(node.inset(0.0, glass::SELECTION_INSET_Y), fill);
         } else {
             painter.rect(node, theme.selection);
         }
     }
-    let color = if !rounded && column.is_focused {
+    let color = if strong {
         theme.selection_text
     } else {
         theme.text
@@ -1400,28 +1460,35 @@ fn draw_split(painter: &mut Painter, split: &BranchSplit, node: Frame, color: cr
     }
 }
 
-/// 候補の行．縦の線に近い側から，番号・文字・添え書きの順に並べる(枝を左右に反転したときは右から)
-fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, direction: f32) {
+/// 候補の行．縦の線に近い側から，番号・文字・添え書きの順に並べる(枝を左右に反転したときは右から)．
+/// soft なら(幹の上にいる)，選んでいる候補を文節と同じ薄い背景にして，文字はふつうの色のままにする
+fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, direction: f32, soft: bool) {
     let theme = painter.theme;
     let rounded = theme.is_rounded();
+    let solid = row.selected && !soft;
     let opacity = if row.selected { 1.0 } else { row.opacity };
-    let text_color = if row.selected {
+    let text_color = if solid {
         theme.selection_text
     } else {
         theme.text
     }
     .faded(opacity);
-    let muted_color = if row.selected {
+    let muted_color = if solid {
         theme.selection_text
     } else {
         theme.text_muted
     }
     .faded(opacity);
     if row.selected {
-        if rounded {
-            painter.capsule(frame.inset(0.0, glass::SELECTION_INSET_Y), theme.selection);
+        let fill = if solid {
+            theme.selection
         } else {
-            painter.rect(frame, theme.selection);
+            theme.focus_tint
+        };
+        if rounded {
+            painter.capsule(frame.inset(0.0, glass::SELECTION_INSET_Y), fill);
+        } else {
+            painter.rect(frame, fill);
         }
     }
     // 番号は番号キーで選べるので，キーキャップの形にする
@@ -1437,20 +1504,7 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, direction: f32) {
         glass::BADGE_SIZE,
     );
     if rounded {
-        if row.selected {
-            painter.draws.push(Draw::RoundRect {
-                frame: badge,
-                radius: glass::KEYCAP_RADIUS,
-                fill: Some(
-                    theme
-                        .selection_text
-                        .with_alpha(tokens::opacity::badge::SELECTED),
-                ),
-                stroke: None,
-            });
-        } else {
-            painter.keycap(badge);
-        }
+        painter.badge_box(badge, solid);
     }
     painter.label(&row.badge, muted_color, badge, Font::Key);
     let content_width = row.command.map_or(0.0, |_| Painter::command_width())
@@ -1463,7 +1517,7 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, direction: f32) {
     };
     if let Some(kind) = row.command {
         // コマンドの候補は，文字の前に種類のアイコンを置く
-        painter.command(kind, text_x, frame.mid_y(), row.selected, opacity);
+        painter.command(kind, text_x, frame.mid_y(), solid, opacity);
         text_x += Painter::command_width();
     }
     painter.text(&row.text, Font::Candidate, text_color, text_x, frame);
@@ -1483,7 +1537,7 @@ fn draw_row(painter: &mut Painter, row: &Row, frame: Frame, direction: f32) {
             note,
             tag_max_x(painter, note, frame, direction),
             frame.mid_y(),
-            row.selected,
+            solid,
             TagStyle::of(note, row.command.is_some()),
         );
     }
@@ -2053,7 +2107,7 @@ mod tests {
                 .iter()
                 .filter(|draw| {
                     matches!(draw, Draw::RoundRect { fill: Some(fill), radius, .. }
-                    if *fill == color && *radius == glass::TAG_RADIUS)
+                    if *fill == color && *radius == map::BADGE_RADIUS)
                 })
                 .count()
         };
@@ -2180,5 +2234,49 @@ mod tests {
         // 確信の低い文節の下の幹は点線
         assert!(scene.draws.iter().any(|draw| matches!(draw,
             Draw::Line { dot_pitch: Some(pitch), .. } if *pitch == glass::DOT_PITCH)));
+    }
+
+    #[test]
+    fn ページの位置は縦の線の下の点で示し_多すぎれば数字_1_ページなら出さない() {
+        let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let mut paged = keyed(map());
+        paged.page_size = Some(2);
+        paged.total = 6;
+        paged.position = 3;
+        let layout = metrics_and_layout(&paged, &theme);
+        let dots = layout.page_dots.expect("ページの点");
+        assert_eq!((dots.count, dots.current), (3, 1));
+        assert_eq!(dots.x, layout.stem_x);
+        let scene = branch_map(&paged, &look, &Fixed);
+        assert!(!texts(&scene).iter().any(|(text, _)| text.contains('/')));
+        // 点で示せないほど多いときは数字
+        paged.total = 20;
+        let many = branch_map(&paged, &look, &Fixed);
+        assert!(texts(&many).iter().any(|(text, _)| text == "2 / 10"));
+        assert!(metrics_and_layout(&paged, &theme).page_dots.is_none());
+        // 1 ページなら出さない
+        paged.total = 2;
+        paged.position = 1;
+        assert!(metrics_and_layout(&paged, &theme).page_dots.is_none());
+        let single = branch_map(&paged, &look, &Fixed);
+        assert!(!texts(&single).iter().any(|(text, _)| text.contains('/')));
+    }
+
+    #[test]
+    fn 幹の上にいるときは文節を強い選択にし_選んでいる候補を薄い背景にする() {
+        let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let mut trunk = keyed(map());
+        trunk.trunk_focused = Some(true);
+        let scene = branch_map(&trunk, &look, &Fixed);
+        let texts = texts(&scene);
+        assert!(texts.contains(&("今日は".into(), theme.selection_text)));
+        assert!(texts.contains(&("京は".into(), theme.text)));
+        // ふだんは候補が強い選択
+        let plain = branch_map(&keyed(map()), &look, &Fixed);
+        assert!(
+            super::super::testing::texts(&plain).contains(&("京は".into(), theme.selection_text))
+        );
     }
 }

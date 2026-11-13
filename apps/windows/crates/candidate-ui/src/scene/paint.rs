@@ -734,7 +734,7 @@ impl<'a> Painter<'a> {
         self.draws.push(Draw::RoundRect {
             frame: rect,
             radius: if theme.is_rounded() {
-                glass::TAG_RADIUS
+                tokens::size::branch_map::BADGE_RADIUS
             } else {
                 0.0
             },
@@ -782,20 +782,7 @@ impl<'a> Painter<'a> {
             self.key_mark_width(keys),
             glass::TAG_HEIGHT,
         );
-        if selected {
-            self.draws.push(Draw::RoundRect {
-                frame: rect,
-                radius: if theme.is_rounded() {
-                    glass::KEYCAP_RADIUS
-                } else {
-                    0.0
-                },
-                fill: Some(theme.selection_text.with_alpha(opacity::badge::SELECTED)),
-                stroke: None,
-            });
-        } else {
-            self.keycap(rect);
-        }
+        self.badge_box(rect, selected);
         let ink = if selected {
             theme.selection_text
         } else {
@@ -803,6 +790,33 @@ impl<'a> Painter<'a> {
         };
         let start = rect.mid_x() - self.parts_width(keys) / 2.0;
         self.draw_parts(keys, start, rect, ink);
+    }
+
+    /// 分岐図の候補の番号と，キーだけの印の面．番号キー・キーで選べる物の印なので，キーキャップの形にする．
+    /// 角の丸みは候補の行と同じ比率(size.branch-map.badge-radius)．選んでいる行の上では，選択の文字の色を薄く敷く
+    pub fn badge_box(&mut self, rect: Frame, selected: bool) {
+        let theme = self.theme;
+        if !theme.is_rounded() {
+            if !selected {
+                self.keycap(rect);
+            }
+            return;
+        }
+        let stroke = tokens::size::part::STROKE;
+        let (fill, line) = if selected {
+            (
+                theme.selection_text.with_alpha(opacity::badge::SELECTED),
+                None,
+            )
+        } else {
+            (theme.badge, Some((theme.line, stroke)))
+        };
+        self.draws.push(Draw::RoundRect {
+            frame: rect.inset(stroke / 2.0, stroke / 2.0),
+            radius: tokens::size::branch_map::BADGE_RADIUS,
+            fill: Some(fill),
+            stroke: line,
+        });
     }
 
     /// 幅に収まる案内．前から並べ，収まらなくなったところから後ろを出さない(macOS の GlassDrawing.hints(fitting:))

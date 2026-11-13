@@ -392,6 +392,32 @@ pub fn draw_stops(painter: &mut Painter, stops: &[Stop], line_width: f32) {
     }
 }
 
+/// ページの位置を示す点．x の縦の線の下に，ページの数だけ縦に並べる．今のページの点は選択の色，ほかは線の色
+pub fn page_dots(painter: &mut Painter, x: f32, top: f32, count: u32, current: u32) {
+    let theme = painter.theme;
+    let size = branch_map::PAGE_DOT_SIZE;
+    for index in 0..count {
+        let mid_y =
+            top + branch_map::PAGE_DOT_PITCH * index as f32 + branch_map::PAGE_DOT_PITCH / 2.0;
+        let frame = Frame::new(
+            (x - size / 2.0).round(),
+            (mid_y - size / 2.0).round(),
+            size,
+            size,
+        );
+        let color = if index == current {
+            theme.selection
+        } else {
+            theme.line
+        };
+        if theme.is_rounded() {
+            painter.draws.push(Draw::Ellipse { frame, color });
+        } else {
+            painter.rect(frame, color);
+        }
+    }
+}
+
 /// 続きがある印．from から to へ，端へ向けて透かした線を引く(畳んでいる枝)．縦か横の線
 pub fn fading_line(painter: &mut Painter, from: Point, to: Point, color: Color, width: f32) {
     const STEPS: usize = 8;

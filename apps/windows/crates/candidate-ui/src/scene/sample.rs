@@ -66,6 +66,13 @@ pub fn with_keys(mut map: BranchMap) -> BranchMap {
             );
         }
     }
+    // 1 ページの数は，注目している文節の候補の数(候補が無ければ知らせない)
+    map.page_size = map
+        .columns
+        .iter()
+        .find(|column| column.is_focused)
+        .map(|column| column.alternatives.len() as u32)
+        .filter(|count| *count > 0);
     map.placed_hints = Some(BranchHints {
         boundary: vec![hint("Shift+←→", "区切り"), hint("Shift+↓", "分割")],
         variant: Some(hint("Shift+Space", "文字種")),
@@ -120,6 +127,14 @@ pub fn branch() -> BranchMap {
         page_size: None,
         hints_on_hold: None,
     })
+}
+
+/// 矢印で木をたどっていて，幹の上(文節)にいる分岐図(macOS の branch-trunk)
+pub fn trunk_branch() -> BranchMap {
+    BranchMap {
+        trunk_focused: Some(true),
+        ..branch()
+    }
 }
 
 /// 表示項目を減らす設定の分岐図．文字種と先の枝を畳み，続きがある印の線を出す(macOS の fewerItemsLattice)

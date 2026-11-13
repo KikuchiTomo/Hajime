@@ -185,7 +185,7 @@ fn render_all(output: &Path) -> Result<()> {
                 None => window,
             }
         };
-        let scenes: [(&str, Scene); 22] = [
+        let scenes: [(&str, Scene); 23] = [
             ("list", scene::candidate_list(&list(), &look, &measure)),
             (
                 "list-grid",
@@ -250,6 +250,10 @@ fn render_all(output: &Path) -> Result<()> {
                 scene::branch_map(&preview(), &look, &measure),
             ),
             ("branch-split", scene::branch_map(&split(), &look, &measure)),
+            (
+                "branch-trunk",
+                scene::branch_map(&scene::sample::trunk_branch(), &look, &measure),
+            ),
             (
                 "branch-fewer",
                 scene::branch_map(&scene::sample::fewer_branch(), &look, &measure),
