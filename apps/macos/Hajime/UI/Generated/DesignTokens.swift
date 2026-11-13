@@ -276,6 +276,7 @@ enum DesignTokens {
             static let keycapPaddingY: CGFloat = 3
             static let keycapHeight: CGFloat = 16
             static let hintGap: CGFloat = 8
+            static let hintLineGap: CGFloat = 4
             static let footerHeight: CGFloat = 28
             static let trunkGap: CGFloat = 8
             static let branchIndent: CGFloat = 28

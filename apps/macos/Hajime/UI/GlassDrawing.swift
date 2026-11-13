@@ -203,7 +203,7 @@ enum GlassDrawing {
         return caps.map { keycapWidth($0, theme: theme) }.reduce(0, +) + Glass.keycapGap * CGFloat(max(caps.count - 1, 0))
     }
 
-    private static func hintWidth(_ hint: KeyHint, theme: ResolvedTheme) -> CGFloat {
+    static func hintWidth(_ hint: KeyHint, theme: ResolvedTheme) -> CGFloat {
         let label = hint.label.size(withAttributes: [.font: theme.labelFont(size: Glass.labelFontSize)]).width
         return keycapsWidth(hint, theme: theme) + Glass.keycapPaddingX + label.rounded(.up)
     }
