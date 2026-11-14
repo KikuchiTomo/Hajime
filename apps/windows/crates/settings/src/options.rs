@@ -30,6 +30,34 @@ pub const WORD_CLASSES: &[Choice] = &[
     ("interjection", "感動詞"),
 ];
 
+/// 選択肢の一覧の中の組．title があれば組の見出しにする(macOS の RuleKinds.Group)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ChoiceGroup {
+    pub title: Option<&'static str>,
+    /// 組に入る選択肢の数(選択肢の並びの順に数える)
+    pub count: usize,
+}
+
+/// 品詞の一覧の組(macOS の DictionaryPage の wordClasses)．名詞，人名，地名・短縮よみ・顔文字・記号，その他
+pub const WORD_CLASS_GROUPS: &[ChoiceGroup] = &[
+    ChoiceGroup {
+        title: None,
+        count: 1,
+    },
+    ChoiceGroup {
+        title: Some(crate::strings::settings::PERSON_NAME_GROUP),
+        count: 3,
+    },
+    ChoiceGroup {
+        title: None,
+        count: 3,
+    },
+    ChoiceGroup {
+        title: Some(crate::strings::settings::OTHER_WORD_CLASSES),
+        count: 6,
+    },
+];
+
 pub const INPUT_STYLES: &[Choice] = &[
     ("romaji", "ローマ字入力"),
     ("kana", "かな入力"),
@@ -237,6 +265,25 @@ mod tests {
         assert_eq!(unique.len(), WORD_CLASSES.len());
         // 通信の品詞の数(protocol/schema.json の WordClass)
         assert_eq!(classes.len(), 13);
+    }
+
+    #[test]
+    fn 品詞の組は選択肢をすべて一度ずつ分ける() {
+        let counts: Vec<usize> = WORD_CLASS_GROUPS.iter().map(|group| group.count).collect();
+        assert_eq!(counts.iter().sum::<usize>(), WORD_CLASSES.len());
+        // 組の先頭の値(macOS の DictionaryPage の wordClasses と同じ分け方)
+        let mut start = 0;
+        let firsts: Vec<&str> = WORD_CLASS_GROUPS
+            .iter()
+            .map(|group| {
+                let first = WORD_CLASSES[start].0;
+                start += group.count;
+                first
+            })
+            .collect();
+        assert_eq!(firsts, ["noun", "surname", "place", "properNoun"]);
+        let titles: Vec<Option<&str>> = WORD_CLASS_GROUPS.iter().map(|group| group.title).collect();
+        assert_eq!(titles, [None, Some("人名"), None, Some("その他")]);
     }
 
     #[test]

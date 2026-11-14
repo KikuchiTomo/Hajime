@@ -4,7 +4,7 @@
 //! 一覧は設定のファイルの JSON の配列のまま扱い，足す・消すは新しい配列を作ってエンジンに書いてもらう．
 //! 形の確かめはエンジンが設定のファイルを読むときと同じに行うので，書いたあとに残っていなければ形が誤っている
 
-use crate::options::Choice;
+use crate::options::{Choice, ChoiceGroup};
 use serde_json::{Map, Value};
 
 /// 一覧の 1 つの欄
@@ -15,6 +15,8 @@ pub struct Field {
     pub label: &'static str,
     /// 選ぶ欄の選択肢．None なら打つ欄
     pub choices: Option<&'static [Choice]>,
+    /// 選ぶ欄の一覧の組(見出しと区切りの線)．空なら組に分けない
+    pub groups: &'static [ChoiceGroup],
     /// 行を見分ける欄か(同じ値の行は置き換える)
     pub key: bool,
     /// キーの書き方の欄(keys::canonical で整え，読めなければ足さない)
@@ -39,6 +41,7 @@ impl Field {
             optional: false,
             prompt: None,
             default_choice: 0,
+            groups: &[],
         }
     }
 
@@ -52,6 +55,7 @@ impl Field {
             optional: false,
             prompt: None,
             default_choice: 0,
+            groups: &[],
         }
     }
 
@@ -70,6 +74,7 @@ impl Field {
             optional: false,
             prompt: None,
             default_choice: 0,
+            groups: &[],
         }
     }
 
@@ -84,6 +89,7 @@ impl Field {
             optional: false,
             prompt: None,
             default_choice: 0,
+            groups: &[],
         }
     }
 
@@ -101,6 +107,11 @@ impl Field {
             default_choice: index,
             ..self
         }
+    }
+
+    /// 選ぶ欄の一覧を組に分ける(品詞)
+    pub const fn grouped(self, groups: &'static [ChoiceGroup]) -> Self {
+        Self { groups, ..self }
     }
 
     /// 入力欄の案内を label と別にする(「コメント(省略可)」)

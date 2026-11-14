@@ -22,6 +22,7 @@ use crate::model::SettingsModel;
 use crate::pages::{self, Page};
 use crate::strings::{features, settings};
 use crate::ui::anim::{Easing, Tween};
+use crate::ui::menu::{MenuLayout, MenuMove, MenuRowKind};
 use crate::ui::nav::NavLayout;
 use crate::ui::scroll::{self, Scroller};
 use crate::ui::table::Move;
@@ -89,6 +90,8 @@ enum Shot {
     ImportPreview,
     /// キー設定の表から確定の行を消した(キーの無い知らせと「既定のキーを追加」)
     MissingKeys,
+    /// 組に分けた一覧を開いた(ユーザー辞書の品詞．組の見出しと区切りの線)
+    GroupedMenu,
     /// キー設定の新しい行に，表にある行と同じ状態・同じキーを入れた(足す前の知らせ)．表は押したキーで絞り込んでいる(チップ)
     KeyDraft,
     /// キー設定の新しい行のキーを記録しているところ(案内と「記録を停止」)
@@ -97,13 +100,14 @@ enum Shot {
 
 impl Shot {
     /// ふつうの 1 枚のほかに写すページと状態
-    const TEMPLATES: [(Page, Shot); 8] = [
+    const TEMPLATES: [(Page, Shot); 9] = [
         (Page::Dictionary, Shot::Open),
         (Page::Dictionary, Shot::Typing),
         (Page::Dictionary, Shot::DynamicOff),
         (Page::Commands, Shot::Open),
         (Page::Dictionary, Shot::ImportPreview),
         (Page::Keys, Shot::MissingKeys),
+        (Page::Dictionary, Shot::GroupedMenu),
         (Page::Keys, Shot::KeyDraft),
         (Page::Keys, Shot::KeyRecording),
     ];
@@ -116,6 +120,7 @@ impl Shot {
             Shot::DynamicOff => "-templates-off",
             Shot::ImportPreview => "-import-preview",
             Shot::MissingKeys => "-missing-keys",
+            Shot::GroupedMenu => "-word-classes-open",
             Shot::KeyDraft => "-key-draft",
             Shot::KeyRecording => "-key-recording",
         }
@@ -239,6 +244,8 @@ struct Flyout {
     window: Window,
     surface: Surface,
     items: Vec<String>,
+    /// 行の並び(項目と，組の見出し・区切りの線)．selected と hover は項目だけを数えた番号
+    layout: MenuLayout,
     selected: Option<usize>,
     hover: Option<usize>,
     scroll: Scroller,
@@ -1701,7 +1708,7 @@ impl App {
         ffi::invalidate(self.window);
     }
 
-    /// 右クリック．表の行ならその行を選んでメニューを出す
+    /// 右クリック．表の行ならその行を選んでメニューを出す．カスタムテーマの行なら編集・複製・削除のメニューを出す
     fn right_click(&mut self, lparam: LPARAM) {
         let (x, y) = self.point(lparam);
         let now = self.now();
@@ -1709,6 +1716,11 @@ impl App {
         let Some(Target::Page(element)) = self.target_at(x, y) else {
             return;
         };
+        if self.view.row_menu_opens(element) {
+            self.open_row_menu(element.row, x, y);
+            ffi::invalidate(self.window);
+            return;
+        }
         if element.part != Part::Table {
             return;
         }
@@ -2545,9 +2557,37 @@ impl App {
         self.open_flyout_at(element, Some(Rect::new(x, y, size::SEGMENT_MIN_WIDTH, 0.0)));
     }
 
+    /// 一覧の行の並びと大きさ(DIP)．幅は開いた部品の幅か，いちばん長い名前が収まる幅の広いほう
+    fn flyout_size(
+        &self,
+        items: &[String],
+        groups: &[crate::options::ChoiceGroup],
+        anchor_width: f32,
+    ) -> (MenuLayout, f32, f32) {
+        let layout = MenuLayout::new(items.len(), groups);
+        let widest = items
+            .iter()
+            .map(|label| self.graphics.width(label, TextStyle::Body))
+            .chain(
+                layout
+                    .headings()
+                    .map(|title| self.graphics.width(title, TextStyle::Caption)),
+            )
+            .fold(0.0f32, f32::max);
+        let width = anchor_width
+            .max(widest + size::FIELD_PADDING_X * 2.0 + size::NAV_INDICATOR_WIDTH * 2.0);
+        let height = (layout.height() + size::FLYOUT_PADDING * 2.0).min(size::DROPDOWN_HEIGHT);
+        (layout, width, height)
+    }
+
     /// 一覧を出す．anchor(窓の中の DIP)があればその下に，無ければ部品の下に出す．下に収まらなければ上に出す
     fn open_flyout_at(&mut self, element: Element, anchor: Option<Rect>) {
         let now = self.now();
+        let groups = if element == SHEET_KIND {
+            &[]
+        } else {
+            self.view.dropdown_groups(element)
+        };
         let (items, selected, left, top, rect) = if element == SHEET_KIND {
             // シートの動作(窓の中の位置)
             let Some((sheet, layout)) = self.sheet.as_ref().zip(self.sheet_layout()) else {
@@ -2574,15 +2614,7 @@ impl App {
             return;
         }
         let padding = size::FLYOUT_PADDING;
-        let item = size::FLYOUT_ITEM_HEIGHT;
-        let widest = items
-            .iter()
-            .map(|label| self.graphics.width(label, TextStyle::Body))
-            .fold(0.0f32, f32::max);
-        let flyout_width = rect
-            .width
-            .max(widest + size::FIELD_PADDING_X * 2.0 + size::NAV_INDICATOR_WIDTH * 2.0);
-        let flyout_height = (items.len() as f32 * item + padding * 2.0).min(size::DROPDOWN_HEIGHT);
+        let (layout, flyout_width, flyout_height) = self.flyout_size(&items, groups, rect.width);
         let (client_left, client_top) = self.client_px(left, top + rect.height + padding);
         let (screen_left, screen_top) = ffi::to_screen(self.window, client_left, client_top);
         let (_, client_above) = self.client_px(0.0, top - padding - flyout_height);
@@ -2608,16 +2640,18 @@ impl App {
         ffi::set_round_corners(window);
         let mut scroll = Scroller::default();
         let viewport = flyout_height - padding * 2.0;
-        scroll.set_extent(items.len() as f32 * item, viewport);
-        if let Some(selected) = selected {
-            let selected_top = selected as f32 * item;
-            scroll.jump_to(selected_top - (viewport - item) / 2.0);
+        scroll.set_extent(layout.height(), viewport);
+        if let Some((selected_top, selected_bottom)) =
+            selected.and_then(|selected| layout.item_span(selected))
+        {
+            scroll.jump_to(selected_top - (viewport - (selected_bottom - selected_top)) / 2.0);
         }
         self.flyout = Some(Flyout {
             element,
             window,
             surface: Surface::new(window),
             items,
+            layout,
             selected,
             hover: selected,
             scroll,
@@ -2677,17 +2711,13 @@ impl App {
         let Some(flyout) = self.flyout.as_mut() else {
             return false;
         };
-        let count = flyout.items.len();
         let current = flyout.hover.or(flyout.selected);
+        // 矢印は項目だけを動く(組の見出しと区切りの線は飛ばす)
         let next = match key {
-            k if k == VK_UP.0 => {
-                Some(current.map_or(count.saturating_sub(1), |index| index.saturating_sub(1)))
-            }
-            k if k == VK_DOWN.0 => {
-                Some(current.map_or(0, |index| (index + 1).min(count.saturating_sub(1))))
-            }
-            k if k == VK_HOME.0 => Some(0),
-            k if k == VK_END.0 => Some(count.saturating_sub(1)),
+            k if k == VK_UP.0 => flyout.layout.moved(current, MenuMove::Up),
+            k if k == VK_DOWN.0 => flyout.layout.moved(current, MenuMove::Down),
+            k if k == VK_HOME.0 => flyout.layout.moved(current, MenuMove::First),
+            k if k == VK_END.0 => flyout.layout.moved(current, MenuMove::Last),
             k if k == VK_RETURN.0 || k == VK_SPACE.0 => {
                 if let Some(index) = current {
                     self.flyout_choose(index);
@@ -2708,10 +2738,9 @@ impl App {
         if let Some(next) = next {
             flyout.hover = Some(next);
             let now = self.started.elapsed().as_secs_f64() * 1000.0;
-            let item = size::FLYOUT_ITEM_HEIGHT;
-            flyout
-                .scroll
-                .reveal(next as f32 * item, (next + 1) as f32 * item, now);
+            if let Some((top, bottom)) = flyout.layout.reveal_span(next) {
+                flyout.scroll.reveal(top, bottom, now);
+            }
             ffi::invalidate(flyout.window);
         }
         true
@@ -2805,11 +2834,8 @@ impl App {
         let (_, y) = self.flyout_local(lparam);
         let now = self.now();
         let local = y - size::FLYOUT_PADDING + flyout.scroll.offset(now);
-        if local < 0.0 {
-            return None;
-        }
-        let index = (local / size::FLYOUT_ITEM_HEIGHT) as usize;
-        (index < flyout.items.len()).then_some(index)
+        // 組の見出しと区切りの線の上は項目にならない(載せても押しても何もしない)
+        flyout.layout.item_at(local)
     }
 
     fn paint_flyout(&mut self) {
@@ -2821,6 +2847,7 @@ impl App {
         let size = ffi::client_size(flyout.window);
         let graphics = &self.graphics;
         let items = &flyout.items;
+        let layout = &flyout.layout;
         let selected = flyout.selected;
         let hover = flyout.hover;
         let scroll = &flyout.scroll;
@@ -2831,7 +2858,8 @@ impl App {
             .surface
             .draw(graphics, size, theme.dpi, clear, None, |canvas| {
                 paint_flyout_items(
-                    canvas, &theme, items, selected, hover, scroll, opened, width, height, now,
+                    canvas, &theme, items, layout, selected, hover, scroll, opened, width, height,
+                    now,
                 );
             });
         let animating = flyout.opened.running(now) || flyout.scroll.animating(now);
@@ -2992,6 +3020,7 @@ impl App {
                 | Shot::DynamicOff
                 | Shot::ImportPreview
                 | Shot::MissingKeys
+                | Shot::GroupedMenu
                 | Shot::KeyDraft
                 | Shot::KeyRecording
         ) {
@@ -3074,6 +3103,33 @@ impl App {
         } else {
             content.max(height)
         };
+        // 組に分けた一覧: 一覧は別の窓に描くものなので，同じ描き方でページの上に重ねて写す
+        let menu = (shot == Shot::GroupedMenu)
+            .then(|| self.view.grouped_dropdown())
+            .flatten()
+            .and_then(|element| {
+                let rect = self.view.rect(element)?;
+                let (items, selected) = self.view.dropdown_items(element);
+                let groups = self.view.dropdown_groups(element);
+                let (layout, menu_width, menu_height) =
+                    self.flyout_size(&items, groups, rect.width);
+                let origin = (
+                    nav_width(width) + rect.x,
+                    rect.max_y() + size::FLYOUT_PADDING,
+                );
+                Some((
+                    element,
+                    items,
+                    selected,
+                    layout,
+                    origin,
+                    menu_width,
+                    menu_height,
+                ))
+            });
+        let total = menu.as_ref().map_or(total, |menu| {
+            total.max(menu.4 .1 + menu.6 + size::FLYOUT_PADDING)
+        });
         let now = self.now() + SNAPSHOT_SETTLE;
         let name = format!(
             "settings-{}{}-{}.png",
@@ -3091,7 +3147,7 @@ impl App {
             focus_visible: false,
             focused_edit: None,
             pressed: None,
-            open: None,
+            open: menu.as_ref().map(|menu| menu.0),
             nav_hover: &self.nav_hover,
             nav_indicator: self.nav_indicator.value(now),
             enter: 1.0,
@@ -3133,6 +3189,33 @@ impl App {
                         hover: 0.0,
                     };
                     import_sheet::paint(canvas, sheet, &layout, &frame, now);
+                }
+                if let Some((_, items, selected, layout, (left, top), menu_width, menu_height)) =
+                    &menu
+                {
+                    let mut menu_scroll = Scroller::default();
+                    menu_scroll
+                        .set_extent(layout.height(), menu_height - size::FLYOUT_PADDING * 2.0);
+                    canvas.translate(*left, *top);
+                    canvas.fill_round(
+                        Rect::new(0.0, 0.0, *menu_width, *menu_height),
+                        size::FLYOUT_RADIUS,
+                        Color::from(self.theme.palette.flyout),
+                    );
+                    paint_flyout_items(
+                        canvas,
+                        &self.theme,
+                        items,
+                        layout,
+                        *selected,
+                        *selected,
+                        &menu_scroll,
+                        1.0,
+                        *menu_width,
+                        *menu_height,
+                        now,
+                    );
+                    canvas.translate(-*left, -*top);
                 }
             },
         );
@@ -4142,6 +4225,7 @@ fn paint_flyout_items(
     canvas: &mut dyn Canvas,
     theme: &Theme,
     items: &[String],
+    layout: &MenuLayout,
     selected: Option<usize>,
     hover: Option<usize>,
     scroll: &Scroller,
@@ -4159,18 +4243,48 @@ fn paint_flyout_items(
         Color::from(palette.flyout_stroke),
     );
     let padding = size::FLYOUT_PADDING;
-    let item = size::FLYOUT_ITEM_HEIGHT;
     let body = Rect::new(0.0, padding, width, height - padding * 2.0);
     canvas.push_clip(body);
     // 開くときに上から少し下りてくる
     let slide = (1.0 - opened) * -size::PAGE_ENTER_OFFSET;
     canvas.set_opacity(opened);
     let offset = scroll.offset(now);
-    for (index, label) in items.iter().enumerate() {
-        let top = padding + index as f32 * item - offset + slide;
+    for row in layout.rows() {
+        let top = padding + row.top - offset + slide;
+        let item = row.height;
         if top + item < 0.0 || top > height {
             continue;
         }
+        let index = match row.kind {
+            MenuRowKind::Item(index) => index,
+            // 組の見出し: 項目と左をそろえた小さい薄い文字(選べないので背景を付けない)
+            MenuRowKind::Heading(title) => {
+                canvas.text(
+                    Rect::new(
+                        padding + size::FIELD_PADDING_X,
+                        top,
+                        width - (padding + size::FIELD_PADDING_X) * 2.0,
+                        item,
+                    ),
+                    title,
+                    TextStyle::Caption,
+                    Color::from(palette.text_secondary),
+                    TextLayout::LINE,
+                );
+                continue;
+            }
+            // 組のあいだの線: 一覧の端から端まで引く(WinUI の MenuFlyoutSeparator)
+            MenuRowKind::Divider => {
+                canvas.fill_rect(
+                    Rect::new(0.0, top + padding, width, part::STROKE),
+                    Color::from(palette.flyout_stroke),
+                );
+                continue;
+            }
+        };
+        let Some(label) = items.get(index) else {
+            continue;
+        };
         // 背景は上下を 1 ドットずつ縮め，隣の項目の背景と離す
         let rect = Rect::new(
             padding,
