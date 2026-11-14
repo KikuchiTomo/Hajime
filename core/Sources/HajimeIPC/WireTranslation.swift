@@ -471,6 +471,18 @@ public struct RoutedActions: Sendable, Equatable {
                 host.append(.runCommand(command))
             }
         }
+        // 候補の窓は 1 つで，モードの表示は一覧や分岐図と同じ窓に出す．一覧か分岐図を出したままモードを切り替えたとき
+        // (文節を打ち直しているあいだの かな・英数 の切り替え)は，モードの表示で一覧や分岐図を消さない(macOS はモードの表示が別の窓)
+        var panelShown = false
+        ui = ui.filter { command in
+            switch command {
+            case .showBranchMap, .showCandidates: panelShown = true
+            case .hide: panelShown = false
+            case .showMode: return !panelShown
+            default: break
+            }
+            return true
+        }
         // 候補の窓を組み立て中の文字の途中(今打っている文節・選んでいる文節)にそろえるときは，その位置を組み立て中の文字の
         // 書き換えに添える．画面の上の位置は入力先のアプリにしか分からないので，DLL がその字の位置を求めて送り直す(macOS は panelAnchor)
         let panelAnchor = actions.lazy.compactMap { action -> Int? in

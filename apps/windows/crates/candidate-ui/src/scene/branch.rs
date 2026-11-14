@@ -49,6 +49,8 @@ struct Metrics {
     font_size: f32,
     /// 1 ドットあたりのデバイスのピクセル数
     pixel_scale: f32,
+    /// 窓の幅の下限(影を除く)
+    min_width: f32,
 }
 
 /// 区切りの線の上と下，カードと枝のあいだの空き
@@ -85,6 +87,7 @@ impl Metrics {
                 shadow,
                 font_size: look.font_size,
                 pixel_scale: look.pixel_scale,
+                min_width: (look.min_width - shadow).max(0.0),
             };
         }
         Self {
@@ -98,6 +101,7 @@ impl Metrics {
             shadow,
             font_size: look.font_size,
             pixel_scale: look.pixel_scale,
+            min_width: (look.min_width - shadow).max(0.0),
         }
     }
 
@@ -106,11 +110,10 @@ impl Metrics {
         self.inset + part::ROW_PADDING_X
     }
 
-    /// 文節の左の端から，その文節の丸(と，そこから出る枝)までの距離．短い文節は真ん中，長い文節は左から決まった距離(1 字と余白)
-    fn stop_offset(&self, width: f32) -> f32 {
-        (width / 2.0)
-            .min(self.font_size + part::ROW_PADDING_X)
-            .round()
+    /// 文節の左の端から，その文節の丸(と，そこから出る枝)までの距離．どの文節でも，余白と全角 1 字の半分(1 字目の真ん中)．
+    /// 文節の幅によらず同じにして，候補を移って幹の文字が替わっても丸と候補の列を動かさない
+    fn stop_offset(&self) -> f32 {
+        (part::ROW_PADDING_X + self.font_size / 2.0).round()
     }
 }
 
@@ -281,7 +284,10 @@ fn trunk_width(column: &BranchColumn, painter: &Painter) -> f32 {
     let mut text = column.split.as_ref().map_or_else(
         || match trunk_command(column) {
             Some((_, title)) => Painter::command_width() + painter.width(title, Font::Trunk),
-            None => painter.width(&column.text, Font::Trunk),
+            // 全角 1 字より狭くしない(半角 1 字の文節でも，丸が文字の真ん中に来る)
+            None => painter
+                .width(&column.text, Font::Trunk)
+                .max(painter.font_size),
         },
         |split| split_pieces(split, painter).width,
     );
@@ -577,7 +583,22 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
     let continues_before = map.continues_before == Some(true);
     let continues_after = map.continues_after == Some(true);
     let more_lead = map::MORE_SIZE * 2.0 + space::GROUP;
-    let mut x = metrics.inset + if continues_before { more_lead } else { 0.0 };
+    // 最初の文節の丸に重ねる文節へ移るキーが，丸より左へはみ出す分だけ，幹の始まりを右へ寄せる(前のまとまりへの山形や窓の端に
+    // キーが詰まらないように)．キーを出していないあいだも同じだけ寄せ，案内を出したときに幹を動かさない
+    let key_overhang = map
+        .columns
+        .first()
+        .and_then(|column| column.jump_key.as_deref())
+        .map_or(0.0, |key| {
+            let hint = KeyHint {
+                keys: key.to_string(),
+                label: String::new(),
+            };
+            (painter.placed_hint_width(&hint) / 2.0 - metrics.stop_offset())
+                .max(0.0)
+                .ceil()
+        });
+    let mut x = metrics.inset + key_overhang + if continues_before { more_lead } else { 0.0 };
     let mut node_x = Vec::new();
     let mut node_widths = Vec::new();
     for column in &map.columns {
@@ -797,9 +818,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
     };
 
     // 窓の幅．上限を超える文は，幹を送る
-    let focus_center = focus.map_or(metrics.inset, |index| {
-        node_x[index] + metrics.stop_offset(node_widths[index])
-    });
+    let focus_center = focus.map_or(metrics.inset, |index| node_x[index] + metrics.stop_offset());
     let boundary_width = painter.placed_hints_width(&hints.boundary);
     let below = map.meaning_placement == Some(MeaningPlacement::Below)
         && column.is_some_and(|column| column.homophone.is_some() && column.split.is_none());
@@ -838,6 +857,10 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         .max(branch_width)
         .max(notes_width + metrics.inset * 2.0)
         .max(heading_width);
+    // 同じ文節を選んでいるあいだは，候補を移っても窓を狭めない(幅を固定する設定は幹の幅のまま)
+    if map.keeps_width != Some(true) {
+        width = width.max(metrics.min_width);
+    }
     let limit = candidate::MAX_WIDTH.max(candidate::MIN_WIDTH);
     let mut shift = 0.0;
     let mut overflows = false;
@@ -1132,7 +1155,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         .collect();
     result.fades_left = overflows && shift > 0.0;
     result.fades_right = overflows && trunk_right - shift > right;
-    let stop_x = |node: &Frame| node.x + metrics.stop_offset(node.width);
+    let stop_x = |node: &Frame| node.x + metrics.stop_offset();
     // 前後のまとまりへ続く側は，幹の線を窓の端まで伸ばして山形を付ける
     result.rail_start = if result.fades_left || continues_before {
         0.0
@@ -1284,7 +1307,7 @@ pub fn branch_map(whole: &BranchMap, look: &Look, measure: &dyn Measure) -> Scen
         .enumerate()
         .map(|(index, node)| {
             Stop::new(
-                Point::new(node.x + metrics.stop_offset(node.width), layout.rail_y),
+                Point::new(node.x + metrics.stop_offset(), layout.rail_y),
                 if Some(index) == layout.focus {
                     State::Selected
                 } else {
@@ -1917,13 +1940,12 @@ fn trunk_node(painter: &mut Painter, column: &BranchColumn, node: Frame, on_trun
                 node,
             );
         }
-        (None, None) => painter.text(
-            &column.text,
-            Font::Trunk,
-            color,
-            node.x + part::ROW_PADDING_X,
-            node,
-        ),
+        (None, None) => {
+            // 全角 1 字より狭い文字は，取った幅の真ん中に描く
+            let slack = (painter.font_size - painter.width(&column.text, Font::Trunk)).max(0.0);
+            let x = node.x + part::ROW_PADDING_X + (slack / 2.0).round();
+            painter.text(&column.text, Font::Trunk, color, x, node);
+        }
     }
     if column.is_corrected == Some(true) {
         // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため
@@ -2590,22 +2612,30 @@ mod tests {
     }
 
     #[test]
-    fn 長い文節の丸は左から決まった距離_短い文節は真ん中() {
+    fn 文節の丸は幅によらず_最初の字の真ん中に置く() {
         let theme = theme("automatic");
         let look = Look::new(&theme, 15.0);
         let metrics = Metrics::new(&look, &Fixed);
-        // 短い文節は真ん中
-        assert_eq!(metrics.stop_offset(20.0), 10.0);
-        // 長い文節は 1 字と余白
-        assert_eq!(metrics.stop_offset(200.0), 15.0 + part::ROW_PADDING_X);
-        // 選んでいる文節から下ろす縦の線も同じ位置
-        let mut long = map();
-        long.columns[0].text = "とてもとても長い文節".into();
-        let layout = metrics_and_layout(&long, &theme);
-        assert_eq!(
-            layout.focus_x,
-            layout.nodes[0].x + 15.0 + part::ROW_PADDING_X
-        );
+        // 余白と全角 1 字の半分
+        assert_eq!(metrics.stop_offset(), (part::ROW_PADDING_X + 7.5).round());
+        // 1 字・半角 1 字・絵文字・5 字のどれでも，選んでいる文節の丸と縦の線・候補の列の x が同じ
+        let layouts: Vec<Layout> = ["木", "a", "🗓", "カレンダー"]
+            .iter()
+            .map(|text| {
+                let mut map = map();
+                map.columns[0].text = (*text).into();
+                metrics_and_layout(&map, &theme)
+            })
+            .collect();
+        for layout in &layouts {
+            assert_eq!(layout.focus_x, layout.nodes[0].x + metrics.stop_offset());
+            assert_eq!(layout.focus_x, layouts[0].focus_x);
+            assert_eq!(layout.stem_x, layouts[0].stem_x);
+            assert_eq!(layout.rows[0].x, layouts[0].rows[0].x);
+        }
+        // 半角 1 字の文節も，全角 1 字ぶんの幅を取る
+        assert_eq!(layouts[1].nodes[0].width, 15.0 + part::ROW_PADDING_X * 2.0);
+        assert_eq!(layouts[1].nodes[0].width, layouts[0].nodes[0].width);
     }
 
     #[test]
@@ -2826,6 +2856,52 @@ mod tests {
             all.target_at(last.x + 1.0, last.mid_y()),
             Some(ipc::PointerTarget::Segment { index: 13 })
         );
+    }
+
+    #[test]
+    fn 最初の文節のキーが丸より左へはみ出す分だけ_幹の始まりを右へ寄せる() {
+        let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let (metrics, painter) = (Metrics::new(&look, &Fixed), Painter::new(&look, &Fixed));
+        let plain = metrics_and_layout(&map(), &theme);
+        let keyed = keyed(map());
+        let key = KeyHint {
+            keys: keyed.columns[0].jump_key.clone().expect("文節へ移るキー"),
+            label: String::new(),
+        };
+        let overhang = (painter.placed_hint_width(&key) / 2.0 - metrics.stop_offset())
+            .max(0.0)
+            .ceil();
+        assert!(overhang > 0.0);
+        // キーの左の端が，キーの無いときの幹の始まりより左へ出ない
+        let layout = metrics_and_layout(&keyed, &theme);
+        assert_eq!(layout.nodes[0].x, plain.nodes[0].x + overhang);
+        // 案内を押し続けて出す設定で，キーを出していないあいだも同じ位置
+        let mut held = keyed.clone();
+        held.hints_on_hold = Some(true);
+        assert_eq!(
+            metrics_and_layout(&held, &theme).nodes[0].x,
+            layout.nodes[0].x
+        );
+    }
+
+    #[test]
+    fn 窓の幅の下限があれば狭めず_幅を固定する設定では使わない() {
+        let theme = theme("automatic");
+        let natural = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
+        let mut look = Look::new(&theme, 15.0);
+        look.min_width = natural.width + 40.0;
+        assert_eq!(
+            branch_map(&map(), &look, &Fixed).width,
+            natural.width + 40.0
+        );
+        look.min_width = natural.width - 40.0;
+        assert_eq!(branch_map(&map(), &look, &Fixed).width, natural.width);
+        let mut fixed = map();
+        fixed.keeps_width = Some(true);
+        let narrow = branch_map(&fixed, &Look::new(&theme, 15.0), &Fixed);
+        look.min_width = narrow.width + 40.0;
+        assert_eq!(branch_map(&fixed, &look, &Fixed).width, narrow.width);
     }
 
     #[test]

@@ -17,6 +17,8 @@ struct AssociationScenarioTests {
         settings.associationDictionaries = [Self.dictionary]
         // 連想の語だけを確かめる．変換マクロ(既定でオン)を入れると，どの語にも「整形」のまとまりが足される
         settings.conversionMacros = false
+        // 候補から始めて木をたどる動きを確かめる(変換の直後に幹の上から始める設定は startsOnTrunk で確かめる)
+        settings.branchStartsOnTrunk = false
         change(&settings)
         return settings
     }
@@ -225,7 +227,10 @@ struct AssociationScenarioTests {
         #expect(harness.lattice?.detail?.current == 0)
         harness.press(.left)
         #expect(harness.lattice?.detail?.current == nil)
-        // 候補にいるときの ← は，今までどおり前の文節(文節が 1 つなので動かない)
+        #expect(harness.lattice?.trunkFocused == false)
+        // 候補にいるときの ← は，幹の上へ戻る
+        harness.press(.left)
+        #expect(harness.lattice?.trunkFocused == true)
         #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
     }
 
@@ -308,6 +313,13 @@ struct AssociationScenarioTests {
         // ↓ で幹の上へ戻る
         harness.press(.down)
         #expect(harness.lattice?.trunkFocused == true && harness.lattice?.columns.first?.selectedVariant == nil)
+        // 2 番目の文字種からも，↓ の 1 回で幹の上へ戻る(1 つ前の文字種へは移らない)
+        harness.press(.up)
+        harness.press(.right)
+        #expect(harness.lattice?.columns.first?.selectedVariant == 1)
+        harness.press(.down)
+        #expect(harness.lattice?.trunkFocused == true && harness.lattice?.columns.first?.selectedVariant == nil)
+        #expect(harness.lattice?.columns.first?.selectedAlternative == 0)
     }
 
     @Test("矢印で木をたどる: 先の枝を左へ出しているとき(反転)は，← で先の枝へ入って進み，→ で戻る．丸の中身でも同じ向き")
@@ -316,10 +328,12 @@ struct AssociationScenarioTests {
         harness.type("utukusii")
         harness.press(.space)
         harness.session.branchMirrored = true
-        // 候補の上の → は，先の枝ではなく次の文節の向き(文節が 1 つなので動かず，幹の上になる)
+        // 候補の上の → は，先の枝と反対の向きなので，幹の上へ戻る
         harness.press(.right)
         #expect(harness.lattice?.detail?.current == nil)
+        #expect(harness.lattice?.trunkFocused == true)
         harness.press(.down)
+        #expect(harness.lattice?.trunkFocused == false)
         // ← で先の枝の最初の丸へ，もう一度 ← で次の丸へ
         harness.press(.left)
         #expect(harness.lattice?.detail?.current == 0)
@@ -373,6 +387,50 @@ struct AssociationScenarioTests {
         #expect(harness.lattice?.keepsWidth == false)
     }
 
+    @Test("変換の直後は幹の上から始まる(既定)．→ でそのまま次の文節へ移り，↓ で候補へ下りる．Space は今までどおり 2 番目の候補へ進む．設定を切ると先頭の候補から始まる")
+    func startsOnTrunk() throws {
+        let two = FakeConverter(["きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil), ("京は", nil)], "いい": [("良い", nil), ("いい", nil)]])
+        two.words["きょうはいい"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "はいい", readingCount: 3, startsWithParticle: true),
+        ]
+        var settings = makeSettings { $0.branchStartsOnTrunk = true }
+        settings.initialFocus = .start
+        let harness = Harness(converter: two, settings: settings, branchStations: true)
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.trunkFocused == true)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+        // → でそのまま次の文節へ
+        harness.press(.right)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        #expect(harness.lattice?.trunkFocused == true)
+        // ↓ で候補へ下りる(選んでいる候補は変えない)．もう一度 ↓ で次の候補
+        harness.press(.down)
+        #expect(harness.lattice?.trunkFocused == false && harness.lattice?.columns[1].selectedAlternative == 0)
+        harness.press(.down)
+        #expect(harness.lattice?.columns[1].selectedAlternative == 1)
+        harness.press(.enter)
+
+        // Space を続けて押すと，今までどおり 2 番目の候補になる
+        harness.type("kyouhaii")
+        harness.press(.space)
+        harness.press(.space)
+        #expect(harness.lattice?.trunkFocused == false && harness.lattice?.columns[0].selectedAlternative == 1)
+        harness.press(.enter)
+
+        // 矢印で木をたどらない表(Windows 風)では，幹の上から始めない
+        let windows = Harness(converter: two, settings: makeSettings { $0.branchStartsOnTrunk = true; $0.keymap = KeymapPreset.windows.keymap }, branchStations: true)
+        windows.type("kyouhaii")
+        windows.press(.space)
+        #expect(windows.lattice?.trunkFocused == false)
+
+        // 設定を切ると，先頭の候補から始まる
+        let off = Harness(converter: two, settings: makeSettings(), branchStations: true)
+        off.type("kyouhaii")
+        off.press(.space)
+        #expect(off.lattice?.trunkFocused == false)
+    }
+
     @Test("矢印で木をたどる: 先頭の候補で ↑ を押すと幹の上へ上り，幹の上の ← → は文節を移り，↓ で候補へ下りる．丸の上の Space は中身に入らず次の候補")
     func trunkLevel() throws {
         let two = FakeConverter(["きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil)], "いい": [("良い", nil), ("いい", nil)]])
@@ -406,7 +464,7 @@ struct AssociationScenarioTests {
         #expect(harness.lattice?.columns[1].selectedAlternative == 1)
     }
 
-    @Test("先の枝: 丸の中身で Enter を押すと選んだ語で確定する．連想変換のキーでも先の枝へ入れる．先の枝が無ければ → は次の文節")
+    @Test("先の枝: 丸の中身で Enter を押すと，選んだ語をその文節に採って幹の上へ戻る．全文は確定しない．もう一度 Enter で確定する．連想変換のキーでも先の枝へ入れる．先の枝が無ければ → は次の文節")
     func branchCommit() throws {
         let harness = stationHarness()
         harness.type("utukusii")
@@ -416,6 +474,11 @@ struct AssociationScenarioTests {
         harness.press(.down)
         harness.press(.down)
         #expect(harness.lattice?.detail?.selectedItem == 1)
+        harness.press(.enter)
+        #expect(harness.committed.isEmpty)
+        #expect(harness.marked.text == Self.groups[0].words[1])
+        #expect(harness.lattice?.association == nil && harness.lattice?.detail?.current == nil)
+        #expect(harness.lattice?.trunkFocused == true)
         harness.press(.enter)
         #expect(harness.committed == Self.groups[0].words[1])
 
@@ -430,6 +493,113 @@ struct AssociationScenarioTests {
         #expect(plain.lattice?.detail == nil)
         plain.press(.right)
         #expect(plain.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+    }
+
+    /// 2 文節の文．2 番目の文節「うつくしい」に連想がある
+    private func twoSegmentHarness(_ change: (inout Settings) -> Void = { _ in }) -> Harness {
+        let converter = FakeConverter([
+            "きょうはうつくしい": [("今日は美しい", nil)], "きょうは": [("今日は", nil), ("京は", nil), ("教は", nil)],
+            "うつくしい": [("美しい", nil), ("美しき", nil)],
+        ])
+        converter.words["きょうはうつくしい"] = [
+            Candidate.Word(text: "今日は", readingCount: 4), Candidate.Word(text: "美しい", readingCount: 5),
+        ]
+        let lookup = FakeAssociationLookup([Self.dictionary.id: ["美しい": Self.groups]])
+        var settings = makeSettings(change)
+        settings.initialFocus = .start
+        return Harness(converter: converter, settings: settings, associations: lookup, branchStations: true)
+    }
+
+    @Test("先の枝: 丸の中身で選んだ語は，戻る向きの矢印でもその文節に採る．そのままほかの文節の候補を選べて，最後に Enter で全文を確定する")
+    func adoptItemAndContinue() throws {
+        let harness = twoSegmentHarness()
+        harness.type("kyouhautukusii")
+        harness.press(.space)
+        // 2 番目の文節へ移り，連想の丸の中身で 2 番目の語を選ぶ
+        harness.press(.up)
+        harness.press(.right)
+        harness.press(.down)
+        harness.press(.right)
+        #expect(harness.lattice?.detail?.current == 0)
+        harness.press(.down)
+        harness.press(.down)
+        #expect(harness.lattice?.detail?.selectedItem == 1)
+        // ← で戻る: 選んでいる語を文節に採って幹の上へ．全文は確定しない
+        harness.press(.left)
+        #expect(harness.committed.isEmpty)
+        #expect(harness.marked.text == "今日は" + Self.groups[0].words[1])
+        #expect(harness.lattice?.association == nil && harness.lattice?.trunkFocused == true)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        // 幹の上の ← で前の文節へ移り，候補を選ぶ．採った語はそのまま
+        harness.press(.left)
+        harness.press(.down)
+        harness.press(.down)
+        #expect(harness.marked.text == "京は" + Self.groups[0].words[1])
+        harness.press(.enter)
+        #expect(harness.committed == "京は" + Self.groups[0].words[1])
+    }
+
+    @Test("先の枝: 丸の中身の番号キーも，その語を文節に採るだけで全文は確定しない．先頭の項目の ↑ と Esc は採らずに戻る")
+    func adoptItemByNumber() throws {
+        let harness = twoSegmentHarness()
+        harness.type("kyouhautukusii")
+        harness.press(.space)
+        harness.press(.up)
+        harness.press(.right)
+        harness.press(.down)
+        harness.press(.right)
+        harness.press(.down)
+        // 先頭の項目の ↑ は丸へ戻り，元の語に戻る
+        harness.press(.up)
+        #expect(harness.marked.text == "今日は美しい" && harness.lattice?.detail?.current == 0)
+        // Esc も採らずに戻る
+        harness.press(.down)
+        harness.press(.down)
+        harness.press(.escape)
+        #expect(harness.marked.text == "今日は美しい")
+        // 番号キーは採る
+        harness.press(.right)
+        harness.press(.down)
+        harness.type("3")
+        #expect(harness.committed.isEmpty)
+        #expect(harness.marked.text == "今日は" + Self.groups[0].words[2])
+        #expect(harness.lattice?.trunkFocused == true)
+    }
+
+    @Test("矢印で木をたどる: 候補を選んだあと，先の枝と反対の向きの矢印で幹の上へ戻る．選んだ候補は変わらず，幹の上の ← → でほかの文節へ移れる")
+    func backToTrunkKeepsCandidate() throws {
+        let harness = twoSegmentHarness()
+        harness.type("kyouhautukusii")
+        harness.press(.space)
+        harness.press(.down)
+        harness.press(.down)
+        #expect(harness.marked.text == "教は美しい")
+        harness.press(.left)
+        #expect(harness.lattice?.trunkFocused == true)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+        #expect(harness.marked.text == "教は美しい")
+        harness.press(.right)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        #expect(harness.marked.text == "教は美しい")
+    }
+
+    @Test("矢印で木をたどらない表(Windows 風)でも，丸の中身の Enter は語を文節に採るだけで，全文は確定しない")
+    func adoptItemWithoutTreeNavigation() throws {
+        let harness = twoSegmentHarness { $0.keymap = KeymapPreset.windows.keymap }
+        harness.type("kyouhautukusii")
+        harness.press(.space)
+        harness.press(.right)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        harness.press(.up, .shift)
+        #expect(harness.lattice?.detail?.current == 0)
+        harness.press(.down)
+        harness.press(.down)
+        harness.press(.enter)
+        #expect(harness.committed.isEmpty)
+        #expect(harness.marked.text == "今日は" + Self.groups[0].words[1])
+        #expect(harness.lattice?.trunkFocused == false)
+        harness.press(.enter)
+        #expect(harness.committed == "今日は" + Self.groups[0].words[1])
     }
 
     @Test("表示項目を減らす設定では，文字種の枝は文字種を選んでいるあいだだけ，候補の先の枝は連想変換のキーで開いたあとだけ出す")
