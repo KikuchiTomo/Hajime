@@ -466,6 +466,24 @@ impl ListSpec {
         Value::Array(elements)
     }
 
+    /// indices の行(items の並び)を，それぞれ元の行のすぐ下に複製した配列．ほかの要素は元のまま．
+    /// キー設定の表は上の行が優先なので，複製を元の行の隣に置いて，書き換える前の動きを変えない(macOS と同じ)
+    pub fn duplicate(&self, list: Option<&Value>, indices: &[usize]) -> Value {
+        let mut position = 0;
+        let mut elements = Vec::new();
+        for (element, item) in self.entries(list) {
+            let copies = item.is_some() && {
+                position += 1;
+                indices.contains(&(position - 1))
+            };
+            if copies {
+                elements.push(element.clone());
+            }
+            elements.push(element);
+        }
+        Value::Array(elements)
+    }
+
     pub fn contains(&self, list: Option<&Value>, item: &Item) -> bool {
         self.items(list).contains(item)
     }
@@ -688,6 +706,12 @@ mod tests {
     fn 選んだ行を消す() {
         let list = json!(["a", "b", "c"]);
         assert_eq!(WORDS.remove(Some(&list), &[0, 2]), json!(["b"]));
+        // 複製は，選んだ行のすぐ下に入る
+        assert_eq!(
+            WORDS.duplicate(Some(&list), &[0, 2]),
+            json!(["a", "a", "b", "c", "c"])
+        );
+        assert_eq!(WORDS.duplicate(Some(&list), &[]), list);
     }
 
     #[test]
