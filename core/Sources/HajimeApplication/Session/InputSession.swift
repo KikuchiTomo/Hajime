@@ -1253,6 +1253,8 @@ public final class InputSession {
             // 連想の一覧の番号キーも，その語句を確定する．その番号の語句が無ければ何もしない
             guard list.select(number: number, perPage: associationPerPage) else { return KeyResult(handled: true) }
             phase = .association(list, origin: origin)
+            // 先の枝の丸の中身では，その語を文節に採るだけにする(全文は確定しない)
+            if isInStationItems { return adoptStationItem(context: context) }
             return KeyResult(handled: true, actions: commitAll())
         }
         if phase != .composing {
@@ -3106,9 +3108,11 @@ public final class InputSession {
     /// |---|---|---|---|---|
     /// | 幹の上 | 文字種へ | 候補へ | (← → で前・次の文節) | |
     /// | 文字種 | ― | 幹の上へ | (← → で前・次の文字種．並びは反転しない) | |
-    /// | 候補 | 前の候補(先頭なら幹の上) | 次の候補 | 先の枝の最初の丸(無ければその向きの文節) | その向きの文節 |
+    /// | 候補 | 前の候補(先頭なら幹の上) | 次の候補 | 先の枝の最初の丸(無ければその向きの文節) | 選んだ候補のまま幹の上へ |
     /// | 丸 | 候補へ | 中身へ | 次の丸 | 前の丸(最初の丸なら候補へ) |
-    /// | 丸の中身 | 前の項目(先頭なら丸へ) | 次の項目 | 次のまとまり | 前のまとまり(最初なら丸へ) |
+    /// | 丸の中身 | 前の項目(先頭なら丸へ) | 次の項目 | 次のまとまり | 前のまとまり(最初なら，選んでいる語を採って幹の上へ) |
+    ///
+    /// 戻る向きの矢印は，選んだものを捨てない．丸の中身を選ばずに出るのは，先頭の項目の ↑ と取り消しのキー
     private func navigateTree(_ arrow: Arrow, event: KeyEvent, context: InputContext) -> KeyResult? {
         guard let place = treePlace else { return nil }
         let toward: Arrow = branchMirrored ? .left : .right
@@ -3156,8 +3160,13 @@ public final class InputSession {
                 trunkLevel = true
                 return done()
             case .left, .right:
-                if arrow == toward, let result = enterBranch(context: context) { return result }
-                return moveSegment(arrow == .right ? .next : .previous, event: event, context: context)
+                if arrow == toward {
+                    if let result = enterBranch(context: context) { return result }
+                    return moveSegment(arrow == .right ? .next : .previous, event: event, context: context)
+                }
+                // 先の枝と反対の向きは，選んだ候補のまま幹の上へ戻る(幹の上の ← → で，ほかの文節へ移れる)
+                trunkLevel = true
+                return done()
             }
         case .station(let current):
             guard let lattice = latticeForBranch() else {
@@ -3196,10 +3205,8 @@ public final class InputSession {
                 if arrow == toward {
                     list.moveGroup(by: 1)
                 } else {
-                    guard list.groupIndex > 0 else {
-                        phase = origin
-                        return done()
-                    }
+                    // 最初のまとまりから戻る向きは，選んでいる語をその文節に採って幹の上へ戻る
+                    guard list.groupIndex > 0 else { return adoptStationItem(context: context) }
                     list.moveGroup(by: -1)
                 }
             }
@@ -3278,11 +3285,16 @@ public final class InputSession {
     /// ほかのコマンドは，選んでいる語を元の変換の文節に入れてから，ふつうに行う(nil を返す)
     private func performInAssociation(_ command: KeymapCommand, list: AssociationList, origin: Phase, context: InputContext) -> KeyResult? {
         var list = list
-        // 先の枝の丸の中身にいるとき: 先頭の語で前へ進むか，先頭のまとまりで前のまとまりへ進むと，丸の上へ戻る
-        if branchStations, branchStation != nil,
-           (command == .previousCandidate && list.indexInGroup == 0) || (command == .previousSegment && list.groupIndex == 0) {
-            phase = origin
-            return KeyResult(handled: true, actions: render(context: context))
+        if isInStationItems {
+            // 先の枝の丸の中身にいるとき: 先頭の語で前へ進むと，丸の上へ戻る
+            if command == .previousCandidate, list.indexInGroup == 0 {
+                phase = origin
+                return KeyResult(handled: true, actions: render(context: context))
+            }
+            // 確定のキーと，先頭のまとまりで前のまとまりへ進むキーは，選んでいる語をその文節に採る．全文は確定しない
+            if command == .commit || (command == .previousSegment && list.groupIndex == 0) {
+                return adoptStationItem(context: context)
+            }
         }
         switch command {
         case .nextCandidate: list.move(by: 1)
@@ -3304,6 +3316,21 @@ public final class InputSession {
             return nil
         }
         phase = .association(list, origin: origin)
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 先の枝の丸の中身(連想の語・マクロの結果)を選んでいるところか
+    private var isInStationItems: Bool {
+        guard branchStations, branchStation != nil, case .association(_, .lattice) = phase else { return false }
+        return true
+    }
+
+    /// 先の枝の丸の中身で選んでいる語を，その文節に採って丸を閉じる．全文は確定しないので，ほかの文節の変換を続けられる．
+    /// 矢印で木をたどれる表では幹の上へ戻る(← → でほかの文節へ移れる．もう一度確定のキーを押すと全文を確定する)
+    private func adoptStationItem(context: InputContext) -> KeyResult {
+        resolveAssociation()
+        branchStation = nil
+        trunkLevel = treeNavigation
         return KeyResult(handled: true, actions: render(context: context))
     }
 
