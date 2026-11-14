@@ -292,7 +292,8 @@ pub fn function_choices() -> Vec<KeyChoice> {
 
 /// メニューの項目の名前．修飾キーは，選ぶと付くのか外れるのかを書く
 pub fn choice_label(choice: &KeyChoice, current: &str) -> String {
-    use crate::strings::keys::{modifier_item, FUNCTION_KEYS_ITEM};
+    use crate::strings::keys::modifier_item;
+    use crate::strings::windows::FUNCTION_KEYS_ITEM;
     match choice {
         KeyChoice::Key(key) => display(key),
         KeyChoice::FunctionKeys => FUNCTION_KEYS_ITEM.to_string(),
