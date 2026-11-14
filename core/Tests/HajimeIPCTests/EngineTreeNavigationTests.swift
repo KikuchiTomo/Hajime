@@ -20,6 +20,7 @@ struct EngineTreeNavigationTests {
 
     private let sent = Box<[WireUiCommand]>([])
     private let service: EngineService
+    private let settings: FakeSettings
     private let session: UInt32
     private let input: EngineService.ConnectionID
     private let window: EngineService.ConnectionID
@@ -31,11 +32,14 @@ struct EngineTreeNavigationTests {
         converter.words[long] = ["亜", "胃", "鵜", "絵", "尾", "蚊", "木", "区", "毛"].map { Candidate.Word(text: $0, readingCount: 1) }
         let lookup = FakeAssociationLookup([Self.dictionary.id: ["美しい": [AssociationGroup(label: "見た目が快い", words: ["綺麗", "華麗"])]]])
         var initial = DefaultSettings.settings
+        // 候補から始めて木をたどる動きを確かめる(変換の直後に幹の上から始める設定は，別のテストで確かめる)
+        initial.branchStartsOnTrunk = false
         initial.associationDictionaries = [Self.dictionary]
         initial.conversionMacros = true
         initial.liveConversion = false
         initial.initialFocus = .start
         let settings = FakeSettings(initial)
+        self.settings = settings
         let sent = sent
         service = EngineService(
             makeSession: {
@@ -92,6 +96,26 @@ struct EngineTreeNavigationTests {
         // 幹の上の ↓ で候補へ下りる
         press(.down)
         #expect(map?.trunkFocused != true && focused?.selectedAlternative != nil)
+    }
+
+    @Test("既定(変換の直後に文節を選択)では，Space の直後に幹の上にいて，→ で次の文節へ移り，Space で 2 番目の候補へ進む")
+    func startsOnTrunk() throws {
+        settings.current.branchStartsOnTrunk = DefaultSettings.settings.branchStartsOnTrunk
+        #expect(settings.current.branchStartsOnTrunk)
+        type("aiueokakikuke")
+        #expect(map?.trunkFocused == true && focusedIndex == 0)
+        press(.right)
+        #expect(map?.trunkFocused == true && focusedIndex == 1)
+        // ↓ で候補へ下りる(選んでいる候補は変えない)
+        press(.down)
+        #expect(map?.trunkFocused != true && focused?.selectedAlternative == 0)
+        press(.escape)
+        press(.escape)
+        type("utukusii")
+        #expect(map?.trunkFocused == true && focused?.selectedAlternative == 0)
+        // Space は，幹の上から候補へ戻って次の候補へ進む
+        press(.space)
+        #expect(map?.trunkFocused != true && focused?.selectedAlternative == 1)
     }
 
     @Test("候補の → で最初の丸へ，↓ で中身へ入り，↑ で丸へ，もう一度 ↑ で候補へ戻る")

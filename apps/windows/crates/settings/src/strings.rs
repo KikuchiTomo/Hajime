@@ -138,6 +138,7 @@ pub mod choice {
     pub const VARIANT_ROW: &str = "候補の上に文字種の行を表示";
     pub const KEY_HINTS: &str = "キーの案内を表示";
     pub const FEWER_ITEMS: &str = "表示項目を減らす";
+    pub const BRANCH_STARTS_ON_TRUNK: &str = "変換の直後に文節を選択";
     pub const BRANCH_HINTS_ALWAYS: &str = "分岐図のキーの案内を常に表示";
     pub const BRANCH_SEGMENTS: &str = "分岐図に一度に表示する文節数";
     pub const BRANCH_WINDOW_WIDTH: &str = "分岐図の窓の幅";
@@ -1206,6 +1207,7 @@ pub mod sync {
         ("showsKeyHints", "キーの案内を表示"),
         ("showsFewerItems", "表示項目を減らす"),
         ("alwaysShowsBranchHints", "分岐図のキーの案内を常に表示"),
+        ("branchStartsOnTrunk", "変換の直後に文節を選択"),
         ("branchSegmentsPerGroup", "分岐図に一度に表示する文節数"),
         ("branchWindowWidth", "分岐図の窓の幅"),
         ("numberKeySelection", "数字キーで候補を選択"),

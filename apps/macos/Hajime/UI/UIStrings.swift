@@ -933,6 +933,7 @@ enum UIStrings {
         static let keyHints = "キーの案内を表示"
         static let fewerItems = "表示項目を減らす"
         static let branchHintsAlways = "分岐図のキーの案内を常に表示"
+        static let branchStartsOnTrunk = "変換の直後に文節を選択"
         static let branchSegments = "分岐図に一度に表示する文節数"
         static func branchSegmentCount(_ value: Int) -> String { value == 0 ? "すべて" : "\(value) 文節" }
         static let branchWindowWidth = "分岐図の窓の幅"
@@ -1318,7 +1319,7 @@ extension UIStrings {
             "showsPartOfSpeech": UIStrings.Settings.showsPartOfSpeech, "showsUsageExamples": UIStrings.Settings.showsUsageExamples,
             "showsHomophones": UIStrings.Settings.showsHomophones,
             "proofreading": UIStrings.Settings.proofreading, "misreadings": Features.misreadings, "prefersKatakana": Features.prefersKatakana,
-            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "showsFewerItems": Choice.fewerItems, "branchSegmentsPerGroup": Choice.branchSegments, "branchWindowWidth": Choice.branchWindowWidth, "alwaysShowsBranchHints": Choice.branchHintsAlways, "numberKeySelection": UIStrings.Settings.numberKeySelection,
+            "showsVariantRow": Choice.variantRow, "showsKeyHints": Choice.keyHints, "showsFewerItems": Choice.fewerItems, "branchStartsOnTrunk": Choice.branchStartsOnTrunk, "branchSegmentsPerGroup": Choice.branchSegments, "branchWindowWidth": Choice.branchWindowWidth, "alwaysShowsBranchHints": Choice.branchHintsAlways, "numberKeySelection": UIStrings.Settings.numberKeySelection,
             "dateConversion": UIStrings.Settings.dateConversion, "symbolConversion": UIStrings.Settings.symbolConversion,
             "emojiConversion": UIStrings.Settings.emojiConversion, "emojiWordConversion": UIStrings.Settings.emojiWordConversion,
             "emojiCandidatePosition": UIStrings.Settings.emojiCandidatePosition,
