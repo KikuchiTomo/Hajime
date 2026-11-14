@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""公式サイトのトップページの説明用の画像(apps/docs-site/static/images/hero.webp と features/*.webp)を作る．
+"""公式サイトのトップページの説明用の画像(apps/docs-site/static/images/hero.webp，features/*.webp，catalog/*.webp)を作る．
 
 Debug でビルドした Hajime Debug が書き出した画面(SnapshotRenderer)を切り抜き，色の面の上に置いて，
 短いラベルと引き出し線を添えた HTML を組み，WKWebView(tools/site/render_html.swift)で描いて WebP にする．
@@ -77,6 +77,28 @@ kbd {{ display: inline-grid; place-items: center; min-width: 46px; height: 46px;
 .app .mode {{ width: 104px; height: 104px; border-radius: 26px; background: {INK}; color: #fff; display: grid; place-items: center;
   font-size: 56px; font-weight: 700; }}
 .app .state {{ font-size: 18px; font-weight: 600; color: #6a6e8c; }}
+
+/* 「そのほかの機能」の小さな画像．ページでは幅 300px ほどで出るので，部品を大きく描いて真ん中に積む */
+body.catalog {{ display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 38px; padding-bottom: 76px; }}
+.crow {{ position: relative; display: flex; align-items: center; justify-content: center; gap: 22px; }}
+.cchip {{ border-radius: 24px; background: {PAPER}; color: {INK}; padding: 20px 34px 18px; font-size: 58px; font-weight: 600; white-space: nowrap;
+  box-shadow: 0 14px 24px rgba(4, 6, 24, .35); }}
+.cchip.in {{ background: rgba(255, 255, 255, .13); color: #fff; box-shadow: inset 0 0 0 3px rgba(255, 255, 255, .34);
+  font-family: "SF Mono", "Menlo", "Hiragino Sans", monospace; font-weight: 500; }}
+.cchip.dim {{ opacity: .42; box-shadow: none; }}
+.cchip.ring {{ box-shadow: 0 0 0 7px var(--sun), 0 14px 24px rgba(4, 6, 24, .35); }}
+.cchip.marked {{ text-decoration: underline; text-decoration-thickness: 5px; text-underline-offset: 12px; text-decoration-color: {AI}; }}
+.s .cchip, .cchip.s {{ font-size: 48px; padding: 17px 28px 15px; border-radius: 20px; }}
+.xs .cchip, .cchip.xs {{ font-size: 40px; padding: 15px 24px 13px; border-radius: 18px; }}
+.cto {{ font-size: 58px; font-weight: 700; color: #fff; }}
+.ckbd {{ display: grid; place-items: center; min-width: 100px; height: 100px; padding: 0 26px; border-radius: 22px; background: #fff; color: {INK};
+  font-size: 48px; font-weight: 600; box-shadow: 0 7px 0 rgba(4, 6, 24, .45), 0 16px 24px rgba(4, 6, 24, .3); }}
+.ckbd.s {{ min-width: 92px; height: 92px; font-size: 40px; padding: 0 18px; border-radius: 20px; }}
+.cplus {{ font-size: 50px; font-weight: 600; color: #fff; }}
+.cnote {{ font-size: 48px; font-weight: 600; color: #fff; white-space: nowrap; }}
+.ccol {{ display: flex; flex-direction: column; align-items: center; gap: 16px; }}
+.ccol .cnote {{ font-size: 40px; opacity: .9; }}
+.cui {{ position: relative; filter: drop-shadow(0 18px 28px rgba(4, 6, 24, .45)); }}
 """
 
 
@@ -117,14 +139,17 @@ class Builder:
         tag = f'<img class="ui" src="{path.as_uri()}" style="{style}">'
         return tag, (lambda fx, fy: (x + width * fx, y + height * fy)), height
 
-    def render(self, name: str, body: str, background: str, sun: str, width=WIDTH, height=HEIGHT, extra_style: str = "", hero=False):
+    def render(self, name: str, body: str, background: str, sun: str, width=WIDTH, height=HEIGHT, extra_style: str = "", hero=False,
+               directory: str = "features", scale: float = SCALE, body_class: str = ""):
         page = self.work / f"{name}.html"
         page.write_text(
             f'<!doctype html><meta charset="utf-8"><style>{STYLE}{extra_style}</style>'
-            f'<body style="width:{width}px;height:{height}px;--bg:{background};--sun:{sun}">{body}</body>', encoding="utf-8")
+            f'<body class="{body_class}" style="width:{width}px;height:{height}px;--bg:{background};--sun:{sun}">{body}</body>',
+            encoding="utf-8")
         png = self.work / f"{name}-out.png"
-        run(self.renderer, page, png, width, height, SCALE)
-        target = IMAGES / "hero.webp" if hero else IMAGES / "features" / f"{name}.webp"
+        run(self.renderer, page, png, width, height, scale)
+        target = IMAGES / "hero.webp" if hero else IMAGES / directory / f"{name}.webp"
+        target.parent.mkdir(parents=True, exist_ok=True)
         run("cwebp", "-quiet", "-q", QUALITY, png, "-o", target)
         print(f"作りました: {target.relative_to(ROOT)}")
 
@@ -330,13 +355,121 @@ def scenes(b: Builder):
     return out
 
 
+# 「そのほかの機能」の分類ごとの色(朝日の色)．背景は夜の色でそろえる
+CATALOG_BACKGROUND = "#1A1C39"
+CATALOG_SUNS = {"input": AI, "conversion": SHU, "correction": FUJI, "language": BENI, "dictionary": WAKAKUSA, "settings": SORA}
+
+
+def crow(*parts, size=""):
+    return f'<div class="crow {size}">{"".join(parts)}</div>'
+
+
+def cchip(text, kind=""):
+    return f'<span class="cchip {kind}">{html.escape(text)}</span>'
+
+
+def cto(glyph="→"):
+    return f'<span class="cto">{glyph}</span>'
+
+
+def cconv(source, result, size=""):
+    return crow(cchip(source, "in"), cto(), cchip(result), size=size)
+
+
+def ckbd(*names, small=False):
+    parts = []
+    for name in names:
+        parts.append('<span class="cplus">+</span>' if name == "+" else f'<span class="ckbd{" s" if small else ""}">{html.escape(name)}</span>')
+    return "".join(parts)
+
+
+def cnote(text):
+    return f'<span class="cnote">{html.escape(text)}</span>'
+
+
+def ccol(top, caption):
+    return f'<div class="ccol">{top}{cnote(caption)}</div>'
+
+
+def catalog_scenes(b: Builder):
+    out = {}
+
+    # 朝日は下の端から少しだけ出す(真ん中に積んだ部品と重ならないように)
+    def add(name, group, *rows, sun_at=(500, 1020, 980)):
+        def make():
+            body = sun(*sun_at) + "".join(rows)
+            b.render(name, body, CATALOG_BACKGROUND, CATALOG_SUNS[group], directory="catalog", scale=1, body_class="catalog")
+        out[name] = make
+
+    def flow_ui(name, width, keep_background=False, radius=0):
+        path = b.cutout(name, keep_background)
+        style = f"width:{width}px;" + (f"border-radius:{radius}px;" if radius else "")
+        return f'<img class="cui" src="{path.as_uri()}" style="{style}">'
+
+    # 入力
+    add("input-styles", "input", crow(cchip("ローマ字"), cchip("かな")), crow(cchip("英字"), cchip("英字(自動)")))
+    add("key-layouts", "input", crow(cchip("US"), cchip("Dvorak"), cchip("Colemak"), size="s"))
+    add("punctuation", "input", crow(cchip("、。"), cchip("，．"), cchip("、．"), cchip("，。"), size="s"), crow(ckbd("[", "]", "/", "¥")))
+    add("shift-english", "input", crow(ckbd("Shift", "+", "H"), cto(), cchip("Hello")))
+    add("number-punctuation", "input", crow(cchip("3.14"), cchip("1,000"), cchip("A-1")))
+    add("numpad-calc", "input", cconv("12*3", "36"), crow(ckbd("Enter")))
+    add("romaji-table", "input", cconv("wyi", "ゐ"), cconv("->", "→"))
+
+    # 変換
+    add("segments", "conversion", flow_ui("branch-split-glass-dark", 780))
+    add("grid", "conversion", flow_ui("list-grid-glass-dark", 390))
+    add("undo", "conversion", crow(ckbd("Esc"), cnote("× 8")))
+    add("undo-commit", "conversion", crow(ckbd("⌃", "+", "⌫")), crow(cchip("今日は雷"), cto(), cchip("今日は雷", "marked")))
+    add("uncertain", "conversion", crow(ckbd("⌥", "+", "→")), crow(cchip("今日は", "dim"), cchip("公園で", "ring"), cchip("遊ぶ", "dim")))
+    add("context", "conversion", crow(cchip("Pythonでプログラムをかこう", "in"), size="xs"), crow(cchip("書こう", "ring"), cchip("加工", "dim")))
+    add("reconvert", "conversion", crow(ckbd("⌃", "+", "⇧", "+", "R")), crow(cchip("貴社"), cto(), cchip("記者", "marked")))
+    add("script-keys", "conversion", crow(*[ccol(ckbd(key, small=True), kind) for key, kind in
+                                          (("F6", "あ"), ("F7", "ア"), ("F8", "ｱ"), ("F9", "Ａ"), ("F10", "A"))], size="s"))
+    add("number-forms", "conversion", cconv("21", "㉑"), crow(cchip("二一"), cchip("弐拾壱"), cchip("ⅩⅩⅠ"), size="s"))
+    add("proofreading", "conversion", cconv("見れる", "見られる", size="s"), cconv("頭痛が痛い", "頭痛がする", size="s"))
+    add("okurigana", "conversion", crow(ccol(cchip("行う"), "本則"), ccol(cchip("行なう"), "許容")))
+    add("learning", "conversion", crow(cchip("雷"), cchip("神鳴り", "dim"), cchip("カミナリ", "dim"), size="s"), crow(ckbd("⌃", "+", "⌫"), cnote("で削除")))
+    add("prediction-manage", "conversion", flow_ui("prediction-glass-dark", 620), crow(ckbd("⌫"), cnote("で読みに復帰")))
+    add("zenzai", "conversion", crow(cchip("精度優先"), cchip("速度優先"), cchip("併用"), size="s"))
+
+    # 補正
+    add("double-key", "correction", crow(cchip("koonnnitiha", "in")), cto("↓"), crow(cchip("こんにちは")))
+    add("misreading", "correction", cconv("ふいんき", "雰囲気"))
+    add("katakana", "correction", crow(cchip("しゅみれーしょん", "in")), cto("↓"), crow(cchip("シミュレーション")))
+    add("phonetic", "correction", cconv("ふぉと", "photo"))
+    add("hand-shift", "correction", crow(cchip("lpmmoyojs", "in")), cto("↓"), crow(cchip("こんにちは")))
+    add("exclusions", "correction", cconv("pthon", "Python3"))
+
+    # 英語と日本語
+    add("loanwords", "language", cconv("れっどはっと", "Red Hat", size="s"), cconv("にゅーらる", "neural", size="s"))
+    add("previous-word", "language", cconv("npm make", "make", size="s"), cconv("試合に make", "負け", size="s"))
+    add("english-japanese-words", "language", crow(cchip("sake", "in")), crow(ccol(cchip("sake"), "英語"), ccol(cchip("酒"), "日本語")))
+
+    # 辞書・マクロ・コマンド
+    add("user-dictionary", "dictionary", cconv("gh", "GitHub"))
+    add("placeholders", "dictionary", cconv("{date}", "2026/11/14", size="s"), cconv("{uuid}", "3f2a9c1e-…", size="s"))
+    add("import", "dictionary", crow(cchip("SKK", "in"), cchip("ほかの IME", "in"), size="s"), cto("↓"), crow(cchip("ユーザー辞書")))
+    add("technical-terms", "dictionary", crow(cchip("医学"), cchip("法律"), cchip("情報技術")))
+    add("macros", "dictionary", cconv("東京", "【東京】"), crow(cchip("東京（とうきょう）"), cchip("**東京**"), size="s"))
+    add("commands", "dictionary", flow_ui("command-list-glass-dark", 680))
+
+    # 設定と更新
+    add("keymap", "settings", crow(cchip("標準"), cchip("Windows 風"), cchip("Mac 風"), size="s"),
+        crow(cchip("ATOK 風"), cchip("Emacs 風"), cchip("Vim 風"), size="s"))
+    add("sync", "settings", crow(cchip("Mac"), cto("⇄"), cchip("Windows")), crow(cchip("Dropbox"), cchip("Google Drive"), cchip("iCloud Drive"), size="xs"))
+    add("onboarding", "settings", flow_ui("onboarding-features-dark", 780, keep_background=True, radius=20))
+    add("updates", "settings", crow(cchip("変更点を確認", "in"), cto(), cchip("更新"), size="s"))
+
+    return out
+
+
 def main():
     arguments = [a for a in sys.argv[1:] if not a.startswith("--")]
     only = next((a.split("=", 1)[1].split(",") for a in sys.argv[1:] if a.startswith("--only=")), None)
     snapshots = pathlib.Path(arguments[0]) if arguments else DEFAULT_SNAPSHOTS
     with tempfile.TemporaryDirectory() as work:
         builder = Builder(snapshots, pathlib.Path(work))
-        for name, make in scenes(builder).items():
+        for name, make in {**scenes(builder), **catalog_scenes(builder)}.items():
             if only is None or name in only:
                 make()
 
