@@ -311,6 +311,8 @@ public enum DefaultSettings {
     /// 分岐図で，1 つのまとまりに出す文節の数の上限．文節へ移るキーが 8 つなので，キーがいつも足りる数にする．0 は区切らない
     public static let branchSegmentsPerGroup = 8
     public static let branchSegmentsPerGroupRange = 0...8
+    /// 変換して分岐図を出した直後に，幹の上(文節)を選んだ状態にする
+    public static let branchStartsOnTrunk = true
     public static let meaningSenseLimit = 3
     public static let meaningSenseLimitRange = 1...5
     /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする
