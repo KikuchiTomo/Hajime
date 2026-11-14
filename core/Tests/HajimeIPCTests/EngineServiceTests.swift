@@ -431,6 +431,29 @@ struct EngineServiceTests {
         return (service, id)
     }
 
+    @Test("起動したときに脇に置いた設定のファイルの名前は，設定の画面に一度だけ答える．ほかの接続には答えない")
+    func setAsideSettingsFile() {
+        let service = EngineService(makeSession: { fatalError("セッションは作らない") }, settings: settings, ui: { _ in }, openSettings: { _ in },
+                                    services: SettingsServices(setAsideSettingsFile: "settings.json.broken-1"))
+        let read = { (id: EngineService.ConnectionID) -> [String: JSONValue]? in
+            let body = WireRequestBody.readSettingsFields(names: [SettingsFields.setAsideFileName], defaults: false)
+            guard case .settingsFields(let values) = service.handle(WireRequest(id: 20, body: body), from: id).body,
+                  let data = values.data(using: .utf8) else { return nil }
+            return try? JSONDecoder().decode([String: JSONValue].self, from: data)
+        }
+        let other = service.connect()
+        _ = service.handle(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), from: other)
+        #expect(read(other) == [SettingsFields.setAsideFileName: .null])
+        let app = service.connect(isSettingsApp: true)
+        _ = service.handle(WireRequest(id: 1, body: .hello(protocolVersion: WireProtocol.version)), from: app)
+        #expect(read(app) == [SettingsFields.setAsideFileName: .string("settings.json.broken-1")])
+        // 2 回目からは知らせない
+        #expect(read(app) == [SettingsFields.setAsideFileName: .null])
+        // ほかの項目と一緒に頼んだときは，知らない名前として断る(設定の項目ではない)
+        let mixed = WireRequestBody.readSettingsFields(names: ["liveConversion", SettingsFields.setAsideFileName], defaults: false)
+        #expect(service.handle(WireRequest(id: 21, body: mixed), from: app).body != .settingsFields(values: "{}"))
+    }
+
     @Test("学習を消す・使い方の記録を読んで消す")
     func learningAndUsage() {
         let resets = Box(0)

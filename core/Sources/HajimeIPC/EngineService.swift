@@ -107,7 +107,7 @@ public final class EngineService {
     /// 設定に関わるファイルの読み書き．無ければファイルの要求に malformed を返す
     private let files: (any SettingsFileHandling)?
     private var isRunningFileWork = false
-    private let services: SettingsServices
+    private var services: SettingsServices
     private var connections: [ConnectionID: Connection] = [:]
     private var sessions: [UInt32: Session] = [:]
     private var nextConnection: UInt64 = 1
@@ -367,6 +367,12 @@ public final class EngineService {
             pendingRegistration = nil
             return .wordRegistration(word: pending?.word, reading: pending?.reading)
         case .readSettingsFields(let names, let defaults):
+            // 起動したときに脇に置いた設定のファイルは，設定の画面に一度だけ知らせる(答えたら忘れる)
+            if names == [SettingsFields.setAsideFileName] {
+                let name = connection.isSettingsApp ? services.setAsideSettingsFile : nil
+                if connection.isSettingsApp { services.setAsideSettingsFile = nil }
+                return fields { () throws(SettingsFields.Failure) in try SettingsFields.setAsideFile(name) }
+            }
             return fields { () throws(SettingsFields.Failure) in
                 let read = try SettingsFields.read(defaults ? DefaultSettings.settings : settings.current, names: names)
                 return try SettingsFields.addingAutomaticJinenModel(services.automaticJinenModel(), to: read, names: names)
