@@ -71,6 +71,8 @@ pub struct ListState {
     pub result: bool,
     /// 書き方のチップの欄の高さ．閉じていれば None
     pub panel: Option<f32>,
+    /// 「キーで検索」のボタンの代わりに置く，押したキーで絞り込んでいるときのチップの幅(キー設定)．絞り込んでいなければ None
+    pub key_search: Option<f32>,
 }
 
 /// 1 行のカードと，その中の部品の位置
@@ -975,7 +977,10 @@ fn place_list(
             )
         });
         let filter_left = filter.map_or(x + inner, |rect| rect.x - size::CONTROL_GAP);
-        let key_width = button_width(crate::strings::keys::SEARCH_BY_KEY, metrics);
+        // 押したキーで絞り込んでいるあいだは，ボタンの場所にチップ(キーの名前と外す印)を置く．検索欄は残りの幅
+        let key_width = state
+            .key_search
+            .unwrap_or_else(|| button_width(crate::strings::keys::SEARCH_BY_KEY, metrics));
         let key = Rect::new(
             filter_left - key_width,
             card_top,
@@ -1657,10 +1662,35 @@ mod tests {
             .expect("登録した単語の行")
     }
 
+    /// キー設定の表に，押したキーで絞り込んでいるときのチップの幅を返す(画面の側の RowState の代わり)
+    struct WithKeyChip(Option<f32>);
+
+    impl Metrics for WithKeyChip {
+        fn lines(&self, text: &str, kind: TextKind, width: f32) -> usize {
+            Estimate.lines(text, kind, width)
+        }
+
+        fn width(&self, text: &str, kind: TextKind) -> f32 {
+            Estimate.width(text, kind)
+        }
+
+        fn list_state(&self, _: &Row, _width: f32) -> ListState {
+            ListState {
+                key_search: self.0,
+                ..ListState::default()
+            }
+        }
+    }
+
     /// キー設定の表のカード
     fn keymap_card() -> CardLayout {
+        keymap_card_with(None)
+    }
+
+    /// キー設定の表のカード．chip は押したキーで絞り込んでいるときのチップの幅
+    fn keymap_card_with(chip: Option<f32>) -> CardLayout {
         let page = sections(Page::Keys).unwrap();
-        let layout = layout(&page, 800.0, |_| true, |_| true, &Estimate);
+        let layout = layout(&page, 800.0, |_| true, |_| true, &WithKeyChip(chip));
         layout
             .sections
             .iter()
@@ -1669,6 +1699,26 @@ mod tests {
             .find(|(card, section)| matches!(section.rows[card.row].control, Control::List(..)))
             .map(|(card, _)| card.clone())
             .expect("キー設定の表の行")
+    }
+
+    #[test]
+    fn 押したキーのチップは_キーで検索_の場所に置き_検索欄は残りの幅にする() {
+        // parts は 入力欄(3)・追加・検索欄・絞り込み・下のボタン(3)・「キーで検索」
+        let plain = keymap_card();
+        let (search, filter, button) = (plain.parts[4], plain.parts[5], plain.parts[9]);
+        assert_eq!(button.max_x() + size::CONTROL_GAP, filter.x);
+        assert_eq!(search.max_x() + size::CONTROL_GAP, button.x);
+        let chipped = keymap_card_with(Some(64.0));
+        let (wide, chip) = (chipped.parts[4], chipped.parts[9]);
+        assert_eq!(chip.width, 64.0);
+        // 右の端(状態の絞り込みの左)は動かず，検索欄がチップの左まで広がる
+        assert_eq!(chip.max_x(), button.max_x());
+        assert_eq!(wide.x, search.x);
+        assert_eq!(wide.max_x() + size::CONTROL_GAP, chip.x);
+        assert_eq!(chipped.parts[5], filter);
+        // 表やほかの部品は動かない
+        assert_eq!(chipped.control, plain.control);
+        assert_eq!(chipped.parts[..4], plain.parts[..4]);
     }
 
     #[test]
@@ -1740,6 +1790,7 @@ mod tests {
             template_button: true,
             result: true,
             panel: Some(100.0),
+            key_search: None,
         });
         let result = card.result.expect("結果の行");
         let panel = card.template_panel.expect("チップの欄");

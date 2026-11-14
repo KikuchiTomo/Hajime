@@ -578,6 +578,8 @@ struct RowState {
     /// 書き方のチップの置き場所(チップを並べる欄の左上を 0 とする)と，その欄の左上(ページの中の座標)
     template_chips: reference::Chips,
     template_origin: (f32, f32),
+    /// 押したキーで表を絞り込んでいるときのキー(整えた書き方．キー設定．macOS の KeymapPage の keyFilter)
+    key_filter: Option<String>,
     /// キーを記録している欄(キー設定のキーの欄か検索欄)．欄が記録を始めた・やめたと知らせてくる
     recording: Option<Part>,
     /// キーを選ぶメニューで，ファンクションキーの一覧を出しているか
@@ -781,6 +783,7 @@ impl RowState {
             template_switch: Vec::new(),
             template_chips: reference::Chips::default(),
             template_origin: (0.0, 0.0),
+            key_filter: None,
             recording: None,
             key_functions: false,
         }
@@ -951,6 +954,32 @@ impl RowState {
             }
             _ => None,
         }
+    }
+
+    /// 押したキーで絞り込んでいるときに，「キーで検索」の代わりに出すチップの文字(キーの名前)
+    fn key_chip(&self) -> Option<String> {
+        self.key_filter.as_deref().map(crate::keys::display)
+    }
+
+    /// 表を押したキー(key_filter)の行だけにする．表のキーの列と同じ書き方で比べる
+    fn restrict_key(&mut self) {
+        let cell = self
+            .key_filter
+            .as_deref()
+            .and_then(crate::keys::filter_cell);
+        self.table
+            .restrict(pages::KEYMAP_KEY_FIELD, cell.as_deref());
+    }
+
+    /// 押したキーでの絞り込みを変える(None で外す)．表を絞り直し，選んだ行と書き換えを外して，先頭に戻す
+    fn set_key_filter(&mut self, notation: Option<&str>) {
+        self.key_filter = notation.and_then(crate::keys::canonical);
+        self.restrict_key();
+        self.editing = None;
+        let content = self.table.len() as f32 * size::TABLE_ROW_HEIGHT;
+        let viewport = table_viewport(self);
+        self.table_scroll.set_extent(content, viewport);
+        self.table_scroll.jump_to(0.0);
     }
 
     /// 欄の枠の中の右の端にボタンを置く欄か(キー設定のキーの欄．キーを選ぶメニューと「記録を停止」)
@@ -2183,6 +2212,7 @@ impl PageView {
                     row.table.filter(&ffi::window_text(search));
                 }
                 row.table.restrict(0, state_filter(row.filter));
+                row.restrict_key();
                 let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
                 row.table_scroll.set_extent(content, table_viewport(row));
             }
@@ -2241,6 +2271,7 @@ impl PageView {
             .rows
             .iter()
             .map(|row| ListInput {
+                key_chip: row.key_chip(),
                 template_button: row.row.control.template_target().is_some()
                     && row.template_enabled,
                 result: !(row.result_text.is_empty() && row.result_problems.is_empty()),
@@ -2533,6 +2564,18 @@ impl PageView {
                     .map(|_| label)
             }
             Part::TemplateButton => Some(crate::strings::templates::BUTTON_HELP),
+            // 「キーで検索」は何をするかを，絞り込んでいるあいだのチップは押すと外れることを出す
+            Part::KeySearch => Some(
+                if self
+                    .rows
+                    .get(element.row)
+                    .is_some_and(|row| row.key_filter.is_some())
+                {
+                    keys::CLEAR_KEY_FILTER
+                } else {
+                    keys::SEARCH_BY_KEY_HELP
+                },
+            ),
             // 絵だけのボタン(キーを選ぶメニュー・記録を停止)は名前を出す
             Part::KeyMenu => Some(keys::CHOOSE_KEY),
             Part::KeyStop => Some(keys::STOP_RECORDING),
@@ -2551,6 +2594,11 @@ impl PageView {
             Part::Increment => format!("{} {}", row.row.title, text::INCREASE),
             Part::Slider => row.title(),
             Part::Filter => keys::STATE.to_string(),
+            // 絞り込んでいるあいだは，外すことと絞り込んでいるキーを読む
+            Part::KeySearch => match row.key_chip() {
+                Some(chip) => format!("{} {chip}", keys::CLEAR_KEY_FILTER),
+                None => keys::SEARCH_BY_KEY.to_string(),
+            },
             Part::Segment(_)
             | Part::Button(_)
             | Part::TemplateSegment(_)
@@ -2777,6 +2825,61 @@ impl PageView {
         }
     }
 
+    /// 「キーで検索」で押したキー(window は受け取った検索欄)で表を絞り込む．チップの幅が変わるので置き直す
+    pub fn key_captured(&mut self, window: Window, notation: &str) -> Option<Event> {
+        let element = self.element_of(window)?;
+        let row = self.rows.get_mut(element.row)?;
+        row.set_key_filter(Some(notation));
+        Some(Event::Relayout)
+    }
+
+    /// 見本の書き出しで，キー設定の表を notation のキーで絞り込んだ状態にする
+    pub fn show_key_filter(&mut self, notation: &str) {
+        for row in &mut self.rows {
+            if row
+                .row
+                .control
+                .list_buttons()
+                .is_some_and(|buttons| buttons.toolbar)
+            {
+                row.set_key_filter(Some(notation));
+            }
+        }
+    }
+
+    /// 見本の書き出しで，キー設定の新しい行のキーの欄に text を入れた状態(recording なら記録しているところ)にする
+    pub fn show_key_draft(&mut self, text: &str, recording: bool) {
+        for row in &mut self.rows {
+            let Some(field) = row
+                .row
+                .control
+                .list_buttons()
+                .and_then(|buttons| buttons.key_menu)
+            else {
+                continue;
+            };
+            if let Some(window) = row.key_window() {
+                ffi::set_text(window, text);
+            }
+            row.recording = recording.then_some(Part::Field(field));
+            // 状態は入力中にし(macOS の新しい行の初めの状態)，コマンドはその状態に置けるものにする
+            let composing = keys::STATES
+                .iter()
+                .position(|(value, _)| *value == "composing");
+            if let (Some(Input::Choice(state)), Some(composing)) =
+                (row.inputs.first_mut(), composing)
+            {
+                *state = composing;
+            }
+            let allowed = row.choice_positions(KEYMAP_COMMAND);
+            if let Some(Input::Choice(command)) = row.inputs.get_mut(KEYMAP_COMMAND) {
+                if !allowed.is_empty() && !allowed.contains(command) {
+                    *command = allowed[0];
+                }
+            }
+        }
+    }
+
     /// 開く一覧を下に出す部品の場所(ページの中の座標)．キーを選ぶメニューは，キーの欄の左の端にそろえて出す
     pub fn menu_rect(&self, element: Element) -> Option<Rect> {
         let row = self.rows.get(element.row)?;
@@ -2886,8 +2989,13 @@ impl PageView {
         }
         match (&row.row.control, part) {
             (_, Part::Reset) => return Some(Event::Reset(row.row.path)),
-            // 次に押したキーを検索欄に書き，その行だけを出す(検索欄はキーの名前で絞る)
+            // 押したキーで絞り込んでいれば外す(チップを押した)．でなければ次に押したキーを検索欄で受け取り，
+            // そのキーの行だけを出す(set_key_filter．検索欄の言葉とは別に絞る．macOS の KeymapPage の keyFilter)
             (_, Part::KeySearch) => {
+                if row.key_filter.is_some() {
+                    row.set_key_filter(None);
+                    return Some(Event::Relayout);
+                }
                 if let Some(search) = row.search {
                     edit::start_recording(search, keys::PRESS);
                 }
@@ -5041,14 +5149,45 @@ impl PageView {
                     );
                 }
                 Part::Field(_) | Part::Search => self.paint_field(canvas, frame, index, row, part),
-                Part::KeySearch => paint::button(
-                    canvas,
-                    theme,
-                    rect,
-                    keys::SEARCH_BY_KEY,
-                    paint::ButtonKind::Standard,
-                    self.state(frame, element, row.part_enabled(part)),
-                ),
+                Part::KeySearch => {
+                    let state = self.state(frame, element, row.part_enabled(part));
+                    match row.key_chip() {
+                        // 押したキーで絞り込んでいるあいだは，キーの名前と外す印のチップにする(押すと外す)
+                        Some(chip) => {
+                            paint::button(
+                                canvas,
+                                theme,
+                                rect,
+                                "",
+                                paint::ButtonKind::Standard,
+                                state,
+                            );
+                            let (label, mark) = key_chip_areas(rect);
+                            canvas.text(
+                                label,
+                                &chip,
+                                TextStyle::Body,
+                                Color::from(theme.palette.text),
+                                TextLayout::LINE,
+                            );
+                            canvas.text(
+                                mark,
+                                theme.glyphs.close,
+                                TextStyle::IconSmall,
+                                Color::from(theme.palette.text_secondary),
+                                TextLayout::CENTER,
+                            );
+                        }
+                        None => paint::button(
+                            canvas,
+                            theme,
+                            rect,
+                            keys::SEARCH_BY_KEY,
+                            paint::ButtonKind::Standard,
+                            state,
+                        ),
+                    }
+                }
                 // キーの欄の枠の中の右の端の絵のボタン(名前は説明の吹き出しと読み上げに出す)
                 Part::KeyMenu | Part::KeyStop => paint::field_button(
                     canvas,
@@ -5837,6 +5976,26 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
     }
 }
 
+/// 押したキーで絞り込んでいるときのチップの幅(キーの名前の幅から．左右の余白と，名前と外す印のあいだを足す)
+fn key_chip_width(label: f32) -> f32 {
+    (label + size::BUTTON_PADDING_X * 2.0 + space::INLINE + size::CHEVRON_SIZE).ceil()
+}
+
+/// チップの中の，キーの名前と外す印の置き場所
+fn key_chip_areas(rect: Rect) -> (Rect, Rect) {
+    let left = rect.x + size::BUTTON_PADDING_X;
+    let mark = rect.max_x() - size::BUTTON_PADDING_X - size::CHEVRON_SIZE;
+    (
+        Rect::new(
+            left,
+            rect.y,
+            (mark - space::INLINE - left).max(0.0),
+            rect.height,
+        ),
+        Rect::new(mark, rect.y, size::CHEVRON_SIZE, rect.height),
+    )
+}
+
 /// 表の行のメニューの項目
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RowMenuItem {
@@ -6321,6 +6480,8 @@ struct Measured<'a> {
 
 /// 一覧の行の，状態で出し入れするもの(layout::ListState の元)
 struct ListInput {
+    /// 押したキーで絞り込んでいるときのチップの文字
+    key_chip: Option<String>,
     template_button: bool,
     result: bool,
     panel: Option<PanelInput>,
@@ -6398,6 +6559,10 @@ impl Metrics for Measured<'_> {
             template_button: input.template_button,
             result: input.result,
             panel,
+            key_search: input
+                .key_chip
+                .as_ref()
+                .map(|chip| key_chip_width(self.measure.width(chip, TextStyle::Body))),
         }
     }
 

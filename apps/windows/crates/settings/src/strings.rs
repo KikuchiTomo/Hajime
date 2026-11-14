@@ -733,6 +733,8 @@ pub mod keys {
     pub const SEARCH_PROMPT: &str = "コマンドやキーで検索";
     pub const SEARCH_BY_KEY: &str = "キーで検索";
     pub const SEARCH_BY_KEY_HELP: &str = "押したキーで絞り込み";
+    /// 押したキーで絞り込んでいるあいだのチップ(押すと外す．UIStrings.Keys.clearKeyFilter)
+    pub const CLEAR_KEY_FILTER: &str = "絞り込みを解除";
     pub const TAB: &str = "キー設定";
     pub const PRESET_MENU: &str = "ひな形を読み込む";
     pub const CUSTOM_PRESET: &str = "カスタム";

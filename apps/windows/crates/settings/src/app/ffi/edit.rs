@@ -31,7 +31,7 @@ pub const WM_FIELD_TAB: u32 = WM_APP + 1;
 pub const WM_FIELD_ENTER: u32 = WM_APP + 2;
 /// 親に届く知らせ: フォーカスが入った・出た(wparam は入ったら 1，lparam は欄)
 pub const WM_FIELD_FOCUS: u32 = WM_APP + 3;
-/// 親に届く知らせ: キーを記録した(lparam は欄)
+/// 親に届く知らせ: キーを記録した(lparam は欄)．wparam が 1 なら欄には入れず，押したキーを持っている(take_captured で受け取る)
 pub const WM_FIELD_RECORDED: u32 = WM_APP + 4;
 /// 親に届く知らせ: Esc を押した(lparam は欄．シート・カスタムテーマの編集の画面と，書き方のチップを閉じる)
 pub const WM_FIELD_ESCAPE: u32 = WM_APP + 5;
@@ -58,6 +58,10 @@ struct FieldData {
     record_on_click: Option<Vec<u16>>,
     /// 記録を始める前の欄の文字．キーを押さずに記録をやめたら戻す(macOS の KeyField は記録をやめても前のキーを残す)
     saved: Option<String>,
+    /// 押したキーを欄に入れずに親へ渡す記録か(キー設定の「キーで検索」．欄の文字は記録の前のまま残す)
+    capture: bool,
+    /// 親へ渡す，押したキーの書き方(capture の記録で押したキー)
+    captured: Option<String>,
 }
 
 /// 枠の無い欄を作る(見えない状態で作る．置くときに見せる)
@@ -81,6 +85,8 @@ pub fn create(parent: HWND, id: u16, placeholder: &str, font: &Font) -> Option<H
         recording: None,
         record_on_click: None,
         saved: None,
+        capture: false,
+        captured: None,
     });
     // SAFETY: window はこのスレッドの窓．data は WM_NCDESTROY で Box に戻して放す
     unsafe {
@@ -138,7 +144,8 @@ pub fn set_placeholder(window: HWND, placeholder: &str) {
     super::win32::invalidate(window);
 }
 
-/// 欄にフォーカスを入れて，次に押したキーを記録する(キー設定の「キーで検索」)．prompt は記録しているあいだの案内
+/// 欄にフォーカスを入れて，次に押したキーを受け取る(キー設定の「キーで検索」)．prompt は記録しているあいだの案内．
+/// 押したキーは欄に入れず(欄は記録の前の文字に戻す)，WM_FIELD_RECORDED(wparam は 1)で親に知らせる
 pub fn start_recording(window: HWND, prompt: &str) {
     let before = super::win32::window_text(window);
     with_data(window, |data| {
@@ -147,6 +154,8 @@ pub fn start_recording(window: HWND, prompt: &str) {
             data.saved = Some(before);
         }
         data.recording = Some(prompt.encode_utf16().collect());
+        data.capture = true;
+        data.captured = None;
     });
     // IME が「かな」「変換」などのキーを先に取ると欄に届かないので，記録しているあいだはこの欄で IME を使わない
     set_ime(window, false);
@@ -161,12 +170,20 @@ pub fn stop_recording(window: HWND) {
     let mut stopped = None;
     with_data(window, |data| {
         if data.recording.take().is_some() {
+            data.capture = false;
             stopped = Some(data.saved.take());
         }
     });
     if let Some(saved) = stopped {
         restore(window, saved);
     }
+}
+
+/// start_recording の記録で押したキーの書き方を受け取る(一度だけ)
+pub fn take_captured(window: HWND) -> Option<String> {
+    let mut captured = None;
+    with_data(window, |data| captured = data.captured.take());
+    captured
 }
 
 /// 記録をやめたあとの欄を元に戻す．IME を使えるようにし，記録の前の文字を入れ直して，親に知らせる
@@ -186,6 +203,8 @@ pub fn set_record_on_click(window: HWND, prompt: Option<&str>) {
         data.record_on_click = prompt.map(|prompt| prompt.encode_utf16().collect());
         data.recording = None;
         data.saved = None;
+        data.capture = false;
+        data.captured = None;
     });
 }
 
@@ -303,10 +322,18 @@ fn handle(
                 pressed(VK_SHIFT.0),
             ) {
                 field.recording = None;
-                field.saved = None;
                 set_ime(window, true);
-                super::win32::set_text(window, &crate::keys::display(&notation));
-                notify_parent(window, WM_FIELD_RECORDED, 0);
+                let saved = field.saved.take();
+                if std::mem::take(&mut field.capture) {
+                    // 押したキーは親に渡し，欄は記録の前の文字に戻す
+                    field.captured = Some(notation);
+                    super::win32::set_text(window, &saved.unwrap_or_default());
+                    super::win32::invalidate(window);
+                    notify_parent(window, WM_FIELD_RECORDED, 1);
+                } else {
+                    super::win32::set_text(window, &crate::keys::display(&notation));
+                    notify_parent(window, WM_FIELD_RECORDED, 0);
+                }
                 notify_parent(window, WM_FIELD_RECORDING, 0);
             }
             Some(LRESULT(0))
@@ -318,6 +345,7 @@ fn handle(
         // フォーカスが外れたらやめる(WM_KILLFOCUS)
         WM_LBUTTONDOWN if field.recording.is_none() && field.record_on_click.is_some() => {
             field.recording = field.record_on_click.clone();
+            field.capture = false;
             field.saved = Some(super::win32::window_text(window));
             // IME が「かな」「変換」などのキーを先に取ると欄に届かないので，記録しているあいだはこの欄で IME を使わない
             set_ime(window, false);
@@ -344,6 +372,7 @@ fn handle(
         WM_SETFOCUS | WM_KILLFOCUS => {
             // フォーカスが外れたら記録をやめ，欄を記録の前の文字に戻す
             if message == WM_KILLFOCUS && field.recording.take().is_some() {
+                field.capture = false;
                 let saved = field.saved.take();
                 restore(window, saved);
             }

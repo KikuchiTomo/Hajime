@@ -374,6 +374,12 @@ pub fn display(notation: &str) -> String {
         .join("+")
 }
 
+/// 押したキーで表を絞り込むときに，表のキーの列と比べる文字．書き方を整えてから画面の書き方にするので，
+/// 整えた書き方が同じキーだけが同じ文字になる(「Space」は「Ctrl+Space」の行に当たらない)．読めなければ None
+pub fn filter_cell(notation: &str) -> Option<String> {
+    canonical(notation).map(|notation| display(&notation))
+}
+
 /// command に割り当てたキー(入力していないときに効く行．状態が「どこでも」か「入力していないとき」)を「、」で並べる．
 /// 無ければ「なし」(macOS の PalettePage の keys(for:))
 pub fn assigned(keymap: Option<&serde_json::Value>, command: &str) -> String {
@@ -806,6 +812,21 @@ mod tests {
             chosen("/", &modifier(Modifier::Shift)).as_deref(),
             Some("/")
         );
+    }
+
+    #[test]
+    fn 押したキーの絞り込みは整えた書き方が同じキーだけに当たる() {
+        // 表のキーの列は，設定の書き方を画面の書き方にしたもの
+        let cell = |notation: &str| display(notation);
+        assert_eq!(filter_cell("Space"), Some(cell("Space")));
+        assert_ne!(filter_cell("Space"), Some(cell("Ctrl Space")));
+        assert_ne!(filter_cell("Space"), Some(cell("Shift Space")));
+        // 押したキーの書き方(修飾キーの順や大文字と小文字)が違っても，同じキーなら当たる
+        assert_eq!(filter_cell("shift ctrl k"), Some(cell("Ctrl Shift k")));
+        assert_eq!(filter_cell("Ctrl+Alt+K"), Some(cell("Ctrl Option k")));
+        assert_eq!(filter_cell("kanji"), Some(cell("Hankaku/Zenkaku")));
+        assert_ne!(filter_cell("k"), Some(cell("Shift k")));
+        assert_eq!(filter_cell("Hyper k"), None);
     }
 
     fn entry(state: &str, key: &str, command: &str) -> (String, String, String) {
