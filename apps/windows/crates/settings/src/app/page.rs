@@ -69,6 +69,11 @@ pub enum Event {
         spec: ListSpec,
         indices: Vec<usize>,
     },
+    /// 選んだ行を，それぞれ元の行のすぐ下に複製する(キー設定の表．表の行の番号)
+    ListDuplicate {
+        spec: ListSpec,
+        indices: Vec<usize>,
+    },
     /// 選んだ行の有効と無効を切り替える(コマンドと変換マクロ．表の行の番号)
     ListToggle {
         spec: ListSpec,
@@ -944,7 +949,7 @@ impl RowState {
     }
 
     /// 表の行を右クリックしたときのメニューの項目(macOS の RuleListEditor・KeymapPage の contextMenu)．
-    /// 1 行だけ選んでいれば編集，キー設定は複製，選んだ行があれば削除
+    /// 1 行だけ選んでいれば編集，選んだ行があれば削除，キー設定は複製も
     fn row_menu(&self) -> Vec<RowMenuItem> {
         if !self.has_add_remove() || !self.enabled {
             return Vec::new();
@@ -953,6 +958,9 @@ impl RowState {
         let mut items = Vec::new();
         if selected.len() == 1 {
             items.push(RowMenuItem::Edit);
+        }
+        if !selected.is_empty() {
+            // 複製は，選んだ行をそれぞれ元の行のすぐ下に足す(何行でも)
             if self
                 .row
                 .control
@@ -961,8 +969,6 @@ impl RowState {
             {
                 items.push(RowMenuItem::Duplicate);
             }
-        }
-        if !selected.is_empty() {
             items.push(RowMenuItem::Remove);
         }
         items
@@ -2858,11 +2864,12 @@ impl PageView {
                     return Some(Event::Action(pages::Action::RestoreKeymap))
                 }
                 ("keymap", Part::Bottom(1)) => {
-                    // 選んだ行を入力欄に写し，追加のボタンで新しい行として足す
-                    let index = *row.table.selected_rows().first()?;
-                    row.fill_inputs(index);
-                    row.editing = None;
-                    return None;
+                    // 選んだ行を，それぞれ元の行のすぐ下に複製する(macOS と同じ)
+                    let selected = row.table.selected_rows();
+                    return (!selected.is_empty()).then_some(Event::ListDuplicate {
+                        spec: *spec,
+                        indices: selected,
+                    });
                 }
                 _ => {}
             }
