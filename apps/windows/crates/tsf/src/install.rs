@@ -11,6 +11,14 @@ pub const TSF_FOLDER: &str = "tsf";
 /// 32 ビットの DLL を置くフォルダ
 pub const X86_FOLDER: &str = "x86";
 
+/// 前の版の消せない DLL を，再起動で消えるまで退けておくフォルダ(tsf の下)．バージョンの名前と重ならないよう . で始める
+pub const RETIRED_FOLDER: &str = ".old";
+
+/// 退けるファイルの名前(元の名前に，重ならないための番号を付ける)
+pub fn retired_name(name: &str, process: u32, stamp: u128, attempt: u32) -> String {
+    format!("{process}-{stamp}-{attempt}-{name}")
+}
+
 /// module(読み込まれた DLL のパス)からインストール先のフォルダを求める
 pub fn installation_folder(module: &Path) -> Option<PathBuf> {
     let mut folder = module.parent()?;
@@ -27,6 +35,29 @@ pub fn installation_folder(module: &Path) -> Option<PathBuf> {
     Some(folder.to_path_buf())
 }
 
+/// module(読み込まれた DLL のパス)が tsf\<バージョン>\ に置いたものなら，tsf のフォルダとそのバージョンのフォルダの名前
+pub fn version_folder(module: &Path) -> Option<(PathBuf, String)> {
+    let mut folder = module.parent()?;
+    if is_named(folder, X86_FOLDER) {
+        folder = folder.parent()?;
+    }
+    let tsf = folder
+        .parent()
+        .filter(|parent| is_named(parent, TSF_FOLDER))?;
+    let name = folder.file_name()?.to_str()?.to_string();
+    Some((tsf.to_path_buf(), name))
+}
+
+/// tsf のフォルダの中の names のうち，今のバージョン(current)でないもの(前の版の DLL を置いたフォルダ)
+pub fn stale_versions<'a>(names: &'a [String], current: &str) -> Vec<&'a str> {
+    names
+        .iter()
+        .map(String::as_str)
+        .filter(|name| !name.eq_ignore_ascii_case(current))
+        .filter(|name| !name.is_empty() && *name != "." && *name != "..")
+        .collect()
+}
+
 fn is_named(folder: &Path, name: &str) -> bool {
     folder
         .file_name()
@@ -37,6 +68,59 @@ fn is_named(folder: &Path, name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn バージョンごとのフォルダを_dll_の場所から求める() {
+        let module = path(&[
+            "C:",
+            "Program Files",
+            "Hajime",
+            "tsf",
+            "0.3.4",
+            "hajime_tsf.dll",
+        ]);
+        let tsf = path(&["C:", "Program Files", "Hajime", "tsf"]);
+        assert_eq!(
+            version_folder(&module),
+            Some((tsf.clone(), "0.3.4".to_string()))
+        );
+        let module = path(&[
+            "C:",
+            "Program Files",
+            "Hajime",
+            "tsf",
+            "0.3.4",
+            "x86",
+            "hajime_tsf.dll",
+        ]);
+        assert_eq!(version_folder(&module), Some((tsf, "0.3.4".to_string())));
+        // tsf の下でなければ(前の置き方)何も消さない
+        let module = path(&["C:", "Program Files", "Hajime", "hajime_tsf.dll"]);
+        assert_eq!(version_folder(&module), None);
+    }
+
+    #[test]
+    fn 今のバージョンでないフォルダだけを選ぶ() {
+        let names = vec![
+            "0.3.3".to_string(),
+            "0.3.4".to_string(),
+            "0.2.7".to_string(),
+        ];
+        assert_eq!(stale_versions(&names, "0.3.4"), vec!["0.3.3", "0.2.7"]);
+        assert!(stale_versions(&["0.3.4".to_string()], "0.3.4").is_empty());
+        // 退けたファイルのフォルダも今の版ではないので選ぶ(再起動を待つ)
+        assert_eq!(
+            stale_versions(&[RETIRED_FOLDER.to_string(), "0.3.4".to_string()], "0.3.4"),
+            vec![RETIRED_FOLDER]
+        );
+    }
+
+    #[test]
+    fn 退けるファイルの名前は試すたびに変わる() {
+        let first = retired_name("hajime_tsf.dll", 10, 20, 0);
+        assert_eq!(first, "10-20-0-hajime_tsf.dll");
+        assert_ne!(first, retired_name("hajime_tsf.dll", 10, 20, 1));
+    }
 
     fn path(parts: &[&str]) -> PathBuf {
         parts.iter().collect()

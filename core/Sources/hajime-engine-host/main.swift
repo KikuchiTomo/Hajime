@@ -298,7 +298,12 @@ func run() -> Int32 {
             _ = command
             #endif
         },
-        flushLearning: { [engine] in engine.flushLearning() },
+        // 入力欄から外れたら，学んだことと使い方の記録を書き出す(macOS の入力コントローラの deactivateServer と同じ．
+        // 使い方の記録は 20 回ごとにしか保存しないので，書き出さないとエンジンが終わるときに残りを失う)
+        flushLearning: { [engine, usage] in
+            engine.flushLearning()
+            usage.flush()
+        },
         log: { message in
             #if os(Windows)
             EngineProcess.debugLog(message)
