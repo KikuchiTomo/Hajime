@@ -13,6 +13,8 @@ final class CandidatePanelController {
     private let bubble = MeaningBubbleController()
     private var fadeTimer: Timer?
     private var lastAnnounced: String?
+    /// 窓を出しているか(出していれば，置く場所が決まるまで前の場所で中身を変える．ClientActionPresenter)
+    var isVisible: Bool { window.isVisible }
     /// 前に出した一覧と分岐図．あとから届いた候補で中身だけが変わったか(選んでいるものは同じか)を見分ける
     private var shownList: CandidatePanel?
     private var shownLattice: LatticePanel?
