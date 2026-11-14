@@ -287,7 +287,8 @@ func run() -> Int32 {
             resetPaletteHistory: resetPaletteHistory,
             previewLanguage: { preview.preview($0, precedingText: $1) },
             previewMacros: { macroPreview.preview(text: $0, reading: $1, pattern: $2) },
-            automaticJinenModel: { [engine] in engine.automaticJinenModel?.rawValue }
+            automaticJinenModel: { [engine] in engine.automaticJinenModel?.rawValue },
+            setAsideSettingsFile: settings.setAsideFile?.lastPathComponent
         ),
         runCommand: { command in
             // 読みで呼び出すコマンド(R-22)．Windows だけで動かす(Linux はまだ設定の画面が無く，コマンドを登録できない)
