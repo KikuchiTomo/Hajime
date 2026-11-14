@@ -747,6 +747,20 @@ pub mod keys {
     pub const DUPLICATE: &str = "複製";
     pub const PRESS: &str = "キーを押してください";
     pub const RECORD: &str = "キーを記録";
+    pub const STOP_RECORDING: &str = "記録を停止";
+    /// キーの欄の右の，押して記録しにくいキーと修飾キーを選ぶメニュー(UIStrings.Keys.chooseKey)
+    pub const CHOOSE_KEY: &str = "キーを選択";
+    /// メニューの中の，ファンクションキーの一覧を開く項目
+    pub const FUNCTION_KEYS_ITEM: &str = "ファンクションキー…";
+
+    /// メニューの中の修飾キーの項目．付いていれば外す，付いていなければ付ける
+    pub fn modifier_item(name: &str, on: bool) -> String {
+        if on {
+            format!("{name} を外す")
+        } else {
+            format!("{name} を付ける")
+        }
+    }
     pub const LOAD_PRESET_TITLE: &str = "ひな形を読み込みますか？";
     pub const RESTORE_TITLE: &str = "既定の表に戻しますか？";
     pub const RESTORE_MESSAGE: &str = "追加した行と変更した行は削除されます。";

@@ -214,6 +214,139 @@ pub fn from_key(
     canonical(&parts.join(" "))
 }
 
+/// キーの欄のメニューで選べる，押して記録しにくいキー(macOS の UIStrings.Keys.specialKeyChoices と同じ並び)
+pub const SPECIAL_KEYS: &[&str] = &[
+    "Escape",
+    "Enter",
+    "Tab",
+    "Space",
+    "Backspace",
+    "Delete",
+    "Up",
+    "Down",
+    "Left",
+    "Right",
+    "Home",
+    "End",
+    "PageUp",
+    "PageDown",
+    "Eisu",
+    "Kana",
+    "Hankaku/Zenkaku",
+    "Henkan",
+    "Muhenkan",
+];
+
+/// キーの欄のメニューで付け外しする修飾キー
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Modifier {
+    Control,
+    /// Windows の Alt(書き方では Option)
+    Option,
+    Shift,
+}
+
+impl Modifier {
+    pub const ALL: [Modifier; 3] = [Modifier::Control, Modifier::Option, Modifier::Shift];
+
+    /// キーの書き方での名前
+    fn notation(self) -> &'static str {
+        match self {
+            Modifier::Control => "Ctrl",
+            Modifier::Option => "Option",
+            Modifier::Shift => "Shift",
+        }
+    }
+}
+
+/// キーの欄のメニューの項目(macOS の KeyField の menu)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KeyChoice {
+    /// このキーにする(今の修飾キーはそのまま)
+    Key(String),
+    /// ファンクションキーの一覧を開く
+    FunctionKeys,
+    /// 修飾キーを付ける・外す
+    Modifier(Modifier),
+}
+
+/// キーの欄のメニューに並べる項目．current は欄の今の値．修飾キーは，欄にキーが入っているときだけ並べる
+pub fn key_choices(current: &str) -> Vec<KeyChoice> {
+    let mut choices: Vec<KeyChoice> = SPECIAL_KEYS
+        .iter()
+        .map(|key| KeyChoice::Key((*key).to_string()))
+        .collect();
+    choices.push(KeyChoice::FunctionKeys);
+    if canonical(current).is_some() {
+        choices.extend(Modifier::ALL.map(KeyChoice::Modifier));
+    }
+    choices
+}
+
+/// ファンクションキーの一覧の項目(F1〜F20)
+pub fn function_choices() -> Vec<KeyChoice> {
+    FUNCTION_KEYS
+        .map(|number| KeyChoice::Key(format!("F{number}")))
+        .collect()
+}
+
+/// メニューの項目の名前．修飾キーは，選ぶと付くのか外れるのかを書く
+pub fn choice_label(choice: &KeyChoice, current: &str) -> String {
+    use crate::strings::keys::{modifier_item, FUNCTION_KEYS_ITEM};
+    match choice {
+        KeyChoice::Key(key) => display(key),
+        KeyChoice::FunctionKeys => FUNCTION_KEYS_ITEM.to_string(),
+        KeyChoice::Modifier(modifier) => modifier_item(
+            &display(modifier.notation()),
+            has_modifier(current, *modifier),
+        ),
+    }
+}
+
+/// 欄の値に修飾キーが付いているか
+pub fn has_modifier(current: &str, modifier: Modifier) -> bool {
+    canonical(current).is_some_and(|notation| {
+        let mut parts: Vec<&str> = notation.split(' ').collect();
+        parts.pop();
+        parts.contains(&modifier.notation())
+    })
+}
+
+/// 今の修飾キーのまま，キーだけを key に変えた書き方(macOS の KeyField の replacing)．欄が空か読めなければ key だけ
+pub fn with_key(current: &str, key: &str) -> Option<String> {
+    let notation = canonical(current).unwrap_or_default();
+    let mut parts: Vec<&str> = notation
+        .split(' ')
+        .filter(|part| !part.is_empty())
+        .collect();
+    parts.pop();
+    parts.push(key);
+    canonical(&parts.join(" "))
+}
+
+/// 修飾キーを付け外しした書き方．欄が空か読めなければ None
+pub fn toggled(current: &str, modifier: Modifier) -> Option<String> {
+    let notation = canonical(current)?;
+    let mut parts: Vec<&str> = notation.split(' ').collect();
+    let key = parts.pop()?;
+    if parts.contains(&modifier.notation()) {
+        parts.retain(|part| *part != modifier.notation());
+    } else {
+        parts.push(modifier.notation());
+    }
+    parts.push(key);
+    canonical(&parts.join(" "))
+}
+
+/// メニューの項目を選んだあとの欄の書き方．ファンクションキーの一覧を開く項目は欄を変えない
+pub fn chosen(current: &str, choice: &KeyChoice) -> Option<String> {
+    match choice {
+        KeyChoice::Key(key) => with_key(current, key),
+        KeyChoice::FunctionKeys => None,
+        KeyChoice::Modifier(modifier) => toggled(current, *modifier),
+    }
+}
+
 fn function_number(lowered: &str) -> Option<u32> {
     let digits = lowered.strip_prefix('f')?;
     if digits.is_empty() {
@@ -592,6 +725,86 @@ mod tests {
         assert_eq!(
             lines[1],
             "入力中・Enter・確定: 同じキーの行があるため無効: 入力中・Enter・取り消し"
+        );
+    }
+
+    #[test]
+    fn メニューには特殊キーとファンクションキーを並べ_キーがあれば修飾キーも並べる() {
+        let empty = key_choices("");
+        assert_eq!(empty.len(), SPECIAL_KEYS.len() + 1);
+        assert_eq!(empty.last(), Some(&KeyChoice::FunctionKeys));
+        let filled = key_choices("Ctrl+K");
+        assert_eq!(
+            filled[filled.len() - 3..],
+            Modifier::ALL.map(KeyChoice::Modifier)
+        );
+        // 並べるキーはどれも書き方として読め，画面の名前から元に戻せる
+        for key in SPECIAL_KEYS {
+            assert_eq!(canonical(key).as_deref(), Some(*key));
+            assert_eq!(canonical(&display(key)).as_deref(), Some(*key));
+        }
+        let functions = function_choices();
+        assert_eq!(functions.len(), 20);
+        assert_eq!(functions[0], KeyChoice::Key("F1".into()));
+        assert_eq!(functions[19], KeyChoice::Key("F20".into()));
+        let labels: Vec<String> = filled
+            .iter()
+            .map(|choice| choice_label(choice, "Ctrl+K"))
+            .collect();
+        assert_eq!(labels[0], "Esc");
+        assert_eq!(labels[16], "半角/全角");
+        assert_eq!(labels[19], "ファンクションキー…");
+        assert_eq!(
+            labels[20..],
+            ["Ctrl を外す", "Alt を付ける", "Shift を付ける"]
+        );
+    }
+
+    #[test]
+    fn メニューでキーを選ぶと今の修飾キーのままキーだけを変える() {
+        let key = |name: &str| KeyChoice::Key(name.to_string());
+        assert_eq!(chosen("", &key("Henkan")).as_deref(), Some("Henkan"));
+        assert_eq!(
+            chosen("Ctrl+Alt+K", &key("F13")).as_deref(),
+            Some("Ctrl Option F13")
+        );
+        assert_eq!(
+            chosen("Shift+Space", &key("Hankaku/Zenkaku")).as_deref(),
+            Some("Shift Hankaku/Zenkaku")
+        );
+        // 読めない値は捨てて，選んだキーだけにする
+        assert_eq!(chosen("Hyper k", &key("Tab")).as_deref(), Some("Tab"));
+        assert_eq!(chosen("Ctrl+K", &KeyChoice::FunctionKeys), None);
+    }
+
+    #[test]
+    fn メニューで修飾キーを付け外しする() {
+        let modifier = |modifier| KeyChoice::Modifier(modifier);
+        assert_eq!(
+            chosen("Space", &modifier(Modifier::Shift)).as_deref(),
+            Some("Shift Space")
+        );
+        // 付ける順によらず Ctrl・Option・Shift の順に整える
+        assert_eq!(
+            chosen("Shift+Space", &modifier(Modifier::Control)).as_deref(),
+            Some("Ctrl Shift Space")
+        );
+        assert_eq!(
+            chosen("Ctrl+Shift+Space", &modifier(Modifier::Option)).as_deref(),
+            Some("Ctrl Option Shift Space")
+        );
+        assert_eq!(
+            chosen("Ctrl+Alt+Shift+Space", &modifier(Modifier::Option)).as_deref(),
+            Some("Ctrl Shift Space")
+        );
+        assert!(has_modifier("Ctrl+Alt+K", Modifier::Option));
+        assert!(!has_modifier("Ctrl+Alt+K", Modifier::Shift));
+        // キーが無ければ付けられない
+        assert_eq!(chosen("", &modifier(Modifier::Control)), None);
+        // 記号の Shift は打つ文字に含まれるので付かない
+        assert_eq!(
+            chosen("/", &modifier(Modifier::Shift)).as_deref(),
+            Some("/")
         );
     }
 

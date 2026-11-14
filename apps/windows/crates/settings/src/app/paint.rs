@@ -336,6 +336,47 @@ pub fn field_frame(
     }
 }
 
+/// 入力欄の枠の中の右の端に置く絵のボタン(キーの欄のキーを選ぶメニュー・記録を停止)．枠は欄が描くので，
+/// 絵だけを閉じたドロップダウンの山形の印と同じ位置に描き，ポインターを載せたら絵のまわりを薄く塗る
+pub fn field_button(canvas: &mut dyn Canvas, theme: &Theme, rect: Rect, glyph: &str, state: State) {
+    let palette = &theme.palette;
+    let radius = size::CONTROL_RADIUS;
+    let inset = tokens::size::space::INLINE;
+    let area = Rect::new(
+        rect.x,
+        rect.y + inset,
+        (rect.width - inset).max(0.0),
+        (rect.height - inset * 2.0).max(0.0),
+    );
+    let fill = if state.pressed && state.enabled {
+        Color::from(palette.nav_pressed)
+    } else {
+        Color::from(palette.nav_hover).with_alpha(state.hover)
+    };
+    canvas.fill_round(area, radius, fill);
+    let color = if state.enabled {
+        palette.text_secondary
+    } else {
+        palette.text_disabled
+    };
+    let chevron = size::CHEVRON_SIZE;
+    canvas.text(
+        Rect::new(
+            rect.max_x() - size::FIELD_PADDING_X - chevron,
+            rect.y,
+            chevron,
+            rect.height,
+        ),
+        glyph,
+        TextStyle::IconSmall,
+        Color::from(color),
+        TextLayout::CENTER,
+    );
+    if state.focus_visible {
+        focus_ring(canvas, theme, area, radius);
+    }
+}
+
 /// 閉じたドロップダウン(選んでいる名前と山形の印)
 pub fn dropdown(
     canvas: &mut dyn Canvas,

@@ -2493,6 +2493,7 @@ impl App {
     // MARK: - ドロップダウン
 
     fn open_flyout(&mut self, element: Element) {
+        self.view.reset_key_menu(element);
         self.open_flyout_at(element, None);
     }
 
@@ -2541,7 +2542,7 @@ impl App {
             (items, selected, anchor.x, anchor.y, anchor)
         } else {
             let (items, selected) = self.view.dropdown_items(element);
-            let Some(rect) = self.view.rect(element) else {
+            let Some(rect) = self.view.menu_rect(element) else {
                 return;
             };
             // ページの中の位置を窓の中の位置にする
@@ -2644,6 +2645,10 @@ impl App {
             self.view.choose(element, index)
         };
         self.dispatch(event);
+        // キーを選ぶメニューのファンクションキーの項目は，続けてその一覧を同じ場所に出す(macOS の KeyField のサブメニュー)
+        if self.view.opens_key_functions(element) {
+            self.open_flyout_at(element, None);
+        }
         ffi::invalidate(self.window);
     }
 
@@ -2850,6 +2855,21 @@ impl App {
             }
         } else if self.focused_edit == Some(window) {
             self.focused_edit = None;
+        }
+        ffi::invalidate(self.window);
+    }
+
+    /// 欄がキーの記録を始めた・やめた．キーの欄の右のボタン(メニューか「記録を停止」)を入れ替える
+    fn field_recording(&mut self, window: Window, recording: bool) {
+        self.view.set_recording(window, recording);
+        // 「記録を停止」を押して記録をやめたら，フォーカスを同じ場所のメニューのボタンに移す
+        if let Focus::Page(element) = self.focus {
+            if element.part == Part::KeyStop && !recording {
+                self.focus = Focus::Page(Element {
+                    row: element.row,
+                    part: Part::KeyMenu,
+                });
+            }
         }
         ffi::invalidate(self.window);
     }
@@ -4473,6 +4493,11 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         edit::WM_FIELD_RECORDED => {
             let field = HWND(lparam.0 as *mut _);
             with_app(|app| app.field_changed(field));
+            Some(LRESULT(0))
+        }
+        edit::WM_FIELD_RECORDING => {
+            let field = HWND(lparam.0 as *mut _);
+            with_app(|app| app.field_recording(field, wparam.0 == 1));
             Some(LRESULT(0))
         }
         WM_CONFIRM => {

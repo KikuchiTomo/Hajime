@@ -96,6 +96,8 @@ pub struct CardLayout {
     pub template_button: Option<Rect>,
     /// 一覧の書き方のチップの欄(ListState::panel)
     pub template_panel: Option<Rect>,
+    /// 一覧のキーの欄の枠の中の右の端のボタン(ListButtons::key_menu)．欄(parts)はこの分だけ狭い
+    pub key_button: Option<Rect>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -307,6 +309,7 @@ fn empty(card: Rect, row: usize) -> CardLayout {
         result: None,
         template_button: None,
         template_panel: None,
+        key_button: None,
     }
 }
 
@@ -643,6 +646,7 @@ fn place_labeled(
         result: None,
         template_button: None,
         template_panel: None,
+        key_button: None,
     }
 }
 
@@ -910,6 +914,7 @@ const NO_BUTTONS: ListButtons = ListButtons {
     result: false,
     template_field: None,
     caption: None,
+    key_menu: None,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -1032,6 +1037,10 @@ fn place_list(
         .filter(|(index, _)| *index < fields)
         .map(|(index, text)| (index, metrics.width(text, TextKind::Body).ceil()));
     let caption_extra = caption.map_or(0.0, |(_, width)| width + size::CONTROL_GAP);
+    // キーを選ぶメニューのボタンはキーの欄の幅の中の右の端に置く(macOS の KeyField は欄とメニューを同じ幅に収める)．
+    // 欄の枠の中に山形の印だけを出すので，幅は印と，印の左右の余白(ドロップダウンの印と同じ位置)
+    let key_menu = buttons.key_menu.filter(|index| *index < fields);
+    let key_button_width = space::INLINE + size::CHEVRON_SIZE + size::FIELD_PADDING_X;
     let field_width = ((inner
         - buttons_width
         - gaps
@@ -1043,13 +1052,25 @@ fn place_list(
         .max(0.0);
     let mut parts = Vec::new();
     let mut template_button = None;
+    let mut key_button = None;
     let mut cursor = x;
     for index in 0..fields {
         if caption.is_some_and(|(at, _)| at == index) {
             cursor += caption_extra;
         }
         let width = fixed.get(index).copied().unwrap_or(field_width);
-        parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
+        if key_menu == Some(index) {
+            let button = key_button_width.min(width);
+            parts.push(Rect::new(cursor, top, width - button, size::CONTROL_HEIGHT));
+            key_button = Some(Rect::new(
+                cursor + width - button,
+                top,
+                button,
+                size::CONTROL_HEIGHT,
+            ));
+        } else {
+            parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
+        }
         cursor += width + size::CONTROL_GAP;
         if template_after == Some(index) {
             template_button = Some(Rect::new(
@@ -1226,6 +1247,7 @@ fn place_list(
     card.result = result;
     card.template_button = template_button;
     card.template_panel = template_panel;
+    card.key_button = key_button;
     card
 }
 
@@ -1633,6 +1655,47 @@ mod tests {
             })
             .map(|(card, _)| card.clone())
             .expect("登録した単語の行")
+    }
+
+    /// キー設定の表のカード
+    fn keymap_card() -> CardLayout {
+        let page = sections(Page::Keys).unwrap();
+        let layout = layout(&page, 800.0, |_| true, |_| true, &Estimate);
+        layout
+            .sections
+            .iter()
+            .zip(&page)
+            .flat_map(|(placed, section)| placed.cards.iter().map(move |card| (card, section)))
+            .find(|(card, section)| matches!(section.rows[card.row].control, Control::List(..)))
+            .map(|(card, _)| card.clone())
+            .expect("キー設定の表の行")
+    }
+
+    #[test]
+    fn キーを選ぶボタンはキーの欄の幅の中の右の端に置き_ほかの欄を狭めない() {
+        let card = keymap_card();
+        let (state, key, command, add) =
+            (card.parts[0], card.parts[1], card.parts[2], card.parts[3]);
+        let button = card.key_button.expect("キーを選ぶボタン");
+        // 状態は決まった幅のまま．キーは欄とボタンを合わせて決まった幅
+        assert_eq!(state.width, tokens::size::settings::KEYMAP_STATE_WIDTH);
+        assert_eq!(button.x, key.max_x());
+        assert_eq!(
+            button.max_x() - key.x,
+            tokens::size::settings::KEYMAP_KEY_WIDTH
+        );
+        assert_eq!((button.y, button.height), (key.y, key.height));
+        // ボタンは印と余白だけの幅で，欄を広く残す
+        assert_eq!(
+            button.width,
+            space::INLINE + size::CHEVRON_SIZE + size::FIELD_PADDING_X
+        );
+        // コマンドの欄は決まった幅のすぐ右から，追加のボタンまで
+        assert_eq!(command.x, button.max_x() + size::CONTROL_GAP);
+        assert_eq!(add.x, command.max_x() + size::CONTROL_GAP);
+        assert!(add.max_x() <= card.card.max_x());
+        // ほかの一覧には置かない
+        assert_eq!(word_card(ListState::default()).key_button, None);
     }
 
     #[test]
