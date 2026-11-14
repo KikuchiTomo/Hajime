@@ -20,7 +20,7 @@ description: Hajime IME のドキュメント(サイトに載せる使う人向�
 
 - `apps/docs-site/content/` のページには frontmatter の `title` と `description` を書く
 - ほかのページへのリンクは相対パス(`usage.md`)．Hextra が URL に直す
-- 図は SVG かテキストの図．画像の中に文字を焼き込まない
+- 図は SVG かテキストの図．画像の中に文字を焼き込まない(トップページの説明用の画像だけは，`tools/site/make_site_images.py` で短いラベルを入れて作る．説明の文は画像に入れず，ページの文字で書く)
 - 英語は `<名前>.en.md`．日本語を先に書く
 - 1 ページに見出しの 2 階層(`##` と `###`)まで．深くなったらページを分ける
 

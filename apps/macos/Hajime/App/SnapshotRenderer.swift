@@ -53,6 +53,11 @@ enum SnapshotRenderer {
                 quietStations.hintsOnHold = true
                 render(latticeView(quietStations, theme: look.theme, appearance: appearance), name: "branch-station-hold-\(look.name)", to: output,
                        appearance: appearance)
+                // 連想の丸の中身を選んでいるところも，同じ設定で(公式サイトの連想変換の画像に使う)
+                var quietAssociation = stationLattice(current: 1, inside: true)
+                quietAssociation.hintsOnHold = true
+                render(latticeView(quietAssociation, theme: look.theme, appearance: appearance), name: "branch-station-association-hold-\(look.name)",
+                       to: output, appearance: appearance)
                 // 矢印キーで木をたどっていて，幹の上(文節)にいるところ．ページの位置は縦の線の下の点
                 render(latticeView(trunkLattice(), theme: look.theme, appearance: appearance), name: "branch-trunk-\(look.name)", to: output,
                        appearance: appearance)
