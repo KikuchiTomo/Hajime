@@ -62,8 +62,15 @@ public enum PanelPlacement {
     /// - 上に置くときは，入力位置の行が上下に動いていなければ上の辺を保つ．窓が低くなっても下げない．
     ///   高くなって入力位置の行に重なるときだけ上に伸ばす(下に置くときは，もともと上の辺が入力位置の行の下にある)
     /// - 入力位置が左右に動いていなければ左の辺を保つ．画面の右からはみ出すときだけ左に寄せる
+    /// - 入力位置の行が，左右に動かず，上下にも 1 行の高さより小さくしか動いていなければ，前の行のまま置く．
+    ///   組み立て中の文字が絵文字になると，行の長方形が数ポイント高くなる．候補を移るたびに窓が上下に動かないようにする
     /// - Returns: 候補ウィンドウの位置と大きさ，置いた側
     public static func place(caret: Rect, size: Rect, screen: Rect, keeping side: Side?, holding held: Placement? = nil) -> Placement {
+        var caret = caret
+        if let held, held.caret.x == caret.x {
+            let line = min(held.caret.height, caret.height)
+            if abs(held.caret.y - caret.y) < line, abs(held.caret.maxY - caret.maxY) < line { caret = held.caret }
+        }
         let below = caret.y - gap - size.height
         let above = caret.maxY + gap
         let fitsBelow = below >= screen.y
