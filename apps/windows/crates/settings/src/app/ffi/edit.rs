@@ -19,9 +19,9 @@ use windows::Win32::UI::Shell::{DefSubclassProc, RemoveWindowSubclass, SetWindow
 use windows::Win32::UI::WindowsAndMessaging::{
     GetClientRect, GetParent, GetWindowTextLengthW, PostMessageW, SendMessageW,
     SetLayeredWindowAttributes, ES_AUTOHSCROLL, LWA_ALPHA, PRF_CLIENT, PRF_ERASEBKGND,
-    WINDOW_STYLE, WM_APP, WM_CHAR, WM_GETFONT, WM_KEYDOWN, WM_KILLFOCUS, WM_LBUTTONDOWN,
+    WINDOW_STYLE, WM_APP, WM_CHAR, WM_GETFONT, WM_KEYDOWN, WM_KEYUP, WM_KILLFOCUS, WM_LBUTTONDOWN,
     WM_MOUSEWHEEL, WM_NCDESTROY, WM_PAINT, WM_PRINTCLIENT, WM_SETFOCUS, WM_SYSCHAR, WM_SYSKEYDOWN,
-    WS_CHILD, WS_EX_LAYERED, WS_TABSTOP,
+    WM_SYSKEYUP, WS_CHILD, WS_EX_LAYERED, WS_TABSTOP,
 };
 use windows_core::w;
 
@@ -62,6 +62,9 @@ struct FieldData {
     capture: bool,
     /// 親へ渡す，押したキーの書き方(capture の記録で押したキー)
     captured: Option<String>,
+    /// 記録したキーの文字(WM_CHAR)を 1 回だけ捨てる．キーを記録するのは押したとき(WM_KEYDOWN)で，同じキーの文字がそのあとに届く．
+    /// 捨てないと，Space を記録した欄に空白が入る(「キーで検索」では検索欄に空白が入り，どの行も当たらなくなる)
+    swallow_char: bool,
 }
 
 /// 枠の無い欄を作る(見えない状態で作る．置くときに見せる)
@@ -87,6 +90,7 @@ pub fn create(parent: HWND, id: u16, placeholder: &str, font: &Font) -> Option<H
         saved: None,
         capture: false,
         captured: None,
+        swallow_char: false,
     });
     // SAFETY: window はこのスレッドの窓．data は WM_NCDESTROY で Box に戻して放す
     unsafe {
@@ -322,6 +326,7 @@ fn handle(
                 pressed(VK_SHIFT.0),
             ) {
                 field.recording = None;
+                field.swallow_char = true;
                 set_ime(window, true);
                 let saved = field.saved.take();
                 if std::mem::take(&mut field.capture) {
@@ -340,6 +345,13 @@ fn handle(
         }
         // 記録しているあいだは文字を入れない
         WM_CHAR | WM_SYSCHAR if field.recording.is_some() => Some(LRESULT(0)),
+        // 記録したキーの文字は入れない(1 回だけ)
+        WM_CHAR | WM_SYSCHAR if std::mem::take(&mut field.swallow_char) => Some(LRESULT(0)),
+        // 文字にならないキーを記録したあとは，次に打つ文字を捨てない(キーを離したら終わり)
+        WM_KEYUP | WM_SYSKEYUP if field.swallow_char => {
+            field.swallow_char = false;
+            None
+        }
         // キーの欄は押したら記録し始める(打って書くこともできる)．次に押したキーをキー設定の書き方
         // (crate::keys::from_key)にして入れ，押すまでは案内を出す．修飾キーだけを押しているあいだは待つ．
         // フォーカスが外れたらやめる(WM_KILLFOCUS)
