@@ -1577,6 +1577,24 @@ impl RowState {
         }
     }
 
+    /// ドロップダウンの一覧の組(見出しと区切りの線)．組に分けない一覧は空．
+    /// 選択肢を絞っているとき(キー設定のコマンド)は番号がずれるので分けない
+    fn dropdown_groups(&self, part: Part) -> &'static [options::ChoiceGroup] {
+        let Part::Field(index) = part else {
+            return &[];
+        };
+        self.row
+            .control
+            .list_spec()
+            .and_then(|spec| spec.fields.get(index))
+            .filter(|field| {
+                field
+                    .choices
+                    .is_some_and(|choices| self.choice_positions(index).len() == choices.len())
+            })
+            .map_or(&[], |field| field.groups)
+    }
+
     /// ドロップダウンで選んでいる番号
     fn dropdown_selected(&self, part: Part) -> Option<usize> {
         match part {
@@ -2673,6 +2691,20 @@ impl PageView {
                     row.dropdown_selected(element.part),
                 )
             })
+    }
+
+    /// 一覧を組に分けて出す初めのドロップダウン(見本の書き出しで開いて写す)
+    pub fn grouped_dropdown(&self) -> Option<Element> {
+        self.elements()
+            .into_iter()
+            .find(|element| !self.dropdown_groups(*element).is_empty())
+    }
+
+    /// ドロップダウンの一覧の組(見出しと区切りの線)．組に分けない一覧は空
+    pub fn dropdown_groups(&self, element: Element) -> &'static [options::ChoiceGroup] {
+        self.rows
+            .get(element.row)
+            .map_or(&[], |row| row.dropdown_groups(element.part))
     }
 
     /// ポインターを載せた部品を変える．動きが始まったら true

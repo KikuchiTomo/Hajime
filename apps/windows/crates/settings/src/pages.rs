@@ -2067,7 +2067,8 @@ const DICTIONARY_FIELDS: &[Field] = &[
         settings::WORD_CLASS,
         options::WORD_CLASSES,
         false,
-    ),
+    )
+    .grouped(options::WORD_CLASS_GROUPS),
     Field::named("comment", settings::COMMENT, false)
         .optional()
         .prompt(settings::COMMENT_PROMPT),
