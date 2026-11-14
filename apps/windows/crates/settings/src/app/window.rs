@@ -1687,7 +1687,7 @@ impl App {
         ffi::invalidate(self.window);
     }
 
-    /// 右クリック．表の行ならその行を選んでメニューを出す
+    /// 右クリック．表の行ならその行を選んでメニューを出す．カスタムテーマの行なら編集・複製・削除のメニューを出す
     fn right_click(&mut self, lparam: LPARAM) {
         let (x, y) = self.point(lparam);
         let now = self.now();
@@ -1695,6 +1695,11 @@ impl App {
         let Some(Target::Page(element)) = self.target_at(x, y) else {
             return;
         };
+        if self.view.row_menu_opens(element) {
+            self.open_row_menu(element.row, x, y);
+            ffi::invalidate(self.window);
+            return;
+        }
         if element.part != Part::Table {
             return;
         }
