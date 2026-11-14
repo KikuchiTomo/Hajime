@@ -61,6 +61,16 @@ struct WireTranslationTests {
         #expect(routed.host == [.toggleLiveConversion])
     }
 
+    @Test("一覧や分岐図を出したままモードを切り替えたときは，モードの表示で消さない．一覧も分岐図も出さないときは，モードの表示を送る")
+    func modeKeepsPanel() {
+        let lattice = LatticePanel(columns: [LatticePanel.Column(text: "猫", alternatives: ["猫"], selectedAlternative: 0, isFocused: true, isUncertain: false, shorter: nil)])
+        let kept = RoutedActions([.showLattice(lattice), .showModeIndicator(.direct)], anchor: nil)
+        #expect(kept.ui.count == 1)
+        #expect({ if case .showBranchMap = kept.ui.first { true } else { false } }())
+        let hidden = RoutedActions([.hideCandidates, .selectMode(.direct), .showModeIndicator(.direct)], anchor: nil)
+        #expect(hidden.ui == [.hide, .showMode(mode: .direct, anchor: nil, label: nil)])
+    }
+
     @Test("予測の窓は組み立て中の文字全体の位置を基準に送り，知らせない DLL では候補の窓と同じ基準にする．nil は窓を消す")
     func prediction() {
         let anchor = WireRect(x: 1, y: 2, width: 3, height: 4)
