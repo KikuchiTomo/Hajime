@@ -755,8 +755,6 @@ pub mod keys {
     pub const STOP_RECORDING: &str = "記録を停止";
     /// キーの欄の右の，押して記録しにくいキーと修飾キーを選ぶメニュー(UIStrings.Keys.chooseKey)
     pub const CHOOSE_KEY: &str = "キーを選択";
-    /// メニューの中の，ファンクションキーの一覧を開く項目
-    pub const FUNCTION_KEYS_ITEM: &str = "ファンクションキー…";
 
     /// メニューの中の修飾キーの項目．付いていれば外す，付いていなければ付ける
     pub fn modifier_item(name: &str, on: bool) -> String {
@@ -1304,6 +1302,8 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
+    /// キーを選ぶメニューの中の，ファンクションキーの一覧を開く項目(macOS は入れ子のメニューの見出し「ファンクションキー」)
+    pub const FUNCTION_KEYS_ITEM: &str = "ファンクションキー…";
     /// 入力欄のすぐ下の，入れたときの結果の頭に置く印(macOS は arrow.turn.down.right の絵)
     pub const RESULT_MARK: &str = "↪ ";
     /// 書き方のチップを開け閉めするボタンの字(macOS は curlybraces の記号)
