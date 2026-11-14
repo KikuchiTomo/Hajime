@@ -17,6 +17,7 @@
     "brackets": "corner",
     "branchCandidatesPerPage": 5,
     "branchSegmentsPerGroup": 8,
+    "branchStartsOnTrunk": true,
     "branchWindowWidth": "fit",
     "calculation": true,
     "candidateFontSize": 15,

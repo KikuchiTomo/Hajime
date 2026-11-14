@@ -63,18 +63,24 @@
          入れたあとに起動する新しいエンジンは「もう動いている」とすぐ終わるので，古い版と新しい DLL が混ざる(候補ウィンドウが出ない)．
          利用者のプロセスなので，利用者の権限で InstallValidate(使っているファイルを調べる)の前に止める -->
     <CustomAction Id="StopRunning" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]taskkill.exe&quot; /F /IM hajime-engine-host.exe /IM hajime-candidate-ui.exe /IM hajime-settings.exe" Execute="immediate" Impersonate="yes" Return="ignore" />
+    <!-- 入れたあと，日本語の既定の入力方式が Hajime IME なら，このセッションの入力方式を Hajime IME に戻す(今出ている版から上書きすると，
+         古い版を消すときに登録が一度外れ，Windows がほかの入力方式に替えるため)．利用者の権限で呼ぶ．失敗しても入れる処理は止めない -->
+    <CustomAction Id="RestoreProfile" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]rundll32.exe&quot; &quot;[TSFVERSIONFOLDER]hajime_tsf.dll&quot;,RestoreProfile" Execute="immediate" Impersonate="yes" Return="ignore" />
     <CustomAction Id="StartEngine" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]hajime-engine-host.exe&quot;" Execute="immediate" Impersonate="yes" Return="asyncNoWait" />
 
     <InstallExecuteSequence>
       <Custom Action="StopRunning" Before="InstallValidate" Condition="Installed OR WIX_UPGRADE_DETECTED" />
-      <Custom Action="Unregister64" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
-      <Custom Action="Unregister32" After="Unregister64" Condition="REMOVE=&quot;ALL&quot;" />
+      <!-- 上書きで古い版を消すとき(UPGRADINGPRODUCTCODE)は登録を外さない．外すとそのあいだに Windows がこのセッションの入力方式を
+           ほかのものに替え，入れ終わっても戻さない．CLSID とプロファイルは版によらず同じなので，新しい版の Register が場所を書き換える -->
+      <Custom Action="Unregister64" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="Unregister32" After="Unregister64" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="Register64" After="InstallFiles" Condition="NOT REMOVE" />
       <Custom Action="Register32" After="Register64" Condition="NOT REMOVE" />
       <Custom Action="StartEngine" After="InstallFinalize" Condition="NOT REMOVE" />
       <!-- 入れたあと(初めて入れたときも上書きのときも)，Windows Installer の標準の確認で再起動を求める．
            起動中のアプリには新しい文字入力のサービスが読み込まれないので，再起動してから使う -->
-      <ScheduleReboot After="StartEngine" Condition="NOT REMOVE" />
+      <Custom Action="RestoreProfile" After="StartEngine" Condition="NOT REMOVE" />
+      <ScheduleReboot After="RestoreProfile" Condition="NOT REMOVE" />
     </InstallExecuteSequence>
   </Package>
 </Wix>

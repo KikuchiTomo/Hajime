@@ -237,6 +237,8 @@ final class CandidatePanelController {
         lastAnnounced = nil
         shownList = nil
         shownLattice = nil
+        // 次の変換に，前の変換の窓の幅の下限を持ち越さない
+        branchView.panel = nil
         side = nil
         held = nil
         bubble.hide()

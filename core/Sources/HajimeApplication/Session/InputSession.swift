@@ -1469,6 +1469,8 @@ public final class InputSession {
         prepareFusionForConversion()
         // 区切りと幹だけの分岐図をすぐ出し，注目している文節の候補だけをここで求める．ほかの文節は followUps で足す
         phase = .lattice(initialLattice(latticeBuilder, quick: true))
+        // 分岐図を出した直後は，幹の上(文節)から始める(設定)．← → でそのまま文節を移れる．Space と番号キーは今までどおり候補を選ぶ
+        trunkLevel = treeNavigation && settings.current.branchStartsOnTrunk && !isSegmentList
         latticeUntouched = true
         if case .lattice(let lattice) = phase { fillPendingSegments(only: lattice.focusedIndex) }
     }
