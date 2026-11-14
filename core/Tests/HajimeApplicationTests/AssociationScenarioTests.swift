@@ -17,6 +17,8 @@ struct AssociationScenarioTests {
         settings.associationDictionaries = [Self.dictionary]
         // 連想の語だけを確かめる．変換マクロ(既定でオン)を入れると，どの語にも「整形」のまとまりが足される
         settings.conversionMacros = false
+        // 候補から始めて木をたどる動きを確かめる(変換の直後に幹の上から始める設定は startsOnTrunk で確かめる)
+        settings.branchStartsOnTrunk = false
         change(&settings)
         return settings
     }
@@ -383,6 +385,50 @@ struct AssociationScenarioTests {
         #expect(all.lattice?.group == nil && all.lattice?.keepsWidth == true)
         #expect(all.lattice?.columns.map(\.jumpKey) == ["⌥A", "⌥S", "⌥D", "⌥F", "⌥J"])
         #expect(harness.lattice?.keepsWidth == false)
+    }
+
+    @Test("変換の直後は幹の上から始まる(既定)．→ でそのまま次の文節へ移り，↓ で候補へ下りる．Space は今までどおり 2 番目の候補へ進む．設定を切ると先頭の候補から始まる")
+    func startsOnTrunk() throws {
+        let two = FakeConverter(["きょうはいい": [("今日はいい", nil)], "きょうは": [("今日は", nil), ("京は", nil)], "いい": [("良い", nil), ("いい", nil)]])
+        two.words["きょうはいい"] = [
+            Candidate.Word(text: "今日", readingCount: 3), Candidate.Word(text: "はいい", readingCount: 3, startsWithParticle: true),
+        ]
+        var settings = makeSettings { $0.branchStartsOnTrunk = true }
+        settings.initialFocus = .start
+        let harness = Harness(converter: two, settings: settings, branchStations: true)
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.trunkFocused == true)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+        // → でそのまま次の文節へ
+        harness.press(.right)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        #expect(harness.lattice?.trunkFocused == true)
+        // ↓ で候補へ下りる(選んでいる候補は変えない)．もう一度 ↓ で次の候補
+        harness.press(.down)
+        #expect(harness.lattice?.trunkFocused == false && harness.lattice?.columns[1].selectedAlternative == 0)
+        harness.press(.down)
+        #expect(harness.lattice?.columns[1].selectedAlternative == 1)
+        harness.press(.enter)
+
+        // Space を続けて押すと，今までどおり 2 番目の候補になる
+        harness.type("kyouhaii")
+        harness.press(.space)
+        harness.press(.space)
+        #expect(harness.lattice?.trunkFocused == false && harness.lattice?.columns[0].selectedAlternative == 1)
+        harness.press(.enter)
+
+        // 矢印で木をたどらない表(Windows 風)では，幹の上から始めない
+        let windows = Harness(converter: two, settings: makeSettings { $0.branchStartsOnTrunk = true; $0.keymap = KeymapPreset.windows.keymap }, branchStations: true)
+        windows.type("kyouhaii")
+        windows.press(.space)
+        #expect(windows.lattice?.trunkFocused == false)
+
+        // 設定を切ると，先頭の候補から始まる
+        let off = Harness(converter: two, settings: makeSettings(), branchStations: true)
+        off.type("kyouhaii")
+        off.press(.space)
+        #expect(off.lattice?.trunkFocused == false)
     }
 
     @Test("矢印で木をたどる: 先頭の候補で ↑ を押すと幹の上へ上り，幹の上の ← → は文節を移り，↓ で候補へ下りる．丸の上の Space は中身に入らず次の候補")

@@ -24,6 +24,8 @@ struct EngineBranchStationTests {
         let converter = FakeConverter(["うつくしい": [("美しい", nil), ("美しき", nil)]], clauses: ["うつくしい": [("美しい", 5), ("美しき", 5)]])
         let lookup = FakeAssociationLookup([Self.dictionary.id: ["美しい": [AssociationGroup(label: "見た目が快い", words: ["綺麗", "華麗"])]]])
         var initial = DefaultSettings.settings
+        // 候補から始めて木をたどる動きを確かめる(変換の直後に幹の上から始める設定は，別のテストで確かめる)
+        initial.branchStartsOnTrunk = false
         initial.associationDictionaries = [Self.dictionary]
         initial.conversionMacros = true
         initial.liveConversion = false

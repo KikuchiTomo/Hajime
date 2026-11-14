@@ -22,6 +22,7 @@
     "brackets",
     "branchCandidatesPerPage",
     "branchSegmentsPerGroup",
+    "branchStartsOnTrunk",
     "branchWindowWidth",
     "calculation",
     "candidateFontSize",
