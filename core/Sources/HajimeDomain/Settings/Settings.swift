@@ -149,6 +149,9 @@ public struct Settings: Sendable, Equatable {
     public var branchSegmentsPerGroup = DefaultSettings.branchSegmentsPerGroup
     /// 分岐図の窓の幅の決め方
     public var branchWindowWidth = BranchWindowWidth.fit
+    /// 変換して分岐図を出した直後に，幹の上(文節)を選んだ状態にする．← → でそのまま文節を移れる．オフなら先頭の候補を選んだ状態で始まる．
+    /// 矢印キーで木をたどれるキー設定のときだけ効く
+    public var branchStartsOnTrunk = DefaultSettings.branchStartsOnTrunk
     /// 番号キーで候補を選ぶ
     public var numberKeySelection = true
     /// 「きょう」「いま」などを日付や時刻に変換する候補を出す
@@ -431,7 +434,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, candidateGridColumns, expandsGridOnPaging, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, alwaysShowsBranchHints, showsFewerItems, branchSegmentsPerGroup, branchWindowWidth, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, alwaysShowsBranchHints, showsFewerItems, branchSegmentsPerGroup, branchWindowWidth, branchStartsOnTrunk, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking,
              jinenModel
@@ -529,6 +532,7 @@ extension Settings: Codable {
         read(.showsFewerItems, into: \.showsFewerItems)
         read(.branchSegmentsPerGroup, into: \.branchSegmentsPerGroup)
         read(.branchWindowWidth, into: \.branchWindowWidth)
+        read(.branchStartsOnTrunk, into: \.branchStartsOnTrunk)
         read(.alwaysShowsBranchHints, into: \.alwaysShowsBranchHints)
         read(.numberKeySelection, into: \.numberKeySelection)
         read(.dateConversion, into: \.dateConversion)
@@ -674,6 +678,7 @@ extension Settings: Codable {
         try container.encode(showsFewerItems, forKey: .showsFewerItems)
         try container.encode(branchSegmentsPerGroup, forKey: .branchSegmentsPerGroup)
         try container.encode(branchWindowWidth, forKey: .branchWindowWidth)
+        try container.encode(branchStartsOnTrunk, forKey: .branchStartsOnTrunk)
         try container.encode(alwaysShowsBranchHints, forKey: .alwaysShowsBranchHints)
         try container.encode(numberKeySelection, forKey: .numberKeySelection)
         try container.encode(dateConversion, forKey: .dateConversion)

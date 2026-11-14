@@ -1501,6 +1501,7 @@ fn conversion() -> Vec<Section> {
                 Row::toggle(choice::KEY_HINTS, "showsKeyHints"),
                 Row::toggle(choice::BRANCH_HINTS_ALWAYS, "alwaysShowsBranchHints"),
                 Row::toggle(choice::FEWER_ITEMS, "showsFewerItems"),
+                Row::toggle(choice::BRANCH_STARTS_ON_TRUNK, "branchStartsOnTrunk"),
                 Row::stepper(
                     choice::BRANCH_SEGMENTS,
                     "branchSegmentsPerGroup",

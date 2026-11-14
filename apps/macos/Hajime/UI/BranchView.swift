@@ -36,6 +36,10 @@ final class BranchView: NSView {
             let shown = panel?.shownGroup()
             panel = shown?.panel
             columnOffset = shown?.offset ?? 0
+            // 同じ文節を選んでいるあいだは，窓の幅を狭めない(候補を移るたびに右の辺が動かないように)．文節を移ったら決め直す
+            let place = shown.map { Place(columns: $0.panel.columns.count, focus: $0.panel.columns.firstIndex(where: \.isFocused), offset: $0.offset) }
+            if place != shownPlace { widthFloor = 0 }
+            shownPlace = place
             cache = nil
             updateTrunkOffset()
             needsDisplay = true
@@ -43,6 +47,15 @@ final class BranchView: NSView {
     }
     /// 出している最初の文節が，文の全体で何番目か(押した文節を文の全体の位置で知らせる)
     private var columnOffset = 0
+    /// 選んでいる文節の場所．変わったら，窓の幅の下限を決め直す
+    private struct Place: Equatable {
+        var columns: Int
+        var focus: Int?
+        var offset: Int
+    }
+    private var shownPlace: Place?
+    /// 窓の幅の下限．同じ文節を選んでいるあいだに出した一番広い幅(内容に合わせる設定のとき)
+    private var widthFloor: CGFloat = 0
     /// 窓の幅の上限(CandidatePanelController が画面の幅から決める)．幹がこれより長い文では，幹を横に送って選んでいる文節を見せる
     var maximumWidth = DesignTokens.Size.Candidate.maxWidth {
         didSet {
@@ -285,6 +298,8 @@ final class BranchView: NSView {
         var size = NSSize.zero
         /// 幹の文節の枠(送ったあとの位置)
         var nodes: [NSRect] = []
+        /// 幹の文節の丸の x(nodes と同じ数)
+        var stops: [CGFloat] = []
         /// 幹の線の y と，左右の端
         var railY: CGFloat = 0
         var railStart: CGFloat = 0
@@ -361,10 +376,11 @@ final class BranchView: NSView {
         return column.variants.indices.map { shows && column.variantKeys.indices.contains($0) ? column.variantKeys[$0] : nil }
     }
 
-    /// 文節の左の端から，その文節の丸(と，そこから出る枝)までの距離．短い文節は真ん中，長い文節は左から決まった距離(1 字と余白)にする．
-    /// 候補を移って文節の字の数が変わっても，丸と枝の位置が動かないようにするため(真ん中に置くと，字の数が変わるたびに枝が左右に動く)
-    private func stopOffset(width: CGFloat) -> CGFloat {
-        min(width / 2, fontSize + Part.rowPaddingX).rounded()
+    /// 文節の左の端から，その文節の丸(と，そこから出る枝)までの距離．どの文節でも，全角 1 字の真ん中に置く．
+    /// 候補を移って文節の字の数や幅が変わっても，丸・枝・候補の列の位置が動かないようにするため
+    /// (文節の真ん中に置くと，1 字の候補と長い候補を行き来するたびに左右に動く)．文節の幅は全角 1 字より狭くしない(trunkWidth)
+    private var stopOffset: CGFloat {
+        (Part.rowPaddingX + trunkFont.pointSize / 2).rounded()
     }
 
     /// ページの位置を示す点の並び．縦の線の下に，ページの数だけ縦に並べる
@@ -391,7 +407,9 @@ final class BranchView: NSView {
 
     /// 幹の文節の幅(文字と左右の余白)
     private func trunkWidth(_ column: LatticePanel.Column) -> CGFloat {
-        var text = trunkCommand(column).map { CommandDrawing.width + textWidth($0.title, font: trunkFont) } ?? textWidth(column.text, font: trunkFont)
+        // 半角 1 字のような狭い文節も，全角 1 字の幅を取る(丸の位置をどの文節でも同じにする．文字は真ん中に描く)
+        var text = trunkCommand(column).map { CommandDrawing.width + textWidth($0.title, font: trunkFont) }
+            ?? max(textWidth(column.text, font: trunkFont), trunkFont.pointSize)
         // 打ち直している文節は，読みのあとの入力位置の線の分を足し，読みが空でも場所が分かる幅を残す
         if column.isEditing { text = max(text + Glass.editingCaretWidth, Glass.editingMinWidth) }
         return (column.split.map { splitPieces($0).width } ?? text) + Part.rowPaddingX * 2 + (column.isCorrected ? correctedLabelWidth : 0)
@@ -411,7 +429,10 @@ final class BranchView: NSView {
     private func layout(for panel: LatticePanel, offset: CGFloat? = nil) -> Layout {
         if offset == nil, panel == self.panel, let cache { return cache }
         let layout = makeLayout(for: panel, offset: offset)
-        if offset == nil, panel == self.panel { cache = layout }
+        if offset == nil, panel == self.panel {
+            cache = layout
+            widthFloor = max(widthFloor, layout.size.width)
+        }
         return layout
     }
 
@@ -426,7 +447,10 @@ final class BranchView: NSView {
         let nodeGap = Map.segmentGap * 2
         // 前後にまとまりが続く側は，山形を置く分だけ幹を内側に寄せる
         let moreLead = Map.moreSize * 2 + Space.group
-        var x = metrics.inset + (panel.continuesBefore ? moreLead : 0)
+        // 最初の文節の丸に重ねるキー(文節へ移るキー)が，丸より左へはみ出す分．山形と重ならないよう，その分も寄せる
+        // (キーを出していないあいだも同じだけ寄せる．修飾キーを押して案内を出したときに幹が動かないように)
+        let firstKeyLead = panel.columns.first?.jumpKey.map { max(BranchMapDrawing.hintWidth(KeyHint(key: $0, label: ""), theme: theme) / 2 - stopOffset, 0) } ?? 0
+        var x = metrics.inset + (panel.continuesBefore ? moreLead + firstKeyLead.rounded(.up) : 0)
         var nodeX: [CGFloat] = []
         var nodeWidths: [CGFloat] = []
         for column in panel.columns {
@@ -537,7 +561,7 @@ final class BranchView: NSView {
         }
 
         // 窓の幅．上限を超える文は，幹を送る
-        let focusCenter = focus.map { nodeX[$0] + stopOffset(width: nodeWidths[$0]) } ?? metrics.inset
+        let focusCenter = focus.map { nodeX[$0] + stopOffset } ?? metrics.inset
         let boundaryWidth = BranchMapDrawing.hintsWidth(hints.boundary, theme: theme)
         let notesWidth = [column?.usageNote.map { textWidth($0, font: labelFont) }, panel.note.map { NoteDrawing.width($0, theme: theme) },
                           panel.meaningPlacement == .below && column?.homophone != nil ? Meaning.listWidth : nil]
@@ -552,6 +576,8 @@ final class BranchView: NSView {
             ? max(reach, kindsReach, boundaryStart + boundaryWidth) + metrics.inset * 2
             : focusCenter + max(reach, kindsReach, boundaryStart + boundaryWidth) + metrics.inset
         var width = max(Size.minWidth, trunkRight + metrics.inset, branchWidth, notesWidth + metrics.inset * 2, headingWidth)
+        // 同じ文節を選んでいるあいだは狭めない(出している分岐図の配置を決めるときだけ)
+        if !panel.keepsWidth, offset == nil, panel == self.panel { width = max(width, widthFloor) }
         let limit = max(maximumWidth, Size.minWidth)
         var shift: CGFloat = 0
         if width > limit {
@@ -704,8 +730,9 @@ final class BranchView: NSView {
         result.fadesLeft = result.overflows && shift > 0
         result.fadesRight = result.overflows && trunkRight - shift > right
         // 前後にまとまりが続く側は，幹の線を窓の端まで伸ばして山形を付ける(続きは線で示す．位置を数字で出さない)
-        result.railStart = result.fadesLeft || panel.continuesBefore ? 0 : (result.nodes.first.map { $0.minX + stopOffset(width: $0.width) } ?? left)
-        result.railEnd = result.fadesRight || panel.continuesAfter ? width : (result.nodes.last.map { $0.minX + stopOffset(width: $0.width) } ?? left)
+        result.stops = result.nodes.map { $0.minX + stopOffset }
+        result.railStart = result.fadesLeft || panel.continuesBefore ? 0 : (result.stops.first ?? left)
+        result.railEnd = result.fadesRight || panel.continuesAfter ? width : (result.stops.last ?? left)
         if panel.continuesBefore, !result.fadesLeft { result.moreBeforeX = left }
         if panel.continuesAfter, !result.fadesRight { result.moreAfterX = right }
         result.focus = focus
@@ -858,8 +885,8 @@ final class BranchView: NSView {
         let stale: CGFloat = column?.isEditing == true ? Opacity.editingStale : 1
 
         // 丸．線は丸の内側を通さない
-        let trunkStops = layout.nodes.enumerated().map { index, node in
-            Stop(center: NSPoint(x: node.minX + stopOffset(width: node.width), y: layout.railY), state: index == layout.focus ? .selected : .plain)
+        let trunkStops = layout.stops.enumerated().map { index, x in
+            Stop(center: NSPoint(x: x, y: layout.railY), state: index == layout.focus ? .selected : .plain)
         }
         var branchStops: [Stop] = []
         for (index, row) in layout.rows.enumerated() where rows.indices.contains(index) {
@@ -1119,7 +1146,9 @@ final class BranchView: NSView {
             TextFitting.draw(command.title, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Part.rowPaddingX + CommandDrawing.width,
                              midY: node.midY)
         } else {
-            TextFitting.draw(column.text, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Part.rowPaddingX, midY: node.midY)
+            // 全角 1 字より狭い文字は，取った幅の真ん中に描く
+            let slack = max(trunkFont.pointSize - textWidth(column.text, font: trunkFont), 0)
+            TextFitting.draw(column.text, attributes: [.font: trunkFont, .foregroundColor: color], x: node.minX + Part.rowPaddingX + (slack / 2).rounded(), midY: node.midY)
         }
         if column.isCorrected {
             // 打ち間違いを直した文節には，文字のあとに補正の色で「修正」と添える．確信の低い文節の点線と見分けるため

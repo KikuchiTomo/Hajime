@@ -1896,6 +1896,27 @@ struct LiveConversionTimingTests {
         #expect(session.isComposing)
     }
 
+    @Test("R-06: エディタとターミナルでも，止まって変換して見せた文は続けて打ってもかなに戻さず，続けて打った分だけを読みのまま足す")
+    func keepsSettledConversionWhileTypingInTerminal() {
+        for profile in [AppProfile.terminal, .programming] {
+            let context = InputContext(profile: profile)
+            let (session, _) = session()
+            var shown: String?
+            for key in "kyouharai" { shown = marked(session.handle(KeyEvent(.character(key)), context: context).actions) ?? shown }
+            // 止まるまでは読みのまま
+            #expect(shown == "きょうはらい")
+            #expect(marked(session.settle(context: context)) == "今日は雷")
+            // 続けて打っても「きょうはらいb」に戻さない．打った分は読みのまま
+            #expect(marked(session.handle(KeyEvent(.character("b")), context: context).actions) == "今日は雷b")
+            #expect(marked(session.handle(KeyEvent(.character("u")), context: context).actions) == "今日は雷ぶ")
+            // 止まると全文を変換し直す
+            #expect(marked(session.settle(context: context)) == "今日はライブ")
+            // 止まったときの読みの中まで消したら，読みのままに戻す
+            #expect(marked(session.handle(KeyEvent(.backspace), context: context).actions) == "きょうはらい")
+            #expect(session.isComposing)
+        }
+    }
+
     /// 「kyouharai」と打って止まり(今日は雷)，続けて keys を打ったあとの組み立て中の文字
     private func typedAfterSettle(_ session: InputSession, _ keys: [KeyEvent]) -> String? {
         for key in "kyouharai" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
