@@ -1,6 +1,6 @@
 ﻿param([Parameter(Mandatory = $true)][string]$Dll)
 
-$expected = @('DllCanUnloadNow', 'DllGetClassObject', 'DllRegisterServer', 'DllUnregisterServer', 'RestoreProfile')
+$expected = @('DllCanUnloadNow', 'DllGetClassObject', 'DllRegisterServer', 'DllUnregisterServer', 'RemoveOldVersions', 'RestoreProfile')
 $output = & llvm-readobj --coff-exports $Dll
 if ($LASTEXITCODE -ne 0) { throw "llvm-readobj が失敗しました: $Dll" }
 $actual = @($output | Select-String -Pattern '^\s*Name:\s*(\S+)' | ForEach-Object { $_.Matches[0].Groups[1].Value } | Sort-Object)
