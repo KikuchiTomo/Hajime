@@ -28,8 +28,8 @@ pub struct Table {
     /// キーボードで動かす行(shown の中の位置)
     cursor: Option<usize>,
     query: String,
-    /// 列の値で絞り込む(列の番号と値．キー設定の状態)
-    restriction: Option<(usize, String)>,
+    /// 列の値で絞り込む(列の番号と値．列の番号の順．キー設定の状態と，押したキー)
+    restrictions: Vec<(usize, String)>,
     /// 並べ替える列と向き(真なら昇順)．None なら rows の並びのまま(macOS の表の見出しを押す並べ替え)
     sort: Option<(usize, bool)>,
 }
@@ -63,13 +63,21 @@ impl Table {
         self.refilter();
     }
 
-    /// column 列の値が value の行だけを出す(None なら絞り込まない)．変わったら選んでいた行は外す
+    /// column 列の値が value と同じ行だけを出す(None ならその列では絞り込まない)．ほかの列の絞り込みと検索の言葉は残し，
+    /// すべてに当たる行を出す．変わったら選んでいた行は外す
     pub fn restrict(&mut self, column: usize, value: Option<&str>) {
-        let restriction = value.map(|value| (column, value.to_string()));
-        if restriction == self.restriction {
+        let mut restrictions: Vec<(usize, String)> = self
+            .restrictions
+            .iter()
+            .filter(|(other, _)| *other != column)
+            .cloned()
+            .collect();
+        restrictions.extend(value.map(|value| (column, value.to_string())));
+        restrictions.sort();
+        if restrictions == self.restrictions {
             return;
         }
-        self.restriction = restriction;
+        self.restrictions = restrictions;
         self.clear_selection();
         self.refilter();
     }
@@ -101,13 +109,13 @@ impl Table {
 
     fn refilter(&mut self) {
         let query = &self.query;
-        let restriction = &self.restriction;
+        let restrictions = &self.restrictions;
         self.shown = (0..self.rows.len())
             .filter(|index| {
                 let row = &self.rows[*index];
-                restriction
-                    .as_ref()
-                    .is_none_or(|(column, value)| row.get(*column) == Some(value))
+                restrictions
+                    .iter()
+                    .all(|(column, value)| row.get(*column) == Some(value))
                     && (query.is_empty()
                         || row
                             .iter()
@@ -248,6 +256,50 @@ mod tests {
                 .collect(),
         );
         table
+    }
+
+    /// キー設定の表(状態・キー・コマンド)
+    fn keymap() -> Table {
+        let mut table = Table::default();
+        table.set_rows(
+            [
+                ["入力中", "Space", "変換"],
+                ["入力中", "Ctrl+Space", "確定"],
+                ["変換中", "Space", "次の候補"],
+                ["変換中", "Shift+Space", "前の候補"],
+            ]
+            .iter()
+            .map(|row| row.iter().map(|cell| (*cell).to_string()).collect())
+            .collect(),
+        );
+        table
+    }
+
+    #[test]
+    fn 列の値で絞ると同じ値の行だけを出し_その値を含むだけの行は出さない() {
+        let mut table = keymap();
+        // 検索の言葉は「Space」を含む行をすべて出す
+        table.filter("space");
+        assert_eq!(table.len(), 4);
+        table.filter("");
+        // 押したキーで絞ると，そのキーの行だけ(「Ctrl+Space」「Shift+Space」は出さない)
+        table.restrict(1, Some("Space"));
+        assert_eq!(table.len(), 2);
+        assert_eq!(table.row_index(0), Some(0));
+        assert_eq!(table.row_index(1), Some(2));
+        // 状態の絞り込みと検索の言葉は別に効き，すべてに当たる行だけを出す
+        table.restrict(0, Some("変換中"));
+        assert_eq!(table.len(), 1);
+        assert_eq!(table.row_index(0), Some(2));
+        table.filter("確定");
+        assert!(table.is_empty());
+        table.filter("");
+        // 片方を外しても，もう片方は残る
+        table.restrict(1, None);
+        assert_eq!(table.len(), 2);
+        assert_eq!(table.row_index(1), Some(3));
+        table.restrict(0, None);
+        assert_eq!(table.len(), 4);
     }
 
     #[test]

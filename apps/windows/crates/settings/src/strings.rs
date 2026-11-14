@@ -738,6 +738,8 @@ pub mod keys {
     pub const SEARCH_PROMPT: &str = "コマンドやキーで検索";
     pub const SEARCH_BY_KEY: &str = "キーで検索";
     pub const SEARCH_BY_KEY_HELP: &str = "押したキーで絞り込み";
+    /// 押したキーで絞り込んでいるあいだのチップ(押すと外す．UIStrings.Keys.clearKeyFilter)
+    pub const CLEAR_KEY_FILTER: &str = "絞り込みを解除";
     pub const TAB: &str = "キー設定";
     pub const PRESET_MENU: &str = "ひな形を読み込む";
     pub const CUSTOM_PRESET: &str = "カスタム";
@@ -752,6 +754,18 @@ pub mod keys {
     pub const DUPLICATE: &str = "複製";
     pub const PRESS: &str = "キーを押してください";
     pub const RECORD: &str = "キーを記録";
+    pub const STOP_RECORDING: &str = "記録を停止";
+    /// キーの欄の右の，押して記録しにくいキーと修飾キーを選ぶメニュー(UIStrings.Keys.chooseKey)
+    pub const CHOOSE_KEY: &str = "キーを選択";
+
+    /// メニューの中の修飾キーの項目．付いていれば外す，付いていなければ付ける
+    pub fn modifier_item(name: &str, on: bool) -> String {
+        if on {
+            format!("{name} を外す")
+        } else {
+            format!("{name} を付ける")
+        }
+    }
     pub const LOAD_PRESET_TITLE: &str = "ひな形を読み込みますか？";
     pub const RESTORE_TITLE: &str = "既定の表に戻しますか？";
     pub const RESTORE_MESSAGE: &str = "追加した行と変更した行は削除されます。";
@@ -767,6 +781,11 @@ pub mod keys {
     }
     pub const PLAIN_CHARACTER: &str = "この状態ではこの文字を入力できなくなります";
     pub const ADD_STANDARD_KEYS: &str = "既定のキーを追加";
+
+    /// 足す前の新しい行と同じ状態・同じキーの行があるとき(UIStrings.Keys.duplicateWarning)
+    pub fn duplicate_warning(row: &str) -> String {
+        format!("同じキーの行より優先します: {row}")
+    }
 
     pub fn load_preset_message(name: &str) -> String {
         format!("現在のキー設定を「{name}」で置き換えます。")
@@ -1285,6 +1304,8 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
+    /// キーを選ぶメニューの中の，ファンクションキーの一覧を開く項目(macOS は入れ子のメニューの見出し「ファンクションキー」)
+    pub const FUNCTION_KEYS_ITEM: &str = "ファンクションキー…";
     /// 入力欄のすぐ下の，入れたときの結果の頭に置く印(macOS は arrow.turn.down.right の絵)
     pub const RESULT_MARK: &str = "↪ ";
     /// 書き方のチップを開け閉めするボタンの字(macOS は curlybraces の記号)

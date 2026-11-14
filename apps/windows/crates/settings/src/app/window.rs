@@ -89,17 +89,23 @@ enum Shot {
     ImportPreview,
     /// キー設定の表から確定の行を消した(キーの無い知らせと「既定のキーを追加」)
     MissingKeys,
+    /// キー設定の新しい行に，表にある行と同じ状態・同じキーを入れた(足す前の知らせ)．表は押したキーで絞り込んでいる(チップ)
+    KeyDraft,
+    /// キー設定の新しい行のキーを記録しているところ(案内と「記録を停止」)
+    KeyRecording,
 }
 
 impl Shot {
     /// ふつうの 1 枚のほかに写すページと状態
-    const TEMPLATES: [(Page, Shot); 6] = [
+    const TEMPLATES: [(Page, Shot); 8] = [
         (Page::Dictionary, Shot::Open),
         (Page::Dictionary, Shot::Typing),
         (Page::Dictionary, Shot::DynamicOff),
         (Page::Commands, Shot::Open),
         (Page::Dictionary, Shot::ImportPreview),
         (Page::Keys, Shot::MissingKeys),
+        (Page::Keys, Shot::KeyDraft),
+        (Page::Keys, Shot::KeyRecording),
     ];
 
     fn suffix(self) -> &'static str {
@@ -110,6 +116,8 @@ impl Shot {
             Shot::DynamicOff => "-templates-off",
             Shot::ImportPreview => "-import-preview",
             Shot::MissingKeys => "-missing-keys",
+            Shot::KeyDraft => "-key-draft",
+            Shot::KeyRecording => "-key-recording",
         }
     }
 }
@@ -173,6 +181,9 @@ fn import_sample() -> PendingImport {
         action: import_sheet::ImportAction::UserDictionary,
     }
 }
+
+/// 見本の書き出しで，キー設定の新しい行に入れて表を絞り込むキー(標準の表の入力中にある)
+const SNAPSHOT_KEY: &str = "Space";
 
 /// 見本の書き出しの 1 枚(ページ・状態・暗いか)
 type SnapshotJob = (Page, Shot, bool);
@@ -2503,6 +2514,7 @@ impl App {
     // MARK: - ドロップダウン
 
     fn open_flyout(&mut self, element: Element) {
+        self.view.reset_key_menu(element);
         self.open_flyout_at(element, None);
     }
 
@@ -2551,7 +2563,7 @@ impl App {
             (items, selected, anchor.x, anchor.y, anchor)
         } else {
             let (items, selected) = self.view.dropdown_items(element);
-            let Some(rect) = self.view.rect(element) else {
+            let Some(rect) = self.view.menu_rect(element) else {
                 return;
             };
             // ページの中の位置を窓の中の位置にする
@@ -2654,6 +2666,10 @@ impl App {
             self.view.choose(element, index)
         };
         self.dispatch(event);
+        // キーを選ぶメニューのファンクションキーの項目は，続けてその一覧を同じ場所に出す(macOS の KeyField のサブメニュー)
+        if self.view.opens_key_functions(element) {
+            self.open_flyout_at(element, None);
+        }
         ffi::invalidate(self.window);
     }
 
@@ -2864,6 +2880,31 @@ impl App {
         ffi::invalidate(self.window);
     }
 
+    /// 欄がキーの記録を始めた・やめた．キーの欄の右のボタン(メニューか「記録を停止」)を入れ替える
+    fn field_recording(&mut self, window: Window, recording: bool) {
+        self.view.set_recording(window, recording);
+        // 「記録を停止」を押して記録をやめたら，フォーカスを同じ場所のメニューのボタンに移す
+        if let Focus::Page(element) = self.focus {
+            if element.part == Part::KeyStop && !recording {
+                self.focus = Focus::Page(Element {
+                    row: element.row,
+                    part: Part::KeyMenu,
+                });
+            }
+        }
+        ffi::invalidate(self.window);
+    }
+
+    /// 「キーで検索」で押したキーを受け取った．そのキーの行だけを出す
+    fn key_captured(&mut self, window: Window) {
+        let Some(notation) = edit::take_captured(window) else {
+            return;
+        };
+        let event = self.view.key_captured(window, &notation);
+        self.dispatch(event);
+        ffi::invalidate(self.window);
+    }
+
     fn field_changed(&mut self, window: Window) {
         if let Some(sheet) = self.sheet.as_mut() {
             if let Some(part) = sheet.part_of(window) {
@@ -2947,7 +2988,12 @@ impl App {
         // 書き方のチップ: 開いているか(閉じた状態はふつうの 1 枚)と，「入力時の値にする」のオン・オフ
         self.templates_open = if matches!(
             shot,
-            Shot::Plain | Shot::DynamicOff | Shot::ImportPreview | Shot::MissingKeys
+            Shot::Plain
+                | Shot::DynamicOff
+                | Shot::ImportPreview
+                | Shot::MissingKeys
+                | Shot::KeyDraft
+                | Shot::KeyRecording
         ) {
             std::collections::HashSet::new()
         } else {
@@ -2992,6 +3038,16 @@ impl App {
                 ffi::edit::replace(field, 0..0, "締切 {da");
                 self.field_changed(field);
             }
+        }
+        // キー設定の新しい行: 表にある行と同じキーを入れて足す前の知らせを出し，そのキーで表を絞り込む．
+        // 記録しているところは，欄を空にして案内と「記録を停止」を出す(欄にフォーカスは入れない)
+        match shot {
+            Shot::KeyDraft => {
+                self.view.show_key_draft(SNAPSHOT_KEY, false);
+                self.view.show_key_filter(SNAPSHOT_KEY);
+            }
+            Shot::KeyRecording => self.view.show_key_draft("", true),
+            _ => {}
         }
         // 取り込む前のシート: 見本のエンジンはファイルを読めないので，macOS の見本と同じ中身を渡す
         self.import_sheet = None;
@@ -3086,6 +3142,10 @@ impl App {
         }
         if let (Some(keymap), Some(model)) = (restored_keymap, &mut self.model) {
             let _ = model.set("keymap", keymap);
+        }
+        // キーの欄は使い回すので，入れた文字を残さない
+        if matches!(shot, Shot::KeyDraft | Shot::KeyRecording) {
+            self.view.show_key_draft("", false);
         }
         self.snapshots = Some((directory, jobs));
         ffi::post(self.window, WM_SNAPSHOT, 0, 0);
@@ -4485,7 +4545,19 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         }
         edit::WM_FIELD_RECORDED => {
             let field = HWND(lparam.0 as *mut _);
-            with_app(|app| app.field_changed(field));
+            with_app(|app| {
+                // 「キーで検索」で受け取ったキーは欄に入れず，表を絞り込む
+                if wparam.0 == 1 {
+                    app.key_captured(field);
+                } else {
+                    app.field_changed(field);
+                }
+            });
+            Some(LRESULT(0))
+        }
+        edit::WM_FIELD_RECORDING => {
+            let field = HWND(lparam.0 as *mut _);
+            with_app(|app| app.field_recording(field, wparam.0 == 1));
             Some(LRESULT(0))
         }
         WM_CONFIRM => {

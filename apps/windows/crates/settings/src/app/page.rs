@@ -69,6 +69,11 @@ pub enum Event {
         spec: ListSpec,
         indices: Vec<usize>,
     },
+    /// 選んだ行を，それぞれ元の行のすぐ下に複製する(キー設定の表．表の行の番号)
+    ListDuplicate {
+        spec: ListSpec,
+        indices: Vec<usize>,
+    },
     /// 選んだ行の有効と無効を切り替える(コマンドと変換マクロ．表の行の番号)
     ListToggle {
         spec: ListSpec,
@@ -444,6 +449,10 @@ pub enum Part {
     Import,
     /// 押したキーで表を絞り込むボタン(キー設定．macOS の「キーで検索」)
     KeySearch,
+    /// キーの欄の右の，押して記録しにくいキーと修飾キーを選ぶメニュー(キー設定．macOS の KeyField の menu)
+    KeyMenu,
+    /// キーを記録しているあいだ，メニューの代わりに出す「記録を停止」のボタン(macOS の KeyField の xmark)
+    KeyStop,
 }
 
 /// ページの中の部品(行の番号と部品)
@@ -569,6 +578,12 @@ struct RowState {
     /// 書き方のチップの置き場所(チップを並べる欄の左上を 0 とする)と，その欄の左上(ページの中の座標)
     template_chips: reference::Chips,
     template_origin: (f32, f32),
+    /// 押したキーで表を絞り込んでいるときのキー(整えた書き方．キー設定．macOS の KeymapPage の keyFilter)
+    key_filter: Option<String>,
+    /// キーを記録している欄(キー設定のキーの欄か検索欄)．欄が記録を始めた・やめたと知らせてくる
+    recording: Option<Part>,
+    /// キーを選ぶメニューで，ファンクションキーの一覧を出しているか
+    key_functions: bool,
 }
 
 /// 謝辞のカードの中の置き場所
@@ -768,6 +783,9 @@ impl RowState {
             template_switch: Vec::new(),
             template_chips: reference::Chips::default(),
             template_origin: (0.0, 0.0),
+            key_filter: None,
+            recording: None,
+            key_functions: false,
         }
     }
 
@@ -938,13 +956,82 @@ impl RowState {
         }
     }
 
+    /// 押したキーで絞り込んでいるときに，「キーで検索」の代わりに出すチップの文字(キーの名前)
+    fn key_chip(&self) -> Option<String> {
+        self.key_filter.as_deref().map(crate::keys::display)
+    }
+
+    /// 表を押したキー(key_filter)の行だけにする．表のキーの列と同じ書き方で比べる
+    fn restrict_key(&mut self) {
+        let cell = self
+            .key_filter
+            .as_deref()
+            .and_then(crate::keys::filter_cell);
+        self.table
+            .restrict(pages::KEYMAP_KEY_FIELD, cell.as_deref());
+    }
+
+    /// 押したキーでの絞り込みを変える(None で外す)．表を絞り直し，選んだ行と書き換えを外して，先頭に戻す
+    fn set_key_filter(&mut self, notation: Option<&str>) {
+        self.key_filter = notation.and_then(crate::keys::canonical);
+        self.restrict_key();
+        self.editing = None;
+        let content = self.table.len() as f32 * size::TABLE_ROW_HEIGHT;
+        let viewport = table_viewport(self);
+        self.table_scroll.set_extent(content, viewport);
+        self.table_scroll.jump_to(0.0);
+    }
+
+    /// 欄の枠の中の右の端にボタンを置く欄か(キー設定のキーの欄．キーを選ぶメニューと「記録を停止」)
+    fn holds_key_button(&self, part: Part) -> bool {
+        let field = self
+            .row
+            .control
+            .list_buttons()
+            .and_then(|buttons| buttons.key_menu);
+        matches!(part, Part::Field(index) if Some(index) == field)
+            && self
+                .card
+                .as_ref()
+                .is_some_and(|card| card.key_button.is_some())
+    }
+
+    /// 欄の枠(ページの中の座標)．枠の中にボタンを置く欄は，ボタンまでを 1 つの枠にする
+    fn field_frame(&self, part: Part) -> Option<Rect> {
+        let rect = self.part_rect(part)?;
+        let button = self
+            .card
+            .as_ref()
+            .and_then(|card| card.key_button)
+            .filter(|_| self.holds_key_button(part));
+        Some(match button {
+            Some(button) => Rect::new(rect.x, rect.y, button.max_x() - rect.x, rect.height),
+            None => rect,
+        })
+    }
+
+    /// キーを選ぶメニューを添える欄(キー設定のキーの欄)の窓
+    fn key_window(&self) -> Option<Window> {
+        let field = self.row.control.list_buttons()?.key_menu?;
+        self.edit(Part::Field(field))
+    }
+
+    /// キーを選ぶメニューに並べる項目(ファンクションキーの一覧を出しているあいだはその一覧)
+    fn key_choices(&self) -> Vec<crate::keys::KeyChoice> {
+        if self.key_functions {
+            return crate::keys::function_choices();
+        }
+        let current = self.key_window().map(ffi::window_text).unwrap_or_default();
+        crate::keys::key_choices(&current)
+    }
+
     /// 入力欄・追加・削除のある一覧か(項目ごとの同期は違う)
     fn has_add_remove(&self) -> bool {
         self.list_spec().is_some() && !matches!(self.row.control, Control::SyncFields(_))
     }
 
     /// 表の行を右クリックしたときのメニューの項目(macOS の RuleListEditor・KeymapPage の contextMenu)．
-    /// 1 行だけ選んでいれば編集，キー設定は複製，選んだ行があれば削除
+    /// 1 行だけ選んでいれば編集，選んだ行があれば削除，キー設定は複製も
     fn row_menu(&self) -> Vec<RowMenuItem> {
         if !self.has_add_remove() || !self.enabled {
             return Vec::new();
@@ -953,6 +1040,9 @@ impl RowState {
         let mut items = Vec::new();
         if selected.len() == 1 {
             items.push(RowMenuItem::Edit);
+        }
+        if !selected.is_empty() {
+            // 複製は，選んだ行をそれぞれ元の行のすぐ下に足す(何行でも)
             if self
                 .row
                 .control
@@ -961,8 +1051,6 @@ impl RowState {
             {
                 items.push(RowMenuItem::Duplicate);
             }
-        }
-        if !selected.is_empty() {
             items.push(RowMenuItem::Remove);
         }
         items
@@ -1063,6 +1151,18 @@ impl RowState {
         let item = spec.make(&values);
         if !spec.is_valid(&item) {
             return Some((self.invalid_text.clone(), true));
+        }
+        // キー設定は，同じ状態・同じキーの行と，文字を打てなくなるキーを知らせる(足すことはできる．macOS の KeymapPage の draftNote)
+        if spec.path == "keymap" {
+            let entries: Vec<(String, String, String)> = self
+                .table
+                .rows()
+                .iter()
+                .map(|cells| crate::keys::entry_of(cells))
+                .collect();
+            let note =
+                crate::keys::draft_note(item.first()?, item.get(1)?, &entries, self.editing)?;
+            return Some((note.text(), false));
         }
         let shown = spec.display(&item);
         let fields = spec.fields.len();
@@ -1216,6 +1316,7 @@ impl RowState {
             // 行のメニューは押した位置に出すので，部品の欄は持たない
             Part::RowMenu => None,
             Part::KeySearch => card.parts.last().copied(),
+            Part::KeyMenu | Part::KeyStop => card.key_button,
             // 更新を確かめるボタン・値の右のボタンは部品の欄の外
             Part::Action
                 if matches!(self.row.control, Control::Version | Control::InfoAction(..)) =>
@@ -1369,6 +1470,14 @@ impl RowState {
                         if button && buttons.template_field == Some(index) {
                             parts.push(Part::TemplateButton);
                         }
+                        // キーの欄の右は，記録しているあいだは「記録を停止」，ほかはキーを選ぶメニュー
+                        if buttons.key_menu == Some(index) {
+                            parts.push(if self.recording == Some(Part::Field(index)) {
+                                Part::KeyStop
+                            } else {
+                                Part::KeyMenu
+                            });
+                        }
                     }
                     // キャンセル(上の 2 つ目)は書き換えているあいだだけ出す
                     let editing = self.editing.is_some();
@@ -1470,6 +1579,8 @@ impl RowState {
         let buttons = self.row.control.list_buttons();
         match part {
             Part::KeySearch => keys::SEARCH_BY_KEY,
+            Part::KeyMenu => keys::CHOOSE_KEY,
+            Part::KeyStop => keys::STOP_RECORDING,
             Part::Top(0) if self.has_add_remove() && self.editing.is_some() => rule_list::UPDATE,
             Part::Top(index) => buttons
                 .and_then(|buttons| buttons.top.get(index).copied())
@@ -1520,6 +1631,14 @@ impl RowState {
                 .row_menu()
                 .iter()
                 .map(|item| item.label().to_string())
+                .collect();
+        }
+        if part == Part::KeyMenu {
+            let current = self.key_window().map(ffi::window_text).unwrap_or_default();
+            return self
+                .key_choices()
+                .iter()
+                .map(|choice| crate::keys::choice_label(choice, &current))
                 .collect();
         }
         match (&self.row.control, part) {
@@ -1651,6 +1770,7 @@ impl RowState {
         match part {
             Part::Dropdown
             | Part::Filter
+            | Part::KeyMenu
             | Part::TableChoice(_)
             | Part::Entry(_, EntryPart::Condition) => true,
             Part::Field(index) => matches!(self.inputs.get(index), Some(Input::Choice(_))),
@@ -2092,6 +2212,7 @@ impl PageView {
                     row.table.filter(&ffi::window_text(search));
                 }
                 row.table.restrict(0, state_filter(row.filter));
+                row.restrict_key();
                 let content = row.table.len() as f32 * size::TABLE_ROW_HEIGHT;
                 row.table_scroll.set_extent(content, table_viewport(row));
             }
@@ -2150,6 +2271,7 @@ impl PageView {
             .rows
             .iter()
             .map(|row| ListInput {
+                key_chip: row.key_chip(),
                 template_button: row.row.control.template_target().is_some()
                     && row.template_enabled,
                 result: !(row.result_text.is_empty() && row.result_problems.is_empty()),
@@ -2333,7 +2455,12 @@ impl PageView {
                     ffi::show(window, false);
                     continue;
                 }
-                let width = rect.width - size::FIELD_PADDING_X * 2.0;
+                // 枠の中の右にボタンを置く欄は，ボタンのすぐ左まで使う(ボタンが右の余白になる)
+                let width = if row.holds_key_button(part) {
+                    rect.width - size::FIELD_PADDING_X
+                } else {
+                    rect.width - size::FIELD_PADDING_X * 2.0
+                };
                 let left = theme.px(x);
                 let top = theme.px(y);
                 ffi::place(
@@ -2437,6 +2564,21 @@ impl PageView {
                     .map(|_| label)
             }
             Part::TemplateButton => Some(crate::strings::templates::BUTTON_HELP),
+            // 「キーで検索」は何をするかを，絞り込んでいるあいだのチップは押すと外れることを出す
+            Part::KeySearch => Some(
+                if self
+                    .rows
+                    .get(element.row)
+                    .is_some_and(|row| row.key_filter.is_some())
+                {
+                    keys::CLEAR_KEY_FILTER
+                } else {
+                    keys::SEARCH_BY_KEY_HELP
+                },
+            ),
+            // 絵だけのボタン(キーを選ぶメニュー・記録を停止)は名前を出す
+            Part::KeyMenu => Some(keys::CHOOSE_KEY),
+            Part::KeyStop => Some(keys::STOP_RECORDING),
             _ => None,
         }
     }
@@ -2452,6 +2594,11 @@ impl PageView {
             Part::Increment => format!("{} {}", row.row.title, text::INCREASE),
             Part::Slider => row.title(),
             Part::Filter => keys::STATE.to_string(),
+            // 絞り込んでいるあいだは，外すことと絞り込んでいるキーを読む
+            Part::KeySearch => match row.key_chip() {
+                Some(chip) => format!("{} {chip}", keys::CLEAR_KEY_FILTER),
+                None => keys::SEARCH_BY_KEY.to_string(),
+            },
             Part::Segment(_)
             | Part::Button(_)
             | Part::TemplateSegment(_)
@@ -2467,9 +2614,13 @@ impl PageView {
                     );
                     format!("{} {value} {}", item.code, item.meaning)
                 }),
-            Part::Top(_) | Part::Bottom(_) | Part::Action | Part::Link(_) | Part::Expand => {
-                row.button_label(element.part).to_string()
-            }
+            Part::Top(_)
+            | Part::Bottom(_)
+            | Part::Action
+            | Part::Link(_)
+            | Part::Expand
+            | Part::KeyMenu
+            | Part::KeyStop => row.button_label(element.part).to_string(),
             // 読み上げは入る文字と，英語か日本語か(macOS の resultChip と同じく 1 つにまとめる)
             Part::PreviewChip(index) => {
                 let chip = row
@@ -2590,6 +2741,8 @@ impl PageView {
             Part::Filter => 31,
             Part::RowMenu => 52,
             Part::KeySearch => 32,
+            Part::KeyMenu => 34,
+            Part::KeyStop => 35,
             Part::Segment(index) => 90 + index,
             Part::Button(index) => 95 + index,
             Part::Field(index) => 10 + index,
@@ -2656,6 +2809,105 @@ impl PageView {
         self.rows
             .get(element.row)
             .is_some_and(|row| row.visible && row.part_enabled(element.part))
+    }
+
+    /// 欄がキーの記録を始めた・やめた．記録しているあいだ，キーの欄の右を「記録を停止」のボタンにする
+    pub fn set_recording(&mut self, window: Window, recording: bool) {
+        let Some(element) = self.element_of(window) else {
+            return;
+        };
+        if let Some(row) = self.rows.get_mut(element.row) {
+            if recording {
+                row.recording = Some(element.part);
+            } else if row.recording == Some(element.part) {
+                row.recording = None;
+            }
+        }
+    }
+
+    /// 「キーで検索」で押したキー(window は受け取った検索欄)で表を絞り込む．チップの幅が変わるので置き直す
+    pub fn key_captured(&mut self, window: Window, notation: &str) -> Option<Event> {
+        let element = self.element_of(window)?;
+        let row = self.rows.get_mut(element.row)?;
+        row.set_key_filter(Some(notation));
+        Some(Event::Relayout)
+    }
+
+    /// 見本の書き出しで，キー設定の表を notation のキーで絞り込んだ状態にする
+    pub fn show_key_filter(&mut self, notation: &str) {
+        for row in &mut self.rows {
+            if row
+                .row
+                .control
+                .list_buttons()
+                .is_some_and(|buttons| buttons.toolbar)
+            {
+                row.set_key_filter(Some(notation));
+            }
+        }
+    }
+
+    /// 見本の書き出しで，キー設定の新しい行のキーの欄に text を入れた状態(recording なら記録しているところ)にする
+    pub fn show_key_draft(&mut self, text: &str, recording: bool) {
+        for row in &mut self.rows {
+            let Some(field) = row
+                .row
+                .control
+                .list_buttons()
+                .and_then(|buttons| buttons.key_menu)
+            else {
+                continue;
+            };
+            if let Some(window) = row.key_window() {
+                ffi::set_text(window, text);
+            }
+            row.recording = recording.then_some(Part::Field(field));
+            // 状態は入力中にし(macOS の新しい行の初めの状態)，コマンドはその状態に置けるものにする
+            let composing = keys::STATES
+                .iter()
+                .position(|(value, _)| *value == "composing");
+            if let (Some(Input::Choice(state)), Some(composing)) =
+                (row.inputs.first_mut(), composing)
+            {
+                *state = composing;
+            }
+            let allowed = row.choice_positions(KEYMAP_COMMAND);
+            if let Some(Input::Choice(command)) = row.inputs.get_mut(KEYMAP_COMMAND) {
+                if !allowed.is_empty() && !allowed.contains(command) {
+                    *command = allowed[0];
+                }
+            }
+        }
+    }
+
+    /// 開く一覧を下に出す部品の場所(ページの中の座標)．キーを選ぶメニューは，キーの欄の左の端にそろえて出す
+    pub fn menu_rect(&self, element: Element) -> Option<Rect> {
+        let row = self.rows.get(element.row)?;
+        let field = row
+            .row
+            .control
+            .list_buttons()
+            .and_then(|buttons| buttons.key_menu);
+        match (element.part, field) {
+            (Part::KeyMenu, Some(field)) => row.field_frame(Part::Field(field)),
+            _ => row.part_rect(element.part),
+        }
+    }
+
+    /// キーを選ぶメニューを初めから開く(ファンクションキーの一覧から戻す)
+    pub fn reset_key_menu(&mut self, element: Element) {
+        if let Some(row) = self.rows.get_mut(element.row) {
+            row.key_functions = false;
+        }
+    }
+
+    /// キーを選ぶメニューでファンクションキーの項目を選んだか(続けてその一覧を開く)
+    pub fn opens_key_functions(&self, element: Element) -> bool {
+        element.part == Part::KeyMenu
+            && self
+                .rows
+                .get(element.row)
+                .is_some_and(|row| row.key_functions)
     }
 
     pub fn is_dropdown(&self, element: Element) -> bool {
@@ -2737,11 +2989,24 @@ impl PageView {
         }
         match (&row.row.control, part) {
             (_, Part::Reset) => return Some(Event::Reset(row.row.path)),
-            // 次に押したキーを検索欄に書き，その行だけを出す(検索欄はキーの名前で絞る)
+            // 押したキーで絞り込んでいれば外す(チップを押した)．でなければ次に押したキーを検索欄で受け取り，
+            // そのキーの行だけを出す(set_key_filter．検索欄の言葉とは別に絞る．macOS の KeymapPage の keyFilter)
             (_, Part::KeySearch) => {
+                if row.key_filter.is_some() {
+                    row.set_key_filter(None);
+                    return Some(Event::Relayout);
+                }
                 if let Some(search) = row.search {
                     edit::start_recording(search, keys::PRESS);
                 }
+                return None;
+            }
+            // 記録をやめて，欄を記録の前のキーに戻す(macOS の KeyField の「記録を停止」)
+            (_, Part::KeyStop) => {
+                if let Some(window) = row.key_window() {
+                    edit::stop_recording(window);
+                }
+                row.recording = None;
                 return None;
             }
             (Control::Stepper(_), Part::Decrement) => return row.step(-1),
@@ -2858,11 +3123,12 @@ impl PageView {
                     return Some(Event::Action(pages::Action::RestoreKeymap))
                 }
                 ("keymap", Part::Bottom(1)) => {
-                    // 選んだ行を入力欄に写し，追加のボタンで新しい行として足す
-                    let index = *row.table.selected_rows().first()?;
-                    row.fill_inputs(index);
-                    row.editing = None;
-                    return None;
+                    // 選んだ行を，それぞれ元の行のすぐ下に複製する(macOS と同じ)
+                    let selected = row.table.selected_rows();
+                    return (!selected.is_empty()).then_some(Event::ListDuplicate {
+                        spec: *spec,
+                        indices: selected,
+                    });
                 }
                 _ => {}
             }
@@ -2981,6 +3247,17 @@ impl PageView {
             (Control::Preset, Part::Dropdown) => keys::PRESETS
                 .get(index)
                 .map(|(preset, _)| Event::LoadPreset(preset)),
+            // 選んだキー・修飾キーを，記録したときと同じ書き方でキーの欄に入れる(macOS の KeyField の menu)
+            (_, Part::KeyMenu) => {
+                let choice = row.key_choices().get(index)?.clone();
+                // ファンクションキーの項目は一覧を出し直す(窓が opens_key_functions を見て開く)
+                row.key_functions = choice == crate::keys::KeyChoice::FunctionKeys;
+                let window = row.key_window()?;
+                if let Some(notation) = crate::keys::chosen(&ffi::window_text(window), &choice) {
+                    ffi::set_text(window, &crate::keys::display(&notation));
+                }
+                None
+            }
             (_, Part::Field(field)) => {
                 // 出した選択肢の位置を選択肢の番号にする(キー設定のコマンドは置けるものだけを出す)
                 let positions = row.choice_positions(field);
@@ -4311,22 +4588,30 @@ impl PageView {
         paint::field_frame(
             canvas,
             frame.theme,
-            rect,
+            row.field_frame(part).unwrap_or(rect),
             focused,
             self.state(frame, element, row.enabled),
         );
         if frame.draw_fields {
             // 見本の書き出しでは EDIT が写らないので，欄の文字か案内を描く
             let text = window.map(ffi::window_text).unwrap_or_default();
-            let (shown, color) = if text.is_empty() {
+            let (shown, color) = if row.recording == Some(part) {
+                // 記録しているあいだは，欄が出す案内を描く
+                (keys::PRESS.to_string(), frame.theme.palette.text_secondary)
+            } else if text.is_empty() {
                 (self.name(element), frame.theme.palette.text_secondary)
             } else {
                 (text, frame.theme.palette.text)
             };
+            let padding = if row.holds_key_button(part) {
+                size::FIELD_PADDING_X
+            } else {
+                size::FIELD_PADDING_X * 2.0
+            };
             let inner = Rect::new(
                 rect.x + size::FIELD_PADDING_X,
                 rect.y,
-                rect.width - size::FIELD_PADDING_X * 2.0,
+                rect.width - padding,
                 rect.height,
             );
             canvas.text(
@@ -4864,12 +5149,55 @@ impl PageView {
                     );
                 }
                 Part::Field(_) | Part::Search => self.paint_field(canvas, frame, index, row, part),
-                Part::KeySearch => paint::button(
+                Part::KeySearch => {
+                    let state = self.state(frame, element, row.part_enabled(part));
+                    match row.key_chip() {
+                        // 押したキーで絞り込んでいるあいだは，キーの名前と外す印のチップにする(押すと外す)
+                        Some(chip) => {
+                            paint::button(
+                                canvas,
+                                theme,
+                                rect,
+                                "",
+                                paint::ButtonKind::Standard,
+                                state,
+                            );
+                            let (label, mark) = key_chip_areas(rect);
+                            canvas.text(
+                                label,
+                                &chip,
+                                TextStyle::Body,
+                                Color::from(theme.palette.text),
+                                TextLayout::LINE,
+                            );
+                            canvas.text(
+                                mark,
+                                theme.glyphs.close,
+                                TextStyle::IconSmall,
+                                Color::from(theme.palette.text_secondary),
+                                TextLayout::CENTER,
+                            );
+                        }
+                        None => paint::button(
+                            canvas,
+                            theme,
+                            rect,
+                            keys::SEARCH_BY_KEY,
+                            paint::ButtonKind::Standard,
+                            state,
+                        ),
+                    }
+                }
+                // キーの欄の枠の中の右の端の絵のボタン(名前は説明の吹き出しと読み上げに出す)
+                Part::KeyMenu | Part::KeyStop => paint::field_button(
                     canvas,
                     theme,
                     rect,
-                    keys::SEARCH_BY_KEY,
-                    paint::ButtonKind::Standard,
+                    if part == Part::KeyStop {
+                        theme.glyphs.close
+                    } else {
+                        theme.glyphs.chevron_down
+                    },
                     self.state(frame, element, row.part_enabled(part)),
                 ),
                 Part::Top(_) | Part::Bottom(_) => {
@@ -5648,6 +5976,26 @@ fn create_inputs<F: FnMut() -> u16>(fields: &mut FieldSource<F>, row: &mut RowSt
     }
 }
 
+/// 押したキーで絞り込んでいるときのチップの幅(キーの名前の幅から．左右の余白と，名前と外す印のあいだを足す)
+fn key_chip_width(label: f32) -> f32 {
+    (label + size::BUTTON_PADDING_X * 2.0 + space::INLINE + size::CHEVRON_SIZE).ceil()
+}
+
+/// チップの中の，キーの名前と外す印の置き場所
+fn key_chip_areas(rect: Rect) -> (Rect, Rect) {
+    let left = rect.x + size::BUTTON_PADDING_X;
+    let mark = rect.max_x() - size::BUTTON_PADDING_X - size::CHEVRON_SIZE;
+    (
+        Rect::new(
+            left,
+            rect.y,
+            (mark - space::INLINE - left).max(0.0),
+            rect.height,
+        ),
+        Rect::new(mark, rect.y, size::CHEVRON_SIZE, rect.height),
+    )
+}
+
 /// 表の行のメニューの項目
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum RowMenuItem {
@@ -6132,6 +6480,8 @@ struct Measured<'a> {
 
 /// 一覧の行の，状態で出し入れするもの(layout::ListState の元)
 struct ListInput {
+    /// 押したキーで絞り込んでいるときのチップの文字
+    key_chip: Option<String>,
     template_button: bool,
     result: bool,
     panel: Option<PanelInput>,
@@ -6209,6 +6559,10 @@ impl Metrics for Measured<'_> {
             template_button: input.template_button,
             result: input.result,
             panel,
+            key_search: input
+                .key_chip
+                .as_ref()
+                .map(|chip| key_chip_width(self.measure.width(chip, TextStyle::Body))),
         }
     }
 
