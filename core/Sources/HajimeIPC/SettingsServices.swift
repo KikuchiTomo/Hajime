@@ -17,12 +17,16 @@ public struct SettingsServices {
     public var previewMacros: (_ text: String, _ reading: String, _ pattern: String?) -> [String]
     /// Jinen モデルを「自動」にしたときにエンジンが決めた結果(JinenModelChoice の値 small・xsmall・off)．まだ決めていなければ nil．設定の画面の選択肢に添える
     public var automaticJinenModel: () -> String?
+    /// 起動したときに読めず，脇に置いた設定のファイルの名前(FileSettingsStore.setAsideFile)．無ければ nil．
+    /// 設定の画面が，既定の設定で起動したことを一度だけ知らせるのに使う(macOS の SettingsWindowController.noteSetAsideFile と同じ)
+    public var setAsideSettingsFile: String?
 
     public init(resetLearning: @escaping () -> Void = {}, usage: (any UsageReading)? = nil, resetPaletteHistory: @escaping () -> Void = {},
                 previewLanguage: @escaping (_ text: String, _ precedingText: String?) -> [WordLanguagePreview.Word] = { _, _ in [] },
                 previewMacros: @escaping (_ text: String, _ reading: String, _ pattern: String?) -> [String] = { _, _, _ in [] },
-                automaticJinenModel: @escaping () -> String? = { nil }) {
+                automaticJinenModel: @escaping () -> String? = { nil }, setAsideSettingsFile: String? = nil) {
         self.automaticJinenModel = automaticJinenModel
+        self.setAsideSettingsFile = setAsideSettingsFile
         self.resetLearning = resetLearning
         self.usage = usage
         self.resetPaletteHistory = resetPaletteHistory

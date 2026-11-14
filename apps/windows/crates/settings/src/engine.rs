@@ -104,6 +104,27 @@ impl<E: Engine> EngineStore<E> {
         }
     }
 
+    /// 起動したときにエンジンが読めず，脇に置いた設定のファイルの名前(core の SettingsFields.setAsideFileName)．
+    /// エンジンは設定の画面に一度だけ答える．無いとき・答えを読めないとき・この項目を知らない前の版のエンジンのときは None
+    pub fn set_aside_file(&self) -> Option<String> {
+        const NAME: &str = "setAsideSettingsFile";
+        let response = self
+            .send(RequestBody::ReadSettingsFields {
+                names: vec![NAME.to_string()],
+                defaults: false,
+            })
+            .ok()?;
+        let ResponseBody::SettingsFields { values } = response else {
+            return None;
+        };
+        parse(&values)
+            .ok()?
+            .get(NAME)?
+            .as_str()
+            .filter(|name| !name.is_empty())
+            .map(str::to_string)
+    }
+
     pub fn reset_learning(&self) -> Result<(), StoreError> {
         self.done(RequestBody::ResetLearning)
     }

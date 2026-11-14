@@ -107,7 +107,7 @@ public final class EngineService {
     /// 設定に関わるファイルの読み書き．無ければファイルの要求に malformed を返す
     private let files: (any SettingsFileHandling)?
     private var isRunningFileWork = false
-    private let services: SettingsServices
+    private var services: SettingsServices
     private var connections: [ConnectionID: Connection] = [:]
     private var sessions: [UInt32: Session] = [:]
     private var nextConnection: UInt64 = 1
@@ -127,7 +127,7 @@ public final class EngineService {
     /// 候補ウィンドウでパレットを操作した対象(届いた順)．ポインタを動かした・ホイールを回したものも順に渡す
     private var paletteTargets: [(session: UInt32, target: PaletteTarget)] = []
 
-    /// 学んだことをファイルに書き出す(AzooKeyConverterEngine.flushLearning)
+    /// 学んだことと使い方の記録をファイルに書き出す(AzooKeyConverterEngine.flushLearning と UsageStore の flush)
     private let flushLearning: () -> Void
 
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
@@ -286,7 +286,7 @@ public final class EngineService {
             ui(.hide)
             // 手書きの窓は閉じない．DLL は入力欄の中で注目が動くたび(入力メニューを出す・閉じるときも)に deactivate を送るので，
             // ここで閉じると開いた直後に消える．入れる先はそのままにし，ほかのアプリに移ったら activate で移す
-            // 入力欄から外れたら，学んだことをファイルに書き出す(macOS の入力コントローラの deactivateServer と同じ)
+            // 入力欄から外れたら，学んだことと使い方の記録をファイルに書き出す(macOS の入力コントローラの deactivateServer と同じ)
             flushLearning()
             // 来てもらうのは手書きの窓の文字を取りに来るときだけ(入力欄から外れたので，変換の続きのためには来なくてよい)
             return edit(actions, handled: true, session: session, anchor: lastAnchor, wakeOnlyForHandwriting: true)
@@ -367,6 +367,12 @@ public final class EngineService {
             pendingRegistration = nil
             return .wordRegistration(word: pending?.word, reading: pending?.reading)
         case .readSettingsFields(let names, let defaults):
+            // 起動したときに脇に置いた設定のファイルは，設定の画面に一度だけ知らせる(答えたら忘れる)
+            if names == [SettingsFields.setAsideFileName] {
+                let name = connection.isSettingsApp ? services.setAsideSettingsFile : nil
+                if connection.isSettingsApp { services.setAsideSettingsFile = nil }
+                return fields { () throws(SettingsFields.Failure) in try SettingsFields.setAsideFile(name) }
+            }
             return fields { () throws(SettingsFields.Failure) in
                 let read = try SettingsFields.read(defaults ? DefaultSettings.settings : settings.current, names: names)
                 return try SettingsFields.addingAutomaticJinenModel(services.automaticJinenModel(), to: read, names: names)

@@ -36,6 +36,15 @@ public enum SettingsFields {
         return try text(of: object)
     }
 
+    /// 設定の画面が読む，設定のファイルに無い項目の名前．起動したときに読めず，脇に置いた設定のファイルの名前(パスは送らない)．
+    /// 設定の画面がこの名前だけで頼んだときに答える(すべての項目を読むときと，書き込みでは扱わない)
+    public static let setAsideFileName = "setAsideSettingsFile"
+
+    /// setAsideSettingsFile だけを頼んだ読み出しの答え(JSON のオブジェクト)．脇に置いたファイルが無ければ null
+    public static func setAsideFile(_ name: String?) throws(Failure) -> String {
+        try text(of: [setAsideFileName: name.map(JSONValue.string) ?? .null])
+    }
+
     /// values(項目の名前から値への JSON のオブジェクト)を settings に重ねる．
     /// 値は設定のファイルを読むときと同じに読み，範囲の外の値は範囲に収める(Settings.clampToValidRanges)．
     /// 読めない値は今の値のまま．返すのは重ねた設定と，書いた項目の名前
