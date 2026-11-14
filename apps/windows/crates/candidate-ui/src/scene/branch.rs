@@ -583,7 +583,22 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
     let continues_before = map.continues_before == Some(true);
     let continues_after = map.continues_after == Some(true);
     let more_lead = map::MORE_SIZE * 2.0 + space::GROUP;
-    let mut x = metrics.inset + if continues_before { more_lead } else { 0.0 };
+    // 最初の文節の丸に重ねる文節へ移るキーが，丸より左へはみ出す分だけ，幹の始まりを右へ寄せる(前のまとまりへの山形や窓の端に
+    // キーが詰まらないように)．キーを出していないあいだも同じだけ寄せ，案内を出したときに幹を動かさない
+    let key_overhang = map
+        .columns
+        .first()
+        .and_then(|column| column.jump_key.as_deref())
+        .map_or(0.0, |key| {
+            let hint = KeyHint {
+                keys: key.to_string(),
+                label: String::new(),
+            };
+            (painter.placed_hint_width(&hint) / 2.0 - metrics.stop_offset())
+                .max(0.0)
+                .ceil()
+        });
+    let mut x = metrics.inset + key_overhang + if continues_before { more_lead } else { 0.0 };
     let mut node_x = Vec::new();
     let mut node_widths = Vec::new();
     for column in &map.columns {
@@ -2840,6 +2855,33 @@ mod tests {
         assert_eq!(
             all.target_at(last.x + 1.0, last.mid_y()),
             Some(ipc::PointerTarget::Segment { index: 13 })
+        );
+    }
+
+    #[test]
+    fn 最初の文節のキーが丸より左へはみ出す分だけ_幹の始まりを右へ寄せる() {
+        let theme = theme("automatic");
+        let look = Look::new(&theme, 15.0);
+        let (metrics, painter) = (Metrics::new(&look, &Fixed), Painter::new(&look, &Fixed));
+        let plain = metrics_and_layout(&map(), &theme);
+        let keyed = keyed(map());
+        let key = KeyHint {
+            keys: keyed.columns[0].jump_key.clone().expect("文節へ移るキー"),
+            label: String::new(),
+        };
+        let overhang = (painter.placed_hint_width(&key) / 2.0 - metrics.stop_offset())
+            .max(0.0)
+            .ceil();
+        assert!(overhang > 0.0);
+        // キーの左の端が，キーの無いときの幹の始まりより左へ出ない
+        let layout = metrics_and_layout(&keyed, &theme);
+        assert_eq!(layout.nodes[0].x, plain.nodes[0].x + overhang);
+        // 案内を押し続けて出す設定で，キーを出していないあいだも同じ位置
+        let mut held = keyed.clone();
+        held.hints_on_hold = Some(true);
+        assert_eq!(
+            metrics_and_layout(&held, &theme).nodes[0].x,
+            layout.nodes[0].x
         );
     }
 
