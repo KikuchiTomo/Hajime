@@ -628,6 +628,16 @@ impl App {
     }
 
     /// 読み込みのスレッドが終わった
+    /// 起動したときにエンジンが読めず，脇に置いた設定のファイルがあれば，その知らせ(macOS の noteSetAsideFile と同じ)．
+    /// 見本のエンジンで開いたとき・計測と見本の画像を作るときは出さない
+    fn set_aside_notice(&mut self) -> Option<After> {
+        if self.offline || self.measure.is_some() || self.snapshots.is_some() {
+            return None;
+        }
+        let name = self.model.as_ref()?.store().set_aside_file()?;
+        Some(After::Notice(crate::strings::more::set_aside(&name)))
+    }
+
     fn finish_loading(&mut self) {
         self.loading = false;
         let Some(model) = self.loaded.lock().ok().and_then(|mut slot| slot.take()) else {
@@ -4307,6 +4317,9 @@ fn main_message(window: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> O
         }
         WM_LOADED => {
             with_app(App::finish_loading);
+            // 読めなかった設定のファイルをエンジンが脇に置いていたら，既定の設定で起動したことを一度だけ知らせる
+            let after = with_app(App::set_aside_notice).flatten();
+            super::actions::run_after(window, after);
             Some(LRESULT(0))
         }
         WM_MEASURE => {

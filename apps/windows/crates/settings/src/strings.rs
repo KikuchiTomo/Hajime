@@ -691,6 +691,11 @@ pub mod more {
     pub const IMPORT_SETTINGS: &str = "設定をインポート…";
     pub const EXPORT_SETTINGS_FILE_NAME: &str = "hajime-settings.json";
     pub const SETTINGS_IMPORTED: &str = "設定をインポートしました";
+
+    /// 読めなかった設定のファイルを脇に置いて，既定の設定で起動したことの知らせ(macOS の UIStrings.Settings.setAside と同じ文)
+    pub fn set_aside(name: &str) -> String {
+        format!("設定ファイルのエラーのため既定の設定で起動しました。元のファイルは「{name}」に保存しました")
+    }
     pub const SETTINGS_EXPORTED: &str = "設定をエクスポートしました";
     pub const SETTINGS_IMPORT_FAILED: &str =
         "インポートできませんでした。ファイルのサイズか形式が正しくありません";
