@@ -3606,6 +3606,16 @@ public final class InputSession {
                 return MarkedText(Self.markedSegments(CorrectedSpan.pieces(of: kana, reading: composition.kana, changed: changed), otherwise: .reading)
                     + [.init(composition.pending, style: .reading)])
             }
+            // エディタとターミナルで控えているあいだも，前に止まったときに変換して見せた読み(今の読みの先頭)はかなに戻さない．
+            // 続けて打った分だけを読みのまま足す(打つたびに全文がかなと漢字で入れ替わってちらつかない)．
+            // 英数字を打っているあいだは，Enter で読みのまま確定するので，見せ方も読みのままにする
+            if codeRestraintApplies, !readingEndsWithAlphanumeric, let settled = settledLive, !settled.reading.isEmpty, composition.kana.hasPrefix(settled.reading),
+               settings.current.liveConverts(readingLength: composition.kana.count) {
+                return MarkedText([
+                    .init(settled.candidate.text, style: .converted),
+                    .init(String(composition.kana.dropFirst(settled.reading.count)) + composition.pending, style: .reading),
+                ])
+            }
             return MarkedText([.init(composition.displayReading, style: .reading)])
         }
         // ローマ字の途中(「ky」など)は変換せず，かなになった部分だけを変換して見せる
