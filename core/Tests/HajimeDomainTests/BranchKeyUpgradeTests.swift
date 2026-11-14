@@ -26,11 +26,11 @@ struct BranchKeyUpgradeTests {
         }
     }
 
-    @Test("変えた表は変えない(利用者の決めたキーを変えない)")
+    @Test("変えた表は，この引き上げでは変えない(矢印の行が標準の系統のままの表は，次の引き上げ BranchKeyCustomUpgrade が替える)")
     func custom() throws {
         var custom = BranchKeyUpgrade.previous(.standard)
         custom.entries.append(KeymapEntry(.idle, KeyStroke(.henkan), .directMode))
-        let result = try upgraded(custom)
+        let result = BranchKeyUpgrade.upgraded(custom)
         #expect(result.command(for: KeyStroke(.right), in: .converting) == .nextSegment)
         #expect(!result.entries.contains { $0.command == .enterBranch })
     }
