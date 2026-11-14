@@ -71,6 +71,8 @@ pub struct ListState {
     pub result: bool,
     /// 書き方のチップの欄の高さ．閉じていれば None
     pub panel: Option<f32>,
+    /// 「キーで検索」のボタンの代わりに置く，押したキーで絞り込んでいるときのチップの幅(キー設定)．絞り込んでいなければ None
+    pub key_search: Option<f32>,
 }
 
 /// 1 行のカードと，その中の部品の位置
@@ -96,6 +98,8 @@ pub struct CardLayout {
     pub template_button: Option<Rect>,
     /// 一覧の書き方のチップの欄(ListState::panel)
     pub template_panel: Option<Rect>,
+    /// 一覧のキーの欄の枠の中の右の端のボタン(ListButtons::key_menu)．欄(parts)はこの分だけ狭い
+    pub key_button: Option<Rect>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -307,6 +311,7 @@ fn empty(card: Rect, row: usize) -> CardLayout {
         result: None,
         template_button: None,
         template_panel: None,
+        key_button: None,
     }
 }
 
@@ -643,6 +648,7 @@ fn place_labeled(
         result: None,
         template_button: None,
         template_panel: None,
+        key_button: None,
     }
 }
 
@@ -910,6 +916,7 @@ const NO_BUTTONS: ListButtons = ListButtons {
     result: false,
     template_field: None,
     caption: None,
+    key_menu: None,
 };
 
 /// 入力欄の並ぶカード(一覧・試す欄)．macOS の RuleListEditor と同じく，上に入力欄とボタン(追加・キャンセル)，
@@ -970,7 +977,10 @@ fn place_list(
             )
         });
         let filter_left = filter.map_or(x + inner, |rect| rect.x - size::CONTROL_GAP);
-        let key_width = button_width(crate::strings::keys::SEARCH_BY_KEY, metrics);
+        // 押したキーで絞り込んでいるあいだは，ボタンの場所にチップ(キーの名前と外す印)を置く．検索欄は残りの幅
+        let key_width = state
+            .key_search
+            .unwrap_or_else(|| button_width(crate::strings::keys::SEARCH_BY_KEY, metrics));
         let key = Rect::new(
             filter_left - key_width,
             card_top,
@@ -1032,6 +1042,10 @@ fn place_list(
         .filter(|(index, _)| *index < fields)
         .map(|(index, text)| (index, metrics.width(text, TextKind::Body).ceil()));
     let caption_extra = caption.map_or(0.0, |(_, width)| width + size::CONTROL_GAP);
+    // キーを選ぶメニューのボタンはキーの欄の幅の中の右の端に置く(macOS の KeyField は欄とメニューを同じ幅に収める)．
+    // 欄の枠の中に山形の印だけを出すので，幅は印と，印の左右の余白(ドロップダウンの印と同じ位置)
+    let key_menu = buttons.key_menu.filter(|index| *index < fields);
+    let key_button_width = space::INLINE + size::CHEVRON_SIZE + size::FIELD_PADDING_X;
     let field_width = ((inner
         - buttons_width
         - gaps
@@ -1043,13 +1057,25 @@ fn place_list(
         .max(0.0);
     let mut parts = Vec::new();
     let mut template_button = None;
+    let mut key_button = None;
     let mut cursor = x;
     for index in 0..fields {
         if caption.is_some_and(|(at, _)| at == index) {
             cursor += caption_extra;
         }
         let width = fixed.get(index).copied().unwrap_or(field_width);
-        parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
+        if key_menu == Some(index) {
+            let button = key_button_width.min(width);
+            parts.push(Rect::new(cursor, top, width - button, size::CONTROL_HEIGHT));
+            key_button = Some(Rect::new(
+                cursor + width - button,
+                top,
+                button,
+                size::CONTROL_HEIGHT,
+            ));
+        } else {
+            parts.push(Rect::new(cursor, top, width, size::CONTROL_HEIGHT));
+        }
         cursor += width + size::CONTROL_GAP;
         if template_after == Some(index) {
             template_button = Some(Rect::new(
@@ -1226,6 +1252,7 @@ fn place_list(
     card.result = result;
     card.template_button = template_button;
     card.template_panel = template_panel;
+    card.key_button = key_button;
     card
 }
 
@@ -1635,6 +1662,92 @@ mod tests {
             .expect("登録した単語の行")
     }
 
+    /// キー設定の表に，押したキーで絞り込んでいるときのチップの幅を返す(画面の側の RowState の代わり)
+    struct WithKeyChip(Option<f32>);
+
+    impl Metrics for WithKeyChip {
+        fn lines(&self, text: &str, kind: TextKind, width: f32) -> usize {
+            Estimate.lines(text, kind, width)
+        }
+
+        fn width(&self, text: &str, kind: TextKind) -> f32 {
+            Estimate.width(text, kind)
+        }
+
+        fn list_state(&self, _: &Row, _width: f32) -> ListState {
+            ListState {
+                key_search: self.0,
+                ..ListState::default()
+            }
+        }
+    }
+
+    /// キー設定の表のカード
+    fn keymap_card() -> CardLayout {
+        keymap_card_with(None)
+    }
+
+    /// キー設定の表のカード．chip は押したキーで絞り込んでいるときのチップの幅
+    fn keymap_card_with(chip: Option<f32>) -> CardLayout {
+        let page = sections(Page::Keys).unwrap();
+        let layout = layout(&page, 800.0, |_| true, |_| true, &WithKeyChip(chip));
+        layout
+            .sections
+            .iter()
+            .zip(&page)
+            .flat_map(|(placed, section)| placed.cards.iter().map(move |card| (card, section)))
+            .find(|(card, section)| matches!(section.rows[card.row].control, Control::List(..)))
+            .map(|(card, _)| card.clone())
+            .expect("キー設定の表の行")
+    }
+
+    #[test]
+    fn 押したキーのチップは_キーで検索_の場所に置き_検索欄は残りの幅にする() {
+        // parts は 入力欄(3)・追加・検索欄・絞り込み・下のボタン(3)・「キーで検索」
+        let plain = keymap_card();
+        let (search, filter, button) = (plain.parts[4], plain.parts[5], plain.parts[9]);
+        assert_eq!(button.max_x() + size::CONTROL_GAP, filter.x);
+        assert_eq!(search.max_x() + size::CONTROL_GAP, button.x);
+        let chipped = keymap_card_with(Some(64.0));
+        let (wide, chip) = (chipped.parts[4], chipped.parts[9]);
+        assert_eq!(chip.width, 64.0);
+        // 右の端(状態の絞り込みの左)は動かず，検索欄がチップの左まで広がる
+        assert_eq!(chip.max_x(), button.max_x());
+        assert_eq!(wide.x, search.x);
+        assert_eq!(wide.max_x() + size::CONTROL_GAP, chip.x);
+        assert_eq!(chipped.parts[5], filter);
+        // 表やほかの部品は動かない
+        assert_eq!(chipped.control, plain.control);
+        assert_eq!(chipped.parts[..4], plain.parts[..4]);
+    }
+
+    #[test]
+    fn キーを選ぶボタンはキーの欄の幅の中の右の端に置き_ほかの欄を狭めない() {
+        let card = keymap_card();
+        let (state, key, command, add) =
+            (card.parts[0], card.parts[1], card.parts[2], card.parts[3]);
+        let button = card.key_button.expect("キーを選ぶボタン");
+        // 状態は決まった幅のまま．キーは欄とボタンを合わせて決まった幅
+        assert_eq!(state.width, tokens::size::settings::KEYMAP_STATE_WIDTH);
+        assert_eq!(button.x, key.max_x());
+        assert_eq!(
+            button.max_x() - key.x,
+            tokens::size::settings::KEYMAP_KEY_WIDTH
+        );
+        assert_eq!((button.y, button.height), (key.y, key.height));
+        // ボタンは印と余白だけの幅で，欄を広く残す
+        assert_eq!(
+            button.width,
+            space::INLINE + size::CHEVRON_SIZE + size::FIELD_PADDING_X
+        );
+        // コマンドの欄は決まった幅のすぐ右から，追加のボタンまで
+        assert_eq!(command.x, button.max_x() + size::CONTROL_GAP);
+        assert_eq!(add.x, command.max_x() + size::CONTROL_GAP);
+        assert!(add.max_x() <= card.card.max_x());
+        // ほかの一覧には置かない
+        assert_eq!(word_card(ListState::default()).key_button, None);
+    }
+
     #[test]
     fn 単語の一覧は結果のあるときだけ_単語の欄の左端から結果の行を置く() {
         let card = word_card(ListState {
@@ -1677,6 +1790,7 @@ mod tests {
             template_button: true,
             result: true,
             panel: Some(100.0),
+            key_search: None,
         });
         let result = card.result.expect("結果の行");
         let panel = card.template_panel.expect("チップの欄");

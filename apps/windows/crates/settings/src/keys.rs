@@ -214,6 +214,140 @@ pub fn from_key(
     canonical(&parts.join(" "))
 }
 
+/// キーの欄のメニューで選べる，押して記録しにくいキー(macOS の UIStrings.Keys.specialKeyChoices と同じ並び)
+pub const SPECIAL_KEYS: &[&str] = &[
+    "Escape",
+    "Enter",
+    "Tab",
+    "Space",
+    "Backspace",
+    "Delete",
+    "Up",
+    "Down",
+    "Left",
+    "Right",
+    "Home",
+    "End",
+    "PageUp",
+    "PageDown",
+    "Eisu",
+    "Kana",
+    "Hankaku/Zenkaku",
+    "Henkan",
+    "Muhenkan",
+];
+
+/// キーの欄のメニューで付け外しする修飾キー
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Modifier {
+    Control,
+    /// Windows の Alt(書き方では Option)
+    Option,
+    Shift,
+}
+
+impl Modifier {
+    pub const ALL: [Modifier; 3] = [Modifier::Control, Modifier::Option, Modifier::Shift];
+
+    /// キーの書き方での名前
+    fn notation(self) -> &'static str {
+        match self {
+            Modifier::Control => "Ctrl",
+            Modifier::Option => "Option",
+            Modifier::Shift => "Shift",
+        }
+    }
+}
+
+/// キーの欄のメニューの項目(macOS の KeyField の menu)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KeyChoice {
+    /// このキーにする(今の修飾キーはそのまま)
+    Key(String),
+    /// ファンクションキーの一覧を開く
+    FunctionKeys,
+    /// 修飾キーを付ける・外す
+    Modifier(Modifier),
+}
+
+/// キーの欄のメニューに並べる項目．current は欄の今の値．修飾キーは，欄にキーが入っているときだけ並べる
+pub fn key_choices(current: &str) -> Vec<KeyChoice> {
+    let mut choices: Vec<KeyChoice> = SPECIAL_KEYS
+        .iter()
+        .map(|key| KeyChoice::Key((*key).to_string()))
+        .collect();
+    choices.push(KeyChoice::FunctionKeys);
+    if canonical(current).is_some() {
+        choices.extend(Modifier::ALL.map(KeyChoice::Modifier));
+    }
+    choices
+}
+
+/// ファンクションキーの一覧の項目(F1〜F20)
+pub fn function_choices() -> Vec<KeyChoice> {
+    FUNCTION_KEYS
+        .map(|number| KeyChoice::Key(format!("F{number}")))
+        .collect()
+}
+
+/// メニューの項目の名前．修飾キーは，選ぶと付くのか外れるのかを書く
+pub fn choice_label(choice: &KeyChoice, current: &str) -> String {
+    use crate::strings::keys::modifier_item;
+    use crate::strings::windows::FUNCTION_KEYS_ITEM;
+    match choice {
+        KeyChoice::Key(key) => display(key),
+        KeyChoice::FunctionKeys => FUNCTION_KEYS_ITEM.to_string(),
+        KeyChoice::Modifier(modifier) => modifier_item(
+            &display(modifier.notation()),
+            has_modifier(current, *modifier),
+        ),
+    }
+}
+
+/// 欄の値に修飾キーが付いているか
+pub fn has_modifier(current: &str, modifier: Modifier) -> bool {
+    canonical(current).is_some_and(|notation| {
+        let mut parts: Vec<&str> = notation.split(' ').collect();
+        parts.pop();
+        parts.contains(&modifier.notation())
+    })
+}
+
+/// 今の修飾キーのまま，キーだけを key に変えた書き方(macOS の KeyField の replacing)．欄が空か読めなければ key だけ
+pub fn with_key(current: &str, key: &str) -> Option<String> {
+    let notation = canonical(current).unwrap_or_default();
+    let mut parts: Vec<&str> = notation
+        .split(' ')
+        .filter(|part| !part.is_empty())
+        .collect();
+    parts.pop();
+    parts.push(key);
+    canonical(&parts.join(" "))
+}
+
+/// 修飾キーを付け外しした書き方．欄が空か読めなければ None
+pub fn toggled(current: &str, modifier: Modifier) -> Option<String> {
+    let notation = canonical(current)?;
+    let mut parts: Vec<&str> = notation.split(' ').collect();
+    let key = parts.pop()?;
+    if parts.contains(&modifier.notation()) {
+        parts.retain(|part| *part != modifier.notation());
+    } else {
+        parts.push(modifier.notation());
+    }
+    parts.push(key);
+    canonical(&parts.join(" "))
+}
+
+/// メニューの項目を選んだあとの欄の書き方．ファンクションキーの一覧を開く項目は欄を変えない
+pub fn chosen(current: &str, choice: &KeyChoice) -> Option<String> {
+    match choice {
+        KeyChoice::Key(key) => with_key(current, key),
+        KeyChoice::FunctionKeys => None,
+        KeyChoice::Modifier(modifier) => toggled(current, *modifier),
+    }
+}
+
 fn function_number(lowered: &str) -> Option<u32> {
     let digits = lowered.strip_prefix('f')?;
     if digits.is_empty() {
@@ -239,6 +373,12 @@ pub fn display(notation: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("+")
+}
+
+/// 押したキーで表を絞り込むときに，表のキーの列と比べる文字．書き方を整えてから画面の書き方にするので，
+/// 整えた書き方が同じキーだけが同じ文字になる(「Space」は「Ctrl+Space」の行に当たらない)．読めなければ None
+pub fn filter_cell(notation: &str) -> Option<String> {
+    canonical(notation).map(|notation| display(&notation))
 }
 
 /// command に割り当てたキー(入力していないときに効く行．状態が「どこでも」か「入力していないとき」)を「、」で並べる．
@@ -324,6 +464,88 @@ pub fn with_missing(keymap: &Value, missing: &[KeymapMissing], standard: &Value)
     let mut entries = keymap.as_array().cloned().unwrap_or_default();
     entries.extend(added);
     Some(Value::Array(entries))
+}
+
+/// 文字を打つ状態(修飾キーの無い文字のキーを置くと，その文字を打てなくなる状態．core の KeymapEntry.blocksTyping)
+const TYPING_STATES: &[&str] = &["anywhere", "idle", "composing"];
+
+/// 修飾キーの無い文字のキーを，文字を打つ状態に置いた行か(core の KeymapEntry.blocksTyping と KeyStroke.isPlainCharacter)．
+/// Shift だけを押した文字のキーも，その文字を打てなくなる
+pub fn blocks_typing(state: &str, key: &str) -> bool {
+    let Some(notation) = canonical(key) else {
+        return false;
+    };
+    let mut parts: Vec<&str> = notation.split(' ').collect();
+    let character = parts.pop().is_some_and(|key| key.chars().count() == 1);
+    character && parts.iter().all(|part| *part == "Shift") && TYPING_STATES.contains(&state)
+}
+
+/// 足す前の新しい行に添える知らせ(macOS の KeymapPage の draftNote)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DraftNote {
+    /// 同じ状態・同じキーの行があり，新しい行がその行より優先される(その行を示す文)
+    Overrides(String),
+    /// 書き換えている行より下に同じ状態・同じキーの行があり，書き換えた行は使われない(下の行を示す文)
+    Hidden(String),
+    /// その文字を打てなくなる
+    PlainCharacter,
+}
+
+impl DraftNote {
+    /// 入力欄の下に出す文
+    pub fn text(&self) -> String {
+        match self {
+            DraftNote::Overrides(row) => crate::strings::keys::duplicate_warning(row),
+            DraftNote::Hidden(row) => crate::strings::keys::hidden(row),
+            DraftNote::PlainCharacter => crate::strings::keys::PLAIN_CHARACTER.to_string(),
+        }
+    }
+}
+
+/// 新しい行(state・key)を足す前の知らせ．entries は今の表の行(状態・キー・コマンド)，replacing は書き換えている行．
+/// 同じ状態・同じキーの行(いちばん下のもの)があればそれを知らせ，無ければ文字を打てなくなるキーを知らせる．
+/// 同じキーの行は下の行を使うので，足す行(表の最後に入る)と，下の行を書き換えるときは新しい行が優先される
+pub fn draft_note(
+    state: &str,
+    key: &str,
+    entries: &[(String, String, String)],
+    replacing: Option<usize>,
+) -> Option<DraftNote> {
+    let notation = canonical(key)?;
+    let existing = entries.iter().enumerate().rev().find(|(index, entry)| {
+        Some(*index) != replacing
+            && entry.0 == state
+            && canonical(&entry.1).as_deref() == Some(notation.as_str())
+    });
+    if let Some((index, _)) = existing {
+        let row = describe(entries, index as u32);
+        return Some(if replacing.is_some_and(|replacing| index > replacing) {
+            DraftNote::Hidden(row)
+        } else {
+            DraftNote::Overrides(row)
+        });
+    }
+    blocks_typing(state, &notation).then_some(DraftNote::PlainCharacter)
+}
+
+/// 表に出している行(状態・キー・コマンドの名前)を，設定のファイルの値(状態・キーの書き方・コマンド)に戻す．
+/// 読めないキーは空にする(どの行とも重ならない)
+pub fn entry_of(cells: &[String]) -> (String, String, String) {
+    let value = |choices: &[(&str, &str)], index: usize| {
+        let cell = cells.get(index).map_or("", String::as_str);
+        choices
+            .iter()
+            .find(|(_, label)| *label == cell)
+            .map_or_else(|| cell.to_string(), |(raw, _)| (*raw).to_string())
+    };
+    (
+        value(STATES, 0),
+        cells
+            .get(1)
+            .and_then(|cell| canonical(cell))
+            .unwrap_or_default(),
+        value(COMMANDS, 2),
+    )
 }
 
 /// 表の問題を 1 行ずつの文にする．entries は表の行(状態・キー・コマンド)
@@ -510,6 +732,185 @@ mod tests {
         assert_eq!(
             lines[1],
             "入力中・Enter・確定: 同じキーの行があるため無効: 入力中・Enter・取り消し"
+        );
+    }
+
+    #[test]
+    fn メニューには特殊キーとファンクションキーを並べ_キーがあれば修飾キーも並べる() {
+        let empty = key_choices("");
+        assert_eq!(empty.len(), SPECIAL_KEYS.len() + 1);
+        assert_eq!(empty.last(), Some(&KeyChoice::FunctionKeys));
+        let filled = key_choices("Ctrl+K");
+        assert_eq!(
+            filled[filled.len() - 3..],
+            Modifier::ALL.map(KeyChoice::Modifier)
+        );
+        // 並べるキーはどれも書き方として読め，画面の名前から元に戻せる
+        for key in SPECIAL_KEYS {
+            assert_eq!(canonical(key).as_deref(), Some(*key));
+            assert_eq!(canonical(&display(key)).as_deref(), Some(*key));
+        }
+        let functions = function_choices();
+        assert_eq!(functions.len(), 20);
+        assert_eq!(functions[0], KeyChoice::Key("F1".into()));
+        assert_eq!(functions[19], KeyChoice::Key("F20".into()));
+        let labels: Vec<String> = filled
+            .iter()
+            .map(|choice| choice_label(choice, "Ctrl+K"))
+            .collect();
+        assert_eq!(labels[0], "Esc");
+        assert_eq!(labels[16], "半角/全角");
+        assert_eq!(labels[19], "ファンクションキー…");
+        assert_eq!(
+            labels[20..],
+            ["Ctrl を外す", "Alt を付ける", "Shift を付ける"]
+        );
+    }
+
+    #[test]
+    fn メニューでキーを選ぶと今の修飾キーのままキーだけを変える() {
+        let key = |name: &str| KeyChoice::Key(name.to_string());
+        assert_eq!(chosen("", &key("Henkan")).as_deref(), Some("Henkan"));
+        assert_eq!(
+            chosen("Ctrl+Alt+K", &key("F13")).as_deref(),
+            Some("Ctrl Option F13")
+        );
+        assert_eq!(
+            chosen("Shift+Space", &key("Hankaku/Zenkaku")).as_deref(),
+            Some("Shift Hankaku/Zenkaku")
+        );
+        // 読めない値は捨てて，選んだキーだけにする
+        assert_eq!(chosen("Hyper k", &key("Tab")).as_deref(), Some("Tab"));
+        assert_eq!(chosen("Ctrl+K", &KeyChoice::FunctionKeys), None);
+    }
+
+    #[test]
+    fn メニューで修飾キーを付け外しする() {
+        let modifier = |modifier| KeyChoice::Modifier(modifier);
+        assert_eq!(
+            chosen("Space", &modifier(Modifier::Shift)).as_deref(),
+            Some("Shift Space")
+        );
+        // 付ける順によらず Ctrl・Option・Shift の順に整える
+        assert_eq!(
+            chosen("Shift+Space", &modifier(Modifier::Control)).as_deref(),
+            Some("Ctrl Shift Space")
+        );
+        assert_eq!(
+            chosen("Ctrl+Shift+Space", &modifier(Modifier::Option)).as_deref(),
+            Some("Ctrl Option Shift Space")
+        );
+        assert_eq!(
+            chosen("Ctrl+Alt+Shift+Space", &modifier(Modifier::Option)).as_deref(),
+            Some("Ctrl Shift Space")
+        );
+        assert!(has_modifier("Ctrl+Alt+K", Modifier::Option));
+        assert!(!has_modifier("Ctrl+Alt+K", Modifier::Shift));
+        // キーが無ければ付けられない
+        assert_eq!(chosen("", &modifier(Modifier::Control)), None);
+        // 記号の Shift は打つ文字に含まれるので付かない
+        assert_eq!(
+            chosen("/", &modifier(Modifier::Shift)).as_deref(),
+            Some("/")
+        );
+    }
+
+    #[test]
+    fn 押したキーの絞り込みは整えた書き方が同じキーだけに当たる() {
+        // 表のキーの列は，設定の書き方を画面の書き方にしたもの
+        let cell = |notation: &str| display(notation);
+        assert_eq!(filter_cell("Space"), Some(cell("Space")));
+        assert_ne!(filter_cell("Space"), Some(cell("Ctrl Space")));
+        assert_ne!(filter_cell("Space"), Some(cell("Shift Space")));
+        // 押したキーの書き方(修飾キーの順や大文字と小文字)が違っても，同じキーなら当たる
+        assert_eq!(filter_cell("shift ctrl k"), Some(cell("Ctrl Shift k")));
+        assert_eq!(filter_cell("Ctrl+Alt+K"), Some(cell("Ctrl Option k")));
+        assert_eq!(filter_cell("kanji"), Some(cell("Hankaku/Zenkaku")));
+        assert_ne!(filter_cell("k"), Some(cell("Shift k")));
+        assert_eq!(filter_cell("Hyper k"), None);
+    }
+
+    fn entry(state: &str, key: &str, command: &str) -> (String, String, String) {
+        (state.to_string(), key.to_string(), command.to_string())
+    }
+
+    #[test]
+    fn 足す前に同じ状態と同じキーの行を知らせる() {
+        let entries = vec![
+            entry("composing", "Enter", "commit"),
+            entry("composing", "Ctrl Space", "cancel"),
+            entry("converting", "Ctrl Space", "commit"),
+            entry("composing", "Ctrl Space", "commit"),
+        ];
+        // 同じ行がいくつもあれば，いちばん下(いま使われている行)を示す
+        assert_eq!(
+            draft_note("composing", "Ctrl+Space", &entries, None),
+            Some(DraftNote::Overrides("入力中・Ctrl+Space・確定".into()))
+        );
+        assert_eq!(
+            draft_note("composing", "ctrl space", &entries, None).map(|note| note.text()),
+            Some("同じキーの行より優先します: 入力中・Ctrl+Space・確定".into())
+        );
+        // 状態かキーが違えば知らせない
+        assert_eq!(draft_note("idle", "Ctrl Space", &entries, None), None);
+        assert_eq!(draft_note("composing", "Space", &entries, None), None);
+        // 読めないキーは知らせない(形の誤りは別に知らせる)
+        assert_eq!(draft_note("composing", "Hyper k", &entries, None), None);
+    }
+
+    #[test]
+    fn 書き換えている行は自分と比べず_下に同じキーの行があれば使われないと知らせる() {
+        let entries = vec![
+            entry("composing", "Enter", "commit"),
+            entry("composing", "Ctrl Space", "cancel"),
+            entry("composing", "Tab", "commit"),
+        ];
+        assert_eq!(draft_note("composing", "Enter", &entries, Some(0)), None);
+        assert_eq!(
+            draft_note("composing", "Ctrl Space", &entries, Some(0)),
+            Some(DraftNote::Hidden("入力中・Ctrl+Space・取り消し".into()))
+        );
+        assert_eq!(
+            draft_note("composing", "Ctrl Space", &entries, Some(2)),
+            Some(DraftNote::Overrides("入力中・Ctrl+Space・取り消し".into()))
+        );
+    }
+
+    #[test]
+    fn 足す前に文字を打てなくなるキーを知らせる() {
+        for state in ["anywhere", "idle", "composing"] {
+            assert_eq!(
+                draft_note(state, "k", &[], None),
+                Some(DraftNote::PlainCharacter),
+                "{state}"
+            );
+        }
+        assert_eq!(
+            draft_note("composing", "Shift k", &[], None),
+            Some(DraftNote::PlainCharacter)
+        );
+        // 文字を打たない状態，修飾キーのあるキー，文字でないキーは知らせない
+        assert_eq!(draft_note("converting", "k", &[], None), None);
+        assert_eq!(draft_note("direct", "k", &[], None), None);
+        assert_eq!(draft_note("composing", "Ctrl k", &[], None), None);
+        assert_eq!(draft_note("composing", "Space", &[], None), None);
+        assert_eq!(draft_note("composing", "F1", &[], None), None);
+        // 同じキーの行があれば，そちらを知らせる
+        assert_eq!(
+            draft_note("idle", "k", &[entry("idle", "k", "commit")], None),
+            Some(DraftNote::Overrides("未入力・K・確定".into()))
+        );
+    }
+
+    #[test]
+    fn 表に出している行を設定の値に戻す() {
+        let cells: Vec<String> = ["入力中", "Ctrl+Alt+K", "確定", "", "1"]
+            .iter()
+            .map(|cell| (*cell).to_string())
+            .collect();
+        assert_eq!(
+            entry_of(&cells),
+            entry("composing", "Ctrl Option k", "commit")
         );
     }
 
