@@ -11,6 +11,11 @@
     <!-- 上書きのときに，TSF の DLL を読み込んでいるアプリ(ほぼすべてのアプリ)を閉じさせない．
          古い DLL は読み込まれたまま残り，次の再起動で消える(下の TSFVERSIONFOLDER の説明) -->
     <Property Id="MSIRESTARTMANAGERCONTROL" Value="Disable" />
+    <!-- 利用者に尋ねずに入れるとき(msiexec /qn と /passive．Microsoft Store・winget・配布の道具)は，入れ終わっても PC を再起動しない．
+         下の ScheduleReboot は，ふつうの画面のときは再起動を尋ねるが，画面の無いとき(UILevel = 2)と，再起動の問いを省く指定のとき
+         (REBOOTPROMPT)は，尋ねずに再起動してしまう．REBOOT=ReallySuppress にすると再起動せず，終了コード 3010(再起動が要る)を返すので，
+         呼んだ側が利用者に伝えられる．呼んだ側が REBOOT を決めているとき(/norestart・/forcerestart)は，その指定のままにする -->
+    <SetProperty Id="REBOOT" Value="ReallySuppress" Sequence="execute" Before="CostInitialize" Condition="(UILevel = 2 OR REBOOTPROMPT) AND NOT REBOOT" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Hajime">
