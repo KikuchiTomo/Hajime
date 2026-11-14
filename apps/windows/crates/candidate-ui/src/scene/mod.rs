@@ -407,6 +407,9 @@ pub struct Look<'a> {
     pub held: Held,
     /// 押し続けて出す案内の濃さ(出し始めに 0 から 1 へ)
     pub hint_opacity: f32,
+    /// 分岐図の窓の幅の下限(影の分を含む)．同じ文節を選んでいるあいだ，候補を移っても窓を狭めないために使う．
+    /// 幅を固定する設定(BranchMap.keeps_width)では使わない
+    pub min_width: f32,
 }
 
 /// 押し続けている修飾キー(案内を出すかを決めるのに使う)
@@ -447,6 +450,7 @@ impl<'a> Look<'a> {
             shows_footer: true,
             held: Held::default(),
             hint_opacity: 1.0,
+            min_width: 0.0,
         }
     }
 

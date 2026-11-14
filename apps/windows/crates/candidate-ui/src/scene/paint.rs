@@ -44,6 +44,8 @@ pub(crate) struct Painter<'a> {
     pub inside: Option<super::bubble::Inside>,
     /// 案内を押し続けているあいだだけ出すときの，押している修飾キーと案内の濃さ．None ならいつも出す
     pub hold: Option<(super::Held, f32)>,
+    /// 候補と幹の字の大きさ(幹の文節の幅の下限に使う)
+    pub font_size: f32,
 }
 
 impl<'a> Painter<'a> {
@@ -56,6 +58,7 @@ impl<'a> Painter<'a> {
             keep_clear: Vec::new(),
             inside: None,
             hold: None,
+            font_size: look.font_size,
         }
     }
 

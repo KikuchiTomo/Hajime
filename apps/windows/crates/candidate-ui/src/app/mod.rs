@@ -8,6 +8,7 @@ pub mod preview;
 pub(crate) mod render;
 #[cfg(debug_assertions)]
 mod snapshot;
+mod steady;
 pub(crate) mod system;
 mod window;
 
@@ -86,6 +87,8 @@ struct App {
     reported_mirrored: bool,
     /// 押し続けて出すキーの案内と，修飾キーを読む時計が動いているか
     hint_hold: hold::HintHold,
+    /// 分岐図で同じ文節を選んでいるあいだの，窓の位置と幅
+    steady: steady::Steady,
     hold_polling: bool,
     /// 前のコマで案内を濃くしている途中だったか
     hint_fading: bool,
@@ -188,6 +191,7 @@ pub fn run() {
             engine: None,
             reported_mirrored: false,
             hint_hold: hold::HintHold::default(),
+            steady: steady::Steady::default(),
             hold_polling: false,
             hint_fading: false,
             scene: None,
@@ -392,8 +396,12 @@ impl App {
                     self.hint_hold.other_key();
                 }
                 self.arrived = false;
+                // 同じ文節を選んでいるあいだは，候補を移っても窓の位置を取り替えない
+                self.steady.show(&map);
                 self.content = Content::BranchMap(Box::new(map));
-                self.anchor = anchor.or(self.anchor.take());
+                self.anchor = anchor
+                    .map(|anchor| self.steady.anchor(anchor))
+                    .or(self.anchor.take());
             }
             UiCommand::ShowNote { note, anchor } => {
                 self.content = Content::Note(note);
@@ -455,7 +463,7 @@ impl App {
             } => {
                 // 予測の窓は組み立て中の文字全体の右に置く．全体の位置を知らせない DLL では候補の窓と同じ基準にする
                 self.prediction_anchor = Some(composition.unwrap_or_else(|| anchor.clone()));
-                self.anchor = Some(anchor);
+                self.anchor = Some(self.steady.anchor(anchor));
             }
             // 候補と知らせを消す．モード表示は残し，出しておく時間が過ぎたら消す(macOS と同じくタグは別に扱う．
             // 同じアプリの中で欄を移ったときや，前のアプリの遅れた deactivate でタグが消えないように)
@@ -464,6 +472,9 @@ impl App {
                     self.content = Content::Hidden;
                 }
             }
+        }
+        if !matches!(self.content, Content::BranchMap(_)) {
+            self.steady.reset();
         }
         let is_list = matches!(self.content, Content::Candidates(_) | Content::BranchMap(_));
         // 分岐図は出した瞬間から濃く出す(キーで起きる変化はその瞬間に終える．macOS #566 と同じ)
@@ -836,6 +847,8 @@ impl App {
         style.rest_opacity = self.rest_opacity;
         (style.held, style.hint_opacity) = self.hint_hold.shown(Instant::now());
         style.pixel_scale = self.window().scale();
+        // 分岐図で同じ文節を選んでいるあいだは，窓の幅を広げるだけで狭めない
+        style.min_width = self.steady.min_width();
         let build = |content: &Content, style: &Look| match content {
             Content::Hidden => None,
             Content::Candidates(list) => Some(scene::candidate_list(list, style, &measure)),
@@ -853,6 +866,9 @@ impl App {
         // 分岐図は，窓の大きさと中身をその瞬間に替える(動いているあいだは候補を読めないため．macOS #566 と同じ)
         let instant = typing || matches!(self.content, Content::BranchMap(_));
         let natural = scene.as_ref().map(|scene| (scene.width, scene.height));
+        if let (Content::BranchMap(_), Some((width, _))) = (&self.content, natural) {
+            self.steady.shown(width);
+        }
         if instant {
             self.resize = None;
         }
