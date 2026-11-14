@@ -49,6 +49,8 @@ struct Metrics {
     font_size: f32,
     /// 1 ドットあたりのデバイスのピクセル数
     pixel_scale: f32,
+    /// 窓の幅の下限(影を除く)
+    min_width: f32,
 }
 
 /// 区切りの線の上と下，カードと枝のあいだの空き
@@ -85,6 +87,7 @@ impl Metrics {
                 shadow,
                 font_size: look.font_size,
                 pixel_scale: look.pixel_scale,
+                min_width: (look.min_width - shadow).max(0.0),
             };
         }
         Self {
@@ -98,6 +101,7 @@ impl Metrics {
             shadow,
             font_size: look.font_size,
             pixel_scale: look.pixel_scale,
+            min_width: (look.min_width - shadow).max(0.0),
         }
     }
 
@@ -510,6 +514,9 @@ struct Layout {
     fades_left: bool,
     fades_right: bool,
     focus: Option<usize>,
+    /// 選んでいる文節の左の端から丸までの距離．候補を移って幹の文字の幅が変わっても動かないよう，
+    /// 文節の文字と，出している候補のうち一番幅の狭いもので決める(1 字の候補と長い候補を行き来しても，丸と候補の列が動かない)
+    focus_offset: f32,
     /// 選んでいる文節の丸の x と，候補の枝の縦の線の x(枝を寄せていなければ同じ)
     focus_x: f32,
     stem_x: f32,
@@ -592,6 +599,15 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         x - node_gap
     } + if continues_after { more_lead } else { 0.0 };
     let focus = focused(map).map(|(index, _)| index);
+    let focus_offset = focus.map_or(0.0, |index| {
+        candidate_rows(&map.columns[index], map, rest)
+            .iter()
+            .map(|row| painter.width(&row.text, Font::Trunk) + part::ROW_PADDING_X * 2.0)
+            .chain([node_widths[index]])
+            .map(|width| metrics.stop_offset(width))
+            .fold(f32::INFINITY, f32::min)
+    });
+    result.focus_offset = focus_offset;
     let column = focus.map(|index| &map.columns[index]);
     let lower = column.map_or_else(Vec::new, |column| candidate_rows(column, map, rest));
     let selected_row = lower.iter().position(|row| row.selected);
@@ -797,9 +813,7 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
     };
 
     // 窓の幅．上限を超える文は，幹を送る
-    let focus_center = focus.map_or(metrics.inset, |index| {
-        node_x[index] + metrics.stop_offset(node_widths[index])
-    });
+    let focus_center = focus.map_or(metrics.inset, |index| node_x[index] + focus_offset);
     let boundary_width = painter.placed_hints_width(&hints.boundary);
     let below = map.meaning_placement == Some(MeaningPlacement::Below)
         && column.is_some_and(|column| column.homophone.is_some() && column.split.is_none());
@@ -838,6 +852,10 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         .max(branch_width)
         .max(notes_width + metrics.inset * 2.0)
         .max(heading_width);
+    // 同じ文節を選んでいるあいだは，候補を移っても窓を狭めない(幅を固定する設定は幹の幅のまま)
+    if map.keeps_width != Some(true) {
+        width = width.max(metrics.min_width);
+    }
     let limit = candidate::MAX_WIDTH.max(candidate::MIN_WIDTH);
     let mut shift = 0.0;
     let mut overflows = false;
@@ -1132,7 +1150,15 @@ fn layout(map: &BranchMap, metrics: &Metrics, painter: &Painter, rest: f32) -> L
         .collect();
     result.fades_left = overflows && shift > 0.0;
     result.fades_right = overflows && trunk_right - shift > right;
-    let stop_x = |node: &Frame| node.x + metrics.stop_offset(node.width);
+    let focus_node = focus.and_then(|index| result.nodes.get(index).copied());
+    let stop_x = |node: &Frame| {
+        node.x
+            + if Some(*node) == focus_node {
+                focus_offset
+            } else {
+                metrics.stop_offset(node.width)
+            }
+    };
     // 前後のまとまりへ続く側は，幹の線を窓の端まで伸ばして山形を付ける
     result.rail_start = if result.fades_left || continues_before {
         0.0
@@ -1284,7 +1310,15 @@ pub fn branch_map(whole: &BranchMap, look: &Look, measure: &dyn Measure) -> Scen
         .enumerate()
         .map(|(index, node)| {
             Stop::new(
-                Point::new(node.x + metrics.stop_offset(node.width), layout.rail_y),
+                Point::new(
+                    node.x
+                        + if Some(index) == layout.focus {
+                            layout.focus_offset
+                        } else {
+                            metrics.stop_offset(node.width)
+                        },
+                    layout.rail_y,
+                ),
                 if Some(index) == layout.focus {
                     State::Selected
                 } else {
@@ -2598,9 +2632,11 @@ mod tests {
         assert_eq!(metrics.stop_offset(20.0), 10.0);
         // 長い文節は 1 字と余白
         assert_eq!(metrics.stop_offset(200.0), 15.0 + part::ROW_PADDING_X);
-        // 選んでいる文節から下ろす縦の線も同じ位置
+        // 選んでいる文節から下ろす縦の線も同じ位置(出している候補も長いとき．短い候補があれば，その候補の位置に合わせる)
         let mut long = map();
         long.columns[0].text = "とてもとても長い文節".into();
+        long.columns[0].alternatives =
+            vec!["とてもとても長い文節".into(), "とてもとても永い文節".into()];
         let layout = metrics_and_layout(&long, &theme);
         assert_eq!(
             layout.focus_x,
@@ -2826,6 +2862,50 @@ mod tests {
             all.target_at(last.x + 1.0, last.mid_y()),
             Some(ipc::PointerTarget::Segment { index: 13 })
         );
+    }
+
+    #[test]
+    fn 同じ文節の候補を移っても_丸と候補の列の位置が動かない() {
+        let theme = theme("automatic");
+        // 選んでいる文節の候補に 1 字の語と長い語がある．幹の文字がどちらになっても，丸と候補の列の x は同じ
+        let mut short = map();
+        let focus = short
+            .columns
+            .iter()
+            .position(|column| column.is_focused)
+            .unwrap();
+        short.columns[focus].alternatives = vec!["木".into(), "カレンダー".into()];
+        short.columns[focus].text = "木".into();
+        short.columns[focus].selected_alternative = Some(0);
+        let mut long = short.clone();
+        long.columns[focus].text = "カレンダー".into();
+        long.columns[focus].selected_alternative = Some(1);
+        let (short, long) = (
+            metrics_and_layout(&short, &theme),
+            metrics_and_layout(&long, &theme),
+        );
+        assert_eq!(short.focus_x, long.focus_x);
+        assert_eq!(short.stem_x, long.stem_x);
+        assert_eq!(short.rows[0].x, long.rows[0].x);
+    }
+
+    #[test]
+    fn 窓の幅の下限があれば狭めず_幅を固定する設定では使わない() {
+        let theme = theme("automatic");
+        let natural = branch_map(&map(), &Look::new(&theme, 15.0), &Fixed);
+        let mut look = Look::new(&theme, 15.0);
+        look.min_width = natural.width + 40.0;
+        assert_eq!(
+            branch_map(&map(), &look, &Fixed).width,
+            natural.width + 40.0
+        );
+        look.min_width = natural.width - 40.0;
+        assert_eq!(branch_map(&map(), &look, &Fixed).width, natural.width);
+        let mut fixed = map();
+        fixed.keeps_width = Some(true);
+        let narrow = branch_map(&fixed, &Look::new(&theme, 15.0), &Fixed);
+        look.min_width = narrow.width + 40.0;
+        assert_eq!(branch_map(&fixed, &look, &Fixed).width, narrow.width);
     }
 
     #[test]
