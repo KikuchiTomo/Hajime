@@ -6,7 +6,6 @@
 
 mod association;
 mod branch;
-mod branch_lines;
 pub mod bubble;
 mod card_layout;
 pub(crate) mod fitting;
@@ -14,6 +13,7 @@ mod list;
 mod list_layout;
 mod meaning;
 pub(crate) mod paint;
+mod route;
 pub mod sample;
 mod small;
 #[cfg(test)]
@@ -295,6 +295,8 @@ pub struct Scene {
     pub keep_clear: Vec<Frame>,
     /// 語の意味の吹き出しを窓の中の行の文字のすぐ右に置くときの範囲(一覧だけ．場面の座標)
     pub inside: Option<bubble::Inside>,
+    /// 分岐図で，候補と先の枝を左右に反転して左へ出しているか．矢印キーを表示の向きに効かせるため，エンジンに知らせる
+    pub mirrored: bool,
 }
 
 /// マウスで押せる範囲と，押したときの対象(macOS の BranchView・CandidateView の target(at:) と同じ)
@@ -401,6 +403,37 @@ pub struct Look<'a> {
     pub pixel_scale: f32,
     /// 候補の一覧の足元の行(案内と位置)を出すか．設定の画面の見本では出さない
     pub shows_footer: bool,
+    /// 押し続けている修飾キー．押し続けて出す設定の分岐図(BranchMap.hints_on_hold)では，この修飾キーを使うキーの案内だけを出す
+    pub held: Held,
+    /// 押し続けて出す案内の濃さ(出し始めに 0 から 1 へ)
+    pub hint_opacity: f32,
+    /// 分岐図の窓の幅の下限(影の分を含む)．同じ文節を選んでいるあいだ，候補を移っても窓を狭めないために使う．
+    /// 幅を固定する設定(BranchMap.keeps_width)では使わない
+    pub min_width: f32,
+}
+
+/// 押し続けている修飾キー(案内を出すかを決めるのに使う)
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Held {
+    pub shift: bool,
+    pub control: bool,
+    pub alt: bool,
+}
+
+impl Held {
+    pub fn is_empty(self) -> bool {
+        !(self.shift || self.control || self.alt)
+    }
+
+    /// キーの名前(「Shift+↑」「Alt+S」など．Windows の書き方)が，押している修飾キーのどれかを使うか
+    pub fn uses(self, keys: &str) -> bool {
+        keys.split(['+', ' ']).any(|part| match part {
+            "Shift" => self.shift,
+            "Ctrl" => self.control,
+            "Alt" => self.alt,
+            _ => false,
+        })
+    }
 }
 
 impl<'a> Look<'a> {
@@ -415,6 +448,9 @@ impl<'a> Look<'a> {
             size: None,
             pixel_scale: 1.0,
             shows_footer: true,
+            held: Held::default(),
+            hint_opacity: 1.0,
+            min_width: 0.0,
         }
     }
 
@@ -496,6 +532,8 @@ pub fn surround(scene: Scene, theme: &ResolvedTheme, surround: Surround) -> Scen
         inside: scene
             .inside
             .map(|inside| inside.offset(margin_x, margin_top)),
+        // 分岐図の向きはそのまま
+        mirrored: scene.mirrored,
     }
 }
 

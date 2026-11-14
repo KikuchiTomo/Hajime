@@ -582,6 +582,9 @@ pub struct ListButtons {
     pub template_field: Option<usize>,
     /// この番号の入力欄の前に置く名前(判別ルールの「直前」．macOS の WordLanguagePage は欄と選ぶ部品のあいだに文字で置く)
     pub caption: Option<(usize, &'static str)>,
+    /// この番号の入力欄のすぐ右に，押して記録しにくいキーと修飾キーを選ぶメニューのボタンを置く
+    /// (キー設定のキーの欄．macOS の KeyField の menu．記録しているあいだは「記録を停止」のボタンになる)
+    pub key_menu: Option<usize>,
 }
 
 /// 一覧のファイルを読み込む・書き出す操作
@@ -783,6 +786,7 @@ impl Control {
                 }
                 _ => None,
             },
+            key_menu: keymap.then_some(KEYMAP_KEY_FIELD),
         })
     }
 
@@ -1160,6 +1164,7 @@ pub enum RangeKind {
     AssociationLimit,
     CustomThemeCornerRadius,
     MeaningSenseLimit,
+    BranchSegmentsPerGroup,
     EmojiCandidatePosition,
     EmojiCandidateCount,
     PaletteColumns,
@@ -1186,6 +1191,7 @@ impl RangeKind {
             RangeKind::AssociationLimit => ranges.association_limit,
             RangeKind::CustomThemeCornerRadius => ranges.custom_theme_corner_radius,
             RangeKind::MeaningSenseLimit => ranges.meaning_sense_limit,
+            RangeKind::BranchSegmentsPerGroup => ranges.branch_segments_per_group,
             RangeKind::EmojiCandidatePosition => ranges.emoji_candidate_position,
             RangeKind::EmojiCandidateCount => ranges.emoji_candidate_count,
             RangeKind::PaletteColumns => ranges.palette_columns,
@@ -1497,6 +1503,19 @@ fn conversion() -> Vec<Section> {
                 .enabled_when(IsNot("predictionDisplay", "off")),
                 Row::toggle(choice::VARIANT_ROW, "showsVariantRow"),
                 Row::toggle(choice::KEY_HINTS, "showsKeyHints"),
+                Row::toggle(choice::BRANCH_HINTS_ALWAYS, "alwaysShowsBranchHints"),
+                Row::toggle(choice::FEWER_ITEMS, "showsFewerItems"),
+                Row::toggle(choice::BRANCH_STARTS_ON_TRUNK, "branchStartsOnTrunk"),
+                Row::stepper(
+                    choice::BRANCH_SEGMENTS,
+                    "branchSegmentsPerGroup",
+                    RangeKind::BranchSegmentsPerGroup,
+                ),
+                Row::choice(
+                    choice::BRANCH_WINDOW_WIDTH,
+                    "branchWindowWidth",
+                    options::BRANCH_WINDOW_WIDTHS,
+                ),
                 Row::seconds(
                     more::LIVE_CONVERSION_DELAY,
                     "liveConversionDelay",
@@ -1959,6 +1978,9 @@ const KEYMAP_FIELDS: &[Field] = &[
     Field::choice("command", keys::COMMAND, keys::COMMANDS, false),
 ];
 
+/// キー設定の新しい行のキーの欄(KEYMAP_FIELDS の番号)
+pub const KEYMAP_KEY_FIELD: usize = 1;
+
 /// キー設定のページ(macOS の KeymapPage)．表の行は上から順に並び，同じキーの行は下の行を使う
 fn keymap() -> Vec<Section> {
     vec![
@@ -2052,7 +2074,8 @@ const DICTIONARY_FIELDS: &[Field] = &[
         settings::WORD_CLASS,
         options::WORD_CLASSES,
         false,
-    ),
+    )
+    .grouped(options::WORD_CLASS_GROUPS),
     Field::named("comment", settings::COMMENT, false)
         .optional()
         .prompt(settings::COMMENT_PROMPT),

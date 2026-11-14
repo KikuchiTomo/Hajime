@@ -81,8 +81,9 @@ const LINE: f32 = size::BODY_LINE_HEIGHT;
 const CHECK: f32 = board::CHECK_SIZE;
 /// 推奨のタグの高さ
 const BADGE_HEIGHT: f32 = board::BADGE_HEIGHT;
-/// テーマのカードの見本の高さ(macOS の fieldHeight × 1.3)
-const SWATCH_HEIGHT: f32 = board::FIELD_HEIGHT * 1.3;
+/// テーマのカードの見本の高さ．入力欄の見本と同じ高さにし，10 のテーマのカード(3 列 × 4 行)がスクロールせずにページに収まるようにする
+/// (初めて開くページで，下の行の名前が切れて見えないように)
+const SWATCH_HEIGHT: f32 = board::FIELD_HEIGHT;
 /// 機能の行の上下の余白(macOS と同じ)
 const SPOT_PADDING_Y: f32 = space::GROUP;
 /// スライダーのつまみの大きさ

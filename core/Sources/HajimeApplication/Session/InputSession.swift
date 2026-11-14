@@ -105,7 +105,8 @@ public final class InputSession {
     private var splitMode = false
     /// 分岐図で，その場で読みを打ち直している文節の位置と，打った読み(editSegment)．
     /// 分岐図は出したままにし，文節を移るキー・Space・Enter で打ち直した読みに替えて変換する
-    private var inlineEdit: (index: Int, typed: Composition)?
+    /// direct は，打ち直しているあいだだけの英数入力(入力モードを切り替えるキーで替える．打った字をそのまま入れる)
+    private var inlineEdit: (index: Int, typed: Composition, direct: Bool)?
     /// 英字入力の Tab で日本語にした語の英字．分岐図で Esc を押したら英字に戻す
     private var convertedFromEnglish: String?
     /// 再変換している元の文字．Esc で読みに戻さず，この文字のまま確定して元に戻す
@@ -122,6 +123,20 @@ public final class InputSession {
     private var pendingNote: Note?
     /// 候補を表に広げているか(KeymapCommand.expandCandidates)．変換を終えるか読みに戻ると閉じる
     private var expandedCandidates = false
+    /// 表示項目を減らす設定で，選んでいる候補の先の枝(語の意味・連想)を開いたか．連想変換のキーで開き，変換を始め直すまで開いたままにする
+    private var branchDetailShown = false
+    /// 先の枝の，今いる丸の位置(branchStations)．候補にいるあいだは nil．丸の中身に入っているあいだも，入った丸を覚えておく
+    private var branchStation: Int?
+    /// 描く側が，候補と先の枝を左へ出しているか(窓の右に入らないときは，枝を左右に反転して出す)．
+    /// 矢印キーを表示の向きに効かせるために，描く側がキーを渡す前に入れる．先の枝へ入る矢印と，丸を進む矢印が左になる
+    public var branchMirrored = false
+    /// 矢印キーで木をたどるとき，今いる所が幹の上(文節)か．false なら候補の上にいる．
+    /// 幹の上では，左右で文節を移り，下で候補へ下り，上で文字種へ上る．候補を移るキー(Space など)を押すと候補へ戻る
+    private var trunkLevel = false
+    /// 矢印キーで木をたどれるか．候補の先の枝へ移るキーが割り当てられているときだけ(ほかのキー設定では，幹の上にいる状態を作らない)
+    private var treeNavigation: Bool {
+        branchStations && !settings.current.keymap.strokes(for: .enterBranch, in: .converting).isEmpty
+    }
     /// 入力文字なしで案内を出したか．出したら次のキーで消す
     private var showsTransientNote = false
     /// 変換中の候補の選択(表記)と文節の区切りの変更．直前の変更の取り消し(KeymapCommand.undoConversionEdit)で戻す
@@ -166,6 +181,12 @@ public final class InputSession {
     private let associationFinder: AssociationFinder
     /// 候補ウィンドウの案内と注記に出すキーの名前の書き方
     private let keyNames: KeyNameStyle
+    /// 分岐図で，選んでいる候補の先の枝(語の意味・連想・変換マクロ)を別々の丸として出し，矢印キーでたどれるようにするか．
+    /// 候補の窓がその形を描けるアプリ(macOS)だけ true にする．false なら，連想変換のキーで連想と変換マクロを 1 つの一覧に出す
+    private let branchStations: Bool
+    /// 分岐図で，長い文をまとまりに区切って 1 つずつ出し，文節へ移るキーを出しているまとまり(区切らないときは選んでいる文節のまわり)に付けるか．
+    /// 候補の窓がまとまりを描けるアプリ(macOS と Windows)だけ true にする．先の枝の丸(branchStations)とは別に決める
+    private let groupsBranchSegments: Bool
     /// 絵文字と記号のパレットに使うもの(R-26)．パレットを描けないアプリでは nil で，パレットのキーは何もしない
     private let paletteServices: PaletteServices?
     /// 開いているパレット．開いているあいだのキーはパレットが受ける
@@ -182,6 +203,7 @@ public final class InputSession {
     ///   - fusing: 別のモデルでも変換して合わせるもの(合議．ADR 0016 の案 2)．nil か設定の jinenModel が「使わない」なら合わせない
     public init(converter: any KanaKanjiConverting, lexicon: any EnglishLexicon, settings: any SettingsReading, usage: (any UsageRecording)? = nil,
                 typoService: (any TypoCorrecting)? = nil, associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac,
+                branchStations: Bool = false, groupsBranchSegments: Bool = false,
                 rejections: (any CorrectionRejectionRecording)? = nil, predictionHiding: (any PredictionHiding)? = nil,
                 usageDictionary: (any UsageDictionaryProviding)? = nil, palette: PaletteServices? = nil, calendar: (any CalendarReading)? = nil,
                 scorer: (any CandidateScoring)? = nil, fusing: (any CandidateFusing)? = nil) {
@@ -191,6 +213,8 @@ public final class InputSession {
         self.predictionHiding = predictionHiding
         self.usageDictionary = usageDictionary
         self.keyNames = keyNames
+        self.branchStations = branchStations
+        self.groupsBranchSegments = groupsBranchSegments
         self.rejections = rejections
         self.converter = converter
         self.lexicon = lexicon
@@ -856,9 +880,13 @@ public final class InputSession {
     }
 
     private func perform(_ command: KeymapCommand, event: KeyEvent, context: InputContext) -> KeyResult {
+        // 矢印キーは，表示の向きに合わせて木をたどる
+        if let arrow = treeArrow(command, event: event), let result = navigateTree(arrow, event: event, context: context) { return result }
         if case .association(let list, let origin) = phase, let result = performInAssociation(command, list: list, origin: origin, context: context) {
             return result
         }
+        if let result = performOnBranchStation(command, context: context) { return result }
+        performOnTrunk(command)
         switch command {
         // IME の機能．入力メニューの操作を取り次がないアプリでも効くよう，キーで受ける
         case .openSettings: return KeyResult(handled: true, actions: commitAll() + [.openSettings])
@@ -960,10 +988,13 @@ public final class InputSession {
             expandedCandidates = false
             return associate(context: context)
         case .expandCandidates: return toggleGrid(context: context)
+        case .enterBranch: return enterBranch(context: context) ?? moveSegment(.next, event: event, context: context)
         // 文節
         case .nextSegment: return moveSegment(.next, event: event, context: context)
         case .previousSegment: return moveSegment(.previous, event: event, context: context)
         case .firstSegment: return moveSegment(.first, context: context)
+        case .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8:
+            return moveSegment(.index(command.segmentJumpIndex ?? 0), context: context)
         case .lastSegment: return moveSegment(.last, context: context)
         case .nextUncertainSegment: return moveSegment(.nextUncertain, context: context)
         case .previousUncertainSegment: return moveSegment(.previousUncertain, context: context)
@@ -1222,6 +1253,8 @@ public final class InputSession {
             // 連想の一覧の番号キーも，その語句を確定する．その番号の語句が無ければ何もしない
             guard list.select(number: number, perPage: associationPerPage) else { return KeyResult(handled: true) }
             phase = .association(list, origin: origin)
+            // 先の枝の丸の中身では，その語を文節に採るだけにする(全文は確定しない)
+            if isInStationItems { return adoptStationItem(context: context) }
             return KeyResult(handled: true, actions: commitAll())
         }
         if phase != .composing {
@@ -1419,6 +1452,9 @@ public final class InputSession {
     /// 変換を始める．設定が一覧でなければ分岐図にする．
     /// 英単語を補正しているときは，直した英単語を読みの中に確定させてから分岐図にする(打ったままに戻すのは補正の直後の Space)
     private func enterConversion(recordsUsage: Bool = true) {
+        branchDetailShown = false
+        branchStation = nil
+        trunkLevel = false
         if recordsUsage { usage?.record(.conversionOpened) }
         conversionHistory.clear()
         heldReading = nil
@@ -1433,6 +1469,8 @@ public final class InputSession {
         prepareFusionForConversion()
         // 区切りと幹だけの分岐図をすぐ出し，注目している文節の候補だけをここで求める．ほかの文節は followUps で足す
         phase = .lattice(initialLattice(latticeBuilder, quick: true))
+        // 分岐図を出した直後は，幹の上(文節)から始める(設定)．← → でそのまま文節を移れる．Space と番号キーは今までどおり候補を選ぶ
+        trunkLevel = treeNavigation && settings.current.branchStartsOnTrunk && !isSegmentList
         latticeUntouched = true
         if case .lattice(let lattice) = phase { fillPendingSegments(only: lattice.focusedIndex) }
     }
@@ -2311,14 +2349,53 @@ public final class InputSession {
                 panel.columns[focused].sourceName = converter.sourceName(of: segment.selected.text, reading: segmentReading)
                 panel.associationHint = associationHint(text: segment.selected.text, reading: segmentReading)
             }
+            // 文節へ移るキーと，文字種にするキーの名前(分岐図の丸の上に出す)
+            // まとまりに区切って出しているときは，出しているまとまりの中で左から数える
+            applyTrunk(to: &panel, lattice: lattice)
+            for (command, index) in zip(KeymapCommand.segmentJumps, jumpRange(of: lattice)) {
+                panel.columns[index].jumpKey = keyLabel(command, in: .converting)
+            }
+            if let focused = panel.columns.firstIndex(where: \.isFocused), panel.columns[focused].variants.count == lattice.focused.variants.count {
+                panel.columns[focused].variantKeys = lattice.focused.variants.map(variantKey)
+            }
+            if branchStations, !splitMode { applyBranch(to: &panel, lattice: lattice) }
+            panel.trunkFocused = trunkLevel && treeNavigation
+            panel.pageSize = latticePerPage
+            if settings.current.showsFewerItems { panel = PanelBuilder.reduced(panel, showsDetail: branchDetailShown || branchStation != nil) }
             if let note = commandNote(for: lattice) { panel.note = note }
             if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
             if splitMode {
                 panel = PanelBuilder.splitting(panel, pieces: focusedSplit(lattice).pieces)
             }
             if let pendingNote { panel.note = pendingNote }
+            panel.hintsOnHold = !settings.current.alwaysShowsBranchHints
             return [.setMarkedText(marked), .showLattice(panel)]
         }
+    }
+
+    /// 選んでいる文節が入っているまとまり(長い文を区切って 1 つずつ出す)．区切らない設定のとき，文節がまとまり 1 つに収まるとき，
+    /// まとまりを描けない候補の窓(groupsBranchSegments が false)では nil
+    private func segmentGroup(of lattice: SegmentLattice) -> Range<Int>? {
+        let size = settings.current.branchSegmentsPerGroup
+        guard groupsBranchSegments, size > 0, lattice.segments.count > size else { return nil }
+        return SegmentGrouping.group(containing: lattice.focusedIndex, texts: lattice.segments.map(\.selected.text), size: size)
+    }
+
+    /// 文節へ移るキーを付ける文節の範囲．まとまりに区切って出しているときは，出しているまとまり．
+    /// 区切らずに出していて文節がキーの数より多いときは，選んでいる文節が入っているキーの数ずつの区間
+    /// (幹を横に送っても，選んでいる文節のまわりの文節にキーが付く)
+    private func jumpRange(of lattice: SegmentLattice) -> Range<Int> {
+        if let group = segmentGroup(of: lattice) { return group }
+        let keys = KeymapCommand.segmentJumps.count
+        guard groupsBranchSegments, keys > 0, lattice.segments.count > keys else { return lattice.segments.indices }
+        let start = lattice.focusedIndex / keys * keys
+        return start..<min(start + keys, lattice.segments.count)
+    }
+
+    /// 幹の出し方(出すまとまりと，窓の幅の決め方)を panel に入れる
+    private func applyTrunk(to panel: inout LatticePanel, lattice: SegmentLattice) {
+        panel.group = segmentGroup(of: lattice)
+        panel.keepsWidth = settings.current.branchWindowWidth == .fixed
     }
 
     /// 文節ごとの一覧で見せるか(分岐図と同じ文節格子を，注目している文節の一覧として見せる)
@@ -2368,6 +2445,17 @@ public final class InputSession {
         if readingCorrector.isApplied { panel.note = PanelBuilder.readingCorrectionNote(key: conversionCancelKeyLabel) }
         if let pendingNote { panel.note = pendingNote }
         return panel
+    }
+
+    /// 上の枝の字種を，注目している文節だけその字種にするキーの名前．そのキーが無ければ nil
+    private func variantKey(_ candidate: Candidate) -> String? {
+        guard case .variant(let variant) = candidate.origin else { return nil }
+        switch variant {
+        case .hiragana: return keyLabel(.segmentToHiragana, in: .converting)
+        case .katakana: return keyLabel(.segmentToKatakana, in: .converting)
+        case .halfwidthKatakana: return keyLabel(.segmentToHalfwidthKatakana, in: .converting)
+        case .fullwidthRoman, .halfwidthRoman: return nil
+        }
     }
 
     /// 字種(variant)が文節の字種(上の枝)の何番目か．無ければ nil
@@ -2488,6 +2576,7 @@ public final class InputSession {
                 if move == .previous { return moveCandidate(.previous, context: context) }
             }
         case .lattice(var lattice):
+            trunkLevel = false
             let perPage = latticePerPage
             let before = lattice.focused.choice
             switch move {
@@ -2594,7 +2683,9 @@ public final class InputSession {
     }
 
     /// 文節の動かし方
-    private enum SegmentMove {
+    private enum SegmentMove: Equatable {
+        /// 位置(0 から)で指した文節へ移る
+        case index(Int)
         case next, previous, first, last, nextUncertain, previousUncertain, extend, shrink, extendToWord, shrinkToWord, split
     }
 
@@ -2611,7 +2702,8 @@ public final class InputSession {
             switch move {
             case .next: return handleHorizontal(forward: true, context: context)
             case .previous: return handleHorizontal(forward: false, context: context)
-            case .first, .last, .nextUncertain, .previousUncertain, .extend, .shrink, .extendToWord, .shrinkToWord, .split: return KeyResult(handled: true)
+            case .index, .first, .last, .nextUncertain, .previousUncertain, .extend, .shrink, .extendToWord, .shrinkToWord, .split:
+                return KeyResult(handled: true)
             }
         case .lattice(var lattice):
             if isSegmentList, case .variant(let index) = lattice.focused.choice, move == .next || move == .previous,
@@ -2634,6 +2726,11 @@ public final class InputSession {
             // 端で止まると Tab で次の文節に移れない．← → は端で止める(選び終えた文節に戻らないように)
             case .next: lattice.moveFocus(by: 1, wraps: event?.key == .tab)
             case .previous: lattice.moveFocus(by: -1, wraps: event?.key == .tab)
+            case .index(let position):
+                // 出しているまとまりの中で左から数える．その位置に文節が無ければ何もしない
+                let shown = jumpRange(of: lattice)
+                guard position >= 0, position < shown.count else { return KeyResult(handled: true) }
+                lattice.focusedIndex = shown.lowerBound + position
             case .first: lattice.focusedIndex = 0
             case .last: lattice.focusedIndex = lattice.segments.count - 1
             case .nextUncertain: lattice.moveToUncertain(forward: true)
@@ -2652,6 +2749,11 @@ public final class InputSession {
                 splitMode = !splitMode && !focusedSplit(lattice).positions.isEmpty
             }
             phase = .lattice(lattice)
+            // 矢印キーで木をたどれるときは，文節を移ったら幹の上にいる(↓ で候補へ下りる)
+            switch move {
+            case .index, .next, .previous, .first, .last, .nextUncertain, .previousUncertain: trunkLevel = treeNavigation && !isSegmentList && !expandedCandidates
+            case .extend, .shrink, .extendToWord, .shrinkToWord, .split: break
+            }
             return KeyResult(handled: true, actions: render(context: context))
         }
     }
@@ -2724,7 +2826,7 @@ public final class InputSession {
     private func beginInlineEdit(context: InputContext) -> KeyResult {
         guard case .lattice(let lattice) = phase else { return KeyResult(handled: true) }
         splitMode = false
-        inlineEdit = (lattice.focusedIndex, newComposition())
+        inlineEdit = (lattice.focusedIndex, newComposition(), false)
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -2737,7 +2839,18 @@ public final class InputSession {
             return nil
         }
         let typesText = !event.modifiers.contains(.command) && !event.modifiers.contains(.control) && !event.modifiers.contains(.option)
+        // 入力モードを切り替えるキー(かな・英数・半角/全角 など)は，打ち直しを終えずに，打ち直しているあいだの入力だけを切り替える．
+        // 文節の中に英字を打てるようにするため．変換と分岐図はそのまま続け，組み立て全体の入力モードは変えない
+        if let command = lookUp(event), [.japaneseMode, .directMode, .toggleMode].contains(command) {
+            edit.direct = command == .directMode || (command == .toggleMode && !edit.direct)
+            inlineEdit = edit
+            return KeyResult(handled: true, actions: render(context: context) + modeIndicator(edit.direct ? .direct : .japanese))
+        }
         switch event.key {
+        case .character(let character) where typesText && edit.direct:
+            edit.typed.insertLiteral(String(character), rawKey: character.isNumber ? character : nil)
+            inlineEdit = edit
+            return KeyResult(handled: true, actions: render(context: context))
         case .character(let character) where typesText:
             if settings.current.inputStyle == .kana,
                 let kana = event.keyLabel.flatMap({ KanaLayout.text(forKey: $0, shift: event.modifiers.contains(.shift), settings: settings.current) }) {
@@ -2826,6 +2939,8 @@ public final class InputSession {
             column.split = nil
             panel.columns[edit.index] = column
         }
+        panel.hintsOnHold = !settings.current.alwaysShowsBranchHints
+        applyTrunk(to: &panel, lattice: lattice)
         return [.setMarkedText(MarkedText(segments, caret: caret)), .showLattice(panel)]
     }
 
@@ -2840,17 +2955,313 @@ public final class InputSession {
     /// 連想変換のキー．入力中なら変換してから，変換中なら選んでいる文節を，連想の一覧に切り替える．
     /// 連想変換を使わない設定のときは，入力中ならふつうに変換する
     private func associate(context: InputContext) -> KeyResult {
+        // 先の枝を丸として出す作りでは，連想変換のキーで先の枝へ入る(連想の語と変換マクロは，それぞれの丸の中に出す)
+        if branchStations, phase != .composing, let result = enterBranch(context: context) { return result }
+        // 表示項目を減らす設定の分岐図では，1 回目で選んでいる候補の先の枝(語の意味・連想)を開く．2 回目から連想の一覧に移る
+        if !branchStations, settings.current.showsFewerItems, !branchDetailShown, case .lattice(let lattice) = phase, inlineEdit == nil, !splitMode,
+           !expandedCandidates, !isSegmentList, hasBranchDetail(lattice) {
+            branchDetailShown = true
+            return KeyResult(handled: true, actions: render(context: context))
+        }
         guard associationFinder.isEnabled else {
             return phase == .composing ? convert(withoutLearning: false, context: context) : KeyResult(handled: true)
         }
         if phase == .composing {
             alphabetRun = false
             enterConversion()
+            // 入力中から押したときも，変換してから先の枝へ入る
+            if branchStations, let result = enterBranch(context: context) { return result }
         }
         if !enterAssociation() {
             pendingNote = associationFinder.hasDictionaries ? PanelBuilder.noAssociationNote : PanelBuilder.noAssociationDictionaryNote
         }
         return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    // MARK: - 先の枝(語の意味・連想・変換マクロ)
+
+    /// 先の枝の丸と，その中身(連想の語・マクロの結果)．意味の丸は中身を持たない
+    private struct BranchStation {
+        var station: BranchDetail.Station
+        var list: AssociationList?
+    }
+
+    /// 注目している文節で選んでいる候補の，先の枝の丸．機能ごとに独立していて，使える物だけを並べる
+    private func stations(for lattice: SegmentLattice) -> [BranchStation] {
+        guard branchStations else { return [] }
+        var result: [BranchStation] = []
+        let text = lattice.focused.selected.text
+        let reading = focusedReading(lattice)
+        if settings.current.meaningPlacement == .side, homophone(for: lattice) != nil {
+            result.append(BranchStation(station: .init(kind: .meaning, title: IndicatorLabels.branchMeaningTitle), list: nil))
+        }
+        if let associations = associationFinder.find(text: text, reading: reading, includesMacros: false) {
+            result.append(BranchStation(station: .init(kind: .association, title: IndicatorLabels.branchAssociationTitle), list: AssociationList(associations)))
+        }
+        if let macros = associationFinder.macros(text: text, reading: reading) {
+            result.append(BranchStation(station: .init(kind: .macro, title: IndicatorLabels.branchMacroTitle), list: AssociationList(macros)))
+        }
+        return result
+    }
+
+    /// 分岐図で先の枝を出せる状態か
+    private func latticeForBranch() -> SegmentLattice? {
+        guard branchStations, case .lattice(let lattice) = phase, inlineEdit == nil, !splitMode, !expandedCandidates, !isSegmentList else { return nil }
+        return lattice
+    }
+
+    /// 候補から先の枝へ入る．もう入っていれば次の丸へ移る．先の枝が無ければ nil(呼んだ側が，ほかの動きをする)
+    private func enterBranch(context: InputContext) -> KeyResult? {
+        guard let lattice = latticeForBranch() else { return nil }
+        let count = stations(for: lattice).count
+        guard count > 0 else { return nil }
+        branchStation = branchStation.map { min($0 + 1, count - 1) } ?? 0
+        branchDetailShown = true
+        trunkLevel = false
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 先の枝の丸の上にいるあいだの，矢印キーでないキー．矢印キーは navigateTree が受け持つ．
+    /// 連想変換のキーと取り消しのキーは候補へ戻る．「候補の先の枝へ移動」を矢印でないキーに割り当てていれば，次の丸へ移る．
+    /// ほかのキー(Space・Tab など)は，候補へ戻ってから今までどおりに動く(丸の上で Space を押して，選ぶつもりのない中身が入ることを避ける)
+    private func performOnBranchStation(_ command: KeymapCommand, context: InputContext) -> KeyResult? {
+        guard let current = branchStation else { return nil }
+        guard let lattice = latticeForBranch(), stations(for: lattice).indices.contains(current) else {
+            branchStation = nil
+            return nil
+        }
+        switch command {
+        case .enterBranch:
+            branchStation = min(current + 1, stations(for: lattice).count - 1)
+        case .associate, .cancel, .undoConversionEdit:
+            branchStation = nil
+        default:
+            branchStation = nil
+            return nil
+        }
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    // MARK: - 矢印キーで木をたどる
+
+    /// 木の上の，今いる場所
+    private enum TreePlace {
+        /// 幹の上(文節)
+        case trunk
+        /// 文字種の枝の上
+        case variant(Int)
+        case candidate
+        /// 先の枝の丸の上
+        case station(Int)
+        /// 丸の中身(連想の語・マクロの結果)
+        case items(AssociationList, origin: Phase)
+    }
+
+    private enum Arrow {
+        case up, down, left, right
+
+        var opposite: Arrow {
+            switch self {
+            case .up: .down
+            case .down: .up
+            case .left: .right
+            case .right: .left
+            }
+        }
+    }
+
+    /// 木をたどる矢印キーか．矢印キーに，候補・文節を移るコマンドか「候補の先の枝へ移動」が割り当てられているときだけ
+    /// (⇧→ のような修飾キー付きの操作や，矢印キーをほかの操作に割り当てた設定は，そのコマンドのまま動かす)
+    private func treeArrow(_ command: KeymapCommand, event: KeyEvent) -> Arrow? {
+        guard branchStations, [.nextCandidate, .previousCandidate, .nextSegment, .previousSegment, .enterBranch].contains(command) else { return nil }
+        switch event.key {
+        case .up: return .up
+        case .down: return .down
+        case .left: return .left
+        case .right: return .right
+        default: return nil
+        }
+    }
+
+    /// 今いる場所．分岐図を路線図の形で出していないとき(表・文節ごとの一覧・区切っているあいだ・打ち直しているあいだ)は nil
+    private var treePlace: TreePlace? {
+        guard inlineEdit == nil, !splitMode, !expandedCandidates, !isSegmentList else { return nil }
+        switch phase {
+        case .association(let list, let origin):
+            return branchStation == nil ? nil : .items(list, origin: origin)
+        case .lattice(let lattice):
+            if let branchStation { return .station(branchStation) }
+            // 幹の上・文字種・候補を矢印でたどるのは，「候補の先の枝へ移動」が割り当てられているときだけ
+            guard treeNavigation else { return nil }
+            if trunkLevel { return .trunk }
+            if case .variant(let index) = lattice.focused.choice { return .variant(index) }
+            return .candidate
+        case .composing, .selecting:
+            return nil
+        }
+    }
+
+    /// 矢印キーは，表示の向きに効く．上下は縦に並ぶ物(候補・丸の中身)を移り，幹との行き来をする．左右は横に並ぶ物(文節・文字種・先の枝の丸)を移る．
+    /// 先の枝は，描く側が左へ出しているとき(branchMirrored)は左へ伸びているので，左右を入れ替える．
+    ///
+    /// | 今いる場所 | ↑ | ↓ | 枝のある側 | 反対の側 |
+    /// |---|---|---|---|---|
+    /// | 幹の上 | 文字種へ | 候補へ | (← → で前・次の文節) | |
+    /// | 文字種 | ― | 幹の上へ | (← → で前・次の文字種．並びは反転しない) | |
+    /// | 候補 | 前の候補(先頭なら幹の上) | 次の候補 | 先の枝の最初の丸(無ければその向きの文節) | 選んだ候補のまま幹の上へ |
+    /// | 丸 | 候補へ | 中身へ | 次の丸 | 前の丸(最初の丸なら候補へ) |
+    /// | 丸の中身 | 前の項目(先頭なら丸へ) | 次の項目 | 次のまとまり | 前のまとまり(最初なら，選んでいる語を採って幹の上へ) |
+    ///
+    /// 戻る向きの矢印は，選んだものを捨てない．丸の中身を選ばずに出るのは，先頭の項目の ↑ と取り消しのキー
+    private func navigateTree(_ arrow: Arrow, event: KeyEvent, context: InputContext) -> KeyResult? {
+        guard let place = treePlace else { return nil }
+        let toward: Arrow = branchMirrored ? .left : .right
+        let done = { KeyResult(handled: true, actions: self.render(context: context)) }
+        let stay = KeyResult(handled: true)
+        switch place {
+        case .trunk:
+            guard case .lattice(var lattice) = phase else { return nil }
+            switch arrow {
+            case .left: return moveSegment(.previous, event: event, context: context)
+            case .right: return moveSegment(.next, event: event, context: context)
+            case .down:
+                trunkLevel = false
+                return done()
+            case .up:
+                guard settings.current.showsVariantRow, lattice.selectVariant(at: 0) else { return stay }
+                trunkLevel = false
+                phase = .lattice(lattice)
+                return done()
+            }
+        case .variant(let index):
+            guard case .lattice(var lattice) = phase else { return nil }
+            switch arrow {
+            case .left, .right:
+                // 文字種は，枝が左右のどちらへ出ていても左から右へ並ぶ
+                guard lattice.selectVariant(at: index + (arrow == .right ? 1 : -1)) else { return stay }
+                phase = .lattice(lattice)
+                return done()
+            case .down:
+                // 幹の上へ戻る(候補は先頭に戻る)．どの文字種からでも 1 回で戻る
+                // (次の候補へ進む操作は，文字種を 1 つずつ下りるので使わない)
+                lattice.selectCandidate(at: 0)
+                phase = .lattice(lattice)
+                trunkLevel = true
+                return done()
+            case .up:
+                return stay
+            }
+        case .candidate:
+            guard case .lattice(let lattice) = phase else { return nil }
+            switch arrow {
+            case .down: return moveCandidate(.next, context: context)
+            case .up:
+                guard case .candidate(0) = lattice.focused.choice else { return moveCandidate(.previous, context: context) }
+                trunkLevel = true
+                return done()
+            case .left, .right:
+                if arrow == toward {
+                    if let result = enterBranch(context: context) { return result }
+                    return moveSegment(arrow == .right ? .next : .previous, event: event, context: context)
+                }
+                // 先の枝と反対の向きは，選んだ候補のまま幹の上へ戻る(幹の上の ← → で，ほかの文節へ移れる)
+                trunkLevel = true
+                return done()
+            }
+        case .station(let current):
+            guard let lattice = latticeForBranch() else {
+                branchStation = nil
+                return nil
+            }
+            let stations = stations(for: lattice)
+            guard stations.indices.contains(current) else {
+                branchStation = nil
+                return nil
+            }
+            switch arrow {
+            case .up: branchStation = nil
+            case .down:
+                // 丸の中身(連想の語・マクロの結果)へ入る．意味の丸には中身が無い
+                guard let list = stations[current].list else { return stay }
+                phase = .association(list, origin: phase)
+            case .left, .right:
+                if arrow == toward {
+                    branchStation = min(current + 1, stations.count - 1)
+                } else {
+                    branchStation = current > 0 ? current - 1 : nil
+                }
+            }
+            return done()
+        case .items(var list, let origin):
+            switch arrow {
+            case .down: list.move(by: 1)
+            case .up:
+                guard list.indexInGroup > 0 else {
+                    phase = origin
+                    return done()
+                }
+                list.move(by: -1)
+            case .left, .right:
+                if arrow == toward {
+                    list.moveGroup(by: 1)
+                } else {
+                    // 最初のまとまりから戻る向きは，選んでいる語をその文節に採って幹の上へ戻る
+                    guard list.groupIndex > 0 else { return adoptStationItem(context: context) }
+                    list.moveGroup(by: -1)
+                }
+            }
+            phase = .association(list, origin: origin)
+            return done()
+        }
+    }
+
+    /// 幹の上にいるあいだの，矢印キーでないキー．文節を移るキーはそのまま動き，幹の上に残る．ほかのキーは，候補へ戻ってから今までどおりに動く
+    private func performOnTrunk(_ command: KeymapCommand) {
+        guard trunkLevel else { return }
+        switch command {
+        case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
+             .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8:
+            break
+        default:
+            trunkLevel = false
+        }
+    }
+
+    /// 先の枝の表示を panel に入れる．丸の上にいれば，その丸の中身の先頭のページも入れる(選ぶ前に中身が見える)
+    private func applyBranch(to panel: inout LatticePanel, lattice: SegmentLattice) {
+        guard let focused = panel.columns.firstIndex(where: \.isFocused) else { return }
+        let stations = stations(for: lattice)
+        guard !stations.isEmpty else {
+            branchStation = nil
+            return
+        }
+        if let current = branchStation, !stations.indices.contains(current) { branchStation = stations.count - 1 }
+        var detail = BranchDetail(stations: stations.map(\.station), current: branchStation)
+        if let current = branchStation {
+            if let list = stations[current].list { fill(&detail, from: list, selects: false) }
+            // 語の意味は，候補にいるあいだと，意味の丸にいるあいだだけ出す
+            if stations[current].station.kind != .meaning { panel.columns[focused].homophone = nil }
+        }
+        panel.associationHint = nil
+        panel.detail = detail
+    }
+
+    /// 丸の中身(今のまとまりの今のページ)を detail に入れる
+    private func fill(_ detail: inout BranchDetail, from list: AssociationList, selects: Bool) {
+        let page = list.page(perPage: settings.current.branchCandidatesPerPage)
+        detail.items = page.words
+        detail.selectedItem = selects ? page.selected : nil
+        detail.label = list.group.label
+        detail.group = list.groupIndex + 1
+        detail.groupCount = list.associations.groups.count
+        detail.position = list.indexInGroup - page.selected + 1
+        detail.total = list.group.words.count
+        detail.pageSize = settings.current.branchCandidatesPerPage
+    }
+
+    /// 注目している文節で選んでいる候補に，先の枝に出すもの(語の意味か，連想があることの知らせ)があるか
+    private func hasBranchDetail(_ lattice: SegmentLattice) -> Bool {
+        homophone(for: lattice) != nil || associationHint(text: lattice.focused.selected.text, reading: focusedReading(lattice)) != nil
     }
 
     /// 選んでいる文節(一覧なら選んでいる候補)の連想の一覧に切り替える．連想が無ければ false
@@ -2874,6 +3285,17 @@ public final class InputSession {
     /// ほかのコマンドは，選んでいる語を元の変換の文節に入れてから，ふつうに行う(nil を返す)
     private func performInAssociation(_ command: KeymapCommand, list: AssociationList, origin: Phase, context: InputContext) -> KeyResult? {
         var list = list
+        if isInStationItems {
+            // 先の枝の丸の中身にいるとき: 先頭の語で前へ進むと，丸の上へ戻る
+            if command == .previousCandidate, list.indexInGroup == 0 {
+                phase = origin
+                return KeyResult(handled: true, actions: render(context: context))
+            }
+            // 確定のキーと，先頭のまとまりで前のまとまりへ進むキーは，選んでいる語をその文節に採る．全文は確定しない
+            if command == .commit || (command == .previousSegment && list.groupIndex == 0) {
+                return adoptStationItem(context: context)
+            }
+        }
         switch command {
         case .nextCandidate: list.move(by: 1)
         case .previousCandidate: list.move(by: -1)
@@ -2882,7 +3304,7 @@ public final class InputSession {
         case .firstCandidate: list.selectFirst()
         case .lastCandidate: list.selectLast()
         // 左右(と迷う文節へ移るキー)で意味のまとまりを移る
-        case .nextSegment, .nextUncertainSegment: list.moveGroup(by: 1)
+        case .nextSegment, .nextUncertainSegment, .enterBranch: list.moveGroup(by: 1)
         case .previousSegment, .previousUncertainSegment: list.moveGroup(by: -1)
         case .cancel, .backToReading, .associate, .undoConversionEdit:
             // 元の変換に戻る
@@ -2890,9 +3312,25 @@ public final class InputSession {
             return KeyResult(handled: true, actions: render(context: context))
         default:
             resolveAssociation()
+            branchStation = nil
             return nil
         }
         phase = .association(list, origin: origin)
+        return KeyResult(handled: true, actions: render(context: context))
+    }
+
+    /// 先の枝の丸の中身(連想の語・マクロの結果)を選んでいるところか
+    private var isInStationItems: Bool {
+        guard branchStations, branchStation != nil, case .association(_, .lattice) = phase else { return false }
+        return true
+    }
+
+    /// 先の枝の丸の中身で選んでいる語を，その文節に採って丸を閉じる．全文は確定しないので，ほかの文節の変換を続けられる．
+    /// 矢印で木をたどれる表では幹の上へ戻る(← → でほかの文節へ移れる．もう一度確定のキーを押すと全文を確定する)
+    private func adoptStationItem(context: InputContext) -> KeyResult {
+        resolveAssociation()
+        branchStation = nil
+        trunkLevel = treeNavigation
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -2943,7 +3381,28 @@ public final class InputSession {
             if isSegmentList {
                 return [.setMarkedText(marked), .showCandidates(PanelBuilder.associationListPanel(for: list, perPage: latticePerPage))]
             }
-            let panel = PanelBuilder.associationLatticePanel(for: lattice, list: list, perPage: settings.current.branchCandidatesPerPage)
+            var panel = PanelBuilder.associationLatticePanel(for: lattice, list: list, perPage: settings.current.branchCandidatesPerPage)
+            panel.hintsOnHold = !settings.current.alwaysShowsBranchHints
+            applyTrunk(to: &panel, lattice: lattice)
+            // 先の枝の丸の中身として出す: 丸の並びと，元の候補(候補の列に控えめに出す)を添える
+            if branchStations, let current = branchStation, case .lattice(let original) = origin {
+                let stations = stations(for: original)
+                if stations.indices.contains(current) {
+                    var detail = BranchDetail(stations: stations.map(\.station), current: current)
+                    fill(&detail, from: list, selects: true)
+                    let source = PanelBuilder.latticePanel(for: original, perPage: settings.current.branchCandidatesPerPage)
+                    if let column = source.columns.first(where: \.isFocused), let focused = panel.columns.firstIndex(where: \.isFocused) {
+                        detail.candidates = column.alternatives
+                        detail.selectedCandidate = column.selectedAlternative
+                        // 文字種の枝も，候補にいるときと同じに出す(丸の中身へ入っても，幹が上下に動かないように)
+                        panel.columns[focused].variants = column.variants
+                        if column.variants.count == original.focused.variants.count {
+                            panel.columns[focused].variantKeys = original.focused.variants.map(variantKey)
+                        }
+                    }
+                    panel.detail = detail
+                }
+            }
             return [.setMarkedText(marked), .showLattice(panel)]
         case .selecting(let selection):
             let candidate = candidate(in: .selecting(selection))
@@ -3008,6 +3467,8 @@ public final class InputSession {
     /// 番号キーでなければ nil
     private func selectInLattice(_ character: Character, lattice: inout SegmentLattice, context: InputContext) -> KeyResult? {
         guard let number = numberKey(character), lattice.select(number: number, perPage: latticeNumberPerPage) else { return nil }
+        branchStation = nil
+        trunkLevel = false
         // 表から選んだら表を閉じ，分岐図に戻って次の文節へ進む
         expandedCandidates = false
         return KeyResult(handled: true, actions: advance(after: lattice, context: context))
@@ -3048,6 +3509,8 @@ public final class InputSession {
     /// 押した対象が今の状態に無ければ何もしない
     public func choose(_ target: PointerTarget, context: InputContext) -> [ClientAction] {
         undoableCommit = nil
+        branchStation = nil
+        trunkLevel = false
         let baseline = editBaseline(command: nil)
         defer { trackConversionEdit(from: baseline) }
         return pick(target, context: context)
@@ -3171,6 +3634,16 @@ public final class InputSession {
                 let kana = Candidate(text: composition.kana, readingCount: composition.kana.count, origin: .variant(.hiragana))
                 return MarkedText(Self.markedSegments(CorrectedSpan.pieces(of: kana, reading: composition.kana, changed: changed), otherwise: .reading)
                     + [.init(composition.pending, style: .reading)])
+            }
+            // エディタとターミナルで控えているあいだも，前に止まったときに変換して見せた読み(今の読みの先頭)はかなに戻さない．
+            // 続けて打った分だけを読みのまま足す(打つたびに全文がかなと漢字で入れ替わってちらつかない)．
+            // 英数字を打っているあいだは，Enter で読みのまま確定するので，見せ方も読みのままにする
+            if codeRestraintApplies, !readingEndsWithAlphanumeric, let settled = settledLive, !settled.reading.isEmpty, composition.kana.hasPrefix(settled.reading),
+               settings.current.liveConverts(readingLength: composition.kana.count) {
+                return MarkedText([
+                    .init(settled.candidate.text, style: .converted),
+                    .init(String(composition.kana.dropFirst(settled.reading.count)) + composition.pending, style: .reading),
+                ])
             }
             return MarkedText([.init(composition.displayReading, style: .reading)])
         }

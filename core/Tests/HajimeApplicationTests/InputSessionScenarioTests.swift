@@ -41,7 +41,9 @@ final class Harness {
 
     /// wrap は変換器を包むもの(SupplementedConverter を通して確かめるとき)．wrapLexicon は英単語の辞書を包むもの(EnglishTermLexicon)
     init(converter: FakeConverter = FakeConverter(), lexicon: FakeLexicon = FakeLexicon(), settings: Settings = DefaultSettings.settings,
-         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, remembersRejections: Bool = false, hidesPredictions: Bool = true,
+         associations: (any AssociationLookup)? = nil, keyNames: KeyNameStyle = .mac, branchStations: Bool = false,
+         groupsBranchSegments: Bool? = nil,
+         remembersRejections: Bool = false, hidesPredictions: Bool = true,
          wrap: ((FakeConverter, FakeSettings) -> any KanaKanjiConverting)? = nil,
          wrapLexicon: ((FakeLexicon, FakeSettings) -> any EnglishLexicon)? = nil, usageDictionary: UsageDictionary? = nil,
          palette: ((FakeSettings) -> PaletteServices)? = nil, calendar: (any CalendarReading)? = nil,
@@ -51,7 +53,9 @@ final class Harness {
         let store = FakeSettings(settings)
         self.settings = store
         self.session = InputSession(converter: wrap?(converter, store) ?? converter, lexicon: wrapLexicon?(lexicon, store) ?? lexicon, settings: store,
-                                    associations: associations, keyNames: keyNames,
+                                    associations: associations, keyNames: keyNames, branchStations: branchStations,
+                                    // 指定しなければ，先の枝の丸と同じ(macOS はどちらも true)
+                                    groupsBranchSegments: groupsBranchSegments ?? branchStations,
                                     rejections: remembersRejections ? SettingsCorrectionRejections(settings: store) : nil,
                                     predictionHiding: hidesPredictions ? SettingsPredictionHiding(settings: store) : nil,
                                     usageDictionary: usageDictionary.map(FakeUsageDictionaryProvider.init), palette: palette?(store),
@@ -1103,6 +1107,37 @@ struct BranchMapControlTests {
         #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
     }
 
+    @Test("R-17: ⌥ とホームポジションのキーで，その位置の文節へ移る．文節の無い位置のキーは何もしない．分岐図に移るキーの名前を出す")
+    func jumpToSegment() {
+        let harness = Harness(converter: converter())
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+        #expect(harness.lattice?.columns.map(\.jumpKey) == ["⌥A", "⌥S"])
+        harness.press(.character("s"), .option)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        harness.press(.character("f"), .option)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 1)
+        harness.press(.character("a"), .option)
+        #expect(harness.lattice?.columns.firstIndex(where: \.isFocused) == 0)
+        // 上の枝の文字種には，選んでいる文節だけをその文字種にするキーの名前を出す
+        #expect(harness.lattice?.columns.first?.variantKeys.prefix(3) == ["F6", "F7", "F8"])
+    }
+
+    @Test("R-17: 分岐図のキーの案内は，既定では修飾キーを押し続けているあいだだけ出す．常に表示する設定なら，いつも出す")
+    func hintsOnHold() {
+        let harness = Harness(converter: converter())
+        harness.type("kyouhaii")
+        harness.press(.space)
+        #expect(harness.lattice?.hintsOnHold == true)
+        var settings = DefaultSettings.settings
+        settings.alwaysShowsBranchHints = true
+        let always = Harness(converter: converter(), settings: settings)
+        always.type("kyouhaii")
+        always.press(.space)
+        #expect(always.lattice?.hintsOnHold == false)
+    }
+
     @Test("R-08: 選んでいる候補に同音異義語があれば使い分けを添え，設定で切れる")
     func homophoneNote() {
         let converter = FakeConverter(["とった": [("撮った", nil), ("取った", nil)]])
@@ -1859,6 +1894,27 @@ struct LiveConversionTimingTests {
         #expect(marked(session.handle(KeyEvent(.character("u")), context: InputContext()).actions) == "今日はライブ")
         // 確定はしない(組み立て中のまま)
         #expect(session.isComposing)
+    }
+
+    @Test("R-06: エディタとターミナルでも，止まって変換して見せた文は続けて打ってもかなに戻さず，続けて打った分だけを読みのまま足す")
+    func keepsSettledConversionWhileTypingInTerminal() {
+        for profile in [AppProfile.terminal, .programming] {
+            let context = InputContext(profile: profile)
+            let (session, _) = session()
+            var shown: String?
+            for key in "kyouharai" { shown = marked(session.handle(KeyEvent(.character(key)), context: context).actions) ?? shown }
+            // 止まるまでは読みのまま
+            #expect(shown == "きょうはらい")
+            #expect(marked(session.settle(context: context)) == "今日は雷")
+            // 続けて打っても「きょうはらいb」に戻さない．打った分は読みのまま
+            #expect(marked(session.handle(KeyEvent(.character("b")), context: context).actions) == "今日は雷b")
+            #expect(marked(session.handle(KeyEvent(.character("u")), context: context).actions) == "今日は雷ぶ")
+            // 止まると全文を変換し直す
+            #expect(marked(session.settle(context: context)) == "今日はライブ")
+            // 止まったときの読みの中まで消したら，読みのままに戻す
+            #expect(marked(session.handle(KeyEvent(.backspace), context: context).actions) == "きょうはらい")
+            #expect(session.isComposing)
+        }
     }
 
     /// 「kyouharai」と打って止まり(今日は雷)，続けて keys を打ったあとの組み立て中の文字

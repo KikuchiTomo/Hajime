@@ -43,6 +43,30 @@ pub extern "system" fn DllRegisterServer() -> HRESULT {
     }
 }
 
+/// インストーラーが入れ終わったあとに rundll32 で呼ぶ(引数は使わない)．日本語の既定の入力方式が Hajime IME なら，
+/// このセッションの入力方式を Hajime IME に戻す(registration::restore_profile)．失敗しても何も返さない
+#[no_mangle]
+pub extern "system" fn RestoreProfile(
+    _window: *mut c_void,
+    _instance: *mut c_void,
+    _arguments: *const u8,
+    _show: i32,
+) {
+    let _ = guard(registration::restore_profile);
+}
+
+/// インストーラーが入れたあと(と消すとき)に rundll32 で呼ぶ(引数は使わない)．前の版の DLL を置いたフォルダを消す
+/// (消せないファイルは次の再起動で消す．registration::remove_old_versions)．失敗しても何も返さない
+#[no_mangle]
+pub extern "system" fn RemoveOldVersions(
+    _window: *mut c_void,
+    _instance: *mut c_void,
+    _arguments: *const u8,
+    _show: i32,
+) {
+    let _ = guard(registration::remove_old_versions);
+}
+
 #[no_mangle]
 pub extern "system" fn DllUnregisterServer() -> HRESULT {
     match guard(registration::unregister) {

@@ -246,6 +246,15 @@ func run() -> Int32 {
     let emoji = engine
     let resetPaletteHistory: () -> Void = {}
     #endif
+    // 長い文のまとまりと先の枝の丸を描けるのは Windows の候補ウィンドウだけ(Linux のアドオンはどちらも描かないので，
+    // 区切ると文節へ移るキーが見えている並びとずれ，丸を出すと見えない丸に入る)．macOS でホストを動かすとき(テスト)も false のまま
+    #if os(Windows)
+    let groupsBranchSegments = true
+    let branchStations = true
+    #else
+    let groupsBranchSegments = false
+    let branchStations = false
+    #endif
     let service = EngineService(
         makeSession: {
             // エンジンのセッションは，候補を文脈で並べ替える採点(検証木)も受け持つ．合議はこのプロセスの中で行う(ADR 0016)
@@ -253,7 +262,7 @@ func run() -> Int32 {
             return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
                                                                  terms: terms, emoji: emoji, lexicon: lexicon, englishTerms: englishTerms),
                                 lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
-                                keyNames: .windows, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
+                                keyNames: .windows, branchStations: branchStations, groupsBranchSegments: groupsBranchSegments, rejections: rejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary,
                                 palette: palette, calendar: calendar, scorer: engineSession, fusing: engineSession)
         },
         settings: settings,
@@ -268,6 +277,7 @@ func run() -> Int32 {
         },
         hints: { FooterHints.make(for: $0, settings: $1) },
         listHints: { FooterHints.make(for: $0, settings: $1) },
+        placedHints: { FooterHints.placed(for: $0, settings: $1) },
         typoService: typoService,
         sync: sync,
         files: files,
@@ -277,7 +287,8 @@ func run() -> Int32 {
             resetPaletteHistory: resetPaletteHistory,
             previewLanguage: { preview.preview($0, precedingText: $1) },
             previewMacros: { macroPreview.preview(text: $0, reading: $1, pattern: $2) },
-            automaticJinenModel: { [engine] in engine.automaticJinenModel?.rawValue }
+            automaticJinenModel: { [engine] in engine.automaticJinenModel?.rawValue },
+            setAsideSettingsFile: settings.setAsideFile?.lastPathComponent
         ),
         runCommand: { command in
             // 読みで呼び出すコマンド(R-22)．Windows だけで動かす(Linux はまだ設定の画面が無く，コマンドを登録できない)
@@ -287,7 +298,12 @@ func run() -> Int32 {
             _ = command
             #endif
         },
-        flushLearning: { [engine] in engine.flushLearning() },
+        // 入力欄から外れたら，学んだことと使い方の記録を書き出す(macOS の入力コントローラの deactivateServer と同じ．
+        // 使い方の記録は 20 回ごとにしか保存しないので，書き出さないとエンジンが終わるときに残りを失う)
+        flushLearning: { [engine, usage] in
+            engine.flushLearning()
+            usage.flush()
+        },
         log: { message in
             #if os(Windows)
             EngineProcess.debugLog(message)

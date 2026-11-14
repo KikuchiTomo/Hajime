@@ -149,7 +149,7 @@ final class CompositionRoot {
         let engineSession = engine.makeSession()
         return InputSession(converter: SupplementedConverter(engineSession, settings: settings, calendar: calendar, postalCodes: postalCodes, dictionaries: dictionaries,
                                                              terms: terms, emoji: emojiLookup, lexicon: lexicon, englishTerms: englishTerms),
-                            lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations,
+                            lexicon: lexicon, settings: settings, usage: usage, typoService: typoService, associations: associations, branchStations: true, groupsBranchSegments: true,
                             rejections: correctionRejections, predictionHiding: predictionHiding, usageDictionary: usageDictionary, palette: paletteServices,
                             calendar: calendar, scorer: engineSession, fusing: engineSession)
     }

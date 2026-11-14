@@ -18,8 +18,8 @@ settings:
     ENABLE_HARDENED_RUNTIME: YES
     DEAD_CODE_STRIPPING: YES
     # IME の本体と補助のアプリ(更新・入力ソースの登録)で同じバージョンにする(tools/release/bump_version.sh が書き換える)
-    MARKETING_VERSION: "0.3.3"
-    CURRENT_PROJECT_VERSION: "29"
+    MARKETING_VERSION: "0.4.0"
+    CURRENT_PROJECT_VERSION: "30"
 packages:
   HajimeCore:
     path: ../../core
@@ -142,11 +142,12 @@ targets:
         # 本番と開発版で変わる値．Info.plist から読む
         HAJIME_SUPPORT_DIRECTORY: men.haji.inputmethod
         HAJIME_ICON_SUFFIX: ""
-        # 入力メニューに出す名前．make install-macos NAME=… で変えられる(tools/macos/write_input_source_names.sh)
+        # アプリの名前(システム設定の入力ソースを足す画面などに出る)
         HAJIME_DISPLAY_NAME: "Hajime IME"
-        # 英字の入力モードの名前は，入力メニューに出す名前のあとにこれを付ける(日本語の環境と英語の環境)
-        HAJIME_ROMAN_MODE_SUFFIX: "英字"
-        HAJIME_ROMAN_MODE_SUFFIX_EN: "English"
+        # メニューバーと入力メニューに出す，入力モードの名前．日本語のモードと英字のモード(tools/macos/write_input_source_names.sh)．
+        # メニューバーは幅が狭いので短くする．make install-macos NAME=… で変えられる
+        HAJIME_JAPANESE_MODE_NAME: "はじめ"
+        HAJIME_ROMAN_MODE_NAME: "Hajime"
         GENERATE_INFOPLIST_FILE: NO
         COMBINE_HIDPI_IMAGES: YES
       # Dev と Debug は開発版．本番と別のアプリ・別の入力ソース・別の学習データになり，並べて入れて試せる．
@@ -161,12 +162,16 @@ targets:
           HAJIME_SUPPORT_DIRECTORY: men.haji.inputmethod.develop
           HAJIME_ICON_SUFFIX: "-dev"
           HAJIME_DISPLAY_NAME: "Hajime IME Dev"
+          HAJIME_JAPANESE_MODE_NAME: "はじめ Dev"
+          HAJIME_ROMAN_MODE_NAME: "Hajime Dev"
         Debug:
           PRODUCT_NAME: "Hajime Debug"
           PRODUCT_BUNDLE_IDENTIFIER: men.haji.inputmethod.debug
           HAJIME_SUPPORT_DIRECTORY: men.haji.inputmethod.debug
           HAJIME_ICON_SUFFIX: "-dev"
           HAJIME_DISPLAY_NAME: "Hajime IME Debug"
+          HAJIME_JAPANESE_MODE_NAME: "はじめ Debug"
+          HAJIME_ROMAN_MODE_NAME: "Hajime Debug"
 # スキームを書いておく．書かないと xcodebuild が自動で作るスキームで実行先の機種が決まらず，
 # 「Supported platforms for the buildables in the current scheme is empty」と出る
   # 更新用のアプリ(R-19)．IME の本体はサンドボックスの中で通信できないので，更新の確認・ダウンロード・インストールはこのアプリが行う．

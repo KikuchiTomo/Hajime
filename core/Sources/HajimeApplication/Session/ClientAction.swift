@@ -264,6 +264,10 @@ public struct LatticePanel: Sendable, Equatable {
         public var sourceName: String?
         /// 文節を区切っているとき(⇧↓)の，区切れる位置で分けた文節．区切っていなければ nil
         public var split: Split?
+        /// この文節へ移るキーの名前(分岐図の丸の上に出す．KeymapCommand.segmentJumps)．キーが割り当てられていない文節と，9 番目からの文節は nil
+        public var jumpKey: String?
+        /// 上の枝の文字種ごとの，その文字種にするキーの名前(variants と同じ数)．キーの無い文字種は nil．キーを出さないときは空
+        public var variantKeys: [String?] = []
         /// その場で打ち直している文節(⇧⌫)．text は打っている読み(変換しない)．枝(alternatives・variants)は打ち直す前の候補で，
         /// 描く側は薄く出して選んでいる形にしない(selectedAlternative・selectedVariant は nil)．候補は変換したときに出し直す
         public var isEditing = false
@@ -306,6 +310,28 @@ public struct LatticePanel: Sendable, Equatable {
     public var associationHint: AssociationHint?
     /// 語の意味(Column.homophone)を候補の枝の右に出すか，下に出すか(設定)
     public var meaningPlacement = MeaningPlacement.side
+    /// 幹に出す文節の範囲．長い文をまとまりに区切って 1 つずつ出すとき，選んでいる文節が入っているまとまり．nil なら全部を出す．
+    /// columns は文の全体のまま(押した文節の位置などは文の全体で数える)．描く側は shownGroup() で範囲だけにして描く
+    public var group: Range<Int>?
+    /// 出している範囲の前と後ろに，文節が続いているか(shownGroup() が入れる)．描く側は幹の線を窓の端まで伸ばし，山形を付ける
+    public var continuesBefore = false
+    public var continuesAfter = false
+    /// 窓の幅を幹の幅のまま変えないか(設定の「分岐図の窓の幅」が固定)．枝が右に入らなければ，左右に反転して左へ出す
+    public var keepsWidth = false
+    /// 矢印キーで木をたどっていて，今いる所が幹の上(文節)か．描く側は，文節を強い選択にし，選んでいる候補を控えめにする
+    public var trunkFocused = false
+    /// 候補の 1 ページの数(ページの位置を出すのに使う)．分からなければ 0
+    public var pageSize = 0
+    /// 選んでいる候補の先の枝(語の意味・連想・変換マクロ)．先の枝を別々の丸として出す作り(InputSession の branchStations)のときだけ入る
+    public var detail: BranchDetail?
+    /// キーの案内を，修飾キーを押し続けているあいだだけ出すか(設定の「分岐図のキーの案内を常に表示」がオフ)．
+    /// 描く側は，案内の場所を空けておき，押し続けている修飾キーを使うキーの案内だけを出す．false なら常に出す
+    public var hintsOnHold = false
+    /// 表示項目を減らす設定で，注目している文節の文字種の枝を畳んでいるか．畳んでいる枝は中身(Column.variants)を入れない．
+    /// 描く側は，続きがある印(端へ向けて透かした線)だけを出す
+    public var collapsesVariants = false
+    /// 表示項目を減らす設定で，選んでいる候補の先の枝(語の意味・連想)を畳んでいるか．畳んでいる枝は中身(Column.homophone・associationHint)を入れない
+    public var collapsesDetail = false
 
     public init(columns: [Column], position: Int = 1, total: Int = 0, note: Note? = nil) {
         self.columns = columns
@@ -313,6 +339,74 @@ public struct LatticePanel: Sendable, Equatable {
         self.total = total
         self.note = note
     }
+
+    /// 出す範囲(group)の文節だけにした分岐図と，その先頭が文の全体で何番目か．範囲が無いか，文の全体ならそのまま返す
+    public func shownGroup() -> (panel: LatticePanel, offset: Int) {
+        guard let group, !group.isEmpty, group.lowerBound >= 0, group.upperBound <= columns.count, group.count < columns.count else {
+            var panel = self
+            panel.group = nil
+            return (panel, 0)
+        }
+        var panel = self
+        panel.columns = Array(columns[group])
+        panel.group = nil
+        panel.continuesBefore = group.lowerBound > 0
+        panel.continuesAfter = group.upperBound < columns.count
+        return (panel, group.lowerBound)
+    }
+}
+
+/// 分岐図で，選んでいる候補の先に伸ばす枝．語の意味・連想・変換マクロを，それぞれ 1 つの丸として並べる(機能ごとに独立した置き場所)．
+/// 矢印キーで，候補 → 丸 → 丸の中身(連想の語・マクロの結果)とたどる
+public struct BranchDetail: Sendable, Equatable {
+    public enum Kind: Sendable, Equatable {
+        case meaning
+        case association
+        case macro
+    }
+
+    public struct Station: Sendable, Equatable {
+        public var kind: Kind
+        /// 丸の見出し(「意味」「連想」「マクロ」)
+        public var title: String
+
+        public init(kind: Kind, title: String) {
+            self.kind = kind
+            self.title = title
+        }
+    }
+
+    public var stations: [Station]
+    /// 今いる丸の位置．候補にいるあいだは nil
+    public var current: Int?
+    /// 今いる丸の中身(連想の語・マクロの結果)の今のページ．意味の丸と，候補にいるあいだは空
+    public var items: [String] = []
+    /// 中身の中で選んでいる位置．丸の上にいるあいだは nil
+    public var selectedItem: Int?
+    /// 中身の説明(連想のまとまりの意味)．無ければ空
+    public var label = ""
+    /// 中身のまとまりの位置(1 から)と数．連想は意味ごとにまとまりがある
+    public var group = 1
+    public var groupCount = 1
+    /// 中身の今のページの先頭が何番目か(1 から)と，まとまりの中の全体の数
+    public var position = 1
+    public var total = 0
+    /// 中身の 1 ページの数
+    public var pageSize = 0
+    /// 中身に入っているあいだの，元の候補(今のページ)と選んでいた位置．候補の列に控えめに出す
+    public var candidates: [String] = []
+    public var selectedCandidate: Int?
+
+    public init(stations: [Station], current: Int? = nil) {
+        self.stations = stations
+        self.current = current
+    }
+}
+
+extension BranchDetail: CustomStringConvertible, CustomDebugStringConvertible {
+    // 中身と候補は入力内容なので，ログには数だけを出す
+    public var description: String { "BranchDetail(stations: \(stations.count), items: \(items.count))" }
+    public var debugDescription: String { description }
 }
 
 /// 打っているあいだに，打っている語句に続くと予測した語句．変換の候補とは体験が違うので，候補の窓に混ぜず別の窓に出す．

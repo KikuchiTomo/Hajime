@@ -38,159 +38,161 @@ layout: hextra-home
 </div>
 
 <figure class="hajime-showcase">
-  <img src="images/hero.webp" alt="テキストエディットで「写真を撮る」と入力し，分岐図の候補の「撮る」の横に，意味・使い方の例・同音語が表示されている" width="1400" height="672" />
+  <img src="images/hero.webp" alt="「写真を撮る」の分岐図．文節・文字種・候補・意味が 1 本の線で結ばれ，矢印キーで選択する" width="2400" height="1120" />
 </figure>
 
 {{< hajime/features title="主な機能" >}}
   {{< hajime/feature
     title="ライブ変換"
-    subtitle="Space を押さなくても，打つそばから漢字に変換され，Enter で確定できます．"
+    subtitle="入力と同時に変換し，Enter で確定．"
     link="docs/usage/#変換と確定"
     image="images/features/live-conversion.webp"
-    alt="テキストエディットのメモで，打っている途中の文が「帰りに駅前のカフェに寄って、買ったばかりの本を少しだけ読んだ」と漢字に変換されている"
+    alt="ローマ字の入力が，Space を押さずに「帰りに駅前のカフェに寄って」と変換されている"
   >}}
   {{< hajime/feature
-    title="変換候補をツリー表示"
-    subtitle="文節ごとに枝分かれした候補で文全体を見渡しながら，直したい文節だけを選び直せます．"
+    title="分岐図"
+    subtitle="文節・候補・語の意味を 1 本の線で結び，矢印キーだけで選択．"
     link="docs/usage/#文節の操作"
     image="images/features/candidate-tree.webp"
-    alt="文節ごとに候補が枝分かれした候補ウィンドウ"
+    alt="「私の名前は中野です」の分岐図．文節の上に文字種，下に候補が並ぶ"
   >}}
   {{< hajime/feature
-    title="一覧の表示"
-    subtitle="候補を縦に並べる一覧にも切り替えられ，上の行からカタカナや全角英数をすぐに選べます．"
+    title="一覧表示"
+    subtitle="従来の一覧にも切り替え可能．"
     link="docs/settings/#変換"
     image="images/features/candidate-list.webp"
-    alt="「へんかん」の候補が一覧で並び，上の行にそのまま・カタカナ・全角英数などの文字種が並んでいる"
+    alt="「へんかん」の候補の一覧．最上段に文字種が並ぶ"
   >}}
   {{< hajime/feature
     title="入力中の候補と予測"
-    subtitle="入力中から候補と続きの予測が出るので，「えぴ」まで打てば Tab で「エピソード」と確定できます．"
+    subtitle="入力途中の候補と，続きの予測を表示．"
     link="docs/usage/#入力中の候補と予測"
     image="images/features/suggestion-prediction.webp"
-    alt="入力中の候補の窓に「なんだ」「何だ」「なんだ？」が並び，予測の窓に「エピソード」と Tab のキーが表示されている"
+    alt="入力中の候補「なんだ」「何だ」と，Tab で確定する予測「エピソード」"
   >}}
   {{< hajime/feature
     title="打ち間違いの補正"
-    subtitle="入力を止めると，文脈から打ち間違いを見つけて補正し，Esc で入力どおりに戻せます．判断がつかないときは「もしかして」で候補を示します．"
+    subtitle="誤入力を文脈から検出して補正．"
     link="docs/usage/#打ち間違いの補正"
     image="images/features/typo-correction.webp"
-    alt="「ありがぷございます」が「ありがとうございます」に補正され，元に戻すボタンが出ている"
+    alt="「ありがぷございます」が「ありがとうございます」に補正され，Esc で復元できる"
   >}}
   {{< hajime/feature
-    title="英単語は英単語のまま"
-    subtitle="日本語入力のまま python と打っても「pyてょn」にはならず，python と入力できます．GitHub や ChatGPT も切り替えずに入力できます．"
+    title="英単語の判別"
+    subtitle="日本語入力のまま英単語を入力可能．"
     link="docs/settings/#英語と日本語"
     image="images/features/english-words.webp"
-    alt="補正の候補として python が選ばれ，入力のままの「pyてょn」と Python が並んでいる"
+    alt="日本語入力で打った python が英単語と判定され，「pyてょn」にならない"
   >}}
   {{< hajime/feature
     title="語の意味と使い分け"
-    subtitle="候補の横に意味と使い方の例，同じ読みのほかの語が出るので，「撮る」と「取る」のどちらを使うかをその場で確認できます．"
+    subtitle="意味・用例・同音語を候補の横に表示．"
     link="docs/usage/#語の意味"
     image="images/features/meaning.webp"
-    alt="「撮る」を選ぶと，写真や動画を写す・映画やテレビ番組などを撮影するという意味と例文，同音語の取る・採る・執る・捕るが表示されている"
+    alt="「撮る」の意味と用例，同音語の取る・採る・執る・捕る"
   >}}
   {{< hajime/feature
     title="連想変換"
-    subtitle="選んでいる語から，似た意味の語や関連する語を探して入力できます．"
+    subtitle="類義語と関連語を候補から検索．"
     link="docs/usage/#連想変換"
     image="images/features/association.webp"
-    alt="「美しい」の連想として，優・素晴しい・綺麗・美的・可愛いが並んでいる"
+    alt="「撮る」の連想として，撮影する・写す・収めるが並ぶ"
   >}}
   {{< hajime/feature
     title="計算・郵便番号・日付"
-    subtitle="1+2*3= は 7 に，100-0001 は住所に，きょうは今日の日付に変換でき，21 は ㉑ や二一にもなります．"
+    subtitle="数式は答えに，郵便番号は住所に，「きょう」は日付に変換．"
     link="docs/usage/#便利な変換"
     image="images/features/date-conversion.webp"
-    alt="「きょう」の候補に 2026/10/30 などの日付が並んでいる"
+    alt="1+2*3= が 7 に，100-0001 が東京都千代田区千代田に，きょうが日付に，21 が ㉑ や二一に変換される"
   >}}
   {{< hajime/feature
-    title="絵文字・記号・顔文字のパレット"
-    subtitle="Control+Option+E・K・F で絵文字・記号・顔文字のパレットが開き(Windows は Ctrl+Alt)，「おじぎ」のような読みや英語，:bow: のようなショートコードで探せます．"
+    title="絵文字・記号・顔文字"
+    subtitle="読み・英語・ショートコードで検索可能なパレット．"
     link="docs/usage/#絵文字と記号のパレット"
     image="images/features/palette.webp"
-    alt="絵文字・顔文字・記号の 3 つのパレットが並び，それぞれの下に選んでいる文字の名前と読みが表示されている"
+    alt="顔文字・絵文字・記号のパレットと，それぞれを開くキー"
   >}}
   {{< hajime/feature
     title="手書き入力"
-    subtitle="読みのわからない漢字は手書きで探せます．設定でオンにすると，Control+Option+H(Windows は Ctrl+Alt+H)で手書きの画面が開きます．"
+    subtitle="読めない漢字を手書きで検索．"
     link="docs/usage/#手書き入力"
     image="images/features/handwriting.webp"
-    alt="手書きの画面に「田」と書かれ，候補に田と H が並んでいる"
+    alt="手書きの「田」から候補が表示されている"
   >}}
   {{< hajime/feature
-    title="候補ウィンドウのテーマ"
-    subtitle="和紙・北欧・ネオン・端末など 8 つのテーマのほか，色・角の丸み・枝の形・書体を自分で決めたテーマも作れます．"
+    title="テーマ"
+    subtitle="10 種のテーマに加え，配色・角丸・書体を自作可能．"
     link="docs/settings/#外観"
     image="images/features/themes.webp"
-    alt="和紙・ネオン・北欧・端末の 4 つのテーマで描いた候補ウィンドウ"
+    alt="和紙・ネオン・北欧・ターミナル・インディゴ・夜のデスクの 6 つのテーマの分岐図"
   >}}
   {{< hajime/feature
     title="アプリごとの入力モード"
-    subtitle="アプリを切り替えたときに日本語入力にするか英数にするかを，アプリごとに決められます．"
+    subtitle="日本語と英数をアプリごとに自動で切り替え．"
     link="docs/settings/#除外設定"
     image="images/features/app-modes.webp"
-    alt="初期設定のアプリごとの入力モードの画面．IME オフを選び，ターミナルに切り替えると英数(A)になる実演を出している"
+    alt="ターミナルは英数，メモとブラウザは日本語に切り替わる"
   >}}
   {{< hajime/feature
     title="外部通信不要"
-    subtitle="変換も補正もすべてこのパソコンの中で処理し，通信するのは「更新を確認」を押したときだけです．"
+    subtitle="変換も補正も端末内で完結．通信は更新の確認時のみ．"
     link="privacy/"
+    image="images/features/offline.webp"
+    alt="変換・補正・学習を端末内で処理し，外部と通信しない"
   >}}
 {{< /hajime/features >}}
 
 {{< hajime/catalog title="そのほかの機能" >}}
   {{< hajime/catalog-group title="入力" >}}
-    {{< hajime/catalog-item title="4 つの入力方式" link="docs/settings/#入力" >}}ローマ字入力・かな入力・英字入力のほか，日本語にする語だけを自動で変換する英字入力(自動)も選べます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="キー配列" link="docs/settings/#入力" >}}US・Dvorak・Colemak などのキー配列で使えます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="句読点と記号のキー" link="docs/settings/#入力" >}}句読点を「、。」「，．」などから選べるほか，[ ] / ¥ のキーで入る文字も変更できます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="Shift で英字" link="docs/settings/#入力" >}}Shift を押して打ち始めた英字は，Space か記号を打つまで英字のまま入力できます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="数字のあとのピリオドとハイフン" link="docs/usage/#便利な変換" >}}「3.14」「1,000」「A-1」を，英数に切り替えずに入力できます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="テンキーで計算" link="docs/settings/#入力" >}}テンキーで「12*3」と打って Enter を押すと，計算結果の 36 が第 1 候補になります．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="ローマ字と記号の変換表" link="docs/settings/#ローマ字と記号" >}}ローマ字の組み合わせ(「wyi」→「ゐ」)や，「->」→「→」のような記号の変換を追加できます．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="4 つの入力方式" image="images/catalog/input-styles.webp" link="docs/settings/#入力" >}}ローマ字・かな・英字・英字(自動)に対応．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="キー配列" image="images/catalog/key-layouts.webp" link="docs/settings/#入力" >}}US・Dvorak・Colemak などに対応．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="句読点と記号のキー" image="images/catalog/punctuation.webp" link="docs/settings/#入力" >}}句読点の種類と，[ ] / ¥ の入力文字を変更可能．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="Shift で英字" image="images/catalog/shift-english.webp" link="docs/settings/#入力" >}}Shift で始めた英字は，Space か記号まで英字のまま入力．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="数字のあとのピリオドとハイフン" image="images/catalog/number-punctuation.webp" link="docs/usage/#便利な変換" >}}「3.14」「1,000」「A-1」を切り替えなしで入力．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="テンキーで計算" image="images/catalog/numpad-calc.webp" link="docs/settings/#入力" >}}「12*3」と Enter で，計算結果の 36 が第 1 候補．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="ローマ字と記号の変換表" image="images/catalog/romaji-table.webp" link="docs/settings/#ローマ字と記号" >}}「wyi」→「ゐ」，「->」→「→」などの変換を追加可能．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="変換" >}}
-    {{< hajime/catalog-item title="文節の操作" link="docs/usage/#文節の操作" >}}文節の区切りを 1 文字単位や単語の切れ目で変えられ，1 つの文節だけを打ち直すこともできます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="候補を表に展開" link="docs/usage/#候補を表に展開" >}}Option+↓ で候補を表に展開すると，候補の多い読みでも 36 個を一度に見渡せます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="Esc で元に戻す" link="docs/usage/#変換と確定" >}}候補や文節の区切りの変更を，8 回までさかのぼって取り消せます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="確定の取り消し" link="docs/usage/#確定の取り消し" >}}確定した直後に Control+Backspace を押すと，確定前の変換に戻って選び直せます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="誤りやすい文節へ移動" link="docs/usage/#変換と確定" >}}Option+→ で，誤変換の可能性が高い文節へ移動します．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="前後の文脈で並べ替え" link="docs/settings/#変換" >}}「Pythonでプログラムをかこう」なら「加工」より「書こう」が先に出るように，前後の文に合う順に候補を並べます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="再変換" link="docs/usage/#再変換" >}}確定した文字を選んで Control+Shift+R を押すと，読みに戻して変換し直せます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="文字種の変換" link="docs/usage/#変換と確定" >}}F6〜F10 で，ひらがな・カタカナ・全角英数・半角英数に変換します．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="数字の表記" link="docs/settings/#変換" >}}21 を ㉑・二一・弐拾壱・ⅩⅩⅠ に変換できます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="校正支援" link="docs/settings/#変換" >}}ら抜き言葉・さ入れ言葉・二重敬語・重言に，本来の形を添えます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="送り仮名" link="docs/settings/#変換" >}}送り仮名を本則・許容から選べます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="学習" link="docs/settings/#変換" >}}選んだ語は次から先に出るようになり，不要な学習は Control+Backspace で削除できます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="予測の管理" link="docs/usage/#入力中の候補と予測" >}}不要な予測は登録して出ないようにでき，確定した直後なら Backspace で補う前の読みに戻せます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="Zenzai モデル" link="docs/settings/#変換" >}}精度を優先・速さを優先・併用から選べ，併用では打っている間だけ小さなモデルで速く表示します．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="文節の操作" image="images/catalog/segments.webp" link="docs/usage/#文節の操作" >}}区切りを 1 文字単位・単語単位で変更し，文節ごとに再入力．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="候補を表に展開" image="images/catalog/grid.webp" link="docs/usage/#候補を表に展開" >}}Option+↓ で 36 個の候補を一覧．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="Esc で元に戻す" image="images/catalog/undo.webp" link="docs/usage/#変換と確定" >}}候補と区切りの変更を 8 回まで取り消し．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="確定の取り消し" image="images/catalog/undo-commit.webp" link="docs/usage/#確定の取り消し" >}}確定直後の Control+Backspace で，確定前の変換に復帰．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="誤りやすい文節へ移動" image="images/catalog/uncertain.webp" link="docs/usage/#変換と確定" >}}Option+→ で，誤変換の可能性が高い文節へ移動．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="前後の文脈で並べ替え" image="images/catalog/context.webp" link="docs/settings/#変換" >}}「Pythonでプログラムをかこう」では，「加工」より「書こう」を優先．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="再変換" image="images/catalog/reconvert.webp" link="docs/usage/#再変換" >}}確定した文字を選択して Control+Shift+R で再変換．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="文字種の変換" image="images/catalog/script-keys.webp" link="docs/usage/#変換と確定" >}}F6〜F10 で，ひらがな・カタカナ・半角カタカナ・全角英数・半角英数に変換．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="数字の表記" image="images/catalog/number-forms.webp" link="docs/settings/#変換" >}}21 を ㉑・二一・弐拾壱・ⅩⅩⅠ に変換．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="校正支援" image="images/catalog/proofreading.webp" link="docs/settings/#変換" >}}ら抜き言葉・さ入れ言葉・二重敬語・重言に，本来の形を併記．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="送り仮名" image="images/catalog/okurigana.webp" link="docs/settings/#変換" >}}本則と許容から選択．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="学習" image="images/catalog/learning.webp" link="docs/settings/#変換" >}}選んだ語を優先し，不要な学習は Control+Backspace で削除．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="予測の管理" image="images/catalog/prediction-manage.webp" link="docs/usage/#入力中の候補と予測" >}}不要な予測を非表示にし，確定直後の Backspace で補完前の読みに復帰．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="Zenzai モデル" image="images/catalog/zenzai.webp" link="docs/settings/#変換" >}}精度優先・速度優先・併用から選択．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="補正" >}}
-    {{< hajime/catalog-item title="キーの二重入力" link="docs/settings/#補正" >}}「koonnnitiha」を「こんにちは」に補正します．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="読み違い" link="docs/settings/#補正" >}}「ふいんき」でも「雰囲気」が候補に出ます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="うろ覚えのカタカナ語" link="docs/settings/#補正" >}}「しゅみれーしょん」でも「シミュレーション」が候補に出ます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="発音どおりに綴った英単語" link="docs/settings/#補正" >}}「ふぉと」で「photo」が候補に出ます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="手の位置のずれ(試験的)" link="docs/settings/#補正" >}}手が 1 キー横にずれたまま打った文を補正します．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="修正しない語句と置き換え" link="docs/settings/#補正" >}}補正してほしくない語句や，「pthon」→「Python3」のような置き換えを登録できます．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="キーの二重入力" image="images/catalog/double-key.webp" link="docs/settings/#補正" >}}「koonnnitiha」を「こんにちは」に補正．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="読み違い" image="images/catalog/misreading.webp" link="docs/settings/#補正" >}}「ふいんき」から「雰囲気」に変換．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="うろ覚えのカタカナ語" image="images/catalog/katakana.webp" link="docs/settings/#補正" >}}「しゅみれーしょん」から「シミュレーション」に変換．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="発音どおりに綴った英単語" image="images/catalog/phonetic.webp" link="docs/settings/#補正" >}}「ふぉと」から「photo」に変換．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="手の位置のずれ(試験的)" image="images/catalog/hand-shift.webp" link="docs/settings/#補正" >}}1 キー横にずれて入力した文を補正．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="修正しない語句と置き換え" image="images/catalog/exclusions.webp" link="docs/settings/#補正" >}}補正の除外と，「pthon」→「Python3」のような置き換えを登録．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="英語と日本語" >}}
-    {{< hajime/catalog-item title="外来語の英字表記" link="docs/settings/#英語と日本語" >}}約 13 万語の英字表記を収録しており，「れっどはっと」で Red Hat，「にゅーらる」で neural が候補に出ます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="直前の単語で判別" link="docs/settings/#英語と日本語" >}}「make」のように英語にも日本語にも読める語を，前の単語に合わせて判別します．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="英語にする単語・日本語にする単語" link="docs/settings/#英語と日本語" >}}常に英語で入力する単語と，常に日本語に変換する単語を登録できます．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="外来語の英字表記" image="images/catalog/loanwords.webp" link="docs/settings/#英語と日本語" >}}約 13 万語を収録．「れっどはっと」から Red Hat に変換．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="直前の単語で判別" image="images/catalog/previous-word.webp" link="docs/settings/#英語と日本語" >}}「make」のように英語にも日本語にも読める語を，直前の単語から判別．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="英語にする単語・日本語にする単語" image="images/catalog/english-japanese-words.webp" link="docs/settings/#英語と日本語" >}}常に英語で入力する単語と，常に日本語に変換する単語を登録．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="辞書・マクロ・コマンド" >}}
-    {{< hajime/catalog-item title="ユーザー辞書" link="docs/settings/#ユーザー辞書と辞書の取り込み" >}}10,000 語まで登録でき，「gh」で GitHub のように英字の読みも使えます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="日付や乱数を入れる単語" link="docs/settings/#単語と変換マクロに書ける書き方" >}}単語に {date} や {uuid} と書いておくと，変換したときの日付や UUID が入ります．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="辞書の取り込み" link="docs/settings/#ユーザー辞書と辞書の取り込み" >}}SKK 辞書やほかの IME の辞書を，数十万語のものでも取り込んで，アプリや文脈ごとに使い分けられます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="専門用語の辞書" link="docs/settings/#専門用語の辞書" >}}医学・法律・情報技術などの専門用語を，分野ごとに選んで候補に出せます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="変換マクロ" link="docs/settings/#コマンドと変換マクロ" >}}選んでいる語を【東京】やルビ，Markdown の太字などの形にして入力できます．形は設定の画面で試しながら追加できます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="コマンド" link="docs/settings/#コマンドと変換マクロ" >}}登録した読みを変換すると，候補からアプリ・Web ページ・ファイルを開けます．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="ユーザー辞書" image="images/catalog/user-dictionary.webp" link="docs/settings/#ユーザー辞書と辞書の取り込み" >}}10,000 単語まで登録可能．「gh」→ GitHub のような英字の読みにも対応．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="日付や乱数を入れる単語" image="images/catalog/placeholders.webp" link="docs/settings/#単語と変換マクロに書ける書き方" >}}{date} や {uuid} で，変換時の日付や UUID を挿入．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="辞書の取り込み" image="images/catalog/import.webp" link="docs/settings/#ユーザー辞書と辞書の取り込み" >}}SKK 辞書やほかの IME の辞書を取り込み，アプリや文脈ごとに使い分け．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="専門用語の辞書" image="images/catalog/technical-terms.webp" link="docs/settings/#専門用語の辞書" >}}医学・法律・情報技術などを分野ごとに選択．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="変換マクロ" image="images/catalog/macros.webp" link="docs/settings/#コマンドと変換マクロ" >}}語を【東京】・ルビ・Markdown の太字などの形に整形．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="コマンド" image="images/catalog/commands.webp" link="docs/settings/#コマンドと変換マクロ" >}}登録した読みから，アプリ・Web ページ・ファイルを起動．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
   {{< hajime/catalog-group title="設定と更新" >}}
-    {{< hajime/catalog-item title="キー設定" link="docs/settings/#キー設定" >}}すべてのキーを変更でき，標準・Windows 風・Mac 風・ATOK 風・Emacs 風・Vim 風のひな形から始められます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="同期とバックアップ" link="docs/settings/#同期とバックアップ" >}}Dropbox・Google Drive・iCloud Drive などのフォルダを指定すると，複数のパソコンで設定と辞書を同期できます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="初期設定" >}}初めて使うときに，英数とかなの切り替え・ライブ変換・外観などを順に選べます．{{< /hajime/catalog-item >}}
-    {{< hajime/catalog-item title="更新を確認" link="docs/install/" >}}新しいバージョンの変更点を確認して，そのまま更新できます．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="キー設定" image="images/catalog/keymap.webp" link="docs/settings/#キー設定" >}}全キーを変更可能．標準・Windows 風・Mac 風・ATOK 風・Emacs 風・Vim 風のひな形を用意．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="同期とバックアップ" image="images/catalog/sync.webp" link="docs/settings/#同期とバックアップ" >}}Dropbox・Google Drive・iCloud Drive などのフォルダで，設定と辞書を同期．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="初期設定" image="images/catalog/onboarding.webp" >}}初回起動時に，入力モードの切り替え・ライブ変換・外観などを選択．{{< /hajime/catalog-item >}}
+    {{< hajime/catalog-item title="更新を確認" image="images/catalog/updates.webp" link="docs/install/" >}}新バージョンの変更点を確認して，そのまま更新．{{< /hajime/catalog-item >}}
   {{< /hajime/catalog-group >}}
 {{< /hajime/catalog >}}

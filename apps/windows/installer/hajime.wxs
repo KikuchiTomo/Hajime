@@ -1,7 +1,12 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="Hajime IME" Manufacturer="haji.men" Version="$(Version)" UpgradeCode="08481E5D-EF2E-4129-9B02-0DB3228DF9D5" Scope="perMachine" Language="1041" Codepage="932">
     <!-- 同じ版でも上書きできるようにする(試しに入れた版の上から入れ直すとき) -->
-    <MajorUpgrade AllowSameVersionUpgrades="yes" DowngradeErrorMessage="新しいバージョンの Hajime IME がインストール済みです。" />
+    <!-- 古い版は，新しい版を入れ終えてから消す(afterInstallExecute)．古い版を消すとき，Windows Installer は古い版の DLL(tsf\<前のバージョン>\)を
+         消そうとし，ほぼすべてのアプリが読み込んでいるので「アプリを終了する必要があります」の窓が出る．それを避けるため，新しい版を入れた直後
+         (古い版を消す前)に RetireOldVersions が古い版のフォルダを消し，消せない DLL は同じドライブの tsf\.old へ退けて再起動で消えるよう頼む．
+         古い版を消す Windows Installer はそのファイルを見つけないので窓を出さない．
+         この順では，同じ版の番号のファイル(exe・DLL の版は apps/windows/Cargo.toml の版)は上書きされない．リリースでは版を上げる -->
+    <MajorUpgrade AllowSameVersionUpgrades="yes" Schedule="afterInstallExecute" DowngradeErrorMessage="新しいバージョンの Hajime IME がインストール済みです。" />
     <MediaTemplate EmbedCab="yes" />
     <!-- 上書きのときに，TSF の DLL を読み込んでいるアプリ(ほぼすべてのアプリ)を閉じさせない．
          古い DLL は読み込まれたまま残り，次の再起動で消える(下の TSFVERSIONFOLDER の説明) -->
@@ -39,10 +44,11 @@
       </Component>
     </StandardDirectory>
 
-    <Component Id="TextService64" Directory="TSFVERSIONFOLDER">
+    <!-- GUID は版によらず同じにする(上の MajorUpgrade の説明) -->
+    <Component Id="TextService64" Directory="TSFVERSIONFOLDER" Guid="3A6F2C1D-8E4B-4F7A-9C25-6B1D0E8F4A73">
       <File Id="TextService64" Source="$(StageDir)\hajime_tsf.dll" />
     </Component>
-    <Component Id="TextService32" Directory="TSFX86FOLDER">
+    <Component Id="TextService32" Directory="TSFX86FOLDER" Guid="7C2E5B94-1D3F-4A86-B0E7-2F9A6C4D8E15">
       <File Id="TextService32" Source="$(StageDir)\x86\hajime_tsf.dll" />
     </Component>
 
@@ -63,18 +69,39 @@
          入れたあとに起動する新しいエンジンは「もう動いている」とすぐ終わるので，古い版と新しい DLL が混ざる(候補ウィンドウが出ない)．
          利用者のプロセスなので，利用者の権限で InstallValidate(使っているファイルを調べる)の前に止める -->
     <CustomAction Id="StopRunning" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]taskkill.exe&quot; /F /IM hajime-engine-host.exe /IM hajime-candidate-ui.exe /IM hajime-settings.exe" Execute="immediate" Impersonate="yes" Return="ignore" />
+    <!-- 入れたあと，日本語の既定の入力方式が Hajime IME なら，このセッションの入力方式を Hajime IME に戻す(今出ている版から上書きすると，
+         古い版を消すときに登録が一度外れ，Windows がほかの入力方式に替えるため)．利用者の権限で呼ぶ．失敗しても入れる処理は止めない -->
+    <CustomAction Id="RestoreProfile" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]rundll32.exe&quot; &quot;[TSFVERSIONFOLDER]hajime_tsf.dll&quot;,RestoreProfile" Execute="immediate" Impersonate="yes" Return="ignore" />
+    <!-- 古い版を消したあと(RemoveExistingProducts)に，新しい版の登録をし直す．v0.3.3 までの版は，上書きで消されるときも登録を外すので，
+         新しい版を先に入れる順では，新しい版の登録が外れたままになる -->
+    <CustomAction Id="Reregister64" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]regsvr32.exe&quot; /s &quot;[TSFVERSIONFOLDER]hajime_tsf.dll&quot;" Execute="deferred" Impersonate="no" Return="check" />
+    <CustomAction Id="Reregister32" Directory="INSTALLFOLDER" ExeCommand="&quot;[SystemFolder]regsvr32.exe&quot; /s &quot;[TSFX86FOLDER]hajime_tsf.dll&quot;" Execute="deferred" Impersonate="no" Return="check" />
+    <!-- 前の版の DLL のフォルダ(tsf\<前のバージョン>)を消す．消せないファイルは再起動で消す．管理者の権限で呼ぶ．失敗しても止めない -->
+    <CustomAction Id="RetireOldVersions" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]rundll32.exe&quot; &quot;[TSFVERSIONFOLDER]hajime_tsf.dll&quot;,RemoveOldVersions" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="RemoveOldVersions" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]rundll32.exe&quot; &quot;[TSFVERSIONFOLDER]hajime_tsf.dll&quot;,RemoveOldVersions" Execute="deferred" Impersonate="no" Return="ignore" />
+    <CustomAction Id="RemoveOldVersionsOnRemove" Directory="INSTALLFOLDER" ExeCommand="&quot;[System64Folder]rundll32.exe&quot; &quot;[TSFVERSIONFOLDER]hajime_tsf.dll&quot;,RemoveOldVersions" Execute="deferred" Impersonate="no" Return="ignore" />
     <CustomAction Id="StartEngine" Directory="INSTALLFOLDER" ExeCommand="&quot;[INSTALLFOLDER]hajime-engine-host.exe&quot;" Execute="immediate" Impersonate="yes" Return="asyncNoWait" />
 
     <InstallExecuteSequence>
       <Custom Action="StopRunning" Before="InstallValidate" Condition="Installed OR WIX_UPGRADE_DETECTED" />
-      <Custom Action="Unregister64" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
-      <Custom Action="Unregister32" After="Unregister64" Condition="REMOVE=&quot;ALL&quot;" />
+      <!-- 上書きで古い版を消すとき(UPGRADINGPRODUCTCODE)は登録を外さない．外すとそのあいだに Windows がこのセッションの入力方式を
+           ほかのものに替え，入れ終わっても戻さない．CLSID とプロファイルは版によらず同じなので，新しい版の Register が場所を書き換える -->
+      <Custom Action="Unregister64" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
+      <Custom Action="Unregister32" After="Unregister64" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="Register64" After="InstallFiles" Condition="NOT REMOVE" />
       <Custom Action="Register32" After="Register64" Condition="NOT REMOVE" />
+      <!-- 古い版を消す(RemoveExistingProducts)前に，古い版の DLL を退ける(上の MajorUpgrade の説明) -->
+      <Custom Action="RetireOldVersions" After="Register32" Condition="WIX_UPGRADE_DETECTED AND NOT REMOVE" />
+      <Custom Action="Reregister64" After="RemoveExistingProducts" Condition="WIX_UPGRADE_DETECTED AND NOT REMOVE" />
+      <Custom Action="Reregister32" After="Reregister64" Condition="WIX_UPGRADE_DETECTED AND NOT REMOVE" />
+      <Custom Action="RemoveOldVersions" After="Reregister32" Condition="NOT REMOVE" />
+      <!-- 消すとき(上書きでないとき)も，前の版のフォルダを消す(今の版のフォルダは Windows Installer が消す) -->
+      <Custom Action="RemoveOldVersionsOnRemove" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" />
       <Custom Action="StartEngine" After="InstallFinalize" Condition="NOT REMOVE" />
       <!-- 入れたあと(初めて入れたときも上書きのときも)，Windows Installer の標準の確認で再起動を求める．
            起動中のアプリには新しい文字入力のサービスが読み込まれないので，再起動してから使う -->
-      <ScheduleReboot After="StartEngine" Condition="NOT REMOVE" />
+      <Custom Action="RestoreProfile" After="StartEngine" Condition="NOT REMOVE" />
+      <ScheduleReboot After="RestoreProfile" Condition="NOT REMOVE" />
     </InstallExecuteSequence>
   </Package>
 </Wix>

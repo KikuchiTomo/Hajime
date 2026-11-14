@@ -308,6 +308,11 @@ public enum DefaultSettings {
     /// 使い方の記録のファイルの大きさの上限．回数だけなので小さい
     public static let maximumUsageFileBytes = 16 * 1024
     /// 語の意味の注釈(R-08)に出す意味の数(既定)と，選べる範囲．辞書の順に出す．多いと候補の窓が縦に長くなる
+    /// 分岐図で，1 つのまとまりに出す文節の数の上限．文節へ移るキーが 8 つなので，キーがいつも足りる数にする．0 は区切らない
+    public static let branchSegmentsPerGroup = 8
+    public static let branchSegmentsPerGroupRange = 0...8
+    /// 変換して分岐図を出した直後に，幹の上(文節)を選んだ状態にする
+    public static let branchStartsOnTrunk = true
     public static let meaningSenseLimit = 3
     public static let meaningSenseLimitRange = 1...5
     /// ユーザー辞書に登録できる語の数と，読み・語の長さの上限．設定ファイルが大きくなりすぎないようにする
@@ -467,6 +472,10 @@ public enum DefaultSettings {
     public static let latticeWarmingPollInterval = 0.01
     /// 入力中の表示を Zenzai なしで求めたとき，打鍵の合間に Zenzai の変換を求めるまでの間(秒)．Windows では DLL に来てもらう(wake)間隔
     public static let deferredConversionPollInterval = 0.005
+    /// 打鍵の合間の Zenzai の変換にかけてよい時間(秒．Windows)．これより長くかかったら，その入力のあいだは打鍵の合間に求めず，
+    /// 打鍵が止まったとき(liveConversionDelay)に求める．CPU で推論すると，読みが長いほど 1 回の変換が打鍵の間隔より長くなり(120 字で約 0.5 秒)，
+    /// 合間に求めていると次の打鍵がその変換を待つため．速く打つ人の打鍵の間隔(約 0.1 秒)にする
+    public static let deferredConversionBudget = 0.1
     /// キーのあとで，画面を出してから 1 つずつ求めて足す処理(InputSession.followUps)のために，Windows で DLL に来てもらう間隔(秒)．
     /// 待たせずに次を求めたいので短くする(来るまでのあいだに次のキーが来れば，そのキーを先に処理する)
     public static let followUpPollInterval = 0.001

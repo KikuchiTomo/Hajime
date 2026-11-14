@@ -286,7 +286,14 @@ extension WireAssociationHeading {
 }
 
 extension WireBranchMap {
-    public init(_ panel: LatticePanel, hints: [WireKeyHint]) {
+    /// hints は足元の案内(前の版の候補ウィンドウが使う)．placedHints は操作する場所に置く案内(新しい分岐図)．
+    /// 足した項目(文節へ移るキー・文字種にするキー・畳んだ枝・置き場所ごとの案内)は省ける項目にしてあり，前の版の DLL とも話せる
+    public init(_ panel: LatticePanel, hints: [WireKeyHint], placedHints: WireBranchHints? = nil) {
+        // 長い文をまとまりに区切って出すときも，文節は文の全体を送り，出すまとまりの範囲(groupStart..<groupEnd)を添える．
+        // 新しい候補ウィンドウは範囲だけを出し，押した文節は文の全体の位置で返す．まとまりを知らない前の版の候補ウィンドウは，
+        // 範囲を読まずに今までどおり文の全体を出すので，押した文節の位置もずれない
+        let shown = panel.shownGroup()
+        let range = shown.panel.columns.count < panel.columns.count ? shown.offset..<(shown.offset + shown.panel.columns.count) : nil
         self.init(
             columns: panel.columns.map { column in
                 WireBranchColumn(
@@ -311,7 +318,10 @@ extension WireBranchMap {
                     sourceName: column.sourceName,
                     split: column.split.map { WireBranchSplit(pieces: $0.pieces) },
                     // 打ち直していなければ送らない
-                    isEditing: column.isEditing ? true : nil
+                    isEditing: column.isEditing ? true : nil,
+                    jumpKey: column.jumpKey,
+                    // キーが 1 つも無ければ送らない
+                    variantKeys: column.variantKeys.contains { $0 != nil } ? column.variantKeys : nil
                 )
             },
             position: UInt32(clamping: panel.position),
@@ -322,8 +332,53 @@ extension WireBranchMap {
             associationHint: panel.associationHint?.label,
             associationKey: panel.associationHint?.key,
             // 注目している文節に意味が無ければ送らない
-            meaningPlacement: panel.columns.contains { $0.homophone != nil } ? WireMeaningPlacement(panel.meaningPlacement) : nil
+            meaningPlacement: panel.columns.contains { $0.homophone != nil } ? WireMeaningPlacement(panel.meaningPlacement) : nil,
+            // 畳んでいなければ送らない
+            collapsesVariants: panel.collapsesVariants ? true : nil,
+            collapsesDetail: panel.collapsesDetail ? true : nil,
+            placedHints: placedHints,
+            // 幹の上にいなければ・1 ページの数が分からなければ・常に出す設定なら送らない
+            trunkFocused: panel.trunkFocused ? true : nil,
+            pageSize: panel.pageSize > 0 ? UInt32(clamping: panel.pageSize) : nil,
+            hintsOnHold: panel.hintsOnHold ? true : nil,
+            // まとまりに区切っていなければ・続いていなければ・中身に合わせる設定なら送らない
+            groupStart: range.map { UInt32(clamping: $0.lowerBound) },
+            groupEnd: range.map { UInt32(clamping: $0.upperBound) },
+            continuesBefore: shown.panel.continuesBefore ? true : nil,
+            continuesAfter: shown.panel.continuesAfter ? true : nil,
+            keepsWidth: panel.keepsWidth ? true : nil,
+            // 先の枝を別々の丸として出す作り(branchStations)のときだけ送る
+            detail: panel.detail.map(WireBranchDetail.init)
         )
+    }
+}
+
+extension WireBranchDetail {
+    public init(_ detail: BranchDetail) {
+        self.init(
+            stations: detail.stations.map { WireBranchStation(kind: WireBranchStationKind($0.kind), title: $0.title) },
+            current: detail.current.map(UInt32.init(clamping:)),
+            items: detail.items,
+            selectedItem: detail.selectedItem.map(UInt32.init(clamping:)),
+            label: detail.label,
+            group: UInt32(clamping: detail.group),
+            groupCount: UInt32(clamping: detail.groupCount),
+            position: UInt32(clamping: detail.position),
+            total: UInt32(clamping: detail.total),
+            pageSize: UInt32(clamping: detail.pageSize),
+            candidates: detail.candidates,
+            selectedCandidate: detail.selectedCandidate.map(UInt32.init(clamping:))
+        )
+    }
+}
+
+extension WireBranchStationKind {
+    public init(_ kind: BranchDetail.Kind) {
+        switch kind {
+        case .meaning: self = .meaning
+        case .association: self = .association
+        case .macro: self = .macro
+        }
     }
 }
 
@@ -353,7 +408,8 @@ public struct RoutedActions: Sendable, Equatable {
     /// composition は組み立て中の文字全体の位置(予測の窓を置く基準)．知らせない DLL では nil．
     /// hints と listHints は分岐図と一覧の足元のキーの案内(FooterHints)．paletteCellSize は設定のパレットのマスの大きさ(パレットを出すときに添える)
     public init(_ actions: [ClientAction], anchor: WireRect?, composition: WireRect? = nil, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] },
-                listHints: (CandidatePanel) -> [WireKeyHint] = { _ in [] }, paletteCellSize: Double = DefaultSettings.paletteCellSize) {
+                listHints: (CandidatePanel) -> [WireKeyHint] = { _ in [] }, placedHints: (LatticePanel) -> WireBranchHints? = { _ in nil },
+                paletteCellSize: Double = DefaultSettings.paletteCellSize) {
         // 次の組み立て中の文字で置き換える，入力位置の前の文字の長さ(予測の確定の取り消し)
         var replacedLength: UInt32?
         for action in actions {
@@ -372,7 +428,7 @@ public struct RoutedActions: Sendable, Equatable {
             case .showCandidates(let panel):
                 ui.append(.showCandidates(list: WireCandidateList(panel, hints: listHints(panel)), anchor: anchor))
             case .showLattice(let panel):
-                ui.append(.showBranchMap(map: WireBranchMap(panel, hints: hints(panel)), anchor: anchor))
+                ui.append(.showBranchMap(map: WireBranchMap(panel, hints: hints(panel), placedHints: placedHints(panel)), anchor: anchor))
             case .hideCandidates:
                 ui.append(.hide)
             case .showModeIndicator(let mode):
@@ -414,6 +470,18 @@ public struct RoutedActions: Sendable, Equatable {
             case .runCommand(let command):
                 host.append(.runCommand(command))
             }
+        }
+        // 候補の窓は 1 つで，モードの表示は一覧や分岐図と同じ窓に出す．一覧か分岐図を出したままモードを切り替えたとき
+        // (文節を打ち直しているあいだの かな・英数 の切り替え)は，モードの表示で一覧や分岐図を消さない(macOS はモードの表示が別の窓)
+        var panelShown = false
+        ui = ui.filter { command in
+            switch command {
+            case .showBranchMap, .showCandidates: panelShown = true
+            case .hide: panelShown = false
+            case .showMode: return !panelShown
+            default: break
+            }
+            return true
         }
         // 候補の窓を組み立て中の文字の途中(今打っている文節・選んでいる文節)にそろえるときは，その位置を組み立て中の文字の
         // 書き換えに添える．画面の上の位置は入力先のアプリにしか分からないので，DLL がその字の位置を求めて送り直す(macOS は panelAnchor)

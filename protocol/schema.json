@@ -1460,6 +1460,15 @@
         },
         {
           "name": "takeWordRegistration"
+        },
+        {
+          "name": "branchLayout",
+          "fields": [
+            {
+              "name": "mirrored",
+              "type": "bool"
+            }
+          ]
         }
       ]
     },
@@ -2103,6 +2112,14 @@
         {
           "name": "isEditing",
           "type": "bool?"
+        },
+        {
+          "name": "jumpKey",
+          "type": "string?"
+        },
+        {
+          "name": "variantKeys",
+          "type": "[string?]?"
         }
       ]
     },
@@ -2127,6 +2144,109 @@
         {
           "name": "label",
           "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "BranchHints",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "boundary",
+          "type": "[KeyHint]"
+        },
+        {
+          "name": "variant",
+          "type": "KeyHint?"
+        },
+        {
+          "name": "candidates",
+          "type": "[KeyHint]"
+        },
+        {
+          "name": "expand",
+          "type": "KeyHint?"
+        },
+        {
+          "name": "items",
+          "type": "[KeyHint]?"
+        }
+      ]
+    },
+    {
+      "name": "BranchStationKind",
+      "kind": "enum",
+      "cases": [
+        "meaning",
+        "association",
+        "macro"
+      ]
+    },
+    {
+      "name": "BranchStation",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "kind",
+          "type": "BranchStationKind"
+        },
+        {
+          "name": "title",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "BranchDetail",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "stations",
+          "type": "[BranchStation]"
+        },
+        {
+          "name": "current",
+          "type": "u32?"
+        },
+        {
+          "name": "items",
+          "type": "[string]"
+        },
+        {
+          "name": "selectedItem",
+          "type": "u32?"
+        },
+        {
+          "name": "label",
+          "type": "string"
+        },
+        {
+          "name": "group",
+          "type": "u32"
+        },
+        {
+          "name": "groupCount",
+          "type": "u32"
+        },
+        {
+          "name": "position",
+          "type": "u32"
+        },
+        {
+          "name": "total",
+          "type": "u32"
+        },
+        {
+          "name": "pageSize",
+          "type": "u32"
+        },
+        {
+          "name": "candidates",
+          "type": "[string]"
+        },
+        {
+          "name": "selectedCandidate",
+          "type": "u32?"
         }
       ]
     },
@@ -2169,6 +2289,54 @@
         {
           "name": "meaningPlacement",
           "type": "MeaningPlacement?"
+        },
+        {
+          "name": "collapsesVariants",
+          "type": "bool?"
+        },
+        {
+          "name": "collapsesDetail",
+          "type": "bool?"
+        },
+        {
+          "name": "placedHints",
+          "type": "BranchHints?"
+        },
+        {
+          "name": "trunkFocused",
+          "type": "bool?"
+        },
+        {
+          "name": "pageSize",
+          "type": "u32?"
+        },
+        {
+          "name": "hintsOnHold",
+          "type": "bool?"
+        },
+        {
+          "name": "groupStart",
+          "type": "u32?"
+        },
+        {
+          "name": "groupEnd",
+          "type": "u32?"
+        },
+        {
+          "name": "continuesBefore",
+          "type": "bool?"
+        },
+        {
+          "name": "continuesAfter",
+          "type": "bool?"
+        },
+        {
+          "name": "keepsWidth",
+          "type": "bool?"
+        },
+        {
+          "name": "detail",
+          "type": "BranchDetail?"
         }
       ]
     },

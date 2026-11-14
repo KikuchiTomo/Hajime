@@ -394,11 +394,11 @@ struct InputExtrasTests {
         #expect(ConversionMacros.results(text: "東京", reading: "とうきょう", macros: macros).isEmpty)
     }
 
-    @Test("設定の新しい項目は既定でオフで，ファイルに書いて読み戻せる")
+    @Test("手のずれの補正(試験的)だけ既定でオフで，ほかの項目は既定でオン．ファイルに書いて読み戻せる")
     func settingsRoundTrip() throws {
         let defaults = Settings()
-        #expect(!defaults.handShiftCorrection && !defaults.looseReadings && !defaults.phoneticSpelling && !defaults.dynamicDictionary
-            && !defaults.conversionMacros && !defaults.launcherCommands)
+        #expect(!defaults.handShiftCorrection)
+        #expect(defaults.looseReadings && defaults.phoneticSpelling && defaults.dynamicDictionary && defaults.conversionMacros && defaults.launcherCommands)
         var settings = Settings()
         settings.handShiftCorrection = true
         settings.launcherCommands = true

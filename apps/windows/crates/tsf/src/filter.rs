@@ -41,6 +41,45 @@ pub fn preserved_chords(state: &SessionState) -> Option<Vec<KeyChord>> {
     Some(chords)
 }
 
+/// 組み立て中(入力中・変換中)に足して予約するキー．Alt+英字・数字・記号・矢印．
+/// Windows 11 のメモ帳などの XAML の入力欄では，Alt の付いたキーがアプリのメニュー(Alt+F の「ファイル」など)に回り，
+/// キーのシンクを通らないので，変換中の Alt+→(要確認の文節)や文節へ移るキー(Alt+A など)が届かない．
+/// 組み立て中はもともとすべてのキーを受け取る(consumes)ので，予約しても振る舞いは変わらない．
+/// 組み立てが終われば外し，アプリのメニューはこれまでどおり開く
+pub fn composing_chords() -> Vec<KeyChord> {
+    let alt = Modifiers {
+        shift: false,
+        control: false,
+        alt: true,
+    };
+    let characters = ('a'..='z')
+        .chain('0'..='9')
+        .chain([';', ',', '.', '/', '-'])
+        .map(|character| Key::Character {
+            text: character.to_string(),
+        });
+    characters
+        .chain([Key::Left, Key::Right, Key::Up, Key::Down])
+        .map(|key| KeyChord {
+            key,
+            modifiers: alt.clone(),
+        })
+        .collect()
+}
+
+/// 予約するキー．組み立て中は，入力していないときの表のキー(idle)に composing_chords を足す
+pub fn chords_while(composing: bool, idle: &[KeyChord]) -> Vec<KeyChord> {
+    let mut chords = idle.to_vec();
+    if composing {
+        for chord in composing_chords() {
+            if !chords.contains(&chord) {
+                chords.push(chord);
+            }
+        }
+    }
+    chords
+}
+
 fn normalized(key: &Key, modifiers: &Modifiers) -> KeyChord {
     let (key, shift) = match key {
         Key::Character { text } => {
@@ -94,6 +133,53 @@ mod tests {
             preceding_text_length: None,
             keyboard_layout: None,
         }
+    }
+
+    #[test]
+    fn 組み立て中だけ_alt_の英字と矢印を足して予約する() {
+        let palette = KeyChord {
+            key: Key::Character { text: "e".into() },
+            modifiers: Modifiers {
+                shift: false,
+                control: true,
+                alt: true,
+            },
+        };
+        let alt = |key: Key| KeyChord {
+            key,
+            modifiers: Modifiers {
+                shift: false,
+                control: false,
+                alt: true,
+            },
+        };
+        let idle = vec![palette.clone()];
+        // 入力していないときは表のキーだけ(アプリの Alt+F のメニューを奪わない)
+        assert_eq!(chords_while(false, &idle), idle);
+        let composing = chords_while(true, &idle);
+        assert_eq!(composing.first(), Some(&palette));
+        for key in [
+            Key::Character { text: "a".into() },
+            Key::Character { text: ";".into() },
+            Key::Character { text: "8".into() },
+            Key::Right,
+            Key::Down,
+            Key::Up,
+        ] {
+            assert!(composing.contains(&alt(key)));
+        }
+        // 予約できる数の上限(preserved::LIMIT の 64)に，表のキーの分の余裕を残す
+        assert!(composing_chords().len() <= 48);
+        // 表のキーと重なるものは 2 回入れない
+        let overlapping = vec![alt(Key::Right)];
+        let merged = chords_while(true, &overlapping);
+        assert_eq!(
+            merged
+                .iter()
+                .filter(|chord| **chord == alt(Key::Right))
+                .count(),
+            1
+        );
     }
 
     #[test]

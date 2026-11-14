@@ -275,6 +275,8 @@ mod tests {
             alternative_details: None,
             source_name: None,
             split: None,
+            jump_key: None,
+            variant_keys: None,
         };
         let map = BranchMap {
             association: None,
@@ -286,6 +288,18 @@ mod tests {
             note: None,
             hints: vec![],
             meaning_placement: None,
+            collapses_variants: None,
+            collapses_detail: None,
+            placed_hints: None,
+            trunk_focused: None,
+            page_size: None,
+            hints_on_hold: None,
+            group_start: None,
+            group_end: None,
+            continues_before: None,
+            continues_after: None,
+            keeps_width: None,
+            detail: None,
         };
         assert_eq!(branch_map(&map).as_deref(), Some("晴れ"));
 
@@ -350,6 +364,8 @@ mod tests {
             alternative_details: None,
             source_name: None,
             split: None,
+            jump_key: None,
+            variant_keys: None,
         };
         let map = |column: BranchColumn| BranchMap {
             association: None,
@@ -361,6 +377,18 @@ mod tests {
             note: None,
             hints: vec![],
             meaning_placement: None,
+            collapses_variants: None,
+            collapses_detail: None,
+            placed_hints: None,
+            trunk_focused: None,
+            page_size: None,
+            hints_on_hold: None,
+            group_start: None,
+            group_end: None,
+            continues_before: None,
+            continues_after: None,
+            keeps_width: None,
+            detail: None,
         };
         assert_eq!(
             branch_map(&map(column.clone())).as_deref(),

@@ -47,11 +47,16 @@ final class HajimeInputController: IMKInputController {
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {
-        Int(NSEvent.EventTypeMask.keyDown.rawValue)
+        // 修飾キーの押し方も受け取る(分岐図で，押し続けている修飾キーを使うキーの案内を出すため)．キーとしては処理せず，入力先のアプリに渡す
+        Int(NSEvent.EventTypeMask.keyDown.rawValue | NSEvent.EventTypeMask.flagsChanged.rawValue)
     }
 
     @MainActor
     override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+        if let event, event.type == .flagsChanged {
+            presenter.modifiersChanged(event.modifierFlags)
+            return false
+        }
         guard let event, let client = sender as? any IMKTextInput,
             let key = NSEventKeyTranslator.translate(event) else { return false }
         let signposter = InputSignposts.signposter
@@ -60,6 +65,8 @@ final class HajimeInputController: IMKInputController {
         followUpTask?.cancel()
         followUpTask = nil
         let context = root.contextProvider.context(for: client, includePrecedingText: !session.isComposing)
+        // 矢印キーは表示の向きに効かせる．今出している分岐図が先の枝を左へ出しているかを，キーを渡す前に知らせる
+        session.branchMirrored = presenter.isBranchMirrored
         let result = signposter.withIntervalSignpost("session") { session.handle(key, context: context) }
         if !result.handled {
             root.passThroughDiagnostics.recordPassThrough(key, mode: session.mode, context: context)

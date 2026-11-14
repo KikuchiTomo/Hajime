@@ -98,6 +98,9 @@ pub mod settings {
     /// UIStrings.Settings.fontSize から値を除いたもの
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
     pub const WORD_CLASS: &str = "品詞";
+    /// 品詞の一覧の組の見出し(macOS の UIStrings.Settings.personNameGroup・otherWordClasses)
+    pub const PERSON_NAME_GROUP: &str = "人名";
+    pub const OTHER_WORD_CLASSES: &str = "その他";
     pub const COMMENT: &str = "コメント";
     pub const COMMENT_PROMPT: &str = "コメント(省略可)";
     pub const ABBREVIATION_NOTE: &str = "読みだけを変換したときに出ます";
@@ -137,6 +140,20 @@ pub mod choice {
     pub const ENGLISH_AUTO_EXAMPLE: (&str, &str) = ("zoom dekaigi", "zoom で会議");
     pub const VARIANT_ROW: &str = "候補の上に文字種の行を表示";
     pub const KEY_HINTS: &str = "キーの案内を表示";
+    pub const FEWER_ITEMS: &str = "表示項目を減らす";
+    pub const BRANCH_STARTS_ON_TRUNK: &str = "変換の直後に文節を選択";
+    pub const BRANCH_HINTS_ALWAYS: &str = "分岐図のキーの案内を常に表示";
+    pub const BRANCH_SEGMENTS: &str = "分岐図に一度に表示する文節数";
+    pub const BRANCH_WINDOW_WIDTH: &str = "分岐図の窓の幅";
+
+    /// 分岐図に一度に出す文節の数の表示．0 は区切らずにすべて出す
+    pub fn branch_segment_count(value: f64) -> String {
+        if value == 0.0 {
+            "すべて".to_string()
+        } else {
+            format!("{value} 文節")
+        }
+    }
     pub const TYPO_CORRECTION: &str = "タイプミスの修正";
     pub const YEN_KEY: &str = "¥ キーで入力する文字";
     pub const THEME: &str = "テーマ";
@@ -677,6 +694,11 @@ pub mod more {
     pub const IMPORT_SETTINGS: &str = "設定をインポート…";
     pub const EXPORT_SETTINGS_FILE_NAME: &str = "hajime-settings.json";
     pub const SETTINGS_IMPORTED: &str = "設定をインポートしました";
+
+    /// 読めなかった設定のファイルを脇に置いて，既定の設定で起動したことの知らせ(macOS の UIStrings.Settings.setAside と同じ文)
+    pub fn set_aside(name: &str) -> String {
+        format!("設定ファイルのエラーのため既定の設定で起動しました。元のファイルは「{name}」に保存しました")
+    }
     pub const SETTINGS_EXPORTED: &str = "設定をエクスポートしました";
     pub const SETTINGS_IMPORT_FAILED: &str =
         "インポートできませんでした。ファイルのサイズか形式が正しくありません";
@@ -719,6 +741,8 @@ pub mod keys {
     pub const SEARCH_PROMPT: &str = "コマンドやキーで検索";
     pub const SEARCH_BY_KEY: &str = "キーで検索";
     pub const SEARCH_BY_KEY_HELP: &str = "押したキーで絞り込み";
+    /// 押したキーで絞り込んでいるあいだのチップ(押すと外す．UIStrings.Keys.clearKeyFilter)
+    pub const CLEAR_KEY_FILTER: &str = "絞り込みを解除";
     pub const TAB: &str = "キー設定";
     pub const PRESET_MENU: &str = "ひな形を読み込む";
     pub const CUSTOM_PRESET: &str = "カスタム";
@@ -733,6 +757,18 @@ pub mod keys {
     pub const DUPLICATE: &str = "複製";
     pub const PRESS: &str = "キーを押してください";
     pub const RECORD: &str = "キーを記録";
+    pub const STOP_RECORDING: &str = "記録を停止";
+    /// キーの欄の右の，押して記録しにくいキーと修飾キーを選ぶメニュー(UIStrings.Keys.chooseKey)
+    pub const CHOOSE_KEY: &str = "キーを選択";
+
+    /// メニューの中の修飾キーの項目．付いていれば外す，付いていなければ付ける
+    pub fn modifier_item(name: &str, on: bool) -> String {
+        if on {
+            format!("{name} を外す")
+        } else {
+            format!("{name} を付ける")
+        }
+    }
     pub const LOAD_PRESET_TITLE: &str = "ひな形を読み込みますか？";
     pub const RESTORE_TITLE: &str = "既定の表に戻しますか？";
     pub const RESTORE_MESSAGE: &str = "追加した行と変更した行は削除されます。";
@@ -748,6 +784,11 @@ pub mod keys {
     }
     pub const PLAIN_CHARACTER: &str = "この状態ではこの文字を入力できなくなります";
     pub const ADD_STANDARD_KEYS: &str = "既定のキーを追加";
+
+    /// 足す前の新しい行と同じ状態・同じキーの行があるとき(UIStrings.Keys.duplicateWarning)
+    pub fn duplicate_warning(row: &str) -> String {
+        format!("同じキーの行より優先します: {row}")
+    }
 
     pub fn load_preset_message(name: &str) -> String {
         format!("現在のキー設定を「{name}」で置き換えます。")
@@ -822,6 +863,14 @@ pub mod keys {
         ("lastSegment", "末尾の文節"),
         ("nextUncertainSegment", "誤りやすい次の文節"),
         ("previousUncertainSegment", "誤りやすい前の文節"),
+        ("jumpToSegment1", "1 番目の文節"),
+        ("jumpToSegment2", "2 番目の文節"),
+        ("jumpToSegment3", "3 番目の文節"),
+        ("jumpToSegment4", "4 番目の文節"),
+        ("jumpToSegment5", "5 番目の文節"),
+        ("jumpToSegment6", "6 番目の文節"),
+        ("jumpToSegment7", "7 番目の文節"),
+        ("jumpToSegment8", "8 番目の文節"),
         ("extendSegment", "文節を伸ばす"),
         ("shrinkSegment", "文節を縮める"),
         ("extendSegmentToWord", "文節を単語単位で伸ばす"),
@@ -852,6 +901,7 @@ pub mod keys {
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
         ("expandCandidates", "候補を表に展開"),
+        ("enterBranch", "候補の先の枝へ移動"),
     ];
     /// コマンドの説明(UIStrings.Keys.help(for:))．名前で分かるコマンドは並べない
     pub const COMMAND_HELP: &[(&str, &str)] = &[
@@ -877,6 +927,14 @@ pub mod keys {
         ),
         ("nextUncertainSegment", "誤変換の多い文節に移動します"),
         ("previousUncertainSegment", "誤変換の多い文節に移動します"),
+        ("jumpToSegment1", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment2", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment3", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment4", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment5", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment6", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment7", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment8", "分岐図の，その位置の文節に移動します"),
         (
             "extendSegmentToWord",
             "文節の終わりを単語の切れ目まで動かします",
@@ -924,6 +982,10 @@ pub mod keys {
         ("registerWord", "選択中の文字でユーザー辞書の登録を開きます"),
         ("openMenu", "入力メニューを入力位置に表示します"),
         ("expandCandidates", "候補を表に展開します"),
+        (
+            "enterBranch",
+            "選んでいる候補の意味・連想・変換マクロへ移動します",
+        ),
     ];
 }
 
@@ -1170,6 +1232,11 @@ pub mod sync {
         ("prefersKatakana", "カタカナ語を優先"),
         ("showsVariantRow", "候補の上に文字種の行を表示"),
         ("showsKeyHints", "キーの案内を表示"),
+        ("showsFewerItems", "表示項目を減らす"),
+        ("alwaysShowsBranchHints", "分岐図のキーの案内を常に表示"),
+        ("branchStartsOnTrunk", "変換の直後に文節を選択"),
+        ("branchSegmentsPerGroup", "分岐図に一度に表示する文節数"),
+        ("branchWindowWidth", "分岐図の窓の幅"),
         ("numberKeySelection", "数字キーで候補を選択"),
         ("dateConversion", "日付と時刻に変換"),
         ("symbolConversion", "記号に変換"),
@@ -1240,6 +1307,8 @@ pub mod sync {
 
 /// Windows の画面だけの文言
 pub mod windows {
+    /// キーを選ぶメニューの中の，ファンクションキーの一覧を開く項目(macOS は入れ子のメニューの見出し「ファンクションキー」)
+    pub const FUNCTION_KEYS_ITEM: &str = "ファンクションキー…";
     /// 入力欄のすぐ下の，入れたときの結果の頭に置く印(macOS は arrow.turn.down.right の絵)
     pub const RESULT_MARK: &str = "↪ ";
     /// 書き方のチップを開け閉めするボタンの字(macOS は curlybraces の記号)
@@ -1344,8 +1413,7 @@ pub mod wizard {
     pub const INITIAL_FOCUS: &str = "最初に選択する文節";
     pub const CHARACTERS_TITLE: &str = "入力する文字";
     pub const FEATURES_TITLE: &str = "便利な機能";
-    pub const EXTRAS_TITLE: &str = "試験的な機能";
-    pub const EXTRAS_DETAIL: &str = "既定ではオフの機能です。";
+    pub const EXTRAS_TITLE: &str = "そのほかの機能";
     pub const MACROS: &str = "変換マクロ";
     pub const MACROS_DETAIL: &str =
         "連想変換と同じ Shift + Space で、選択中の単語を「」で囲む・ルビを付けるなどして表示します。";

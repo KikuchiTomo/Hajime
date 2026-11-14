@@ -86,6 +86,8 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     /// 候補を表に広げる(一覧の候補の数 × 設定の列の数を 1 ページにし，列を横に並べる)．広げているときは元に戻す．
     /// 表では文節を移るキーで列を移り，番号キーは選んでいる列の中で選ぶ．Esc でも元に戻す
     case expandCandidates
+    /// 分岐図で，選んでいる候補の先の枝(語の意味・連想・変換マクロ)へ移る．先の枝の中では次の丸へ移る．先の枝が無ければ次の文節へ移る
+    case enterBranch
 
     // 文節
     case nextSegment
@@ -95,6 +97,15 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
     /// 確信の低い次の文節へ移る
     case nextUncertainSegment
     case previousUncertainSegment
+    /// 分岐図の 1〜8 番目の文節へ移る(→ を何度も押さずに，離れた文節へ 1 回で移る)
+    case jumpToSegment1
+    case jumpToSegment2
+    case jumpToSegment3
+    case jumpToSegment4
+    case jumpToSegment5
+    case jumpToSegment6
+    case jumpToSegment7
+    case jumpToSegment8
     case extendSegment
     case shrinkSegment
     /// 文節の終わりを次の語の切れ目まで延ばす(1 文字ずつの extendSegment より少ない打鍵で長さを変える)
@@ -167,6 +178,14 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case tools
     }
 
+    /// 文節へ移るコマンド．1 番目の文節から順
+    public static let segmentJumps: [KeymapCommand] = [
+        .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8,
+    ]
+
+    /// 文節へ移るコマンドなら，移る先の文節の位置(0 から)
+    public var segmentJumpIndex: Int? { Self.segmentJumps.firstIndex(of: self) }
+
     public var group: Group {
         switch self {
         case .japaneseMode, .directMode, .toggleMode, .nextInputStyle, .romajiStyle, .kanaStyle, .englishStyle, .englishAutoStyle,
@@ -176,8 +195,9 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType,
              .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: .scripts
         case .nextCandidate, .previousCandidate, .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .associate,
-             .expandCandidates: .candidates
+             .expandCandidates, .enterBranch: .candidates
         case .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
+             .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment: .segments
         case .commit, .commitFirstSegment, .cancel, .backToReading, .resumeEditing, .undoConversionEdit, .undoPrediction, .undoCommit: .commit
         case .forgetCandidate, .forgetLastCommit, .hidePrediction: .learning
@@ -199,8 +219,9 @@ public enum KeymapCommand: String, Sendable, Hashable, Codable, CaseIterable {
         case .convert, .convertWithoutLearning, .deleteBackward, .insertBoundary, .acceptSuggestion, .hidePrediction: [.composing]
         case .toHiragana, .toKatakana, .toHalfwidthKatakana, .toFullwidthAlphanumeric, .toHalfwidthAlphanumeric, .switchKanaType,
              .commit, .cancel, .nextCandidate, .previousCandidate, .associate: [.composing, .converting]
-        case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .expandCandidates,
+        case .nextCandidatePage, .previousCandidatePage, .firstCandidate, .lastCandidate, .expandCandidates, .enterBranch,
              .nextSegment, .previousSegment, .firstSegment, .lastSegment, .nextUncertainSegment, .previousUncertainSegment,
+             .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8,
              .extendSegment, .shrinkSegment, .extendSegmentToWord, .shrinkSegmentToWord, .splitSegment, .editSegment, .commitFirstSegment, .backToReading,
              .resumeEditing, .undoConversionEdit, .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana,
              .forgetCandidate: [.converting]
