@@ -197,6 +197,16 @@ impl ThemeAction {
     ];
 }
 
+/// カスタムテーマの行の右のボタンの名前(ThemeAction::ROW の番号)．行のメニューの項目も同じ名前にする
+fn theme_button_label(button: usize) -> &'static str {
+    match ThemeAction::ROW.get(button) {
+        Some(ThemeAction::Edit) => more::EDIT_THEME,
+        Some(ThemeAction::Duplicate) => more::DUPLICATE_THEME,
+        Some(_) => more::DELETE_THEME,
+        None => "",
+    }
+}
+
 /// カスタムテーマの編集の画面の下のボタン(macOS の CustomThemeEditor)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EditorAction {
@@ -1031,8 +1041,12 @@ impl RowState {
     }
 
     /// 表の行を右クリックしたときのメニューの項目(macOS の RuleListEditor・KeymapPage の contextMenu)．
-    /// 1 行だけ選んでいれば編集，選んだ行があれば削除，キー設定は複製も
+    /// 1 行だけ選んでいれば編集，選んだ行があれば削除，キー設定は複製も．
+    /// カスタムテーマの行は右のボタンと同じ編集・複製・削除(macOS の AppearancePage の contextMenu)
     fn row_menu(&self) -> Vec<RowMenuItem> {
+        if let Control::CustomTheme(_) = self.row.control {
+            return theme_menu(&self.row.control, self.visible && self.enabled, self.room);
+        }
         if !self.has_add_remove() || !self.enabled {
             return Vec::new();
         }
@@ -1595,12 +1609,7 @@ impl RowState {
             },
             Part::Button(index) => match self.row.control {
                 Control::Buttons(buttons) => buttons.get(index).map_or("", |(label, _)| label),
-                Control::CustomTheme(_) => match ThemeAction::ROW.get(index) {
-                    Some(ThemeAction::Edit) => more::EDIT_THEME,
-                    Some(ThemeAction::Duplicate) => more::DUPLICATE_THEME,
-                    Some(_) => more::DELETE_THEME,
-                    None => "",
-                },
+                Control::CustomTheme(_) => theme_button_label(index),
                 _ => "",
             },
             Part::Segment(index) => match self.row.control {
@@ -1694,6 +1703,24 @@ impl RowState {
                 .unwrap_or_default(),
             _ => Vec::new(),
         }
+    }
+
+    /// ドロップダウンの一覧の組(見出しと区切りの線)．組に分けない一覧は空．
+    /// 選択肢を絞っているとき(キー設定のコマンド)は番号がずれるので分けない
+    fn dropdown_groups(&self, part: Part) -> &'static [options::ChoiceGroup] {
+        let Part::Field(index) = part else {
+            return &[];
+        };
+        self.row
+            .control
+            .list_spec()
+            .and_then(|spec| spec.fields.get(index))
+            .filter(|field| {
+                field
+                    .choices
+                    .is_some_and(|choices| self.choice_positions(index).len() == choices.len())
+            })
+            .map_or(&[], |field| field.groups)
     }
 
     /// ドロップダウンで選んでいる番号
@@ -2927,6 +2954,20 @@ impl PageView {
             })
     }
 
+    /// 一覧を組に分けて出す初めのドロップダウン(見本の書き出しで開いて写す)
+    pub fn grouped_dropdown(&self) -> Option<Element> {
+        self.elements()
+            .into_iter()
+            .find(|element| !self.dropdown_groups(*element).is_empty())
+    }
+
+    /// ドロップダウンの一覧の組(見出しと区切りの線)．組に分けない一覧は空
+    pub fn dropdown_groups(&self, element: Element) -> &'static [options::ChoiceGroup] {
+        self.rows
+            .get(element.row)
+            .map_or(&[], |row| row.dropdown_groups(element.part))
+    }
+
     /// ポインターを載せた部品を変える．動きが始まったら true
     pub fn set_hover(&mut self, element: Option<Element>, now: f64) {
         let duration = f64::from(motion::HOVER);
@@ -3627,7 +3668,16 @@ impl PageView {
             .is_some_and(|row| !row.row_menu().is_empty())
     }
 
-    /// 表の行のメニューで index を選んだ．編集は入力欄に写し，複製と削除は表の下のボタンと同じにする
+    /// 右クリックでメニューを出せる行か(表でない行．カスタムテーマの行の，選ぶところと右のボタン)
+    pub fn row_menu_opens(&self, element: Element) -> bool {
+        matches!(element.part, Part::Radio | Part::Button(_))
+            && self.rows.get(element.row).is_some_and(|row| {
+                matches!(row.row.control, Control::CustomTheme(_)) && !row.row_menu().is_empty()
+            })
+    }
+
+    /// 表の行のメニューで index を選んだ．編集は入力欄に写し，複製と削除は表の下のボタンと同じにする．
+    /// カスタムテーマの行のメニューは，行の右のボタンを押したのと同じにする
     pub fn choose_row_menu(&mut self, row_index: usize, index: usize, now: f64) -> Option<Event> {
         let row = self.rows.get_mut(row_index)?;
         let item = *row.row_menu().get(index)?;
@@ -3650,6 +3700,13 @@ impl PageView {
                 Element {
                     row: row_index,
                     part: Part::Bottom(0),
+                },
+                now,
+            ),
+            RowMenuItem::Theme(button) => self.activate(
+                Element {
+                    row: row_index,
+                    part: Part::Button(button),
                 },
                 now,
             ),
@@ -6002,6 +6059,23 @@ enum RowMenuItem {
     Edit,
     Duplicate,
     Remove,
+    /// カスタムテーマの行の右のボタン(ThemeAction::ROW の番号)と同じ操作
+    Theme(usize),
+}
+
+/// 行を右クリックしたときのメニューの項目．カスタムテーマの行だけ，右のボタンと同じ並びで編集・複製・削除を出す
+/// (macOS の AppearancePage の contextMenu)．既成のテーマの行には出さない．
+/// 複製は上限まで作ったら(room が false)ボタンが使えないので，メニューにも出さない
+fn theme_menu(control: &Control, enabled: bool, room: bool) -> Vec<RowMenuItem> {
+    if !enabled || !matches!(control, Control::CustomTheme(_)) {
+        return Vec::new();
+    }
+    ThemeAction::ROW
+        .iter()
+        .enumerate()
+        .filter(|(_, action)| room || **action != ThemeAction::Duplicate)
+        .map(|(button, _)| RowMenuItem::Theme(button))
+        .collect()
 }
 
 impl RowMenuItem {
@@ -6010,6 +6084,7 @@ impl RowMenuItem {
             RowMenuItem::Edit => crate::strings::rule_list::EDIT,
             RowMenuItem::Duplicate => keys::DUPLICATE,
             RowMenuItem::Remove => crate::strings::settings::REMOVE,
+            RowMenuItem::Theme(button) => theme_button_label(button),
         }
     }
 }
@@ -6672,6 +6747,55 @@ fn font_items(
                 .collect();
             (items, choice)
         }
+    }
+}
+
+#[cfg(test)]
+mod theme_menu_tests {
+    use super::*;
+
+    fn labels(items: &[RowMenuItem]) -> Vec<&'static str> {
+        items.iter().map(|item| item.label()).collect()
+    }
+
+    #[test]
+    fn カスタムテーマの行のメニューは右のボタンと同じ編集_複製_削除() {
+        let items = theme_menu(&Control::CustomTheme(1), true, true);
+        assert_eq!(
+            items,
+            [
+                RowMenuItem::Theme(0),
+                RowMenuItem::Theme(1),
+                RowMenuItem::Theme(2)
+            ]
+        );
+        assert_eq!(
+            labels(&items),
+            [more::EDIT_THEME, more::DUPLICATE_THEME, more::DELETE_THEME]
+        );
+        // 項目の番号は行の右のボタンの番号(同じ操作を呼ぶ)
+        for (button, action) in ThemeAction::ROW.iter().enumerate() {
+            let expected = match action {
+                ThemeAction::Edit => more::EDIT_THEME,
+                ThemeAction::Duplicate => more::DUPLICATE_THEME,
+                _ => more::DELETE_THEME,
+            };
+            assert_eq!(RowMenuItem::Theme(button).label(), expected);
+        }
+    }
+
+    #[test]
+    fn 既成のテーマの行と使えない行にはメニューを出さない() {
+        assert!(theme_menu(&Control::ThemeOption("indigo"), true, true).is_empty());
+        assert!(theme_menu(&Control::Toggle, true, true).is_empty());
+        assert!(theme_menu(&Control::CustomTheme(0), false, true).is_empty());
+    }
+
+    #[test]
+    fn 上限まで作ったら複製を出さない() {
+        let items = theme_menu(&Control::CustomTheme(0), true, false);
+        assert_eq!(labels(&items), [more::EDIT_THEME, more::DELETE_THEME]);
+        assert_eq!(items, [RowMenuItem::Theme(0), RowMenuItem::Theme(2)]);
     }
 }
 

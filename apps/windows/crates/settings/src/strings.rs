@@ -98,6 +98,9 @@ pub mod settings {
     /// UIStrings.Settings.fontSize から値を除いたもの
     pub const FONT_SIZE_NAME: &str = "候補の文字サイズ";
     pub const WORD_CLASS: &str = "品詞";
+    /// 品詞の一覧の組の見出し(macOS の UIStrings.Settings.personNameGroup・otherWordClasses)
+    pub const PERSON_NAME_GROUP: &str = "人名";
+    pub const OTHER_WORD_CLASSES: &str = "その他";
     pub const COMMENT: &str = "コメント";
     pub const COMMENT_PROMPT: &str = "コメント(省略可)";
     pub const ABBREVIATION_NOTE: &str = "読みだけを変換したときに出ます";

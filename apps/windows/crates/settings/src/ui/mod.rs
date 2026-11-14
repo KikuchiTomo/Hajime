@@ -1,9 +1,10 @@
 #![forbid(unsafe_code)]
 
-//! 設定の画面の OS に依存しない部分(動き・スクロール・表の選び方・左の一覧の並び)．
+//! 設定の画面の OS に依存しない部分(動き・スクロール・表の選び方・左の一覧の並び・開いた一覧の行の並び)．
 //! 描き方と OS の呼び出しは app が受け持つ．ここは macOS でもテストできる
 
 pub mod anim;
+pub mod menu;
 pub mod nav;
 pub mod scroll;
 pub mod table;

@@ -1,9 +1,13 @@
 {{- /*
-機能の一覧の 1 項目．title が名前，中身が説明，link は詳しい説明のページ
+機能の一覧の 1 項目．image は説明用の画像(static からのパス．名前と説明が同じことを言うので，代替テキストは空にする)，
+title が名前，中身が説明，link は詳しい説明のページ
 */ -}}
 {{- $link := .Get "link" -}}
 {{- $href := cond (hasPrefix $link "/") ($link | relURL) $link -}}
 <li class="hajime-catalog__item">
+  {{- with .Get "image" }}
+  <img class="hajime-catalog__image" src="{{ . | relURL }}" alt="" width="1000" height="625" loading="lazy" decoding="async" />
+  {{- end }}
   <h4 class="hajime-catalog__name">
     {{- if $link }}<a href="{{ $href }}">{{ .Get "title" }}</a>{{ else }}{{ .Get "title" }}{{ end -}}
   </h4>
