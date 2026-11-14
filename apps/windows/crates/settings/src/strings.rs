@@ -763,6 +763,11 @@ pub mod keys {
     pub const PLAIN_CHARACTER: &str = "この状態ではこの文字を入力できなくなります";
     pub const ADD_STANDARD_KEYS: &str = "既定のキーを追加";
 
+    /// 足す前の新しい行と同じ状態・同じキーの行があるとき(UIStrings.Keys.duplicateWarning)
+    pub fn duplicate_warning(row: &str) -> String {
+        format!("同じキーの行より優先します: {row}")
+    }
+
     pub fn load_preset_message(name: &str) -> String {
         format!("現在のキー設定を「{name}」で置き換えます。")
     }

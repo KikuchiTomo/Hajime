@@ -1070,6 +1070,18 @@ impl RowState {
         if !spec.is_valid(&item) {
             return Some((self.invalid_text.clone(), true));
         }
+        // キー設定は，同じ状態・同じキーの行と，文字を打てなくなるキーを知らせる(足すことはできる．macOS の KeymapPage の draftNote)
+        if spec.path == "keymap" {
+            let entries: Vec<(String, String, String)> = self
+                .table
+                .rows()
+                .iter()
+                .map(|cells| crate::keys::entry_of(cells))
+                .collect();
+            let note =
+                crate::keys::draft_note(item.first()?, item.get(1)?, &entries, self.editing)?;
+            return Some((note.text(), false));
+        }
         let shown = spec.display(&item);
         let fields = spec.fields.len();
         let others: Vec<&Vec<String>> = self

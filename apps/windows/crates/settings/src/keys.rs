@@ -326,6 +326,88 @@ pub fn with_missing(keymap: &Value, missing: &[KeymapMissing], standard: &Value)
     Some(Value::Array(entries))
 }
 
+/// 文字を打つ状態(修飾キーの無い文字のキーを置くと，その文字を打てなくなる状態．core の KeymapEntry.blocksTyping)
+const TYPING_STATES: &[&str] = &["anywhere", "idle", "composing"];
+
+/// 修飾キーの無い文字のキーを，文字を打つ状態に置いた行か(core の KeymapEntry.blocksTyping と KeyStroke.isPlainCharacter)．
+/// Shift だけを押した文字のキーも，その文字を打てなくなる
+pub fn blocks_typing(state: &str, key: &str) -> bool {
+    let Some(notation) = canonical(key) else {
+        return false;
+    };
+    let mut parts: Vec<&str> = notation.split(' ').collect();
+    let character = parts.pop().is_some_and(|key| key.chars().count() == 1);
+    character && parts.iter().all(|part| *part == "Shift") && TYPING_STATES.contains(&state)
+}
+
+/// 足す前の新しい行に添える知らせ(macOS の KeymapPage の draftNote)
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DraftNote {
+    /// 同じ状態・同じキーの行があり，新しい行がその行より優先される(その行を示す文)
+    Overrides(String),
+    /// 書き換えている行より下に同じ状態・同じキーの行があり，書き換えた行は使われない(下の行を示す文)
+    Hidden(String),
+    /// その文字を打てなくなる
+    PlainCharacter,
+}
+
+impl DraftNote {
+    /// 入力欄の下に出す文
+    pub fn text(&self) -> String {
+        match self {
+            DraftNote::Overrides(row) => crate::strings::keys::duplicate_warning(row),
+            DraftNote::Hidden(row) => crate::strings::keys::hidden(row),
+            DraftNote::PlainCharacter => crate::strings::keys::PLAIN_CHARACTER.to_string(),
+        }
+    }
+}
+
+/// 新しい行(state・key)を足す前の知らせ．entries は今の表の行(状態・キー・コマンド)，replacing は書き換えている行．
+/// 同じ状態・同じキーの行(いちばん下のもの)があればそれを知らせ，無ければ文字を打てなくなるキーを知らせる．
+/// 同じキーの行は下の行を使うので，足す行(表の最後に入る)と，下の行を書き換えるときは新しい行が優先される
+pub fn draft_note(
+    state: &str,
+    key: &str,
+    entries: &[(String, String, String)],
+    replacing: Option<usize>,
+) -> Option<DraftNote> {
+    let notation = canonical(key)?;
+    let existing = entries.iter().enumerate().rev().find(|(index, entry)| {
+        Some(*index) != replacing
+            && entry.0 == state
+            && canonical(&entry.1).as_deref() == Some(notation.as_str())
+    });
+    if let Some((index, _)) = existing {
+        let row = describe(entries, index as u32);
+        return Some(if replacing.is_some_and(|replacing| index > replacing) {
+            DraftNote::Hidden(row)
+        } else {
+            DraftNote::Overrides(row)
+        });
+    }
+    blocks_typing(state, &notation).then_some(DraftNote::PlainCharacter)
+}
+
+/// 表に出している行(状態・キー・コマンドの名前)を，設定のファイルの値(状態・キーの書き方・コマンド)に戻す．
+/// 読めないキーは空にする(どの行とも重ならない)
+pub fn entry_of(cells: &[String]) -> (String, String, String) {
+    let value = |choices: &[(&str, &str)], index: usize| {
+        let cell = cells.get(index).map_or("", String::as_str);
+        choices
+            .iter()
+            .find(|(_, label)| *label == cell)
+            .map_or_else(|| cell.to_string(), |(raw, _)| (*raw).to_string())
+    };
+    (
+        value(STATES, 0),
+        cells
+            .get(1)
+            .and_then(|cell| canonical(cell))
+            .unwrap_or_default(),
+        value(COMMANDS, 2),
+    )
+}
+
 /// 表の問題を 1 行ずつの文にする．entries は表の行(状態・キー・コマンド)
 pub fn report_lines(report: &KeymapReport, entries: &[(String, String, String)]) -> Vec<String> {
     use crate::strings::keys::{missing, PLAIN_CHARACTER};
@@ -510,6 +592,90 @@ mod tests {
         assert_eq!(
             lines[1],
             "入力中・Enter・確定: 同じキーの行があるため無効: 入力中・Enter・取り消し"
+        );
+    }
+
+    fn entry(state: &str, key: &str, command: &str) -> (String, String, String) {
+        (state.to_string(), key.to_string(), command.to_string())
+    }
+
+    #[test]
+    fn 足す前に同じ状態と同じキーの行を知らせる() {
+        let entries = vec![
+            entry("composing", "Enter", "commit"),
+            entry("composing", "Ctrl Space", "cancel"),
+            entry("converting", "Ctrl Space", "commit"),
+            entry("composing", "Ctrl Space", "commit"),
+        ];
+        // 同じ行がいくつもあれば，いちばん下(いま使われている行)を示す
+        assert_eq!(
+            draft_note("composing", "Ctrl+Space", &entries, None),
+            Some(DraftNote::Overrides("入力中・Ctrl+Space・確定".into()))
+        );
+        assert_eq!(
+            draft_note("composing", "ctrl space", &entries, None).map(|note| note.text()),
+            Some("同じキーの行より優先します: 入力中・Ctrl+Space・確定".into())
+        );
+        // 状態かキーが違えば知らせない
+        assert_eq!(draft_note("idle", "Ctrl Space", &entries, None), None);
+        assert_eq!(draft_note("composing", "Space", &entries, None), None);
+        // 読めないキーは知らせない(形の誤りは別に知らせる)
+        assert_eq!(draft_note("composing", "Hyper k", &entries, None), None);
+    }
+
+    #[test]
+    fn 書き換えている行は自分と比べず_下に同じキーの行があれば使われないと知らせる() {
+        let entries = vec![
+            entry("composing", "Enter", "commit"),
+            entry("composing", "Ctrl Space", "cancel"),
+            entry("composing", "Tab", "commit"),
+        ];
+        assert_eq!(draft_note("composing", "Enter", &entries, Some(0)), None);
+        assert_eq!(
+            draft_note("composing", "Ctrl Space", &entries, Some(0)),
+            Some(DraftNote::Hidden("入力中・Ctrl+Space・取り消し".into()))
+        );
+        assert_eq!(
+            draft_note("composing", "Ctrl Space", &entries, Some(2)),
+            Some(DraftNote::Overrides("入力中・Ctrl+Space・取り消し".into()))
+        );
+    }
+
+    #[test]
+    fn 足す前に文字を打てなくなるキーを知らせる() {
+        for state in ["anywhere", "idle", "composing"] {
+            assert_eq!(
+                draft_note(state, "k", &[], None),
+                Some(DraftNote::PlainCharacter),
+                "{state}"
+            );
+        }
+        assert_eq!(
+            draft_note("composing", "Shift k", &[], None),
+            Some(DraftNote::PlainCharacter)
+        );
+        // 文字を打たない状態，修飾キーのあるキー，文字でないキーは知らせない
+        assert_eq!(draft_note("converting", "k", &[], None), None);
+        assert_eq!(draft_note("direct", "k", &[], None), None);
+        assert_eq!(draft_note("composing", "Ctrl k", &[], None), None);
+        assert_eq!(draft_note("composing", "Space", &[], None), None);
+        assert_eq!(draft_note("composing", "F1", &[], None), None);
+        // 同じキーの行があれば，そちらを知らせる
+        assert_eq!(
+            draft_note("idle", "k", &[entry("idle", "k", "commit")], None),
+            Some(DraftNote::Overrides("未入力・K・確定".into()))
+        );
+    }
+
+    #[test]
+    fn 表に出している行を設定の値に戻す() {
+        let cells: Vec<String> = ["入力中", "Ctrl+Alt+K", "確定", "", "1"]
+            .iter()
+            .map(|cell| (*cell).to_string())
+            .collect();
+        assert_eq!(
+            entry_of(&cells),
+            entry("composing", "Ctrl Option k", "commit")
         );
     }
 
