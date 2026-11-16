@@ -38,7 +38,7 @@ layout: hextra-home
 </div>
 
 <figure class="hajime-showcase">
-  <img src="images/hero.webp" alt="「写真を撮る」の分岐図．文節・文字種・候補・意味が 1 本の線で結ばれ，矢印キーで選択する" width="2400" height="1120" />
+  <img src="images/hero.webp" alt="「写真を撮る」の変換候補のツリー表示．文節・文字種・候補・意味を矢印キーで選択可能" width="2400" height="1120" />
 </figure>
 
 {{< hajime/features title="主な機能" >}}
