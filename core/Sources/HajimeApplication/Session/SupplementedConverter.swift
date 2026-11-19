@@ -151,7 +151,16 @@ public final class SupplementedConverter: KanaKanjiConverting {
 
     /// 読みの中の部分ごとに効いている辞書と専門用語の辞書から語を引き，変わっていればエンジンに渡す
     private func prepareAuxiliaryWords(for reading: String) {
-        guard lookup != nil || terms != nil else { return }
+        guard let found = auxiliaryLookup(for: reading) else { return }
+        auxiliarySources = found.sources
+        guard found.words != auxiliary else { return }
+        auxiliary = found.words
+        base.setAuxiliaryWords(found.words)
+    }
+
+    /// 読みの中の部分ごとに効いている辞書と専門用語の辞書から引いた語．引く辞書が無ければ nil．エンジンには渡さない
+    private func auxiliaryLookup(for reading: String) -> Lookup? {
+        guard lookup != nil || terms != nil else { return nil }
         let current = settings.current
         let hits = Dictionary(recentDictionaryCommits.map { ($0, 1) }, uniquingKeysWith: +)
         let active = lookup == nil ? [] : DictionaryActivation.active(current.importedDictionaries, applicationID: applicationID, recentHits: hits)
@@ -172,10 +181,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
             auxiliaryCache.lookups[reading] = found
         }
         lastAuxiliaryReading = reading
-        auxiliarySources = found.sources
-        guard found.words != auxiliary else { return }
-        auxiliary = found.words
-        base.setAuxiliaryWords(found.words)
+        return found
     }
 
     /// reading の中の部分(長さ DefaultSettings.maximumImportedReadingLength まで)を，効いている辞書と専門用語の辞書の使う分野で引く．
@@ -245,6 +251,13 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func setDeferring(_ deferring: Bool) { base.setDeferring(deferring) }
     public func consumeDeferredMiss() -> Bool { base.consumeDeferredMiss() }
     public func setArrivalObserver(_ observer: (@MainActor () -> Void)?) { base.setArrivalObserver(observer) }
+    /// 取り込んだ辞書と専門用語の辞書から引いた語が，今エンジンに渡している語と同じ読みだけを裏で求める．
+    /// 語が違う読みは，語を渡し直すと前に求めた変換を捨てる(setAuxiliaryWords)．裏で求めているあいだに表示が別の読みを求めると，
+    /// 語を渡し直し合って互いの変換を捨て続けるので，その読みは裏で求めず，今までどおり candidates(for:) の中で求める
+    public func prefetchCandidates(for reading: String) -> Bool {
+        if let found = auxiliaryLookup(for: reading), found.words != auxiliary { return true }
+        return base.prefetchCandidates(for: reading)
+    }
     public var hasDeferredConversion: Bool { base.hasDeferredConversion }
     public func performDeferredConversion() { base.performDeferredConversion() }
     public func didCommit(_ candidate: Candidate) {
