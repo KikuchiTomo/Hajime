@@ -39,7 +39,7 @@ Windows 10 22H2 以降(64 ビット)に対応しています．インストー�
 3. 設定 > 時刻と言語 > 言語と地域 で「日本語」の「言語のオプション」を開き，「キーボードの追加」から「Hajime IME」を追加します．
 
 > [!NOTE]
-> インストーラーは未署名のため，SmartScreen の警告が表示されます．「詳細情報」から「実行」を選択してください．コード署名は [SignPath Foundation](https://signpath.org) に申請中です．詳細は [Code signing policy](../code-signing-policy.md) をご覧ください．
+> インストーラーは未署名のため，SmartScreen の警告が表示されます．「詳細情報」から「実行」を選択してください．コード署名は Certum の証明書で行う予定です．詳細は [Code signing policy](../code-signing-policy.md) をご覧ください．
 
 ### アップデート {#windows-update}
 
