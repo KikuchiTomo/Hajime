@@ -61,6 +61,23 @@ struct NasalReadingResolver {
         return composition.conversionReading != before
     }
 
+    /// resolveSettled が比べる読みのもっともらしさを，待たずに裏で求めておく(変換器を待たない設定にして呼ぶ．KanaKanjiConverting.setDeferring)．
+    /// 求め終えていれば，resolveSettled で選び直したあとの読みを返す．まだなら nil(届いたあとに呼び直す)．
+    /// 後ろの「nn」で比べる読みは前の「nn」の選び方で変わるので，まだ無い点数に当たったらそこでやめ，届いてから続きを求める
+    /// (求める読みとその順を，resolveSettled が待って求めるときと同じにする)
+    func settledIfPrepared(_ composition: Composition) -> Composition? {
+        var settled = composition
+        for position in settled.nasalAmbiguities.indices {
+            let length = DefaultSettings.nasalSettledContextLength
+            _ = converter.consumeDeferredMiss()
+            let vowel = score(settled, position: position, usesNaRow: false, contextLength: length)
+            let naRow = score(settled, position: position, usesNaRow: true, contextLength: length)
+            if converter.consumeDeferredMiss() { return nil }
+            settled.setNasalReading(at: position, usesNaRow: naRow > vowel)
+        }
+        return settled
+    }
+
     /// 読みを切り替えたときの，母音のまわりの読みのもっともらしさ
     private func score(_ composition: Composition, position: Int, usesNaRow: Bool,
                        contextLength: Int = DefaultSettings.nasalContextLength) -> Double {

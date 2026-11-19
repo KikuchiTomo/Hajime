@@ -633,8 +633,11 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
     private var deferredMiss = false
     /// 裏の変換が動いているか
     private var backgroundBusy = false
-    /// 裏で次に求める読み．動いている変換が終わったら求める
-    private var backgroundPending: String?
+    /// 裏で次に求める読み．動いている変換が終わったら求める．settledOnly は prefetchCandidates で頼まれたもの
+    private var backgroundPending: (reading: String, settledOnly: Bool)?
+    /// 打鍵が止まったあとの変換(prefetchCandidates)を裏で求めようとして，求められなかった読み．求め直し続けないために覚える．
+    /// 求めた変換を捨てるときと入力を終えたときに空にする
+    private var failedPrefetches: Set<String> = []
     /// 入力の区切り．入力を終えたあとに届いた前の入力の結果を捨てる
     private var generation = 0
     /// 裏の変換の結果が届いたときに呼ぶ(setArrivalObserver)
@@ -703,12 +706,26 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         arrivalObserver = observer
     }
 
+    /// 打鍵が止まったあとの処理が使う変換(打鍵が止まったときと同じ問い)を，待たずに裏で求めておく．
+    /// 手元にあるか，求められなかった読みなら true(待っても届かないので，呼ぶ側は今までどおり待って求める)．
+    /// 変換器に頼む変換とその順は，待って求めるとき(request)と同じにする: 動いている裏の変換は終わらせ，順番を待っていた変換は
+    /// やめて(settleBackground と同じ)，そのあとにこの読みを求める．違うのは，求めるのがメインスレッドでなく変換用のスレッドであることだけ
+    func prefetchCandidates(for reading: String) -> Bool {
+        guard !reading.isEmpty, cache[reading] == nil, !failedPrefetches.contains(reading) else { return true }
+        requestInBackground(reading, settledOnly: true)
+        return false
+    }
+
     /// 裏の変換を始める．動いていれば，終わったあとに最新の読みを求める
-    private func requestInBackground(_ reading: String) {
-        deferredMiss = true
-        wanted.set(reading)
+    /// - Parameter settledOnly: 打鍵が止まったあとに使う変換だけを求める(速い変換を先に求めない．表示が「待っている」とも見なさない)
+    private func requestInBackground(_ reading: String, settledOnly: Bool = false) {
+        // 止まったあとに使う変換を頼まれただけでは，打ち進めたことにしない(動いている変換の Zenzai の段を飛ばさせない．待って求めるときと同じ)
+        if !settledOnly {
+            deferredMiss = true
+            wanted.set(reading)
+        }
         guard !backgroundBusy else {
-            backgroundPending = reading
+            backgroundPending = (reading, settledOnly)
             return
         }
         backgroundPending = nil
@@ -717,7 +734,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         let skipsZenzai = !usesTypingModel && engine.usesZenzai && engine.skipsZenzaiWhileTyping
         var stages: [BackgroundConversion.Stage] = []
         // 併用のときと Zenzai が遅い環境では，先に速い変換を求めて出し，そのあとで Zenzai の変換を求める
-        if skipsZenzai || usesTypingModel {
+        if !settledOnly, skipsZenzai || usesTypingModel {
             var options = engine.options(leftContext: leftContext, usesZenzai: !skipsZenzai, usesTypingModel: usesTypingModel)
             if learningSuspended { options.learningType = .nothing }
             stages.append(.init(stream: .typing, session: typingSessionID, options: options, key: Self.typingCacheKey(reading), usesZenzai: false,
@@ -728,7 +745,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         // 速い変換を先に出したときは，打ち進めていれば Zenzai の変換を飛ばす(次の読みの速い変換を待たせない)
         stages.append(.init(stream: nil, session: sessionID, options: options, key: reading, usesZenzai: engine.usesZenzai, onlyIfLatest: !stages.isEmpty))
         let job = BackgroundConversion(reading: reading, stages: stages, restSession: restSessionID, generation: generation, gate: engine.converterGate,
-                                       streams: streams, mailbox: mailbox, wanted: wanted)
+                                       streams: streams, mailbox: mailbox, wanted: wanted, reportsFailure: settledOnly)
         // 速い変換を先に求めたときは，Zenzai の変換を待たずに届ける
         let stageFinished: @Sendable () -> Void = { [weak self] in
             DispatchQueue.main.async {
@@ -754,7 +771,9 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         let arrived = drainMailbox()
         if let next = backgroundPending {
             backgroundPending = nil
-            if cache[next] == nil { requestInBackground(next) }
+            if cache[next.reading] == nil, !(next.settledOnly && failedPrefetches.contains(next.reading)) {
+                requestInBackground(next.reading, settledOnly: next.settledOnly)
+            }
             // 取り込みのために立てた印で，次の表示が「待っている」と見なさないようにする
             deferredMiss = false
         }
@@ -765,12 +784,14 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
     @discardableResult
     private func drainMailbox() -> Bool {
         var arrived = false
-        for delivery in mailbox.take() where delivery.generation == generation {
+        let taken = mailbox.take()
+        for delivery in taken.deliveries where delivery.generation == generation {
             if delivery.usesZenzai { engine.recordZenzaiCost(delivery.duration) }
             guard cache[delivery.key] == nil else { continue }
             cache[delivery.key] = makeResult(delivery.result, readingLength: delivery.reading.count)
             arrived = true
         }
+        for failure in taken.failures where failure.generation == generation { failedPrefetches.insert(failure.reading) }
         return arrived
     }
 
@@ -1369,6 +1390,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         settleBackground()
         generation += 1
         cache = [:]
+        failedPrefetches = []
         engine.converterGate.use { _ in streams.reset() }
         deferredReading = nil
     }
@@ -1383,6 +1405,7 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
     func endComposition() {
         settleBackground()
         generation += 1
+        failedPrefetches = []
         plausibilityPending = []
         engine.converterGate.use { _ in streams.reset() }
         deferredReading = nil
@@ -1586,17 +1609,31 @@ final class ConversionMailbox: @unchecked Sendable {
         var generation: Int
     }
 
+    /// 求められなかった変換(打鍵が止まったあとに使う変換を頼まれたときだけ置く)
+    struct Failure {
+        var reading: String
+        var generation: Int
+    }
+
     private let lock = NSLock()
     private var deliveries: [Delivery] = []
+    private var failures: [Failure] = []
 
     func put(_ delivery: Delivery) {
         lock.withLock { deliveries.append(delivery) }
     }
 
-    func take() -> [Delivery] {
+    func put(_ failure: Failure) {
+        lock.withLock { failures.append(failure) }
+    }
+
+    func take() -> (deliveries: [Delivery], failures: [Failure]) {
         lock.withLock {
-            defer { deliveries = [] }
-            return deliveries
+            defer {
+                deliveries = []
+                failures = []
+            }
+            return (deliveries, failures)
         }
     }
 }
@@ -1622,6 +1659,8 @@ struct BackgroundConversion: @unchecked Sendable {
     var streams: ConversionStreams
     var mailbox: ConversionMailbox
     var wanted: WantedReading
+    /// 求められなかったことも届けるか(届くまで待っている相手がいるとき)
+    var reportsFailure = false
 
     /// - Parameter stageFinished: 最後でない段を求め終えるたびに呼ぶ(途中の結果を先に届ける)
     func run(stageFinished: @Sendable () -> Void) {
@@ -1641,7 +1680,10 @@ struct BackgroundConversion: @unchecked Sendable {
                 if result != nil { streams.setLast(reading, for: stream) }
                 return result
             }
-            guard let result else { continue }
+            guard let result else {
+                if reportsFailure { mailbox.put(ConversionMailbox.Failure(reading: reading, generation: generation)) }
+                continue
+            }
             mailbox.put(.init(reading: reading, key: stage.key, result: result, duration: ContinuousClock.now - started, usesZenzai: stage.usesZenzai,
                               generation: generation))
             if index < stages.count - 1 { stageFinished() }

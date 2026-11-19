@@ -111,3 +111,73 @@ struct BackgroundConversionTests {
         #expect(deferred == blocking)
     }
 }
+
+/// 打鍵が止まったあとの処理に使う変換を裏で求める(KanaKanjiConverting.prefetchCandidates)
+extension BackgroundConversionTests {
+    private func makeEngine() throws -> (engine: AzooKeyConverterEngine, directory: URL) {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-background-\(UUID().uuidString)")
+        return (try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "background"), directory)
+    }
+
+    @Test("裏で求めておいた変換は，待って求めた変換と同じ候補になる", arguments: ["きょうはいいてんきですね", "みんなのいけんをはんえいする", "あ"])
+    func prefetchedCandidatesMatchBlocking(reading: String) async throws {
+        let (engine, directory) = try makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let prefetching = engine.makeSession()
+        let box = Box()
+        prefetching.setArrivalObserver { box.value.arrivals += 1 }
+        // 頼んだ時点では手元に無く，待たずに返る
+        #expect(!prefetching.prefetchCandidates(for: reading))
+        // 表示が変換を待っているとは見なさない(止まったあとの処理のための変換なので)
+        #expect(!prefetching.consumeDeferredMiss())
+        for _ in 0..<2000 where !prefetching.prefetchCandidates(for: reading) { try await Task.sleep(for: .milliseconds(2)) }
+        #expect(prefetching.prefetchCandidates(for: reading))
+        #expect(box.value.arrivals > 0)
+        let blocking = engine.makeSession()
+        #expect(prefetching.candidates(for: reading).map(\.text) == blocking.candidates(for: reading).map(\.text))
+        prefetching.endComposition()
+        blocking.endComposition()
+    }
+
+    @Test("裏で求め終える前に待って求めても，同じ候補になる(同じ読みを二重に求めない)")
+    func candidatesBeforePrefetchArrives() throws {
+        let (engine, directory) = try makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let reading = "きょうはいいてんきですね"
+        let prefetching = engine.makeSession()
+        #expect(!prefetching.prefetchCandidates(for: reading))
+        let early = prefetching.candidates(for: reading).map(\.text)
+        #expect(prefetching.prefetchCandidates(for: reading))
+        let blocking = engine.makeSession()
+        #expect(early == blocking.candidates(for: reading).map(\.text))
+        prefetching.endComposition()
+        blocking.endComposition()
+    }
+
+    @Test("打っている途中の変換を裏で求めているあいだに頼んでも，どちらも届く")
+    func prefetchWhileTypingConversionRuns() async throws {
+        let (engine, directory) = try makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let session = engine.makeSession()
+        // 打鍵の経路: 待たずに裏へ回す
+        session.setTyping(true)
+        session.setDeferring(true)
+        #expect(session.candidates(for: "きょうはいいてんき").isEmpty)
+        session.setDeferring(false)
+        session.setTyping(false)
+        #expect(!session.prefetchCandidates(for: "きょうはいいてんきですね"))
+        for _ in 0..<2000 where !session.prefetchCandidates(for: "きょうはいいてんきですね") { try await Task.sleep(for: .milliseconds(2)) }
+        #expect(session.prefetchCandidates(for: "きょうはいいてんきですね"))
+        let blocking = engine.makeSession()
+        #expect(session.candidates(for: "きょうはいいてんきですね").map(\.text) == blocking.candidates(for: "きょうはいいてんきですね").map(\.text))
+        session.endComposition()
+        blocking.endComposition()
+    }
+
+    @Test("空の読みは求めるものが無い")
+    func emptyReadingNeedsNoPrefetch() throws {
+        let (engine, directory) = try makeEngine()
+        defer { try? FileManager.default.removeItem(at: directory) }
+        #expect(engine.makeSession().prefetchCandidates(for: ""))
+    }
+}

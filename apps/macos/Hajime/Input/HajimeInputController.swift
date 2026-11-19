@@ -207,6 +207,8 @@ final class HajimeInputController: IMKInputController {
             if settles {
                 try? await Task.sleep(until: start + .seconds(settleDelay), clock: .continuous)
                 guard !Task.isCancelled, let self else { return }
+                // 止まったときの表示に使う変換は裏で求め，届いてから出す(メインスレッドで求めると，そのあいだに来たキーを待たせる)
+                guard await self.waitUntilPrepared({ self.session.prepareSettle() }) else { return }
                 InputSignposts.signposter.withIntervalSignpost("settle") {
                     self.presenter.apply(self.session.settle(context: context), to: client)
                 }
@@ -275,6 +277,17 @@ final class HajimeInputController: IMKInputController {
         }
     }
 
+    /// 打鍵が止まったあとの処理に使う変換を裏で求めているあいだ，届くまで待つ(InputSession.prepareSettle・prepareWarming)．
+    /// 待つあいだメインスレッドは空いているので，次のキーはすぐ処理できる．次のキーで取り消されたら false
+    @MainActor
+    private func waitUntilPrepared(_ isPrepared: @MainActor () -> Bool) async -> Bool {
+        while !isPrepared() {
+            try? await Task.sleep(for: .seconds(DefaultSettings.idlePreparationPollInterval))
+            if Task.isCancelled { return false }
+        }
+        return true
+    }
+
     @MainActor
     private func cancelPrefetch() {
         prefetchTask?.cancel()
@@ -284,6 +297,8 @@ final class HajimeInputController: IMKInputController {
     /// 分岐図の候補を 1 文節ずつ前もって求める．文節ごとにほかの処理(次のキー)に譲り，取り消されたらやめる
     @MainActor
     private func warmLattice() async {
+        // 下見に使う読み全体の変換も，裏で求め終えてから始める
+        guard await waitUntilPrepared({ self.session.prepareWarming() }) else { return }
         for step in session.latticeWarmingSteps {
             await Task.yield()
             guard !Task.isCancelled else { return }

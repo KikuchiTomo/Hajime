@@ -49,6 +49,27 @@ struct TermDictionaryConverterTests {
         #expect(converter.sourceName(of: "過電圧を", reading: "かでんあつを") == TermField.engineering.name)
     }
 
+    @Test("エンジンに渡している語が変わる読みは，裏で先に求めない(語を渡し直して，求めた変換を捨て合わないように)")
+    func prefetchesOnlyWithTheSameWords() {
+        let (converter, base, terms, _) = make(Settings())
+        terms.words["かでんあつ"] = [TermWord(word: DictionaryWord(reading: "かでんあつ", word: "過電圧"), field: .engineering)]
+        base.supportsDeferring = true
+        _ = converter.candidates(for: "かでんあ")
+        #expect(base.auxiliaryWords.isEmpty)
+        // 「かでんあつ」まで読むと専門用語の語が増える．渡している語と違うので，裏では求めず，語も渡し直さない
+        #expect(converter.prefetchCandidates(for: "かでんあつ"))
+        #expect(base.prefetched.isEmpty)
+        #expect(base.auxiliaryWords.isEmpty)
+        // 語が変わらない読みは裏で求める
+        #expect(!converter.prefetchCandidates(for: "かでん"))
+        #expect(base.prefetched == ["かでん"])
+        // 待って求めれば，語を渡してから求める(今までどおり)
+        _ = converter.candidates(for: "かでんあつ")
+        #expect(base.auxiliaryWords.map(\.word.word) == ["過電圧"])
+        #expect(!converter.prefetchCandidates(for: "かでんあつを"))
+        #expect(base.prefetched == ["かでん", "かでんあつを"])
+    }
+
     @Test("通常の辞書に同じ読みの語がある語は，さらに低い点数で渡し，読み全体と一致しても前に差し込まない")
     func homophones() {
         let (converter, base, terms, _) = make(Settings())

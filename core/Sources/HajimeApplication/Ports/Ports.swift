@@ -85,6 +85,10 @@ public protocol KanaKanjiConverting: AnyObject {
     func consumeDeferredMiss() -> Bool
     /// 裏で求めていた変換が届いたときに呼ぶ処理を入れる
     func setArrivalObserver(_ observer: (@MainActor () -> Void)?)
+    /// 打鍵が止まったあとの処理が使う変換(打鍵が止まったときの candidates(for:) と同じ問い)を，待たずに裏で求めておく．
+    /// 手元にあれば true．false なら裏で求めているので，届くまで呼び直す(届く前に candidates(for:) を呼べば，その中で待つ)．
+    /// 変換を裏で求められない変換器と，求められなかった読みでは true を返す(今までどおり candidates(for:) の中で求める)
+    func prefetchCandidates(for reading: String) -> Bool
     /// 入力中の表示を Zenzai なしで求めたため，打鍵の合間に Zenzai で求めておく読みがあるか
     var hasDeferredConversion: Bool { get }
     /// 打鍵の合間に，Zenzai なしで済ませた読みを Zenzai で求めておく(打鍵が止まったときや Space ですぐ使えるように)
@@ -96,6 +100,7 @@ extension KanaKanjiConverting {
     public func setDeferring(_ deferring: Bool) {}
     public func consumeDeferredMiss() -> Bool { false }
     public func setArrivalObserver(_ observer: (@MainActor () -> Void)?) {}
+    public func prefetchCandidates(for reading: String) -> Bool { true }
     public func listCandidates(for reading: String) -> [Candidate] { candidates(for: reading) }
     public var hasDeferredConversion: Bool { false }
     public func performDeferredConversion() {}

@@ -686,6 +686,50 @@ public final class InputSession {
         return english
     }
 
+    /// 打鍵が止まったときの表示(settle)に使う変換を，待たずに裏で求めておく．求め終えていれば(求めるものが無いときも) true．
+    /// false のあいだは裏で求めているので，少し待って呼び直し，true になってから settle を呼ぶ(メインスレッドを変換で塞がない．
+    /// 待つあいだに次のキーが来たら，settle は呼ばない)．true になる前に settle を呼んでも結果は同じで，その中で待つ
+    public func prepareSettle() -> Bool {
+        // 前のキーで裏へ回した調べものがまだ届いていないときは，settle がそれを待って済ませてから進める(settleDeferredLookups)．
+        // その結果で読みが変わるので，ここでは先を求めない
+        guard defersLiveConversion, awaitsSettle, settlingEnglishInput == nil, !nasalPending, !correctionPending else { return true }
+        converter.setDeferring(true)
+        _ = converter.consumeDeferredMiss()
+        defer {
+            converter.setDeferring(false)
+            _ = converter.consumeDeferredMiss()
+        }
+        var settled = composition
+        if !readingCorrector.isApplied {
+            // 「nn」のあとの母音の読みを選び直す(resolveSettledNasalReadings)ための，読みのもっともらしさ
+            if !composition.nasalAmbiguities.isEmpty, composition.conversionReading != nasalSettledReading {
+                guard let resolved = NasalReadingResolver(converter: converter).settledIfPrepared(composition) else { return false }
+                settled = resolved
+            }
+            // 読み全体が英語にも日本語にも読める語かを見分ける(freezeEnglishWord)ための，読みのもっともらしさと変換．
+            // 見分ける読みは変換する読み(末尾の「n」を「ん」にしたもの)なので，表示の読みと違うときはこちらだけを求める
+            // (2 つの読みを交互に求めると，取り込んだ辞書の語が読みごとに入れ替わり，求めた変換を捨て合うことがある)
+            if let reading = corrector.readingToClassify(in: settled) {
+                _ = converter.plausibility(of: reading)
+                let awaitsPlausibility = converter.consumeDeferredMiss()
+                let converted = OffensiveWords.isOffensive(reading: reading) || converter.prefetchCandidates(for: reading)
+                return converted && !awaitsPlausibility
+            }
+        }
+        // 読みや選んだ語句のまま見せるとき(composingMarkedText)は，変換を使わない
+        guard heldReading != composition, acceptedPrediction?.composition != composition, corrector.active == nil,
+              settings.current.liveConverts(readingLength: settled.kana.count), !(codeRestraintApplies && readingEndsWithAlphanumeric),
+              forcedBoundaries.isEmpty || readingCorrector.isApplied else { return true }
+        return converter.prefetchCandidates(for: settled.kana)
+    }
+
+    /// 下見(latticeWarmingSteps)に使う読み全体の変換を，待たずに裏で求めておく．求め終えていれば(下見するものが無いときも) true．
+    /// 使い方は prepareSettle と同じ．true になってから latticeWarmingSteps を取り出す
+    public func prepareWarming() -> Bool {
+        guard defersLiveConversion, phase == .composing, !composition.isEmpty else { return true }
+        return converter.prefetchCandidates(for: composition.conversionReading)
+    }
+
     /// 打鍵が止まった(DefaultSettings.liveConversionSettleDelay)．かなのまま見せていた語も変換して見せる
     public func settle(context: InputContext) -> [ClientAction] {
         if let english = settlingEnglishInput { return english.settle() }

@@ -85,6 +85,15 @@ public final class FakeConverter: KanaKanjiConverting {
     }
     public func setArrivalObserver(_ observer: (@MainActor () -> Void)?) { arrivalObserver = observer }
 
+    /// 打鍵が止まったあとに使う変換を裏で求めるよう頼まれた読み(prefetchCandidates)
+    public private(set) var prefetched: [String] = []
+    public func prefetchCandidates(for reading: String) -> Bool {
+        guard supportsDeferring, !reading.isEmpty, !delivered.contains(reading) else { return true }
+        prefetched.append(reading)
+        if !pendingDeferred.contains(reading) { pendingDeferred.append(reading) }
+        return false
+    }
+
     /// 裏へ回した読みを届ける(届いたものがあれば，届いたときの処理を呼ぶ)
     public func deliverDeferred() {
         guard !pendingDeferred.isEmpty else { return }
