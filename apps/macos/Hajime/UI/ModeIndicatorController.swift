@@ -2,6 +2,7 @@ import AppKit
 import HajimeDomain
 
 /// 入力モードを切り替えたとき，入力位置の近くに小さな表示を出す(docs/dev/DESIGN-SYSTEM.md の「モードの表示」)．
+/// macOS が入力位置の行のすぐ下に出す入力ソースの表示と重ならないよう，行の上に置く(FloatingPanel.indicatorOrigin)
 @MainActor
 final class ModeIndicatorController {
     private let view = ModeIndicatorView()
@@ -28,7 +29,7 @@ final class ModeIndicatorController {
         let size = view.fittingSize
         backdrop.cornerRadius = view.theme.cornerRadius
         _ = FloatingPanel.attach(view, to: window, backdrop: view.theme.isRounded ? backdrop : nil)
-        window.setFrame(NSRect(origin: FloatingPanel.origin(for: size, caret: caret), size: size), display: true)
+        window.setFrame(NSRect(origin: FloatingPanel.indicatorOrigin(for: size, caret: caret), size: size), display: true)
         if view.theme.isRounded { window.invalidateShadow() }
         window.alphaValue = 1
         window.orderFrontRegardless()

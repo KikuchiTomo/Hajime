@@ -357,6 +357,7 @@ pub mod size {
         pub const FONT_SIZE: f32 = 14.0;
         pub const PADDING_X: f32 = 8.0;
         pub const PADDING_Y: f32 = 4.0;
+        pub const SYSTEM_INDICATOR_CLEARANCE: f32 = 32.0;
     }
     pub mod branch {
         pub const TRUNK_GAP: f32 = 12.0;

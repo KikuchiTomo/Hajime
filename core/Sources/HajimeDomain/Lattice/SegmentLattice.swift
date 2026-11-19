@@ -193,7 +193,7 @@ public enum CandidatePresentation: String, Sendable, Equatable, CaseIterable {
     case automatic
     /// 文節ごとの一覧．文節は分岐図と同じに分け，注目している文節の候補を縦に並べる．操作は分岐図と同じ
     case segmentList
-    /// 文全体の候補の一覧
+    /// 文全体の候補の一覧．文節を移るキーを押すと，文節に分けて文節ごとの一覧に切り替える
     case list
 
     /// Space で読みを文節に分けて変換するか(分岐図と文節ごとの一覧)
