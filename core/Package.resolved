@@ -1,12 +1,12 @@
 {
-  "originHash" : "2741f82fa9dc2163e458b422bc2c01f525d153f5e55dd3ee89c9b623125821c0",
+  "originHash" : "2648c85be8b4b9ad50cb7e5ced83d6d0e4c2ebe0d529c3420c7e1420a248acf1",
   "pins" : [
     {
       "identity" : "azookeykanakanjiconverter",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/KikuchiTomo/AzooKeyKanaKanjiConverter",
       "state" : {
-        "revision" : "6a0147897c68b47808257b1ef79cd0ee72049273"
+        "revision" : "42e70abbf90d2bb67d437cc626038c1b142191b6"
       }
     },
     {

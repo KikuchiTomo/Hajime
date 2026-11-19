@@ -37,4 +37,21 @@ struct ZenzaiContextTests {
         #expect(AzooKeyConverterSession.typingCacheKey("きょう") != "きょう")
         #expect(AzooKeyConverterSession.typingCacheKey("きょう").hasSuffix("きょう"))
     }
+
+    @Test("推論のバッチに入りきらない長さの読みでも止まらず，候補を返す(250 字を超える読みを確定せずに打ち続けたとき)",
+          .enabled(if: ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"] != nil), arguments: [200, 256, 300, 600])
+    @MainActor
+    func longReadingDoesNotOverflowBatch(length: Int) throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent("hajime-context-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let model = try ProcessInfo.processInfo.environment["HAJIME_ZENZAI_MODEL"].map { try ZenzaiModel.verified(at: URL(fileURLWithPath: $0)) }
+        let engine = try AzooKeyConverterEngine(memoryDirectory: directory, versionString: "context", zenzai: model)
+        let session = engine.makeSession()
+        // 前に求めた読みの続きではない長い読みを求める(読みと候補のトークン列をまるごと評価する)
+        let reading = String(repeating: "あ", count: length)
+        #expect(!session.candidates(for: reading).isEmpty)
+        // 検証木の採点も，プロンプトを置けないときは採点できなかったものとして返す
+        #expect(session.scores(of: [reading, "嗚呼" + String(reading.dropFirst(2))], reading: reading, before: "", after: "").count == 2)
+        session.endComposition()
+    }
 }
