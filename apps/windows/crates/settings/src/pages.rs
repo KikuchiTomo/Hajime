@@ -1170,6 +1170,7 @@ pub enum RangeKind {
     PaletteColumns,
     PaletteRows,
     PaletteCellSize,
+    PaletteScale,
     PaletteFrequentRows,
 }
 
@@ -1197,6 +1198,7 @@ impl RangeKind {
             RangeKind::PaletteColumns => ranges.palette_columns,
             RangeKind::PaletteRows => ranges.palette_rows,
             RangeKind::PaletteCellSize => ranges.palette_cell_size,
+            RangeKind::PaletteScale => ranges.palette_scale,
             RangeKind::PaletteFrequentRows => ranges.palette_frequent_rows,
         }
     }
@@ -1216,6 +1218,7 @@ impl RangeKind {
         match self {
             RangeKind::AssociationLimit => catalog.association_limit_step,
             RangeKind::PaletteCellSize => catalog.palette_cell_size_step,
+            RangeKind::PaletteScale => catalog.palette_scale_step,
             _ => 1.0,
         }
     }
@@ -2325,6 +2328,7 @@ fn palette_page() -> Vec<Section> {
                     "paletteCellSize",
                     RangeKind::PaletteCellSize,
                 ),
+                Row::slider(palette::SCALE, "paletteScale", RangeKind::PaletteScale),
                 Row::stepper(
                     palette::FREQUENT_ROWS,
                     "paletteFrequentRows",
@@ -2924,6 +2928,9 @@ mod tests {
         assert!(rows
             .iter()
             .any(|row| row.control == Control::Slider(RangeKind::PaletteCellSize)));
+        assert!(rows
+            .iter()
+            .any(|row| row.control == Control::Slider(RangeKind::PaletteScale)));
         // 注記は名前の無い行の説明にしない(幅の無い説明にならない)
         assert!(!rows.iter().any(|row| row.control == Control::Note));
     }

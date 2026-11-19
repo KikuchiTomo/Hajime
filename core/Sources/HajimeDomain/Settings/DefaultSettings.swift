@@ -524,6 +524,11 @@ public enum DefaultSettings {
     public static let paletteCellSizeRange = 28.0...64.0
     /// 設定の画面でパレットのマスの大きさを変える刻み(pt)
     public static let paletteCellSizeStep = 2.0
+    /// パレット全体(マス・文字・探す欄・見出し・説明・余白・角丸)に掛ける倍率と，選べる範囲．マスの大きさ・列数・行数で決めた窓にそのまま掛ける
+    public static let paletteScale = 1.0
+    public static let paletteScaleRange = 0.5...1.5
+    /// 設定の画面でパレットの倍率を変える刻み
+    public static let paletteScaleStep = 0.1
     /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
     public static let paletteFrequentRows = 1
     public static let paletteFrequentRowsRange = 0...4

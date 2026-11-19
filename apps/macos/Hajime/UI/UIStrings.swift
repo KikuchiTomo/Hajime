@@ -1027,6 +1027,7 @@ enum UIStrings {
         static let columns = "パレットの列数"
         static let rows = "パレットの行数"
         static let cellSize = "パレットのマスの大きさ"
+        static let scale = "パレットの倍率"
         static let showsPreview = "パレットに文字の説明を表示"
         static let showsUnicodeName = "説明に Unicode の名前を表示"
         static let showsReadings = "説明に読みを表示"
@@ -1051,6 +1052,7 @@ enum UIStrings {
         static let clearHistoryNote = "ピン留めと肌の色の設定は残ります"
         static let openKeys = "キー設定を開く"
         static func cellSizeValue(_ size: Int) -> String { "\(cellSize): \(size) pt" }
+        static func scaleValue(_ percent: Int) -> String { "\(scale): \(percent)%" }
     }
 
     enum Features {
@@ -1344,7 +1346,7 @@ extension UIStrings {
             "launcherCommands": Extras.launcherCommands, "commands": Extras.commandsPage,
             "englishTermCandidates": Extras.englishTermCandidates, "englishTerms": Extras.englishTerms,
             "palette": Palette.enabled, "paletteClosesAfterInsert": Palette.closesAfterInsert, "paletteRecordsHistory": Palette.recordsHistory,
-            "paletteColumns": Palette.columns, "paletteRows": Palette.rows, "paletteCellSize": Palette.cellSize,
+            "paletteColumns": Palette.columns, "paletteRows": Palette.rows, "paletteCellSize": Palette.cellSize, "paletteScale": Palette.scale,
             "paletteShowsPreview": Palette.showsPreview, "paletteFrequentRows": Palette.frequentRows,
             "paletteShowsUnicodeName": Palette.showsUnicodeName, "paletteShowsReadings": Palette.showsReadings,
             "paletteShowsShortcodes": Palette.showsShortcodes, "paletteShowsCodePoints": Palette.showsCodePoints,

@@ -96,6 +96,7 @@
     "paletteFrequentRows",
     "paletteRecordsHistory",
     "paletteRows",
+    "paletteScale",
     "paletteShowsCodePoints",
     "paletteShowsPreview",
     "paletteShowsReadings",
@@ -488,6 +489,7 @@
     "wordLanguageWordLength" : 32
   },
   "paletteCellSizeStep" : 2,
+  "paletteScaleStep" : 0.1,
   "ranges" : {
     "associationLimit" : [
       10,
@@ -564,6 +566,10 @@
     "paletteRows" : [
       3,
       12
+    ],
+    "paletteScale" : [
+      0.5,
+      1.5
     ],
     "reviewCorrectionTimeout" : [
       5,

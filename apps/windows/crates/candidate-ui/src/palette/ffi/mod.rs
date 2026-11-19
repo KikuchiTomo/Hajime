@@ -5,7 +5,7 @@
 
 mod window;
 
-use super::layout::{cell_size, Fonts, Layout, Wheel};
+use super::layout::{cell_size, zoom, Fonts, Layout, Wheel};
 use super::motion::{ease_out, progress, Motion};
 use super::scene;
 use crate::announce::{self, Announcer};
@@ -135,6 +135,7 @@ impl Controller {
             theme,
             Surround::Shadow,
         );
+        self.window.set_zoom(zoom(&panel));
         let scale = self.window.scale();
         let pixels = |value: f32| (value * scale).round() as i32;
         let (left, top) = match self.origin {

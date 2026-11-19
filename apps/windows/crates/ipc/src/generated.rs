@@ -2309,6 +2309,8 @@ pub struct PalettePanel {
     #[serde(rename = "previewFields")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub preview_fields: Option<PalettePreviewFields>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scale: Option<f64>,
 }
 
 impl fmt::Debug for PalettePanel {
@@ -2335,6 +2337,7 @@ impl fmt::Debug for PalettePanel {
             .field("cellsPerRow", &self.cells_per_row)
             .field("motion", &self.motion)
             .field("previewFields", &self.preview_fields)
+            .field("scale", &self.scale)
             .finish()
     }
 }

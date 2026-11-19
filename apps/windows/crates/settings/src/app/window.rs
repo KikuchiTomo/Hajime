@@ -1263,6 +1263,7 @@ impl App {
                     code_points: on("paletteShowsCodePoints"),
                 },
                 number("paletteCellSize"),
+                number("paletteScale"),
             )
         });
         // 絵文字の見本は設定のとおりの位置・数・名前で並べる(macOS の EmojiSection)
@@ -1284,6 +1285,7 @@ impl App {
                 panel.columns,
                 panel.visible_rows,
                 panel.cell_size,
+                panel.scale,
                 panel.shows_preview,
                 panel.preview_fields.as_ref().map(|fields| (
                     fields.unicode_name,

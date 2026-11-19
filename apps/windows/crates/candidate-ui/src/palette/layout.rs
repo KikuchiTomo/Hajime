@@ -169,6 +169,14 @@ impl Fonts {
     }
 }
 
+/// 全体の倍率(設定のパレットの倍率)．添えていない(倍率を知らないエンジン)か，値が使えない(0 以下や数でない)ときは等倍
+pub fn zoom(panel: &PalettePanel) -> f32 {
+    match panel.scale {
+        Some(scale) if scale.is_finite() && scale > 0.0 => scale as f32,
+        _ => 1.0,
+    }
+}
+
 /// マスの一辺．設定の値が使えない(0 以下や数でない)ときは 0 にし，マス目を描かない
 pub fn cell_size(panel: &PalettePanel) -> f32 {
     let size = panel.cell_size as f32;
@@ -917,6 +925,30 @@ mod tests {
         assert_eq!(
             layout.target(&panel, layout.grid.x, layout.grid.y, false),
             None
+        );
+    }
+
+    #[test]
+    fn 倍率は添えた値を使い添えていないか使えなければ等倍にする() {
+        let scaled = |scale| PalettePanel {
+            scale,
+            ..sample::emoji()
+        };
+        assert_eq!(zoom(&scaled(Some(1.5))), 1.5);
+        assert_eq!(zoom(&scaled(Some(0.5))), 0.5);
+        assert_eq!(zoom(&scaled(None)), 1.0);
+        assert_eq!(zoom(&scaled(Some(0.0))), 1.0);
+        assert_eq!(zoom(&scaled(Some(f64::NAN))), 1.0);
+        // 設定の見本は設定の倍率を添える
+        let fields = ipc::PalettePreviewFields {
+            unicode_name: true,
+            readings: true,
+            shortcodes: true,
+            code_points: true,
+        };
+        assert_eq!(
+            zoom(&sample::settings(9, 6, 1, true, fields, 36.0, 0.8)),
+            0.8
         );
     }
 
