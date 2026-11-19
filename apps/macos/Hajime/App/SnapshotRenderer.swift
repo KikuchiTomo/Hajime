@@ -241,6 +241,18 @@ enum SnapshotRenderer {
                 SettingsFixture.settle(window)
                 guard let frame = window.contentView?.superview else { continue }
                 render(frame, name: "onboarding-\(page)\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+                guard page == .modeIndicator else { continue }
+                // macOS の表示を止めたあとの見え方(止め方のカードにポインタを置いたとき)と，macOS の表示を使う選択
+                withTransaction(transaction) { model.hidesSystemIndicator = true }
+                SettingsFixture.settle(window)
+                render(frame, name: "onboarding-\(page)-hidden\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+                withTransaction(transaction) {
+                    model.hidesSystemIndicator = false
+                    model.draft.showsModeIndicator = false
+                }
+                SettingsFixture.settle(window)
+                render(frame, name: "onboarding-\(page)-system\(suffix)", to: output, appearance: NSAppearance(named: appearance))
+                withTransaction(transaction) { model.draft.showsModeIndicator = true }
             }
             window.close()
         }

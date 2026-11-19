@@ -9,6 +9,8 @@ struct OnboardingStage: NSViewRepresentable {
     let settings: HajimeDomain.Settings
     var spotlight: OnboardingSpotlight?
     var appMode = AppProfile.imeOff
+    /// 入力モードの表示のページで，macOS の表示を止めたあとの見え方を見せるか
+    var hidesSystemIndicator = false
 
     func makeNSView(context: Context) -> DemoStageView {
         DemoStageView()
@@ -16,9 +18,10 @@ struct OnboardingStage: NSViewRepresentable {
 
     func updateNSView(_ view: DemoStageView, context: Context) {
         // 台本は時刻を含むことがある(日付の実演)ので，ページ・見せている機能・設定が変わったときだけ作り直す
-        let key = "\(page.rawValue)-\(spotlight?.rawValue ?? -1)-\(appMode.rawValue)"
+        let key = "\(page.rawValue)-\(spotlight?.rawValue ?? -1)-\(appMode.rawValue)-\(hidesSystemIndicator)"
         guard view.needsReplay(key: key, settings: settings) else { return }
-        view.play(DemoScripts.frames(for: page, settings: settings, spotlight: spotlight, appMode: appMode), settings: settings, key: key)
+        view.play(DemoScripts.frames(for: page, settings: settings, spotlight: spotlight, appMode: appMode, hidesSystemIndicator: hidesSystemIndicator),
+                  settings: settings, key: key)
     }
 }
 
@@ -155,6 +158,19 @@ final class DemoStageView: NSView {
         return (start + committed, start + committed + marked)
     }
 
+    /// 入力位置(縦線)の x．組み立て中の文字は，文節ごとに segmentGap だけ空けて描く(draw と同じ)
+    private var caretX: CGFloat {
+        let attributes = textAttributes
+        var x = fieldRect.minX + Size.cardPadding + (current?.committed ?? "").size(withAttributes: attributes).width
+        for segment in current?.marked.segments ?? [] {
+            x += segment.text.size(withAttributes: attributes).width + Self.segmentGap
+        }
+        return x.rounded()
+    }
+
+    /// 組み立て中の文字の文節のあいだ
+    private static let segmentGap: CGFloat = 2
+
     override func layout() {
         super.layout()
         let field = fieldRect
@@ -165,8 +181,14 @@ final class DemoStageView: NSView {
         let x = min(max(positions.markedStart - Size.cardPadding, Size.stagePadding), bounds.width - Size.stagePadding - size.width)
         panelHost.frame = NSRect(x: x.rounded(), y: top, width: size.width, height: size.height)
         let modeSize = mode.fittingSize
-        mode.frame = NSRect(x: min(positions.end + DesignTokens.Size.Space.group, bounds.width - Size.stagePadding - modeSize.width).rounded(),
-                            y: top, width: modeSize.width, height: modeSize.height)
+        if current?.modeAbove == true {
+            // 本物と同じく入力位置の行の上に出すコマ(macOS の表示と並べて見せる)では，入力欄の上に，入力位置と中心をそろえて置く
+            mode.frame = NSRect(x: (caretX - modeSize.width / 2).rounded(), y: field.minY - Size.demoGap - modeSize.height,
+                                width: modeSize.width, height: modeSize.height)
+        } else {
+            mode.frame = NSRect(x: min(positions.end + DesignTokens.Size.Space.group, bounds.width - Size.stagePadding - modeSize.width).rounded(),
+                                y: top, width: modeSize.width, height: modeSize.height)
+        }
     }
 
     // MARK: - 入力欄の模型
@@ -208,13 +230,16 @@ final class DemoStageView: NSView {
             case .correction:
                 GlassDrawing.drawUnderline(from: from, to: x, y: underlineY, color: theme.correction, dotted: true, theme: theme)
             }
-            x += 2
+            x += Self.segmentGap
         }
         // 入力位置
         NSColor.controlAccentColor.setFill()
         NSRect(x: x.rounded(), y: lineTop, width: 2, height: lineHeight).fill()
         if let application = current?.application {
             drawApplicationTab(application, above: field)
+        }
+        if let label = current?.systemMode {
+            drawSystemIndicator(label, caretX: x.rounded(), below: field)
         }
         if let key = current?.key {
             drawKey(key, above: field)
@@ -237,6 +262,20 @@ final class DemoStageView: NSView {
         path.lineWidth = DesignTokens.Size.Part.stroke
         path.stroke()
         name.draw(at: NSPoint(x: cap.minX + DesignTokens.Size.Part.fieldPaddingX, y: cap.minY + DesignTokens.Size.Part.tagPaddingY), withAttributes: attributes)
+    }
+
+    /// macOS が入力位置の下に出す入力ソースの表示の模型．アクセントカラーの面に白い字で，入力位置の真下に出す
+    private func drawSystemIndicator(_ label: String, caretX: CGFloat, below field: NSRect) {
+        let attributes: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: Size.applicationTabFontSize, weight: .semibold),
+                                                         .foregroundColor: NSColor.white]
+        let text = label.size(withAttributes: attributes)
+        let height = text.height + DesignTokens.Size.Part.tagPaddingY * 2
+        let width = max(text.width + DesignTokens.Size.Part.fieldPaddingX * 2, height)
+        let bubble = NSRect(x: (caretX - width / 2).rounded(), y: field.maxY + Size.demoGap, width: width, height: height)
+        let path = NSBezierPath(roundedRect: bubble, xRadius: DesignTokens.Size.Part.tagRadius, yRadius: DesignTokens.Size.Part.tagRadius)
+        NSColor.controlAccentColor.setFill()
+        path.fill()
+        label.draw(at: NSPoint(x: (bubble.midX - text.width / 2).rounded(), y: bubble.minY + DesignTokens.Size.Part.tagPaddingY), withAttributes: attributes)
     }
 
     /// 入力欄の上に，入力先のアプリの名前を窓の見出しのように出す
