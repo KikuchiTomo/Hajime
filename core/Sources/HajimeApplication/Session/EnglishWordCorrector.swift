@@ -148,14 +148,26 @@ final class EnglishWordCorrector {
     /// ローマ字入力では日本語を打つのが主なので，前が英語のとき(「Let's」のあと)と，利用者が英語にすると決めた語だけを英語にする
     /// (WordLanguageJudge の japaneseFirst)．打鍵が止まったときと変換・確定の前に呼ぶ．確定させたら true
     func freezeEnglishWord(in composition: inout Composition, context: WordLanguageContext) -> Bool {
-        guard active == nil, settings.current.correction.english, settings.current.typoCorrection != .off,
-            let keys = composition.rawKeys, !keys.isEmpty, keys.allSatisfy({ $0.isASCII && $0.isLowercase && $0.isLetter }),
-            composition.pending.isEmpty || composition.pending == "n",
-            WordLanguageClassifier.reading(of: keys) != nil,
+        guard let keys = wholeReadingKeys(of: composition),
             classifier.language(of: keys, context: context, mode: .japaneseFirst) == .english else { return false }
         active = Correction(rawStart: 0, kanaStart: 0, keys: keys, word: lexicon.spelling(of: keys) ?? keys)
         commit(into: &composition)
         return true
+    }
+
+    /// freezeEnglishWord が英語か日本語かを見分けるキーの並び(読み全体が小文字の英字で，ローマ字として読める)．見分けないときは nil
+    private func wholeReadingKeys(of composition: Composition) -> String? {
+        guard active == nil, settings.current.correction.english, settings.current.typoCorrection != .off,
+            let keys = composition.rawKeys, !keys.isEmpty, keys.allSatisfy({ $0.isASCII && $0.isLowercase && $0.isLetter }),
+            composition.pending.isEmpty || composition.pending == "n",
+            WordLanguageClassifier.reading(of: keys) != nil else { return nil }
+        return keys
+    }
+
+    /// freezeEnglishWord が語を見分けるために変換して調べる読み．見分けないとき，変換を求めずに決まるときは nil．
+    /// 打鍵が止まったときに使う変換を，前もって裏で求めておくのに使う(InputSession.prepareSettle)
+    func readingToClassify(in composition: Composition) -> String? {
+        wholeReadingKeys(of: composition).flatMap { classifier.readingToConvert(for: $0, mode: .japaneseFirst) }
     }
 
     /// ローマ字として読んだかなが，英単語にしない長さ(設定)以下か(「make」→ まけ，「line」→ りね)．

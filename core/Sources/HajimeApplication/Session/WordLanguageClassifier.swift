@@ -24,6 +24,13 @@ final class WordLanguageClassifier {
         return judge.decide(evidence(for: keys), context: context)
     }
 
+    /// 語を見分ける(language)ときに変換して調べる読み．変換を求めずに決まる語，前に調べた語，ローマ字として読めない語では nil．
+    /// 打鍵が止まったときに見分ける語の変換を，前もって裏で求めておくのに使う(InputSession.prepareSettle)
+    func readingToConvert(for keys: String, mode: WordLanguageJudge.Mode) -> String? {
+        guard cache[keys] == nil, evidenceWithoutConversion(for: keys, mode: mode) == nil else { return nil }
+        return Self.reading(of: keys)
+    }
+
     /// 変換を求めなくても決まる語の手がかり．変換が要る語は nil．
     ///
     /// ローマ字入力で英語の辞書にない長い語(文をまるごと打った並びなど)は，読みのもっともらしさも不適切な語かも見ずに日本語と決まる

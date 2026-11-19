@@ -27,9 +27,27 @@ final class TypingLatencyProbe {
     fileprivate(set) var conversionLags: [Double] = []
     private var pendingSince: ContinuousClock.Instant?
     private var lastContext = InputContext()
+    /// 打鍵が止まったあとの処理に使う変換を，裏で求め終えてから進めるか(アプリと同じ)．false なら今までどおりその処理の中で待つ
+    private let prepares: Bool
+    /// 組み立て中の文字を出し直した記録(--trace-display)．時刻は文の最初のキーから(ミリ秒)
+    fileprivate(set) var displays: [(time: Double, source: String, text: String)] = []
+    fileprivate var displayOrigin: ContinuousClock.Instant?
+    var tracesDisplay = false
+
+    private func record(_ actions: [ClientAction], source: String) {
+        guard tracesDisplay else { return }
+        for action in actions {
+            if case .setMarkedText(let marked) = action {
+                let origin = displayOrigin ?? clock.now
+                displayOrigin = origin
+                displays.append((Self.milliseconds(clock.now - origin), source, marked.text))
+            }
+        }
+    }
 
     /// - Parameter defers: 打っているあいだの変換を裏で求めるか(アプリと同じ)．false なら今までどおりキーの処理の中で待つ
-    init(session: InputSession, service: ZenzaiTypoService?, settings: Settings, defers: Bool) {
+    init(session: InputSession, service: ZenzaiTypoService?, settings: Settings, defers: Bool, prepares: Bool = true) {
+        self.prepares = prepares
         self.session = session
         self.service = service
         self.settings = settings
@@ -39,7 +57,7 @@ final class TypingLatencyProbe {
     }
 
     private func conversionArrived() {
-        _ = measure("届いた変換を出す") { session.conversionDidArrive(context: lastContext) }
+        record(measure("届いた変換を出す") { session.conversionDidArrive(context: lastContext) }, source: "届")
         if session.needsFollowUpsAfterArrival {
             followUpTask?.cancel()
             runFollowUps(context: lastContext)
@@ -71,6 +89,7 @@ final class TypingLatencyProbe {
         let result = session.handle(KeyEvent(key), context: context)
         let elapsed = Self.milliseconds(clock.now - start)
         for action in result.actions { if case .commit(let value) = action { committed += value } }
+        record(result.actions, source: "鍵")
         lastContext = context
         if session.awaitsConversion {
             if pendingSince == nil { pendingSince = start }
@@ -89,12 +108,23 @@ final class TypingLatencyProbe {
             for step in steps {
                 await Task.yield()
                 guard !Task.isCancelled, let self else { return }
-                _ = self.measure("あとから足す") { step() }
+                self.record(self.measure("あとから足す") { step() }, source: "足")
             }
         }
     }
 
+    /// 裏で求めている変換が届くまで待つ(アプリの HajimeInputController と同じ)．待つあいだメインスレッドは空いている．取り消されたら false
+    private func waitUntil(_ isReady: () -> Bool) async -> Bool {
+        guard prepares else { return true }
+        while !isReady() {
+            try? await Task.sleep(for: .seconds(DefaultSettings.idlePreparationPollInterval))
+            if Task.isCancelled { return false }
+        }
+        return true
+    }
+
     private func warmLattice() async {
+        guard await waitUntil({ session.prepareWarming() }) else { return }
         for step in session.latticeWarmingSteps {
             await Task.yield()
             guard !Task.isCancelled else { return }
@@ -129,7 +159,8 @@ final class TypingLatencyProbe {
             if settles {
                 try? await Task.sleep(until: start + .seconds(settleDelay), clock: .continuous)
                 guard !Task.isCancelled, let self else { return }
-                _ = self.measure("止まったとき") { self.session.settle(context: context) }
+                guard await self.waitUntil({ self.session.prepareSettle() }) else { return }
+                self.record(self.measure("止まったとき") { self.session.settle(context: context) }, source: "止")
                 await self.warmLattice()
             }
             guard let self, self.session.awaitsReview else { return }
@@ -148,7 +179,7 @@ final class TypingLatencyProbe {
                 }
                 self.session.provideCorrections(corrections)
             }
-            _ = self.measure("見直し") { self.session.review(context: context) }
+            self.record(self.measure("見直し") { self.session.review(context: context) }, source: "見")
             await self.warmLattice()
         }
     }
@@ -175,11 +206,14 @@ final class TypingLatencyProbe {
     /// file の各行(ローマ字)を，intervals の間隔(ミリ秒)ごとに打ち，届いてから処理し終えるまでの時間をまとめて出す．
     /// 行の中の空白は Space(変換)，行の終わりで Enter を押す
     static func run(file: String, intervals: [Double], engine: AzooKeyConverterEngine, service: ZenzaiTypoService?,
-                    terms: (any TermDictionaryLookup)?, usesFusion: Bool, trace: Bool, traceThreshold: Double = 16, defers: Bool, pause: Double, printsText: Bool) throws {
+                    terms: (any TermDictionaryLookup)?, usesFusion: Bool, trace: Bool, traceThreshold: Double = 16, defers: Bool, pause: Double, printsText: Bool,
+                    tracesDisplay: Bool = false, settleDelay: Double? = nil, correctionDelay: Double? = nil, prepares: Bool = true) throws {
         let lines = try String(contentsOfFile: file, encoding: .utf8).split(whereSeparator: \.isNewline)
             .filter { !$0.hasPrefix("#") && !$0.isEmpty }.map(String.init)
         var settings = DefaultSettings.settings
         if !usesFusion { settings.jinenModel = .off }
+        if let settleDelay { settings.liveConversionDelay = settleDelay }
+        if let correctionDelay { settings.correctionDelay = correctionDelay }
         let store = StaticSettings(settings)
         print("負荷: \(loadAverage())")
         for interval in intervals {
@@ -187,12 +221,13 @@ final class TypingLatencyProbe {
             let converter = SupplementedConverter(engineSession, settings: store, calendar: SystemCalendar(clock: { Date() }), terms: terms)
             let session = InputSession(converter: converter, lexicon: WordListLexicon(), settings: store, typoService: service,
                                        branchStations: true, groupsBranchSegments: true, scorer: engineSession, fusing: usesFusion ? engineSession : nil)
-            let probe = TypingLatencyProbe(session: session, service: service, settings: settings, defers: defers)
+            let probe = TypingLatencyProbe(session: session, service: service, settings: settings, defers: defers, prepares: prepares)
             // 辞書とモデルを読み込ませる 1 文は数えない
             for key in "kyouhaiitenkidesu" { _ = probe.press(KeyEvent.Key.character(key)) }
             _ = probe.press(KeyEvent.Key.enter)
             probe.steps = [:]
             probe.conversionLags = []
+            probe.tracesDisplay = tracesDisplay
             var handle: [Double] = []
             var latency: [Double] = []
             for line in lines {
@@ -207,6 +242,12 @@ final class TypingLatencyProbe {
                     }
                 }
                 probe.stop()
+                if tracesDisplay {
+                    // 出し直すたびの時刻・きっかけ(鍵: キー，届: 届いた変換，止: 打鍵の止まり，見: 見直し，足: あとから足す)・文字
+                    for display in probe.displays { print(String(format: "  %7.1f ms  ", display.time) + display.source + "  " + display.text) }
+                    probe.displays = []
+                    probe.displayOrigin = nil
+                }
                 if printsText { print("  確定: \(probe.takeCommitted())") }
                 // 次の文の前に，止まったあとの処理を終わらせる
                 RunLoop.main.run(until: Date().addingTimeInterval(0.3))
