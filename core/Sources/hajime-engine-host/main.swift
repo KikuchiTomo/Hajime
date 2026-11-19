@@ -237,7 +237,7 @@ func run() -> Int32 {
     // 絵文字に変換するときも同じ表から引く(このビルドの書体が描ける絵文字だけを出すため)
     if settings.current.palette || settings.current.emojiConversion { paletteCatalog.preload() }
     let paletteUsage = FilePaletteUsageStore(fileURL: HostPaths.local.appendingPathComponent(DefaultSettings.paletteUsageFileName))
-    let palette: PaletteServices? = PaletteServices(catalog: paletteCatalog, usage: paletteUsage, now: { Date() })
+    let palette: PaletteServices? = PaletteServices(catalog: paletteCatalog, usage: paletteUsage, now: { Date() }, showsSelectionInClient: false)
     let resetPaletteHistory: () -> Void = { paletteUsage.update { $0.clearHistory() } }
     let emoji = PaletteEmojiLookup(catalog: paletteCatalog, usage: paletteUsage, settings: settings, now: { Date() })
     #else

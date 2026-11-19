@@ -40,14 +40,14 @@ struct PaletteScenarioTests {
     private let start = Date(timeIntervalSince1970: 1_800_000_000)
 
     private func harness(settings change: (inout Settings) -> Void = { _ in }, usage: FakePaletteUsageStore = FakePaletteUsageStore(),
-                         catalog: FakePaletteCatalog = FakePaletteCatalog(table)) -> Harness {
+                         catalog: FakePaletteCatalog = FakePaletteCatalog(table), showsSelectionInClient: Bool = true) -> Harness {
         var settings = DefaultSettings.settings
         settings.paletteColumns = 6
         settings.paletteRows = 3
         change(&settings)
         let now = start
         return Harness(converter: FakeConverter(["かな": [("仮名", nil)]]), settings: settings,
-                       palette: { _ in PaletteServices(catalog: catalog, usage: usage, now: { now }) })
+                       palette: { _ in PaletteServices(catalog: catalog, usage: usage, now: { now }, showsSelectionInClient: showsSelectionInClient) })
     }
 
     private func openEmoji(_ harness: Harness) {
@@ -573,6 +573,105 @@ struct PaletteScenarioTests {
         openEmoji(harness)
         #expect(harness.session.deactivate().contains(.hidePalette))
         #expect(!harness.session.isPaletteOpen)
+    }
+
+    private func isShowPalette(_ action: ClientAction) -> Bool {
+        if case .showPalette = action { true } else { false }
+    }
+
+    private func isSetMarkedText(_ action: ClientAction) -> Bool {
+        if case .setMarkedText = action { true } else { false }
+    }
+
+    @Test("R-26: 開いているあいだは選んでいる文字を組み立て中の文字として入力先に出し，⌫ と矢印で消さない")
+    func holdsSelectionInClient() throws {
+        let harness = harness()
+        harness.type("kana")
+        openEmoji(harness)
+        // 打っていた文字を確定し，窓を出してから，選んでいる文字を出す(窓を置く場所は出す前の入力位置で決める)
+        #expect(harness.committed == "かな")
+        #expect(harness.marked == MarkedText([.init("😀", style: .converted)]))
+        let opening = harness.lastResult.actions
+        let commit = try #require(opening.firstIndex(of: .commit("かな")))
+        let show = try #require(opening.firstIndex(where: isShowPalette))
+        let mark = try #require(opening.lastIndex(where: isSetMarkedText))
+        #expect(commit < show && show < mark)
+        // 探す語が空のとき・ローマ字の打ちかけ・かな・見つからない語のどれでも，⌫ と矢印は IME が受け，組み立て中の文字を残す
+        for typed in ["", "e", "ega", "k", "ka"] {
+            harness.type(typed)
+            for key in [KeyEvent.Key.left, .right, .up, .down, .backspace] {
+                harness.press(key)
+                #expect(harness.lastResult.handled, "\(typed) \(key)")
+                #expect(harness.palette != nil, "\(typed) \(key)")
+                // ⌫ で探す語が空に戻っても，選んでいる文字が出ている
+                #expect(harness.marked != .empty, "\(typed) \(key)")
+            }
+            harness.press(.escape)
+            if harness.palette == nil { openEmoji(harness) }
+        }
+        // 選択を動かすと，出している文字も替わる
+        harness.press(.right)
+        #expect(harness.marked.text == "😃")
+        harness.click(.hover(PalettePanel.Position(row: 2, column: 1)))
+        #expect(harness.marked.text == "👍")
+        // 動かないキーでは出し直さない
+        harness.press(.up, .shift)
+        #expect(harness.lastResult == KeyResult(handled: true))
+        // 見つからない語は，探す欄の文字を出す
+        harness.type("ka")
+        #expect(harness.palette?.selection == nil)
+        #expect(harness.marked.text == "か")
+        // ⌫ で消した分だけ探す欄と同じに戻る
+        harness.press(.backspace)
+        #expect(harness.palette?.query == "k")
+        #expect(harness.marked.text == texts(harness.palette).first?.first)
+    }
+
+    @Test("R-26: 入れると組み立て中の文字を確定で置き換え，入れずに閉じると消す")
+    func replacesOrClearsSelectionInClient() {
+        let harness = harness()
+        openEmoji(harness)
+        harness.type("ojigi")
+        #expect(harness.marked.text == "🙇")
+        // 閉じずに入れたら，確定のあとで選んでいる文字を出し直す
+        harness.press(.enter, .shift)
+        #expect(harness.lastResult.actions.first == .commit("🙇"))
+        #expect(harness.lastResult.actions.last == .setMarkedText(MarkedText([.init("🙇", style: .converted)])))
+        // 入れて閉じるときは確定だけ(確定が組み立て中の文字を置き換える)
+        harness.press(.enter)
+        #expect(harness.lastResult.actions == [.commit("🙇"), .hidePalette])
+        // Esc・開いている種類のキー・⌘ との組み合わせ・入力先から外れたときは，入れずに消してから閉じる
+        openEmoji(harness)
+        harness.press(.escape)
+        #expect(harness.lastResult.actions == [.setMarkedText(.empty), .hidePalette])
+        openEmoji(harness)
+        openEmoji(harness)
+        #expect(harness.lastResult.actions == [.setMarkedText(.empty), .hidePalette])
+        openEmoji(harness)
+        harness.press(.character("v"), .command)
+        #expect(harness.lastResult == KeyResult(handled: false, actions: [.setMarkedText(.empty), .hidePalette]))
+        openEmoji(harness)
+        #expect(harness.session.deactivate() == [.setMarkedText(.empty), .hidePalette])
+        // 肌の色の帯では，帯で選んでいる肌の色の文字を出す
+        openEmoji(harness)
+        harness.type("ojigi")
+        harness.press(.enter, .option)
+        harness.press(.right)
+        #expect(harness.marked.text == "🙇🏻")
+    }
+
+    @Test("R-26: 入力先に出さない作り(Windows)では，組み立て中の文字に触れない")
+    func leavesClientUntouched() {
+        let harness = harness(showsSelectionInClient: false)
+        openEmoji(harness)
+        var actions = harness.lastResult.actions
+        for key in [KeyEvent.Key.character("k"), .right, .backspace, .down, .enter] {
+            harness.press(key)
+            actions += harness.lastResult.actions
+            #expect(harness.lastResult.handled)
+        }
+        #expect(!actions.contains(where: isSetMarkedText))
+        #expect(harness.marked == .empty)
     }
 
     @Test("R-26: 英数入力では探す欄に打ったままを見せる．かなにした読みでも探す")

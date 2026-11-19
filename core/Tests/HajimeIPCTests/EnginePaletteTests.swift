@@ -34,7 +34,7 @@ struct EnginePaletteTests {
         let sent = Box<[WireUiCommand]>([])
         let catalog = FakePaletteCatalog(Self.table)
         let usage = FakePaletteUsageStore()
-        let palette = PaletteServices(catalog: catalog, usage: usage, now: { Date(timeIntervalSince1970: 1_800_000_000) })
+        let palette = PaletteServices(catalog: catalog, usage: usage, now: { Date(timeIntervalSince1970: 1_800_000_000) }, showsSelectionInClient: false)
         self.settings = settings
         self.sent = sent
         self.usage = usage

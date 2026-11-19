@@ -250,7 +250,7 @@ final class CompositionRoot {
     /// 入力欄ごとのセッションで共有する，パレットに使うもの．表か使い方の置き場所が無ければパレットを開かない
     private lazy var paletteServices: PaletteServices? = {
         guard let paletteCatalog, let paletteUsage else { return nil }
-        return PaletteServices(catalog: paletteCatalog, usage: paletteUsage, now: Date.init)
+        return PaletteServices(catalog: paletteCatalog, usage: paletteUsage, now: Date.init, showsSelectionInClient: true)
     }()
     /// パレットの窓．開くたびに作らず使い回す
     private(set) lazy var palette = PaletteController()
