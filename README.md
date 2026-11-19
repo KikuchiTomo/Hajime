@@ -38,6 +38,10 @@ macOS・Windows 向けの日本語入力システムです．
 
 インストール後には，お使いの PC の再起動を推奨します．
 
+## コード署名ポリシー
+
+macOS 版は Apple の Developer ID の証明書で署名し，公証を受けています．Windows 版は現在未署名で，SignPath Foundation の OSS 向けのコード署名を申請します．詳細は [Code signing policy](https://haji.men/code-signing-policy/) をご覧ください．
+
 ## ライセンス
 
 MIT License です([LICENSE](LICENSE))．
