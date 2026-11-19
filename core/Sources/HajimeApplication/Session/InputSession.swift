@@ -3174,7 +3174,7 @@ public final class InputSession {
     }
 
     /// 先の枝の丸の上にいるあいだの，矢印キーでないキー．矢印キーは navigateTree が受け持つ．
-    /// 連想変換のキーと取り消しのキーは候補へ戻る．「候補の先の枝へ移動」を矢印でないキーに割り当てていれば，次の丸へ移る．
+    /// 連想変換のキーと取り消しのキーは候補へ戻る．「意味・連想・マクロへ移動」を矢印でないキーに割り当てていれば，次の丸へ移る．
     /// ほかのキー(Space・Tab など)は，候補へ戻ってから今までどおりに動く(丸の上で Space を押して，選ぶつもりのない中身が入ることを避ける)
     private func performOnBranchStation(_ command: KeymapCommand, context: InputContext) -> KeyResult? {
         guard let current = branchStation else { return nil }
@@ -3222,7 +3222,7 @@ public final class InputSession {
         }
     }
 
-    /// 木をたどる矢印キーか．矢印キーに，候補・文節を移るコマンドか「候補の先の枝へ移動」が割り当てられているときだけ
+    /// 木をたどる矢印キーか．矢印キーに，候補・文節を移るコマンドか「意味・連想・マクロへ移動」が割り当てられているときだけ
     /// (⇧→ のような修飾キー付きの操作や，矢印キーをほかの操作に割り当てた設定は，そのコマンドのまま動かす)
     private func treeArrow(_ command: KeymapCommand, event: KeyEvent) -> Arrow? {
         guard branchStations, [.nextCandidate, .previousCandidate, .nextSegment, .previousSegment, .enterBranch].contains(command) else { return nil }
@@ -3243,7 +3243,7 @@ public final class InputSession {
             return branchStation == nil ? nil : .items(list, origin: origin)
         case .lattice(let lattice):
             if let branchStation { return .station(branchStation) }
-            // 幹の上・文字種・候補を矢印でたどるのは，「候補の先の枝へ移動」が割り当てられているときだけ
+            // 幹の上・文字種・候補を矢印でたどるのは，「意味・連想・マクロへ移動」が割り当てられているときだけ
             guard treeNavigation else { return nil }
             if trunkLevel { return .trunk }
             if case .variant(let index) = lattice.focused.choice { return .variant(index) }

@@ -95,7 +95,7 @@ pub const YEN_KEY: &[Choice] = &[
 ];
 
 pub const PRESENTATIONS: &[Choice] = &[
-    ("automatic", "分岐図"),
+    ("automatic", "ツリー表示"),
     ("segmentList", "一覧"),
     ("list", "文全体の一覧"),
 ];
