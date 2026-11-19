@@ -62,7 +62,7 @@ menu:
     - name: プライバシーポリシー
       pageRef: /privacy
       weight: 1
-    - name: コード署名ポリシー
+    - name: Code signing policy
       pageRef: /code-signing-policy
       weight: 2
 

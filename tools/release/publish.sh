@@ -25,7 +25,7 @@ section=$(python3 -I "$root/tools/release/changelog.py" section "$version")
 notes=$(printf '%s\n\n<details>\n<summary>マージした PR</summary>\n\n%s\n\n</details>\n' "$section" "$changes")
 if [ -n "$mentions" ]; then notes=$(printf '%s\n\n## コントリビューター\n\n%s\n' "$notes" "$mentions"); fi
 # 配布物の署名の方針は，配布のページから辿れるようにする(SignPath Foundation の条件)
-notes=$(printf '%s\n\n[コード署名ポリシー(Code signing policy)](https://haji.men/code-signing-policy/)\n' "$notes")
+notes=$(printf '%s\n\n[Code signing policy](https://haji.men/code-signing-policy/)\n' "$notes")
 # shellcheck disable=SC2086
 gh release create "$tag" --verify-tag --latest \
   --title "v$version" --notes "$notes" \

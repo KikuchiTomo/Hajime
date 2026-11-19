@@ -49,7 +49,7 @@ Free code signing provided by [SignPath.io](https://about.signpath.io), certific
 - Approvers: [KikuchiTomo](https://github.com/KikuchiTomo)
 - Privacy policy: This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. See the [privacy policy](https://haji.men/privacy/) (in Japanese).
 
-The full policy is on the [code signing policy](https://haji.men/code-signing-policy/#code-signing-policy) page.
+The full policy is on the [code signing policy](https://haji.men/code-signing-policy/) page.
 
 ## License
 
