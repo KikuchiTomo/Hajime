@@ -88,11 +88,12 @@ MainActor.assumeIsolated {
             Evaluation.conversion(cases: try EvaluationCase.load(from: file), engine: playground.engine, terms: playground.terms,
                                   fusion: playground.usesFusion)
         } else if let file = arguments.value(of: "--typing-latency") {
-            // 決まった間隔でキーが届いたときの遅れを測る．--intervals 40,80,120 (ミリ秒)，--trace で遅れたキーを出す．
+            // 決まった間隔でキーが届いたときの遅れを測る．--intervals 40,80,120 (ミリ秒)，--trace で遅れたキー(--trace-threshold ミリ秒を超えたもの．既定 16)を出す．
             // 文の中の「|」は打鍵の止まり(--pause ミリ秒．既定 700)．--blocking を付けると，打っているあいだの変換をキーの処理の中で待つ(裏で求める前の作りと比べる)
             let intervals = (arguments.value(of: "--intervals") ?? "40,80,120,180").split(separator: ",").compactMap { Double($0) }
             try TypingLatencyProbe.run(file: file, intervals: intervals, engine: playground.engine, service: playground.typoService,
                                        terms: playground.terms, usesFusion: playground.usesFusion, trace: CommandLine.arguments.contains("--trace"),
+                                       traceThreshold: arguments.value(of: "--trace-threshold").flatMap(Double.init) ?? 16,
                                        defers: !CommandLine.arguments.contains("--blocking"),
                                        pause: arguments.value(of: "--pause").flatMap(Double.init) ?? 700,
                                        printsText: CommandLine.arguments.contains("--print-text"))

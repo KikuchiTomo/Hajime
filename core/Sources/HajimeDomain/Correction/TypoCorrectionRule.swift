@@ -19,7 +19,8 @@ public struct TypoCorrectionRule: Sendable {
     ///   (「scrip」+「t」．子音で終わる英単語は，最後のキーが打ちかけとして残る)
     public func tails(in composition: Composition, includingPending: Bool = false) -> [Composition.Tail] {
         guard level != .off, includingPending || composition.pending.isEmpty || composition.pending == "n" else { return [] }
-        return composition.tails().filter { tail in
+        // 条件に合わない部分は，文字列を作る前に除く(長い読みで打鍵ごとに全部を作らない)．下の条件は同じものを含む
+        return composition.tails(maximumKeyCount: DefaultSettings.maximumCorrectionLength, requiresInvalidRomaji: true).filter { tail in
             tail.containsInvalidRomaji
                 && (tail.startsWithUnconvertible || tail.startsFreeRegion)
                 && tail.keys.count >= DefaultSettings.minimumCorrectionLength

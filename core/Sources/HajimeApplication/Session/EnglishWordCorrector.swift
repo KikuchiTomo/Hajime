@@ -240,8 +240,10 @@ final class EnglishWordCorrector {
         let keys = Array(raw)
         let kana = Array(composition.conversionReading)
         var best: (gain: Double, correction: Correction)?
-        for tail in composition.tails() where tail.kanaStart != dismissedKanaStart && tail.keys.allSatisfy({ $0.isASCII && $0.isLowercase && $0.isLetter }) {
-            if onlyUnreadable, !tail.containsInvalidRomaji { continue }
+        // 英小文字だけの部分(と，読めない並びを含む部分)だけを調べる．長い読みでは区切りが多いので，要らない部分は作らない
+        // 英単語の後ろの読み．英単語の終わりの位置で決まるので，同じ位置は 1 回だけ組み立てる
+        var followings: [Int: Composition] = [:]
+        for tail in composition.tails(requiresInvalidRomaji: onlyUnreadable, requiresLowercaseLetters: true) where tail.kanaStart != dismissedKanaStart {
             // 英単語のすぐ後ろ(「python」+「no」)は日本語の助詞が来るところなので，続けて英単語を探さない
             if tail.kanaStart > 0, Composition.isAlphanumeric(kana[tail.kanaStart - 1]) { continue }
             var japanese: Double?
@@ -253,8 +255,15 @@ final class EnglishWordCorrector {
                 guard !aligned.contains(end) else { continue }
                 let word = String(keys[tail.rawStart..<end])
                 // 英単語の後ろは，かなになり切る日本語でなければならない
-                var following = Composition()
-                for key in keys[end...] { following.insertRomaji(key) }
+                let following: Composition
+                if let made = followings[end] {
+                    following = made
+                } else {
+                    var made = Composition()
+                    for key in keys[end...] { made.insertRomaji(key) }
+                    followings[end] = made
+                    following = made
+                }
                 guard !following.containsInvalidRomaji, following.pending.isEmpty || following.pending == "n",
                     TypoCorrectionRule.startsLikeFollowingEnglish(following.conversionReading),
                     lexicon.isWord(word), !customization.isException(keys: word, reading: ""), !readsAsShortJapanese(word) else { continue }

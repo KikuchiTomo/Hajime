@@ -263,25 +263,59 @@ public struct Composition: Sendable, Equatable {
     }
 
     /// 区切りから末尾までの部分を，長いもの(前の区切り)から順に返す．打ったキーと読みの対応が外れていたら空
-    public func tails() -> [Tail] {
+    /// - Parameters:
+    ///   - maximumKeyCount: 打ったキーがこの数より多い部分は返さない(nil ならすべて)
+    ///   - requiresInvalidRomaji: ローマ字として読めない並びを含む部分だけを返す
+    ///   - requiresLowercaseLetters: 打ったキーが英小文字だけの部分だけを返す
+    ///
+    /// 絞り込みは，使う側が返ってきた部分をあとから同じ条件で選ぶのと同じ結果になる．長い読みでは区切りが多く，
+    /// 区切りごとに末尾までのキーを文字列にすると読みの長さの 2 乗の手間になるので，要らない部分は文字列を作る前に除く
+    public func tails(maximumKeyCount: Int? = nil, requiresInvalidRomaji: Bool = false, requiresLowercaseLetters: Bool = false) -> [Tail] {
         guard let rawKeys else { return [] }
         let keys = Array(rawKeys)
         // まだかなになっていないローマ字(pending の「b」など)は読めない並びに数えない．
         // 数えると「konob」のような打ちかけの日本語まで英単語として補正してしまう
         let resolved = Array(kana)
+        // 読みのその位置から末尾までに，ローマ字として読めなかった英字があるか(後ろから 1 回なめて求める)
+        var invalidFrom = [Bool](repeating: false, count: resolved.count + 1)
+        for index in resolved.indices.reversed() {
+            invalidFrom[index] = invalidFrom[index + 1] || Self.isASCIILetter(resolved[index])
+        }
+        // キーのその位置から末尾までが，英小文字だけか
+        var lowercaseFrom = [Bool](repeating: true, count: keys.count + 1)
+        if requiresLowercaseLetters {
+            for index in keys.indices.reversed() {
+                lowercaseFrom[index] = lowercaseFrom[index + 1] && Self.isASCIILowercaseLetter(keys[index])
+            }
+        }
         return boundaries.compactMap { boundary in
             guard boundary.rawCount < keys.count, boundary.kanaCount >= frozenKanaEnd,
                 boundary.kanaCount <= resolved.count else { return nil }
-            let tailKana = resolved[boundary.kanaCount...]
+            if let maximumKeyCount, keys.count - boundary.rawCount > maximumKeyCount { return nil }
+            let containsInvalidRomaji = invalidFrom[boundary.kanaCount]
+            if requiresInvalidRomaji, !containsInvalidRomaji { return nil }
+            if requiresLowercaseLetters, !lowercaseFrom[boundary.rawCount] { return nil }
             return Tail(
                 keys: String(keys[boundary.rawCount...]),
                 rawStart: boundary.rawCount,
                 kanaStart: boundary.kanaCount,
-                containsInvalidRomaji: tailKana.contains { $0.isASCII && $0.isLetter },
-                startsWithUnconvertible: tailKana.first.map { $0.isASCII && $0.isLetter } ?? false,
+                containsInvalidRomaji: containsInvalidRomaji,
+                startsWithUnconvertible: boundary.kanaCount < resolved.count && Self.isASCIILetter(resolved[boundary.kanaCount]),
                 startsFreeRegion: boundary.kanaCount == frozenKanaEnd
             )
         }
+    }
+
+    /// 英字(A〜Z，a〜z)か．Character.isASCII && isLetter と同じ(Unicode の表を引かずに済ませる)
+    private static func isASCIILetter(_ character: Character) -> Bool {
+        guard let value = character.asciiValue else { return false }
+        return (0x41...0x5A).contains(value) || (0x61...0x7A).contains(value)
+    }
+
+    /// 英小文字(a〜z)か．Character.isASCII && isLowercase && isLetter と同じ
+    private static func isASCIILowercaseLetter(_ character: Character) -> Bool {
+        guard let value = character.asciiValue else { return false }
+        return (0x61...0x7A).contains(value)
     }
 
     /// 補正した英単語を読みの中に確定させる．英単語のあとに打ったキー(after)は，日本語として打ち直す．
