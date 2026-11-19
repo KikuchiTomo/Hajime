@@ -39,4 +39,4 @@ Releases are published only on [GitHub Releases](https://github.com/KikuchiTomo/
 
 This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.
 
-Hajime IME connects to https://haji.men only when the user selects "更新を確認" (Check for Updates). See the [privacy policy](privacy.md) (in Japanese).
+Hajime IME connects to https://haji.men only when the user selects "更新を確認" (Check for Updates). See the [privacy policy](privacy.en.md).

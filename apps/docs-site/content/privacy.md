@@ -2,6 +2,8 @@
 title: プライバシーポリシー及び免責事項
 ---
 
+English: [Privacy Policy and Disclaimer](privacy.en.md)
+
 本プライバシーポリシー及び免責事項(以下「本規定」といいます．)は，日本語入力システム Hajime IME における利用者の情報の取扱い及び開発者が責任を負わないことについて定めるものです．
 
 ## 第1章　総則
