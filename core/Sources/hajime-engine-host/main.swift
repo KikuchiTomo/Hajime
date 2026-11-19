@@ -308,7 +308,9 @@ func run() -> Int32 {
             #if os(Windows)
             EngineProcess.debugLog(message)
             #endif
-        }
+        },
+        // 打っているあいだの変換は裏で求め，キーへの応答では待たない(届いた変換は DLL の次の wake で渡す)
+        defersConversion: true
     )
     settings.observe { [weak engine] in
         engine?.apply($0)

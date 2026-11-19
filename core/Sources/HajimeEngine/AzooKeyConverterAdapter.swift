@@ -13,7 +13,15 @@ public enum DictionaryDirectoryError: Error, Equatable {
 /// azooKey の型はこのモジュールの外に出さない(docs/dev/ARCHITECTURE.md)．
 @MainActor
 public final class AzooKeyConverterEngine {
-    private let converter: KanaKanjiConverter
+    /// 変換器．メインスレッドと変換用のスレッド(conversionQueue)が順番に使う(ConverterGate)
+    private let gate: ConverterGate
+    /// 打鍵を待たせずに変換を求めるスレッド(AzooKeyConverterSession の裏の変換)．1 本ずつ流す
+    nonisolated let conversionQueue = DispatchQueue(label: "men.haji.inputmethod.conversion", qos: .userInitiated)
+    /// 読みのもっともらしさだけを求める変換器(Zenzai も学習も使わない軽い変換)．文の変換とは別に持ち，
+    /// 文の変換(Zenzai)が動いているあいだも待たずに求められるようにする．辞書を別に読むぶん，メモリは増える
+    private let lightGate: ConverterGate
+    /// 読みのもっともらしさを裏で求めるスレッド
+    nonisolated let lightQueue = DispatchQueue(label: "men.haji.inputmethod.plausibility", qos: .userInitiated)
     private let memoryDirectory: URL
     private let versionString: String
     /// 精度を優先するモデル(small)と，速さを優先するモデル(xsmall)．どちらも確かめ済み．無ければ nil
@@ -81,7 +89,8 @@ public final class AzooKeyConverterEngine {
         self.accurateZenzai = zenzai
         self.fastZenzai = fastZenzai
         self.jinenModels = [jinen, fastJinen].compactMap { $0 }.reduce(into: [:]) { $0[$1.variant] = $1 }
-        self.converter = dictionaryDirectory.map { KanaKanjiConverter(dicdataStore: DicdataStore(dictionaryURL: $0)) } ?? KanaKanjiConverter.withDefaultDictionary()
+        self.gate = ConverterGate(dictionaryDirectory.map { KanaKanjiConverter(dicdataStore: DicdataStore(dictionaryURL: $0)) } ?? KanaKanjiConverter.withDefaultDictionary())
+        self.lightGate = ConverterGate(dictionaryDirectory.map { KanaKanjiConverter(dicdataStore: DicdataStore(dictionaryURL: $0)) } ?? KanaKanjiConverter.withDefaultDictionary())
     }
 
     /// 読みに合う絵文字(EmojiLooking)．肌の色などを変えた形は除く．パレットの表を持たない作り(Linux)で使う．
@@ -90,7 +99,9 @@ public final class AzooKeyConverterEngine {
     /// 要らない印を除く．azooKey の絵文字の辞書は名前を持たないので，文節の語(word)とは照らし合わせない
     public func emoji(for reading: String, word: EmojiWord, limit: Int) -> [String] {
         var seen = Set<String>()
-        return emojiReplacer.getSearchResult(query: reading, target: [.emoji], ignoreNonBaseEmoji: true)
+        // 絵文字の辞書は変換の設定(options)にも渡していて，変換用のスレッドも引く．同時に引かないよう，変換器と同じ鍵をかける
+        let replacer = emojiReplacer
+        return gate.use { _ in replacer.getSearchResult(query: reading, target: [.emoji], ignoreNonBaseEmoji: true) }
             .map { Self.withoutExtraEmojiStyle($0.text) }
             .filter { seen.insert($0).inserted }
             .prefix(max(limit, 0)).map { $0 }
@@ -116,8 +127,11 @@ public final class AzooKeyConverterEngine {
     /// 入力欄ひとつぶんの変換．検証木の採点(CandidateScoring)と合議(CandidateFusing)も同じものが受け持つ
     public func makeSession() -> any KanaKanjiConverting & CandidateScoring & CandidateFusing {
         // 読みのもっともらしさを測る変換は，表示する変換と状態を混ぜないよう別のセッションで行う
-        AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession(),
-                                typingSessionID: converter.createSession(), restSessionID: converter.createSession())
+        let lightSessionID = lightGate.use { $0.createSession() }
+        return gate.use { converter in
+            AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession(),
+                                    typingSessionID: converter.createSession(), restSessionID: converter.createSession(), lightSessionID: lightSessionID)
+        }
     }
 
     /// 最初の変換で Zenzai モデルの準備が走るので，起動時に一度変換しておく．入力内容は使わない
@@ -313,8 +327,11 @@ public final class AzooKeyConverterEngine {
 
     /// 「自動」を測るための変換のセッション(入力に使うセッションと状態を混ぜない)
     private func makeProbeSession() -> AzooKeyConverterSession {
-        AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession(),
-                                typingSessionID: converter.createSession(), restSessionID: converter.createSession())
+        let lightSessionID = lightGate.use { $0.createSession() }
+        return gate.use { converter in
+            AzooKeyConverterSession(engine: self, sessionID: converter.createSession(), scoringSessionID: converter.createSession(),
+                                    typingSessionID: converter.createSession(), restSessionID: converter.createSession(), lightSessionID: lightSessionID)
+        }
     }
 
     /// 合議の 1 歩の p95 が，Zenzai だけの 1 歩の p95 ＋ DefaultSettings.jinenAutomaticStepMargin 以下か(「自動」でその大きさを使うか)
@@ -388,9 +405,11 @@ public final class AzooKeyConverterEngine {
     /// 学習データをファイルに書き出す．入力欄からフォーカスが外れたときなどに呼ぶ
     public func flushLearning() {
         guard learningType == .inputAndOutput else { return }
-        restoreLearningConfig(converter)
-        converter.stopComposition()
-        converter.commitUpdateLearningData()
+        gate.use { converter in
+            restoreLearningConfig(converter)
+            converter.stopComposition()
+            converter.commitUpdateLearningData()
+        }
     }
 
     /// azooKey は学習の設定を変換器に 1 つだけ持ち，変換を求めるたびにその要求の設定で上書きする．学習を使わない要求
@@ -410,7 +429,7 @@ public final class AzooKeyConverterEngine {
 
     /// 学んだことをすべて消す
     public func resetLearning() {
-        converter.resetMemory()
+        gate.use { $0.resetMemory() }
     }
 
     /// 変換に効く設定を入れる．設定が変わるたびに呼ぶ
@@ -470,7 +489,8 @@ public final class AzooKeyConverterEngine {
             DicdataElement(word: $0.word.word, ruby: KanaWidth.katakana(from: $0.word.reading), cid: Self.partOfSpeechID(for: $0.word.wordClass),
                            mid: MIDData.一般.mid, value: DefaultSettings.importedWordCost + $0.costOffset)
         }
-        converter.importDynamicUserDictionary(user + imported)
+        gate.use { $0.importDynamicUserDictionary(user + imported) }
+        lightGate.use { $0.importDynamicUserDictionary(user + imported) }
     }
 
     /// 品詞に当たる変換エンジンの品詞の ID．名前の無い ID は本体の辞書の語の ID(サ変名詞は「勉強」，形容動詞は「綺麗」，
@@ -493,11 +513,20 @@ public final class AzooKeyConverterEngine {
     }
 
     fileprivate func withSession<Result>(_ id: KanaKanjiConverter.ConversionSessionID, _ body: (KanaKanjiConverter) -> Result) -> Result? {
-        try? converter.withSession(id) { body(converter) }
+        gate.use { converter in try? converter.withSession(id) { body(converter) } }
+    }
+
+    /// 裏の変換に渡す変換器の入れ物
+    fileprivate nonisolated var converterGate: ConverterGate { gate }
+    /// 読みのもっともらしさを求める変換器の入れ物
+    fileprivate nonisolated var plausibilityGate: ConverterGate { lightGate }
+
+    fileprivate func removeLightSession(_ id: KanaKanjiConverter.ConversionSessionID) {
+        lightGate.use { $0.removeSession(id) }
     }
 
     fileprivate func removeSession(_ id: KanaKanjiConverter.ConversionSessionID) {
-        converter.removeSession(id)
+        gate.use { $0.removeSession(id) }
     }
 
     public var usesZenzai: Bool { zenzai != nil }
@@ -569,6 +598,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
     private let engine: AzooKeyConverterEngine
     private let sessionID: KanaKanjiConverter.ConversionSessionID
     private let scoringSessionID: KanaKanjiConverter.ConversionSessionID
+    /// 読みのもっともらしさを求める変換器(AzooKeyConverterEngine.plausibilityGate)のセッション
+    private let lightSessionID: KanaKanjiConverter.ConversionSessionID
     /// Zenzai が遅い環境で，打鍵が止まる前の表示を Zenzai なしで求めるセッション．azooKey は前の読みからの差分で変換するので，
     /// Zenzai を使う変換(止まったとき・Space)と同じセッションで交互に求めると，差分が使えず毎回一から変換して遅くなる
     private let typingSessionID: KanaKanjiConverter.ConversionSessionID
@@ -590,12 +621,24 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
     private var cache: [String: Result] = [:]
     /// 打鍵が止まる前の表示を求めているか(setTyping)．Zenzai が遅い環境では，そのあいだ Zenzai を使わない
     private var typing = false
-    /// 前に変換を求めた読み．続きの読みなら azooKey の差分の変換を使える
-    private var lastRequested: String?
-    /// 入力中の表示のセッション(typingSessionID)で前に変換を求めた読み
-    private var lastTypingRequested: String?
-    /// 残りの読みのセッション(restSessionID)で前に変換を求めた読み
-    private var lastRestRequested: String?
+    /// セッションの流れごとに，前に変換を求めた読み．メインスレッドと裏の変換の両方が，変換器を使う順に書き換える
+    private let streams = ConversionStreams()
+    /// 裏の変換の結果を受け取る入れ物
+    private let mailbox = ConversionMailbox()
+    /// 裏で求めたい最新の読み(裏の変換が古い読みを求めているあいだに打ち進めたら，途中の読みは飛ばす)
+    private let wanted = WantedReading()
+    /// 打鍵の経路で，手元に無い変換を待たずに裏で求めるか(setDeferring)
+    private var deferring = false
+    /// 待たずに裏へ回した変換があったか(consumeDeferredMiss)
+    private var deferredMiss = false
+    /// 裏の変換が動いているか
+    private var backgroundBusy = false
+    /// 裏で次に求める読み．動いている変換が終わったら求める
+    private var backgroundPending: String?
+    /// 入力の区切り．入力を終えたあとに届いた前の入力の結果を捨てる
+    private var generation = 0
+    /// 裏の変換の結果が届いたときに呼ぶ(setArrivalObserver)
+    private var arrivalObserver: (@MainActor () -> Void)?
     /// 入力中の表示を Zenzai なしで求めた最後の読み．打鍵の合間に Zenzai で求めておく(performDeferredConversion)
     private var deferredReading: String?
     /// 入力位置の前にある文字列(左の文脈)．Zenzai が変換の手がかりに使う
@@ -612,7 +655,9 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
     private var lastEngineCandidates: [Int: KanaKanjiConverterModule.Candidate] = [:]
 
     init(engine: AzooKeyConverterEngine, sessionID: KanaKanjiConverter.ConversionSessionID, scoringSessionID: KanaKanjiConverter.ConversionSessionID,
-         typingSessionID: KanaKanjiConverter.ConversionSessionID, restSessionID: KanaKanjiConverter.ConversionSessionID) {
+         typingSessionID: KanaKanjiConverter.ConversionSessionID, restSessionID: KanaKanjiConverter.ConversionSessionID,
+         lightSessionID: KanaKanjiConverter.ConversionSessionID) {
+        self.lightSessionID = lightSessionID
         self.engine = engine
         self.sessionID = sessionID
         self.scoringSessionID = scoringSessionID
@@ -625,7 +670,11 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         // isolated deinit は Swift 6.2 からで，CI の Swift 6.1 では使えない
         let engine = engine
         let sessionIDs = [sessionID, scoringSessionID, typingSessionID, restSessionID]
-        Task { @MainActor in sessionIDs.forEach(engine.removeSession) }
+        let lightSessionID = lightSessionID
+        Task { @MainActor in
+            sessionIDs.forEach(engine.removeSession)
+            engine.removeLightSession(lightSessionID)
+        }
     }
 
     func candidates(for reading: String) -> [HajimeDomain.Candidate] {
@@ -639,6 +688,112 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
 
     func setTyping(_ typing: Bool) {
         self.typing = typing
+    }
+
+    func setDeferring(_ deferring: Bool) {
+        self.deferring = deferring
+    }
+
+    func consumeDeferredMiss() -> Bool {
+        defer { deferredMiss = false }
+        return deferredMiss
+    }
+
+    func setArrivalObserver(_ observer: (@MainActor () -> Void)?) {
+        arrivalObserver = observer
+    }
+
+    /// 裏の変換を始める．動いていれば，終わったあとに最新の読みを求める
+    private func requestInBackground(_ reading: String) {
+        deferredMiss = true
+        wanted.set(reading)
+        guard !backgroundBusy else {
+            backgroundPending = reading
+            return
+        }
+        backgroundPending = nil
+        backgroundBusy = true
+        let usesTypingModel = engine.typingZenzai != nil
+        let skipsZenzai = !usesTypingModel && engine.usesZenzai && engine.skipsZenzaiWhileTyping
+        var stages: [BackgroundConversion.Stage] = []
+        // 併用のときと Zenzai が遅い環境では，先に速い変換を求めて出し，そのあとで Zenzai の変換を求める
+        if skipsZenzai || usesTypingModel {
+            var options = engine.options(leftContext: leftContext, usesZenzai: !skipsZenzai, usesTypingModel: usesTypingModel)
+            if learningSuspended { options.learningType = .nothing }
+            stages.append(.init(stream: .typing, session: typingSessionID, options: options, key: Self.typingCacheKey(reading), usesZenzai: false,
+                                onlyIfLatest: false))
+        }
+        var options = engine.options(leftContext: leftContext, usesZenzai: true, usesTypingModel: false)
+        if learningSuspended { options.learningType = .nothing }
+        // 速い変換を先に出したときは，打ち進めていれば Zenzai の変換を飛ばす(次の読みの速い変換を待たせない)
+        stages.append(.init(stream: nil, session: sessionID, options: options, key: reading, usesZenzai: engine.usesZenzai, onlyIfLatest: !stages.isEmpty))
+        let job = BackgroundConversion(reading: reading, stages: stages, restSession: restSessionID, generation: generation, gate: engine.converterGate,
+                                       streams: streams, mailbox: mailbox, wanted: wanted)
+        // 速い変換を先に求めたときは，Zenzai の変換を待たずに届ける
+        let stageFinished: @Sendable () -> Void = { [weak self] in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.backgroundStageArrived() }
+            }
+        }
+        engine.conversionQueue.async { [weak self] in
+            job.run(stageFinished: stageFinished)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.backgroundFinished() }
+            }
+        }
+    }
+
+    /// 裏の変換の途中の結果(速い変換)が届いた
+    private func backgroundStageArrived() {
+        if drainMailbox() { arrivalObserver?() }
+    }
+
+    /// 裏の変換が終わった．結果を取り込み，打ち進めていれば最新の読みを求め，届いたことを知らせる
+    private func backgroundFinished() {
+        backgroundBusy = false
+        let arrived = drainMailbox()
+        if let next = backgroundPending {
+            backgroundPending = nil
+            if cache[next] == nil { requestInBackground(next) }
+            // 取り込みのために立てた印で，次の表示が「待っている」と見なさないようにする
+            deferredMiss = false
+        }
+        if arrived { arrivalObserver?() }
+    }
+
+    /// 届いている裏の変換の結果を取り込む．前の入力の結果は捨てる
+    @discardableResult
+    private func drainMailbox() -> Bool {
+        var arrived = false
+        for delivery in mailbox.take() where delivery.generation == generation {
+            if delivery.usesZenzai { engine.recordZenzaiCost(delivery.duration) }
+            guard cache[delivery.key] == nil else { continue }
+            cache[delivery.key] = makeResult(delivery.result, readingLength: delivery.reading.count)
+            arrived = true
+        }
+        return arrived
+    }
+
+    /// 待って求める前に，動いている裏の変換を終わらせて結果を取り込む(同じ読みを二重に求めない)
+    private func settleBackground() {
+        guard backgroundBusy else { return }
+        backgroundPending = nil
+        engine.conversionQueue.sync {}
+        drainMailbox()
+    }
+
+    private func makeResult(_ result: ConversionResult, readingLength: Int) -> Result {
+        var seen = Set<String>()
+        var all: [HajimeDomain.Candidate] = []
+        for candidate in result.mainResults + result.firstClauseResults where seen.insert(candidate.text).inserted {
+            all.append(register(candidate, readingLength: readingLength))
+        }
+        var clauseSeen = Set<String>()
+        var clauses: [HajimeDomain.Candidate] = []
+        for candidate in result.firstClauseResults where clauseSeen.insert(candidate.text).inserted {
+            clauses.append(register(candidate, readingLength: readingLength))
+        }
+        return Result(all: all, clauses: clauses)
     }
 
     var hasDeferredConversion: Bool {
@@ -732,22 +887,58 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
     func plausibility(of reading: String) -> Double {
         guard !reading.isEmpty else { return -.infinity }
         if let cached = plausibilityCache[reading] { return cached }
-        var composing = ComposingText()
-        composing.insertAtCursorPosition(reading, inputStyle: .direct)
         // 点数だけを使うので，Zenzai・絵文字・特別な候補・打ち間違いの補正を使わず，候補も 1 つだけ求める
         var options = engine.options(leftContext: nil, usesZenzai: false, candidateCount: 1)
         options.textReplacer = .empty
         options.specialCandidateProviders = []
         options.typoCorrectionMode = .disabled
         options.learningType = .nothing
-        let best = engine.withSession(scoringSessionID) { converter in
-            converter.requestCandidates(composing, options: options).mainResults
-                .first { Self.readingCount($0.composingCount, readingLength: reading.count) == reading.count }
-                .map { Double($0.value) }
+        if deferring {
+            // 打鍵の経路では待たない．裏で求め，届いたら知らせる(arrivalObserver)
+            requestPlausibilityInBackground(reading, options: options)
+            return -.infinity
         }
-        let score = (best ?? nil) ?? -.infinity
+        let score = BackgroundPlausibility.score(of: reading, options: options, session: lightSessionID, gate: engine.plausibilityGate)
         plausibilityCache[reading] = score
         return score
+    }
+
+    /// 裏で求めている読みのもっともらしさ
+    private var plausibilityBusy = false
+    private var plausibilityPending: [String] = []
+    private let plausibilityMailbox = PlausibilityMailbox()
+
+    private func requestPlausibilityInBackground(_ reading: String, options: ConvertRequestOptions) {
+        deferredMiss = true
+        if !plausibilityPending.contains(reading) { plausibilityPending.append(reading) }
+        guard !plausibilityBusy else { return }
+        startPlausibilityJob(options: options)
+    }
+
+    private func startPlausibilityJob(options: ConvertRequestOptions) {
+        guard !plausibilityPending.isEmpty else { return }
+        plausibilityBusy = true
+        let job = BackgroundPlausibility(readings: plausibilityPending, options: options, session: lightSessionID, generation: generation,
+                                         gate: engine.plausibilityGate, mailbox: plausibilityMailbox)
+        plausibilityPending = []
+        engine.lightQueue.async { [weak self] in
+            job.run()
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.plausibilityFinished(options: job.options) }
+            }
+        }
+    }
+
+    private func plausibilityFinished(options: ConvertRequestOptions) {
+        plausibilityBusy = false
+        var arrived = false
+        for delivery in plausibilityMailbox.take() where delivery.generation == generation {
+            plausibilityCache[delivery.reading] = delivery.score
+            arrived = true
+        }
+        plausibilityPending.removeAll { plausibilityCache[$0] != nil }
+        startPlausibilityJob(options: options)
+        if arrived { arrivalObserver?() }
     }
 
     func segmentationWords(for reading: String) -> [HajimeDomain.Candidate.Word] {
@@ -823,7 +1014,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         let config = ExperimentalTypoCorrectionConfig(
             beamSize: DefaultSettings.typoCorrectionBeamSize, topK: DefaultSettings.typoCorrectionTopK, nBest: DefaultSettings.typoCorrectionCandidateCount)
         // 訂正は表示する変換と状態を混ぜないよう，求めたあとに変換の状態を捨てる
-        lastRequested = nil
+        settleBackground()
+        engine.converterGate.use { _ in streams.forget(.sentence) }
         let corrections = engine.withSession(sessionID) { converter -> [ZenzaiTypoCandidate] in
             defer { converter.stopComposition() }
             return converter.experimentalRequestTypoCorrection(
@@ -845,7 +1037,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
             return composing
         }
         let options = engine.options(leftContext: leftContext)
-        lastRequested = nil
+        settleBackground()
+        engine.converterGate.use { _ in streams.forget(.sentence) }
         let scores = engine.withSession(sessionID) { converter -> [Float?] in
             defer { converter.stopComposition() }
             return converter.experimentalScoreTypoInputs(leftSideContext: leftContext ?? "", inputs: inputs, options: options, inputStyle: .roman2kana)
@@ -1168,28 +1361,30 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         guard !learningSuspended else { return }
         learningSuspended = true
         // 学習を使った結果を使い回さないよう，前の結果を捨てて一から変換する
+        invalidateConversions()
+    }
+
+    /// 求めた変換を捨て，次は差分ではなく一から変換する．裏で求めている途中の結果も使わない
+    private func invalidateConversions() {
+        settleBackground()
+        generation += 1
         cache = [:]
-        lastRequested = nil
-        lastTypingRequested = nil
-        lastRestRequested = nil
+        engine.converterGate.use { _ in streams.reset() }
         deferredReading = nil
     }
 
     /// 取り込んだ辞書の語が変わったら，前の結果は使えないので捨て，次は差分ではなく一から変換する
     func setAuxiliaryWords(_ words: [AuxiliaryWord]) {
         guard engine.setAuxiliaryWords(words) else { return }
-        cache = [:]
+        invalidateConversions()
         segmentCandidateCache = [:]
-        lastRequested = nil
-        lastTypingRequested = nil
-        lastRestRequested = nil
-        deferredReading = nil
     }
 
     func endComposition() {
-        lastRequested = nil
-        lastTypingRequested = nil
-        lastRestRequested = nil
+        settleBackground()
+        generation += 1
+        plausibilityPending = []
+        engine.converterGate.use { _ in streams.reset() }
         deferredReading = nil
         learningSuspended = false
         // 学ばなかった入力(学習を使わない変換)も最後の確定にし，その前の入力の学習を取り消さないようにする
@@ -1224,69 +1419,46 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         if let cached = cache[reading] { return cached }
         let key = skipsZenzai || usesTypingModel ? Self.typingCacheKey(reading) : reading
         if let cached = cache[key] { return cached }
+        if deferring {
+            // 打鍵の経路では待たない．裏で求め，届いたら表示を出し直す(arrivalObserver)
+            requestInBackground(reading)
+            return nil
+        }
+        // 裏で求めている途中なら終わるのを待ち，その結果があれば使う
+        settleBackground()
+        if let cached = cache[reading] ?? cache[key] { return cached }
         var composing = ComposingText()
         composing.insertAtCursorPosition(reading, inputStyle: .direct)
         var options = engine.options(leftContext: leftContext, usesZenzai: !skipsZenzai, usesTypingModel: usesTypingModel)
         if learningSuspended { options.learningType = .nothing }
         // azooKey は前に求めた読みからの差分で変換を進める．前の読みの続きでない読み(文節ごとの残りの読みなど)を
         // そのまま渡すと前の結果が混ざる(「ひとだ」→「非とだ」)ので，続きでなければ状態を捨ててから求める
-        let stream = stream(for: reading, separatesTyping: skipsZenzai || usesTypingModel)
-        let previous = switch stream {
-        case .typing: lastTypingRequested
-        case .sentence: lastRequested
-        case .rest: lastRestRequested
-        }
-        let continues = previous.map(reading.hasPrefix) ?? false
-        let session = switch stream {
-        case .typing: typingSessionID
-        case .sentence: sessionID
-        case .rest: restSessionID
-        }
+        let separatesTyping = skipsZenzai || usesTypingModel
         let started = ContinuousClock.now
-        guard let result = engine.withSession(session, { converter in
-            if !continues { converter.stopComposition() }
-            return converter.requestCandidates(composing, options: options)
-        }) else {
-            return nil
+        let streams = streams
+        let ids = (typing: typingSessionID, sentence: sessionID, rest: restSessionID)
+        var stream = ConversionStreams.Stream.sentence
+        let result: ConversionResult? = engine.converterGate.use { converter in
+            stream = streams.stream(for: reading, separatesTyping: separatesTyping)
+            let continues = streams.last(stream).map(reading.hasPrefix) ?? false
+            let session = switch stream {
+            case .typing: ids.typing
+            case .sentence: ids.sentence
+            case .rest: ids.rest
+            }
+            let result = try? converter.withSession(session) {
+                if !continues { converter.stopComposition() }
+                return converter.requestCandidates(composing, options: options)
+            }
+            if result != nil { streams.setLast(reading, for: stream) }
+            return result
         }
-        switch stream {
-        case .typing:
-            lastTypingRequested = reading
-            deferredReading = reading
-        case .sentence:
-            lastRequested = reading
-        case .rest:
-            lastRestRequested = reading
-        }
+        guard let result else { return nil }
+        if stream == .typing { deferredReading = reading }
         if stream != .typing, engine.usesZenzai { engine.recordZenzaiCost(ContinuousClock.now - started) }
-        var seen = Set<String>()
-        var all: [HajimeDomain.Candidate] = []
-        for candidate in result.mainResults + result.firstClauseResults where seen.insert(candidate.text).inserted {
-            all.append(register(candidate, readingLength: reading.count))
-        }
-        var clauseSeen = Set<String>()
-        var clauses: [HajimeDomain.Candidate] = []
-        for candidate in result.firstClauseResults where clauseSeen.insert(candidate.text).inserted {
-            clauses.append(register(candidate, readingLength: reading.count))
-        }
-        let value = Result(all: all, clauses: clauses)
+        let value = makeResult(result, readingLength: reading.count)
         cache[key] = value
         return value
-    }
-
-    /// 変換を求めるセッションの流れ
-    private enum Stream {
-        /// 打鍵が止まる前の表示(Zenzai なしか，併用のときの速いモデル)
-        case typing
-        /// 打っている文．前の読みの続きを差分で変換する
-        case sentence
-        /// 打っている文の続きでない読み
-        case rest
-    }
-
-    private func stream(for reading: String, separatesTyping: Bool) -> Stream {
-        if separatesTyping { return .typing }
-        return lastRequested.map(reading.hasPrefix) ?? true ? .sentence : .rest
     }
 
     /// 打鍵が止まる前に求めた表示(Zenzai なしか，併用のときの速いモデル)を覚えるキー(読みの前に読みには出ない文字を付ける)
@@ -1316,5 +1488,215 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
         case .composite(let lhs, let rhs):
             return min(readingCount(lhs, readingLength: readingLength) + readingCount(rhs, readingLength: readingLength), readingLength)
         }
+    }
+}
+
+/// 変換器をメインスレッドと変換用のスレッドで順番に使うための入れ物．azooKey の変換器はスレッドセーフではないので，
+/// 使うあいだは鍵をかける．打鍵の経路は変換器に触れない(AzooKeyConverterSession.setDeferring)ので，鍵を待つのは
+/// 変換を待ってよい操作(Space・Enter・打鍵が止まったあとの処理)だけになる
+final class ConverterGate: @unchecked Sendable {
+    private let lock = NSRecursiveLock()
+    private let converter: KanaKanjiConverter
+
+    init(_ converter: KanaKanjiConverter) {
+        self.converter = converter
+    }
+
+    func use<T>(_ body: (KanaKanjiConverter) throws -> T) rethrows -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try body(converter)
+    }
+}
+
+/// セッションの流れごとに，前に変換を求めた読み．変換器を使うあいだ(ConverterGate.use の中)だけ読み書きする
+final class ConversionStreams: @unchecked Sendable {
+    /// 変換を求めるセッションの流れ
+    enum Stream {
+        /// 打鍵が止まる前の表示(Zenzai なしか，併用のときの速いモデル)
+        case typing
+        /// 打っている文．前の読みの続きを差分で変換する
+        case sentence
+        /// 打っている文の続きでない読み
+        case rest
+    }
+
+    private var lastSentence: String?
+    private var lastTyping: String?
+    private var lastRest: String?
+
+    func stream(for reading: String, separatesTyping: Bool) -> Stream {
+        if separatesTyping { return .typing }
+        return lastSentence.map(reading.hasPrefix) ?? true ? .sentence : .rest
+    }
+
+    func last(_ stream: Stream) -> String? {
+        switch stream {
+        case .typing: lastTyping
+        case .sentence: lastSentence
+        case .rest: lastRest
+        }
+    }
+
+    func setLast(_ reading: String, for stream: Stream) {
+        switch stream {
+        case .typing: lastTyping = reading
+        case .sentence: lastSentence = reading
+        case .rest: lastRest = reading
+        }
+    }
+
+    func forget(_ stream: Stream) {
+        switch stream {
+        case .typing: lastTyping = nil
+        case .sentence: lastSentence = nil
+        case .rest: lastRest = nil
+        }
+    }
+
+    func reset() {
+        lastSentence = nil
+        lastTyping = nil
+        lastRest = nil
+    }
+}
+
+/// 裏で求めたい最新の読み．裏の変換が，打ち進めたかを確かめるのに使う
+final class WantedReading: @unchecked Sendable {
+    private let lock = NSLock()
+    private var reading: String?
+
+    func set(_ reading: String) {
+        lock.withLock { self.reading = reading }
+    }
+
+    func isLatest(_ reading: String) -> Bool {
+        lock.withLock { self.reading == reading }
+    }
+}
+
+/// 裏の変換の結果を，メインスレッドが取り込むまで置いておく
+final class ConversionMailbox: @unchecked Sendable {
+    struct Delivery {
+        var reading: String
+        var key: String
+        var result: ConversionResult
+        var duration: Duration
+        var usesZenzai: Bool
+        var generation: Int
+    }
+
+    private let lock = NSLock()
+    private var deliveries: [Delivery] = []
+
+    func put(_ delivery: Delivery) {
+        lock.withLock { deliveries.append(delivery) }
+    }
+
+    func take() -> [Delivery] {
+        lock.withLock {
+            defer { deliveries = [] }
+            return deliveries
+        }
+    }
+}
+
+/// 裏の変換 1 回分．変換用のスレッドで動かす．メインスレッドの状態には触れず，結果は ConversionMailbox に置く
+struct BackgroundConversion: @unchecked Sendable {
+    struct Stage {
+        /// 求める流れ．nil なら，変換器を使うときに文の続きか別の読みかを決める
+        var stream: ConversionStreams.Stream?
+        var session: KanaKanjiConverter.ConversionSessionID
+        var options: ConvertRequestOptions
+        var key: String
+        var usesZenzai: Bool
+        /// 打ち進めていたら(求めたい最新の読みが変わっていたら)求めない
+        var onlyIfLatest: Bool
+    }
+
+    var reading: String
+    var stages: [Stage]
+    var restSession: KanaKanjiConverter.ConversionSessionID
+    var generation: Int
+    var gate: ConverterGate
+    var streams: ConversionStreams
+    var mailbox: ConversionMailbox
+    var wanted: WantedReading
+
+    /// - Parameter stageFinished: 最後でない段を求め終えるたびに呼ぶ(途中の結果を先に届ける)
+    func run(stageFinished: @Sendable () -> Void) {
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(reading, inputStyle: .direct)
+        for (index, stage) in stages.enumerated() {
+            if stage.onlyIfLatest, !wanted.isLatest(reading) { continue }
+            let started = ContinuousClock.now
+            let result: ConversionResult? = gate.use { converter in
+                let stream = stage.stream ?? streams.stream(for: reading, separatesTyping: false)
+                let continues = streams.last(stream).map(reading.hasPrefix) ?? false
+                let session = stream == .rest ? restSession : stage.session
+                let result = try? converter.withSession(session) {
+                    if !continues { converter.stopComposition() }
+                    return converter.requestCandidates(composing, options: stage.options)
+                }
+                if result != nil { streams.setLast(reading, for: stream) }
+                return result
+            }
+            guard let result else { continue }
+            mailbox.put(.init(reading: reading, key: stage.key, result: result, duration: ContinuousClock.now - started, usesZenzai: stage.usesZenzai,
+                              generation: generation))
+            if index < stages.count - 1 { stageFinished() }
+        }
+    }
+}
+
+/// 裏で求めた読みのもっともらしさを，メインスレッドが取り込むまで置いておく
+final class PlausibilityMailbox: @unchecked Sendable {
+    struct Delivery {
+        var reading: String
+        var score: Double
+        var generation: Int
+    }
+
+    private let lock = NSLock()
+    private var deliveries: [Delivery] = []
+
+    func put(_ delivery: Delivery) {
+        lock.withLock { deliveries.append(delivery) }
+    }
+
+    func take() -> [Delivery] {
+        lock.withLock {
+            defer { deliveries = [] }
+            return deliveries
+        }
+    }
+}
+
+/// 読みのもっともらしさ(候補を作らない軽い変換の点数)を求める．変換用のスレッドでまとめて求めるときにも使う
+struct BackgroundPlausibility: @unchecked Sendable {
+    var readings: [String]
+    var options: ConvertRequestOptions
+    var session: KanaKanjiConverter.ConversionSessionID
+    var generation: Int
+    var gate: ConverterGate
+    var mailbox: PlausibilityMailbox
+
+    func run() {
+        for reading in readings {
+            mailbox.put(.init(reading: reading, score: Self.score(of: reading, options: options, session: session, gate: gate), generation: generation))
+        }
+    }
+
+    static func score(of reading: String, options: ConvertRequestOptions, session: KanaKanjiConverter.ConversionSessionID, gate: ConverterGate) -> Double {
+        var composing = ComposingText()
+        composing.insertAtCursorPosition(reading, inputStyle: .direct)
+        let best: Double?? = gate.use { converter in
+            try? converter.withSession(session) {
+                converter.requestCandidates(composing, options: options).mainResults
+                    .first { AzooKeyConverterSession.readingCount($0.composingCount, readingLength: reading.count) == reading.count }
+                    .map { Double($0.value) }
+            }
+        }
+        return (best ?? nil) ?? -.infinity
     }
 }

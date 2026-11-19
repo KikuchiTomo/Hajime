@@ -66,6 +66,20 @@ final class Harness {
         for character in text { press(.character(character)) }
     }
 
+    /// 打っているあいだの変換を裏で求める作りにする(アプリと同じ)．求めた変換は deliverConversions を呼ぶまで届かない
+    func deferConversions() {
+        converter.supportsDeferring = true
+        session.setConversionArrivalHandler { [weak self] in
+            guard let self else { return }
+            self.apply(self.session.conversionDidArrive(context: self.context))
+        }
+    }
+
+    /// 裏で求めていた変換を届ける
+    func deliverConversions() {
+        converter.deliverDeferred()
+    }
+
     /// 打鍵が止まり，さらに長く止まったときの処理(ライブ変換の表示と打ち間違いの見直し)
     func settle() {
         for action in session.settle(context: context) + session.review(context: context) {

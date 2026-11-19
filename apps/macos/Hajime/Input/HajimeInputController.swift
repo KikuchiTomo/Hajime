@@ -46,6 +46,26 @@ final class HajimeInputController: IMKInputController {
         self.presenter = presenter
         self.menuBuilder = menuBuilder
         super.init(server: server, delegate: delegate, client: inputClient)
+        // 打っているあいだの変換は裏で求め，キーの処理では待たない．届いたら表示を出し直す
+        MainActor.assumeIsolated {
+            session.setConversionArrivalHandler { [weak self] in self?.conversionArrived() }
+        }
+    }
+
+    /// 裏で求めていた変換が届いた．打っている途中なら，届いた変換で組み立て中の文字と候補を出し直す
+    @MainActor
+    private func conversionArrived() {
+        guard let client = client() else { return }
+        let context = presenter.context
+        let actions = InputSignposts.signposter.withIntervalSignpost("arrival") { session.conversionDidArrive(context: context) }
+        if !actions.isEmpty {
+            InputSignposts.signposter.withIntervalSignpost("present") { presenter.apply(actions, to: client) }
+        }
+        // 変換を待っていて求められなかった予測は，届いたいま求める
+        if session.needsFollowUpsAfterArrival {
+            followUpTask?.cancel()
+            runFollowUps(client: client, context: context)
+        }
     }
 
     override func recognizedEvents(_ sender: Any!) -> Int {

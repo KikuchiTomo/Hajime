@@ -57,6 +57,8 @@ public final class EngineService {
         /// 打鍵の合間の Zenzai の変換(performDeferredConversion)が打鍵の間隔より長くかかったか．
         /// true のあいだは合間に求めず，打鍵が止まったときに求める(次の打鍵を待たせない)．入力を終えたら戻す
         var deferredIsSlow = false
+        /// 裏で求めていた変換が届いたか(InputSession.setConversionArrivalHandler)．次の wake で表示を出し直す
+        var conversionArrived = false
     }
 
     /// 打ち間違いの訂正を裏で求めている途中の仕事．求め終わったら result が入り，次の wake で使う
@@ -131,6 +133,8 @@ public final class EngineService {
 
     /// 学んだことと使い方の記録をファイルに書き出す(AzooKeyConverterEngine.flushLearning と UsageStore の flush)
     private let flushLearning: () -> Void
+    /// 打っているあいだの変換を裏で求め，キーの処理では待たないか．届いた変換は DLL の次の wake で渡す
+    private let defersConversion: Bool
 
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
                 openSettings: @escaping (_ arguments: [String]) -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
@@ -139,7 +143,8 @@ public final class EngineService {
                 typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
                 sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
                 services: SettingsServices = SettingsServices(), runCommand: @escaping (LauncherCommand) -> Void = { _ in },
-                flushLearning: @escaping () -> Void = {}, log: @escaping (String) -> Void = { _ in }) {
+                flushLearning: @escaping () -> Void = {}, log: @escaping (String) -> Void = { _ in }, defersConversion: Bool = false) {
+        self.defersConversion = defersConversion
         self.runCommand = runCommand
         self.flushLearning = flushLearning
         self.services = services
@@ -239,6 +244,9 @@ public final class EngineService {
             nextSession &+= 1
             if nextSession == 0 { nextSession = 1 }
             let input = makeSession()
+            if defersConversion {
+                input.setConversionArrivalHandler { [weak self] in self?.sessions[session]?.conversionArrived = true }
+            }
             sessions[session] = Session(owner: id, input: input)
             connection.sessions.insert(session)
             connections[id] = connection
@@ -588,6 +596,13 @@ public final class EngineService {
             actions += current.input.choose(PointerTarget(choice.target), context: context)
             sessions[session]?.followUps = current.input.followUps(context: context)
         }
+        if current.conversionArrived {
+            // 裏で求めていた変換が届いた．打っている途中なら，届いた変換で表示を出し直す
+            sessions[session]?.conversionArrived = false
+            actions += current.input.conversionDidArrive(context: context)
+            // 変換を待っていて求められなかった予測は，届いたいま求める
+            if current.input.needsFollowUpsAfterArrival { sessions[session]?.followUps = current.input.followUps(context: context) }
+        }
         if let step = sessions[session]?.followUps.first {
             // 画面を出したあとで求めて足す処理を，1 回の wake に 1 つずつ動かす(macOS の HajimeInputController と同じ)
             sessions[session]?.followUps.removeFirst()
@@ -751,6 +766,8 @@ public final class EngineService {
 
     private func otherTypingWakeAfter(_ current: Session) -> UInt32? {
         if !current.followUps.isEmpty { return Self.followUpPollMilliseconds }
+        // 裏で求めている変換を待っているあいだは，届いたらすぐ出せるよう短い間隔で来てもらう
+        if current.conversionArrived || current.input.awaitsConversion { return Self.deferredConversionPollMilliseconds }
         if current.correction != nil { return Self.correctionPollMilliseconds }
         let delays = settings.current
         if current.input.awaitsDeferredConversion {

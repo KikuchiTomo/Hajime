@@ -19,7 +19,22 @@ final class WordLanguageClassifier {
     }
 
     func language(of keys: String, context: WordLanguageContext, mode: WordLanguageJudge.Mode) -> WordLanguage {
-        WordLanguageJudge(settings: settings.current.wordLanguage, mode: mode, japaneseReadingLength: settings.current.englishSkipLength).decide(evidence(for: keys), context: context)
+        let judge = WordLanguageJudge(settings: settings.current.wordLanguage, mode: mode, japaneseReadingLength: settings.current.englishSkipLength)
+        if let light = evidenceWithoutConversion(for: keys, mode: mode) { return judge.decide(light, context: context) }
+        return judge.decide(evidence(for: keys), context: context)
+    }
+
+    /// 変換を求めなくても決まる語の手がかり．変換が要る語は nil．
+    ///
+    /// ローマ字入力で英語の辞書にない長い語(文をまるごと打った並びなど)は，読みのもっともらしさも不適切な語かも見ずに日本語と決まる
+    /// (WordLanguageJudge.decide)．その語のために読みを 2 回変換すると，確定のたびに文の長さだけ待たせるので，求めずに決める．
+    /// 変換の結果(不適切な語か)を見る語は，短い語，英字の語のあとによく続く語，読みが短い語，英語の辞書にある語
+    private func evidenceWithoutConversion(for keys: String, mode: WordLanguageJudge.Mode) -> WordLanguageJudge.Evidence? {
+        guard mode == .japaneseFirst, cache[keys] == nil, let reading = Self.reading(of: keys) else { return nil }
+        let isWord = keys.allSatisfy({ $0.isASCII && $0.isLetter }) && isEnglishWord(keys)
+        guard !isWord, keys.count > DefaultSettings.maximumJapaneseFirstShortWordLength, !TypoCorrectionRule.isWordAfterEnglish(reading),
+              reading.count > settings.current.englishSkipLength else { return nil }
+        return WordLanguageJudge.Evidence(keys: keys, isEnglishWord: false, reading: reading, plausibilityPerCharacter: nil, isOffensive: false)
     }
 
     /// 英語の辞書にある語か
