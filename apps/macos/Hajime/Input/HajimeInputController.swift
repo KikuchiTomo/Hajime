@@ -27,6 +27,8 @@ final class HajimeInputController: IMKInputController {
     private var followUpTask: Task<Void, Never>?
     /// 打っているあいだに前もって求めている打ち間違いの訂正(見直すときに待たせないため)．次のキーで取り消す
     private var prefetchTask: Task<Void, Never>?
+    /// 打鍵が止まってから予測を出す設定で，予測を出す時機を待つタイマー(InputSession.revealPrediction)．次のキーが来たらやめる
+    private var predictionTask: Task<Void, Never>?
     /// 打ち間違いの見直しの記録．補正が出ないときに，求めなかったのか・時間切れか・直さないと決めたのかを実機で見分けるため．
     /// 打った文字・読み・候補は記録せず，数と時間と結果の種類だけを残す(docs/dev/SECURITY-MODEL.md)
     private static let correctionLogger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "correction")
@@ -64,6 +66,10 @@ final class HajimeInputController: IMKInputController {
         defer { signposter.endInterval("key", keyInterval) }
         followUpTask?.cancel()
         followUpTask = nil
+        predictionTask?.cancel()
+        predictionTask = nil
+        // キーを受けた入力先が，候補・予測・案内の窓を使う(ほかの入力先の遅れた処理では出させない)
+        presenter.claimWindows()
         let context = root.contextProvider.context(for: client, includePrecedingText: !session.isComposing)
         // 矢印キーは表示の向きに効かせる．今出している分岐図が先の枝を左へ出しているかを，キーを渡す前に知らせる
         session.branchMirrored = presenter.isBranchMirrored
@@ -89,7 +95,34 @@ final class HajimeInputController: IMKInputController {
         } else {
             scheduleSettle(client: client, context: context)
         }
+        schedulePrediction(client: client, context: context)
         return result.handled
+    }
+
+    /// 打鍵が止まってから予測を出す設定なら，最後のキーから設定の時間(predictionDelay)たったときに予測を出す．
+    /// 待つのはメインスレッドの Task で，キーの処理は待たせない．次のキーが来たらやめるので，打ち続けているあいだは出さない
+    @MainActor
+    private func schedulePrediction(client: any IMKTextInput, context: InputContext) {
+        guard session.awaitsPrediction else { return }
+        let delay = root.settings.current.predictionDelay
+        predictionTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(delay))
+            guard !Task.isCancelled, let self else { return }
+            self.presenter.apply(self.session.revealPrediction(context: context), to: client)
+        }
+    }
+
+    /// 打鍵のあとで動かす処理(打鍵が止まったときの表示・見直し・あとから求めて足す処理・予測)をすべてやめる．
+    /// 入力を終えたあとに，古い内容で窓を出し直さないため
+    @MainActor
+    private func cancelPendingWork() {
+        settleTask?.cancel()
+        settleTask = nil
+        followUpTask?.cancel()
+        followUpTask = nil
+        predictionTask?.cancel()
+        predictionTask = nil
+        cancelPrefetch()
     }
 
     /// Space で変換したときに打ち間違いの訂正がまだ求め終わっていなければ，変換は出したまま訂正を裏で求め，
@@ -241,6 +274,8 @@ final class HajimeInputController: IMKInputController {
     @MainActor
     override func activateServer(_ sender: Any!) {
         super.activateServer(sender)
+        // 入力先になったので，候補・予測・案内の窓はこの入力先が使う(前の入力先の遅れた処理では出させない)
+        presenter.claimWindows()
         root.inputSourceRegistration.repairIfNeeded()
         if let client = sender as? any IMKTextInput {
             KeyboardLayoutOverride.apply(root.settings.current.keyboardLayout, to: client)
@@ -258,11 +293,7 @@ final class HajimeInputController: IMKInputController {
 
     @MainActor
     override func deactivateServer(_ sender: Any!) {
-        settleTask?.cancel()
-        settleTask = nil
-        followUpTask?.cancel()
-        followUpTask = nil
-        cancelPrefetch()
+        cancelPendingWork()
         if let client = sender as? any IMKTextInput {
             presenter.apply(session.deactivate(), to: client)
             root.modeMemory.record(session.mode, application: client.bundleIdentifier())
@@ -277,6 +308,8 @@ final class HajimeInputController: IMKInputController {
 
     @MainActor
     override func commitComposition(_ sender: Any!) {
+        // OS が組み立て中の文字を確定させた(マウスで入力位置を動かしたなど)．打鍵のあとの処理は要らないのでやめる
+        cancelPendingWork()
         guard let client = sender as? any IMKTextInput else { return }
         presenter.apply(session.deactivate(), to: client)
     }
@@ -344,12 +377,14 @@ final class HajimeInputController: IMKInputController {
     /// 入力メニューの「手書き入力」．キーの「手書き入力」と同じく，組み立て中の文字を確定してから窓を開く
     @MainActor @objc func openHandwriting(_ sender: Any) {
         guard let client = client() else { return }
+        presenter.claimWindows()
         presenter.apply(session.openHandwriting(), to: client)
     }
 
     /// 入力メニューの「絵文字と記号」．前に見ていた種類(絵文字か記号か)で開く
     @MainActor @objc func openPalette(_ sender: Any) {
         guard let client = client() else { return }
+        presenter.claimWindows()
         presenter.apply(session.openPalette(), to: client)
     }
 

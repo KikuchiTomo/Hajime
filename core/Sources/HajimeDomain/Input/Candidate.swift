@@ -98,6 +98,9 @@ public struct Candidate: Sendable, Equatable {
     public var learnedParts: [Candidate] = []
     /// 確定した履歴(学習)にある語句か．エンジンが学習から引いた語だけでできているとき true．入力中の予測で履歴にあるものを先に出すのに使う
     public var isLearned = false
+    /// 語句全体の読み(ひらがな)．続く語句の予測(KanaKanjiConverting.predictions)で，エンジンが読みを教えるときだけ入る．
+    /// 予測を選んで読みを補うのに使う(打った読みより長い)．無ければ nil
+    public var reading: String?
     /// ユーザー辞書の語に利用者が付けたコメント．候補の窓で語の横に出し，押すとコメントを入れる．無ければ nil
     public var comment: String?
 

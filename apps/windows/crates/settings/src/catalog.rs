@@ -35,6 +35,7 @@ pub struct Ranges {
     pub suggestion_skip_count: Range,
     pub english_skip_length: Range,
     pub correction_delay: Range,
+    pub prediction_delay: Range,
     pub review_correction_timeout: Range,
     pub late_correction_timeout: Range,
     pub mode_indicator_duration: Range,

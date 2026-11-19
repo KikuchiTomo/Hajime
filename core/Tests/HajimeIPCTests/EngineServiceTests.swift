@@ -290,6 +290,23 @@ struct EngineServiceTests {
         #expect(wait > UInt32((delay * 1000).rounded()) - 50)
     }
 
+    @Test("セッションを閉じたら，そのセッションが出していた候補の窓を消す(DLL が deactivate を送らずに閉じても残さない)")
+    func closingSessionHidesCandidates() throws {
+        try settings.update { $0.suggestionDisplay = .always }
+        let id = greeted()
+        let session = try open(id)
+        _ = type("kana", session: session, from: id)
+        #expect(sent.value.contains { if case .showCandidates = $0 { true } else { false } })
+        sent.value = []
+        #expect(service.handle(WireRequest(id: 5, body: .closeSession(session: session)), from: id).body == .done)
+        #expect(sent.value == [.hide])
+        // 窓を出していないセッションを閉じても，ほかのセッションの窓は消さない
+        let other = try open(id)
+        sent.value = []
+        _ = service.handle(WireRequest(id: 6, body: .closeSession(session: other)), from: id)
+        #expect(sent.value.isEmpty)
+    }
+
     @Test("設定の画面から設定を読み書きし，範囲の外の値は直し，知らない値は変えない")
     func writeSettings() {
         let id = greeted()

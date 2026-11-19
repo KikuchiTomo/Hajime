@@ -1157,6 +1157,7 @@ pub enum RangeKind {
     SuggestionSkipCount,
     EnglishSkipLength,
     CorrectionDelay,
+    PredictionDelay,
     ReviewCorrectionTimeout,
     LateCorrectionTimeout,
     ModeIndicatorDuration,
@@ -1184,6 +1185,7 @@ impl RangeKind {
             RangeKind::SuggestionSkipCount => ranges.suggestion_skip_count,
             RangeKind::EnglishSkipLength => ranges.english_skip_length,
             RangeKind::CorrectionDelay => ranges.correction_delay,
+            RangeKind::PredictionDelay => ranges.prediction_delay,
             RangeKind::ReviewCorrectionTimeout => ranges.review_correction_timeout,
             RangeKind::LateCorrectionTimeout => ranges.late_correction_timeout,
             RangeKind::ModeIndicatorDuration => ranges.mode_indicator_duration,
@@ -1489,8 +1491,19 @@ fn conversion() -> Vec<Section> {
                 Row::choice(
                     choice::PREDICTION_DISPLAY,
                     "predictionDisplay",
-                    options::SUGGESTION_DISPLAY,
+                    options::PREDICTION_DISPLAY,
                 ),
+                Row::seconds(
+                    choice::PREDICTION_DELAY,
+                    "predictionDelay",
+                    RangeKind::PredictionDelay,
+                )
+                .enabled_when(Is("predictionDisplay", "afterPause")),
+                Row::toggle(
+                    choice::PREDICTION_KEEPS_COMPOSING,
+                    "predictionKeepsComposing",
+                )
+                .enabled_when(IsNot("predictionDisplay", "off")),
                 Row::toggle(
                     choice::PREDICTION_PREFERS_HISTORY,
                     "predictionPrefersHistory",
@@ -2873,8 +2886,24 @@ mod tests {
             .find(|row| row.path == "predictionDisplay")
             .unwrap();
         assert!(
-            matches!(prediction.control, Control::Choice(choices) if choices == options::SUGGESTION_DISPLAY)
+            matches!(prediction.control, Control::Choice(choices) if choices == options::PREDICTION_DISPLAY)
         );
+        // 予測までの待ち時間は「入力中のタイミングで制御」を選んだときだけ使える
+        let delay = rows
+            .iter()
+            .find(|row| row.path == "predictionDelay")
+            .unwrap();
+        assert!(matches!(
+            delay.control,
+            Control::Seconds(RangeKind::PredictionDelay)
+        ));
+        assert_eq!(
+            RangeKind::PredictionDelay.range(&catalog),
+            crate::catalog::Range(0.1, 2.0)
+        );
+        assert!(rows
+            .iter()
+            .any(|row| row.path == "predictionKeepsComposing"));
         let skip = rows
             .iter()
             .find(|row| row.path == "suggestionSkipCount")

@@ -20,6 +20,8 @@ final class CandidatePanelController {
     private var shownLattice: LatticePanel?
     /// 窓を入力位置の上と下のどちらに置いているか．出しているあいだは同じ側に保ち，隠したら決め直す
     private var side: PanelPlacement.Side?
+    /// 窓を出していれば，入力位置の上と下のどちらに置いているか(予測の窓を，候補の窓に重ねずに置くのに使う)
+    var placedSide: PanelPlacement.Side? { window.isVisible ? side : nil }
     /// 候補を選んでいるときに置いた窓．続けて選んでいるあいだは，候補が並び始める辺をこの窓から動かさない
     private var held: PanelPlacement.Placement?
     /// 窓の枠線を動かしている途中か

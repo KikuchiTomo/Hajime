@@ -195,6 +195,13 @@ private struct ConversionTab: View {
                                   value: UIStrings.More.skipCount)
                 .disabled(model, when: \.suggestionDisplay, is: .off)
                 ResettablePicker(model: model, title: UIStrings.Choice.predictionDisplay, keyPath: \.predictionDisplay, label: UIStrings.Choice.label(for:))
+                ResettableRow(model: model, keyPath: \.predictionDelay) {
+                    SecondsSlider(title: UIStrings.Choice.predictionDelay, value: model.binding(\.predictionDelay),
+                                  range: DefaultSettings.predictionDelayRange)
+                }
+                .disabled(model, unless: \.predictionDisplay, is: .afterPause)
+                ResettableToggle(model: model, title: UIStrings.Choice.predictionKeepsComposing, keyPath: \.predictionKeepsComposing)
+                    .disabled(model, when: \.predictionDisplay, is: .off)
                 ResettableToggle(model: model, title: UIStrings.Choice.predictionPrefersHistory, keyPath: \.predictionPrefersHistory)
                     .disabled(model, when: \.predictionDisplay, is: .off)
                 ResettableToggle(model: model, title: UIStrings.Choice.predictionFromCorrection, keyPath: \.predictionFromCorrection)

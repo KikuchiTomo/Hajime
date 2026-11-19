@@ -213,12 +213,16 @@ final class CompositionRoot {
     }
 
     func makePresenter(session: InputSession) -> ClientActionPresenter {
-        ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, prediction: prediction, settings: settings,
+        ClientActionPresenter(session: session, candidatePanel: candidatePanel, modeIndicator: modeIndicator, note: note, prediction: prediction,
+                              windows: windowOwnership, settings: settings,
                               openSettings: { [unowned self] in self.settingsWindow.show() },
                               openWordRegistration: { [unowned self] in self.settingsWindow.showUserDictionary(word: $0, reading: $1) },
                               readingOf: { [transcriber] in transcriber.reading(of: $0) }, handwriting: handwriting, palette: palette,
                               runCommand: { [unowned self] in self.commandLauncher.run($0) })
     }
+
+    /// 候補・予測・案内の窓を今使っている入力先(入力先ごとの ClientActionPresenter で共有する)
+    private let windowOwnership = WindowOwnership()
 
     /// 「ファイルを開く」コマンドのファイルのブックマーク(この Mac だけ)
     private(set) lazy var commandBookmarks = CommandBookmarks(defaults: .standard)

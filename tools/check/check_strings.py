@@ -30,6 +30,7 @@ OPTION_TABLES = {
     "PRESENTATIONS": ("Choice", "CandidatePresentation"),
     "INITIAL_FOCUS": ("Choice", "InitialFocus"),
     "SUGGESTION_DISPLAY": ("Choice", "SuggestionDisplay"),
+    "PREDICTION_DISPLAY": ("Choice", "PredictionDisplay"),
     "TYPO_CORRECTION": ("Choice", "TypoCorrectionLevel"),
     "CORRECTION_SENSITIVITY": ("More", "CorrectionSensitivity"),
     "OKURIGANA": ("Features", "OkuriganaStyle"),

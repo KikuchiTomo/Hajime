@@ -953,6 +953,8 @@ enum UIStrings {
         static let predictionDisplay = "入力中の予測"
         static let predictionPrefersHistory = "入力履歴の予測を優先"
         static let predictionFromCorrection = "タイプミス修正後の読みからも予測"
+        static let predictionDelay = "予測までの待ち時間"
+        static let predictionKeepsComposing = "予測の選択後も入力を継続"
         static let hiddenPredictions = "予測に表示しない語句"
         static let hiddenPredictionPlaceholder = "語句"
         static let hiddenPredictionsEmpty = "予測に表示しない語句はありません"
@@ -963,6 +965,15 @@ enum UIStrings {
             case .off: "オフ"
             case .whenLiveConversionOff: "ライブ変換がオフのとき"
             case .always: "常に"
+            }
+        }
+
+        static func label(for display: PredictionDisplay) -> String {
+            switch display {
+            case .off: "オフ"
+            case .whenLiveConversionOff: "ライブ変換がオフのとき"
+            case .always: "常に"
+            case .afterPause: "入力中のタイミングで制御"
             }
         }
 
@@ -1308,6 +1319,7 @@ extension UIStrings {
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "predictionPrefersHistory": Choice.predictionPrefersHistory,
             "predictionFromCorrection": Choice.predictionFromCorrection, "hiddenPredictions": Choice.hiddenPredictions, "suggestionSkipCount": More.suggestionSkipCount,
+            "predictionDelay": Choice.predictionDelay, "predictionKeepsComposing": Choice.predictionKeepsComposing,
             "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates, "candidateGridColumns": More.gridColumns, "expandsGridOnPaging": More.expandsGridOnPaging,
             "contextualSegmentCandidates": More.contextualSegmentCandidates, "listSegmentAlternatives": More.listSegmentAlternatives,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
