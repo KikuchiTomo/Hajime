@@ -28,7 +28,7 @@ jobs:
   rust-windows:
     # 持ち主の PR は結果を待たずにマージするので動かさない(費用を抑える)．まとめて確かめるときは手で動かす．ほかの人の PR では動かす
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login != github.repository_owner
-    runs-on: windows-2025
+    runs-on: windows-2022
     timeout-minutes: 30
     defaults:
       run:
@@ -83,7 +83,7 @@ jobs:
     # 配布物の署名の道具(tools/windows/sign*.ps1)を，Certum の証明書なしで確かめる．
     # Certum の SimplySign Desktop を取得して入れるので，手で動かしたときだけ動かす
     if: github.event_name == 'workflow_dispatch'
-    runs-on: windows-2025
+    runs-on: windows-2022
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -129,7 +129,8 @@ jobs:
   core-windows:
     # 持ち主の PR は結果を待たずにマージするので動かさない(費用を抑える)．まとめて確かめるときは手で動かす．ほかの人の PR では動かす
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login != github.repository_owner
-    runs-on: windows-2025
+    # 配布物を作る環境(package-windows.yml)と同じ，Visual Studio 2022 の入った環境に固定する
+    runs-on: windows-2022
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
