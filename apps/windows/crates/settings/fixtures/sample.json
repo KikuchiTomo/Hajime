@@ -727,6 +727,8 @@
     "zenzaiModel": "accurate",
     "predictionPrefersHistory": true,
     "predictionFromCorrection": true,
+    "predictionDelay": 0.5,
+    "predictionKeepsComposing": true,
     "hiddenPredictions": []
   },
   "changes": {

@@ -349,6 +349,9 @@ public enum DefaultSettings {
     /// 英単語にしない読みの長さを選べる範囲(文字)．0 は長さで区別しない
     public static let englishSkipLengthRange = 0...10
     public static let correctionDelayRange = 0.4...3.0
+    /// 入力中の予測を，打鍵が止まってから出すまでの時間(秒)と，選べる範囲(Settings.predictionDelay)
+    public static let predictionDelay = 0.5
+    public static let predictionDelayRange = 0.1...2.0
     public static let modeIndicatorDurationRange = 0.3...3.0
     /// 候補の文字の大きさ(pt)を選べる範囲
     public static let candidateFontSizeRange = 12.0...24.0

@@ -56,7 +56,7 @@ RESTORE_ALL = ("バックアップ", "すべての設定を既定に戻す")
 RANGE_NAMES = {"listCandidatesPerPage": "candidatesPerPage", "branchCandidatesPerPage": "candidatesPerPage"}
 STEP_NAMES = {"reviewCorrectionTimeout": "correctionTimeoutStep", "lateCorrectionTimeout": "correctionTimeoutStep",
               "associationLimit": "associationLimitStep", "paletteCellSize": "paletteCellSizeStep", "paletteScale": "paletteScaleStep"}
-SECONDS = {"liveConversionDelay", "correctionDelay", "reviewCorrectionTimeout", "lateCorrectionTimeout", "modeIndicatorDuration"}
+SECONDS = {"liveConversionDelay", "predictionDelay", "correctionDelay", "reviewCorrectionTimeout", "lateCorrectionTimeout", "modeIndicatorDuration"}
 ROLE_NAMES = {"AXCheckBox": "スイッチ", "AXPopUpButton": "選択肢", "AXIncrementor": "ステッパー", "AXSlider": "スライダー", "AXButton": "ボタン"}
 
 

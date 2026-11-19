@@ -104,8 +104,10 @@
     "paletteShowsUnicodeName",
     "phoneticSpelling",
     "postalCodeConversion",
+    "predictionDelay",
     "predictionDisplay",
     "predictionFromCorrection",
+    "predictionKeepsComposing",
     "predictionPrefersHistory",
     "prefersKatakana",
     "profileRules",
@@ -570,6 +572,10 @@
     "paletteScale" : [
       0.5,
       1.5
+    ],
+    "predictionDelay" : [
+      0.1,
+      2
     ],
     "reviewCorrectionTimeout" : [
       5,

@@ -36,6 +36,7 @@ struct SettingsCatalogTests {
                 "suggestionSkipCount": range(DefaultSettings.suggestionSkipCountRange),
                 "englishSkipLength": range(DefaultSettings.englishSkipLengthRange),
                 "correctionDelay": range(DefaultSettings.correctionDelayRange),
+                "predictionDelay": range(DefaultSettings.predictionDelayRange),
                 "reviewCorrectionTimeout": range(DefaultSettings.reviewCorrectionTimeoutRange),
                 "lateCorrectionTimeout": range(DefaultSettings.lateCorrectionTimeoutRange),
                 "modeIndicatorDuration": range(DefaultSettings.modeIndicatorDurationRange),

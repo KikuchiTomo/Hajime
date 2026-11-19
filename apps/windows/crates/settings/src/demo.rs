@@ -486,7 +486,7 @@ fn lattice(columns: &[(&str, &[&str])], focus: usize, uncertain: Option<usize>) 
 // MARK: - ページ
 
 /// step の実演．spotlight(機能の紹介のページで見せている機能)があれば，その機能だけを(オフでも)見せる
-/// app_mode は，アプリごとの入力モードのページでポインタを置いたカード(そのモードの動きを見せる)
+/// app_mode は，アプリごとの入力モードのページでポインタを置いた行(そのモードの動きを見せる)
 pub fn script(
     step: Step,
     choices: &Choices,

@@ -111,18 +111,19 @@ struct OnboardingView: View {
         }
     }
 
-    /// 除外設定で選べる，アプリを切り替えたときのモード．ここでは紹介だけで，選ぶのは設定の画面
+    /// 除外設定で選べる，アプリを切り替えたときのモード．ここでは紹介だけで，選ぶのは設定の画面．
+    /// 選択肢のカード(OptionCard)と見分けられるよう，背景と枠線の無い行で並べる
     private var appModes: some View {
         VStack(spacing: Size.cardGap) {
             ForEach([AppProfile.imeOff, .imeOn, .remembersMode], id: \.self) { profile in
-                InfoCard(mark: Self.mark(for: profile), title: UIStrings.Settings.label(for: profile), highlighted: model.appMode == profile) {
+                InfoRow(mark: Self.mark(for: profile), title: UIStrings.Settings.label(for: profile), shown: model.appMode == profile) {
                     model.appMode = profile
                 }
             }
         }
     }
 
-    /// カードのタグ．モード表示と同じ文字(A・あ)を枠に入れて見せる．記憶は両方を並べる
+    /// 行のタグ．モード表示と同じ文字(A・あ)を枠に入れて見せる．記憶は両方を並べる
     private static func mark(for profile: AppProfile) -> String {
         switch profile {
         case .imeOff: UIStrings.ModeIndicator.label(for: InputMode.direct)
@@ -375,41 +376,38 @@ private struct CharacterRow<Value: Hashable & CaseIterable>: View where Value.Al
     }
 }
 
-/// 紹介だけのカード．入力モード表示と名前を並べる．ポインタを置くか押すと，左の舞台にそのモードの動きを見せる
-private struct InfoCard: View {
+/// 紹介だけの行．入力モード表示と名前を並べる．選択肢ではないので，カードの背景・枠線を付けず，押しても何も選ばない．
+/// ポインタを置くと左の舞台にそのモードの動きを見せ，見せている行のほかは薄くする
+private struct InfoRow: View {
     private typealias Size = DesignTokens.Size.Onboarding
-    private typealias Opacity = DesignTokens.Opacity.Onboarding
 
     let mark: String
     let title: String
-    let highlighted: Bool
+    /// 左の舞台に動きを見せているモードの行か
+    let shown: Bool
     let focus: () -> Void
 
     var body: some View {
+        let markColor = shown ? Color.accentColor : Color.secondary
         HStack(spacing: Size.cardGap) {
             Text(mark)
                 .font(.callout.weight(.semibold))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(markColor)
                 .lineLimit(1)
                 .fixedSize()
                 // 3 つのタグの幅をそろえる(記憶のタグは A とあの 2 文字)
                 .frame(width: Size.infoSymbolWidth * 2, height: Size.infoSymbolWidth)
-                .overlay(RoundedRectangle(cornerRadius: Size.cardRadius / 2, style: .continuous).stroke(Color.accentColor, lineWidth: 1.5))
+                .overlay(RoundedRectangle(cornerRadius: Size.cardRadius / 2, style: .continuous).stroke(markColor, lineWidth: 1.5))
                 .accessibilityHidden(true)
-            Text(title).font(.headline)
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(shown ? Color.primary : Color.secondary)
             Spacer(minLength: 0)
         }
-        .padding(Size.cardPadding)
-        .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
-            .fill(highlighted ? Color.accentColor.opacity(Opacity.cardSelected) : Color.primary.opacity(Opacity.cardIdle)))
-        .overlay(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
-            .strokeBorder(highlighted ? Color.accentColor : Color.clear, lineWidth: 1.5))
-        .contentShape(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous))
+        .contentShape(Rectangle())
         .onHover { inside in if inside { focus() } }
-        .onTapGesture(perform: focus)
-        .animation(.easeOut(duration: DesignTokens.Motion.Onboarding.page / 1000), value: highlighted)
+        .animation(.easeOut(duration: DesignTokens.Motion.Onboarding.page / 1000), value: shown)
         .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(highlighted ? .isSelected : [])
     }
 }
 

@@ -65,6 +65,25 @@ public enum SuggestionDisplay: String, Sendable, Equatable, Codable, CaseIterabl
     case always
 }
 
+/// 打っているあいだに予測の窓(入力中の予測)を出すか
+public enum PredictionDisplay: String, Sendable, Equatable, Codable, CaseIterable {
+    case off
+    /// ライブ変換がオフのときだけ出す
+    case whenLiveConversionOff
+    case always
+    /// 打鍵が設定の時間(Settings.predictionDelay)止まったら出す．打ち続けているあいだは出さない
+    case afterPause
+
+    /// 予測を別の窓に分ける前の設定(入力中の候補の窓に予測を混ぜていた)から決める
+    public init(_ display: SuggestionDisplay) {
+        switch display {
+        case .off: self = .off
+        case .whenLiveConversionOff: self = .whenLiveConversionOff
+        case .always: self = .always
+        }
+    }
+}
+
 /// 打ち間違いを直す基準．直した読みが打ったままの読みよりどれだけもっともらしければ直すか(対数確率の差)
 public enum CorrectionSensitivity: String, Sendable, Equatable, Codable, CaseIterable {
     /// 確かなときだけ直す

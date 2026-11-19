@@ -163,6 +163,8 @@ pub mod choice {
     pub const PREDICTION_DISPLAY: &str = "入力中の予測";
     pub const PREDICTION_PREFERS_HISTORY: &str = "入力履歴の予測を優先";
     pub const PREDICTION_FROM_CORRECTION: &str = "タイプミス修正後の読みからも予測";
+    pub const PREDICTION_DELAY: &str = "予測までの待ち時間";
+    pub const PREDICTION_KEEPS_COMPOSING: &str = "予測の選択後も入力を継続";
     pub const HIDDEN_PREDICTIONS: &str = "予測に表示しない語句";
     pub const HIDDEN_PREDICTION_PLACEHOLDER: &str = "語句";
     pub const HIDDEN_PREDICTIONS_EMPTY: &str = "予測に表示しない語句はありません";
@@ -1205,6 +1207,8 @@ pub mod sync {
             "predictionFromCorrection",
             "タイプミス修正後の読みからも予測",
         ),
+        ("predictionDelay", "予測までの待ち時間"),
+        ("predictionKeepsComposing", "予測の選択後も入力を継続"),
         ("suggestionSkipCount", "入力中の候補を省略する件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
         ("branchCandidatesPerPage", "分岐図の候補数"),

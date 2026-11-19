@@ -120,7 +120,7 @@ enum Target {
     Spot(usize),
     /// 機能の行のスイッチ
     Switch(usize),
-    /// アプリごとの入力モードのカード(ポインターを置くとそのモードの動きを見せる)
+    /// アプリごとの入力モードの紹介の行(ポインターを置くとそのモードの動きを見せる．押しても何も選ばない)
     Info(usize),
     MenuItem(usize),
     Button(Button),
@@ -736,7 +736,7 @@ impl Wizard {
         }
     }
 
-    /// アプリごとの入力モードのカードを選び，そのモードの実演を始め直す
+    /// アプリごとの入力モードの紹介の行にポインターを置いたとき，そのモードの実演を始め直す
     fn app_mode_index(&mut self, index: usize) {
         let Some(mark) = self.step.items().into_iter().find_map(|item| match item {
             Item::Info(infos) => infos.get(index).map(|info| info.mark),
@@ -949,7 +949,8 @@ impl Wizard {
                 self.focus = Focus::Spot(index);
                 self.toggle(index);
             }
-            Target::Info(index) => self.app_mode_index(index),
+            // 紹介の行は選択肢ではないので，押しても何もしない
+            Target::Info(_) => {}
             Target::MenuItem(index) => self.choose_menu(index),
             Target::Button(button) => {
                 if self.button_visible(button) && self.button_enabled(button) {
@@ -1037,7 +1038,8 @@ impl Wizard {
                         if index > 0 {
                             y += gap;
                         }
-                        let height = padding * 2.0 + LINE.max(board::INFO_SYMBOL_WIDTH);
+                        // カードではないので，カードの中の余白は取らない
+                        let height = LINE.max(board::INFO_SYMBOL_WIDTH);
                         parts.push(Part {
                             kind: PartKind::Info(index, *info),
                             rect: Rect::new(0.0, y, width, height),
@@ -2660,7 +2662,7 @@ fn paint_page(
                 field,
                 card,
             } => paint_card(canvas, wizard, rect, &look, (item, index), field, card),
-            PartKind::Info(index, info) => paint_info(canvas, wizard, rect, &look, index, info),
+            PartKind::Info(_, info) => paint_info(canvas, wizard, rect, info),
             PartKind::Theme(index) => paint_theme(canvas, wizard, rect, &look, index),
             PartKind::Picker {
                 item,
@@ -2869,66 +2871,38 @@ fn paint_card(
     }
 }
 
-/// 説明だけのカード．入力モード表示を枠に入れて並べる(macOS の InfoCard)
-/// アプリごとの入力モードのカード．実演に動きを見せているモードのカードは選んだカードと同じ背景にする
-fn paint_info(
-    canvas: &mut dyn Canvas,
-    wizard: &Wizard,
-    rect: Rect,
-    look: &Look,
-    index: usize,
-    info: Info,
-) {
-    let theme = &wizard.theme;
-    let palette = &theme.palette;
-    let target = Target::Info(index);
-    let (hover, pressed) = if look.current {
-        (
-            wizard.hover_value(target, look.now),
-            wizard.pressed == Some(target),
-        )
+/// 紹介だけの行．入力モード表示を枠に入れて並べる(macOS の InfoRow)．
+/// 選択肢ではないので，カードの背景・枠線と，ポインターを置いたとき・押したときの背景は付けない．
+/// 実演に動きを見せているモードの行のほかは薄くする
+fn paint_info(canvas: &mut dyn Canvas, wizard: &Wizard, rect: Rect, info: Info) {
+    let palette = &wizard.theme.palette;
+    let shown = wizard.app_mode == info.mark;
+    let (mark_color, title_color) = if shown {
+        (palette.accent, palette.text)
     } else {
-        (0.0, false)
+        (palette.text_secondary, palette.text_secondary)
     };
-    card_ground(
-        canvas,
-        theme,
-        rect,
-        wizard.app_mode == info.mark,
-        hover,
-        pressed,
-    );
     let mark = Rect::new(
-        rect.x + board::CARD_PADDING,
+        rect.x,
         rect.y + (rect.height - board::INFO_SYMBOL_WIDTH) / 2.0,
         board::INFO_SYMBOL_WIDTH * 2.0,
         board::INFO_SYMBOL_WIDTH,
     );
-    canvas.stroke_round(
-        mark,
-        board::CARD_RADIUS / 2.0,
-        1.5,
-        Color::from(palette.accent),
-    );
+    canvas.stroke_round(mark, board::CARD_RADIUS / 2.0, 1.5, Color::from(mark_color));
     canvas.text(
         mark,
         &mark_label(info.mark),
         TextStyle::Section,
-        Color::from(palette.accent),
+        Color::from(mark_color),
         TextLayout::CENTER,
     );
-    // 名前はタグと同じく縦の真ん中に置く(macOS の InfoCard)
+    // 名前はタグと同じく縦の真ん中に置く(macOS の InfoRow)
     let x = mark.max_x() + board::CARD_GAP;
     canvas.text(
-        Rect::new(
-            x,
-            rect.y,
-            rect.max_x() - board::CARD_PADDING - x,
-            rect.height,
-        ),
+        Rect::new(x, rect.y, rect.max_x() - x, rect.height),
         info.title,
         TextStyle::Section,
-        Color::from(palette.text),
+        Color::from(title_color),
         TextLayout::LINE,
     );
 }

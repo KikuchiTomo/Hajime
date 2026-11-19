@@ -655,6 +655,8 @@ impl App {
             self.prediction_window().hide();
             self.prediction_on_glass = theme.backdrop;
         }
+        // 候補の窓を置いている側．その側へは，予測の窓を行と候補の窓のあいだまでしか出さない
+        let candidates_above = self.window().is_placed_above();
         match (&scene, self.prediction_anchor.clone()) {
             (Some(scene), Some(anchor)) => {
                 let window = if self.prediction_on_glass {
@@ -663,7 +665,13 @@ impl App {
                     &mut self.prediction_plain
                 };
                 window.set_chrome(theme.backdrop, dark, theme.frame);
-                window.place_beside(&anchor, scene, tokens::size::prediction::GAP);
+                window.place_beside(
+                    &anchor,
+                    scene,
+                    tokens::size::prediction::GAP,
+                    candidates_above,
+                    ANCHOR_GAP,
+                );
                 let _ = window.draw(&self.renderer, scene, measure, 1.0);
                 if std::mem::take(&mut self.prediction_changed) && system::screen_reader() {
                     if let Some(prediction) = &self.prediction {

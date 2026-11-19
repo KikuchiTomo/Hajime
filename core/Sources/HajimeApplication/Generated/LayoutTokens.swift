@@ -76,6 +76,7 @@ public enum LayoutTokens {
         public static let fontSize: Double = 14
         public static let paddingX: Double = 8
         public static let paddingY: Double = 4
+        public static let systemIndicatorClearance: Double = 32
     }
     public enum Branch {
         public static let trunkGap: Double = 12

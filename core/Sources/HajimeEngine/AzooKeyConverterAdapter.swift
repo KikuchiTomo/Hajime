@@ -721,6 +721,8 @@ final class AzooKeyConverterSession: KanaKanjiConverting, CandidateScoring, Cand
             engineCandidates[id] = candidate
             var prediction = HajimeDomain.Candidate(text: candidate.text, readingCount: reading.count, origin: .engine(id: id))
             prediction.isLearned = !candidate.data.isEmpty && candidate.data.allSatisfy { $0.metadata.contains(.isLearned) }
+            // 語句全体の読み(辞書の読みはカタカナ)．予測を選んで読みを補うのに使う
+            if !candidate.data.isEmpty { prediction.reading = KanaWidth.hiragana(from: candidate.data.reduce(into: "") { $0 += $1.ruby }) }
             return prediction
         }
         predictionCache[reading] = Array(predictions)
