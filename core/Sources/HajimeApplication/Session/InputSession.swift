@@ -75,6 +75,14 @@ public final class InputSession {
     private var undoableCommit: UndoableCommit?
     /// 今受けているキーで取り消せる確定(キーを受けたときに undoableCommit から移す)
     private var undoingCommit: UndoableCommit?
+    /// 打鍵が止まってから予測を出す設定(predictionDisplay が afterPause)で，打鍵が設定の時間止まったか．キーを受けるたびに false に戻す
+    private var predictionPauseElapsed = false
+    /// 予測を選んで読みを補った(設定 predictionKeepsComposing)読みと，その予測の候補．読みを変えるまでは予測の語句で見せ，その語句で確定する
+    private var acceptedPrediction: (composition: Composition, candidate: Candidate)?
+    /// 予測を選んで読みを補った直後に，補う前の読みに戻せる記録．次のキーまで持つ
+    private var completedPrediction: PredictionCompletion?
+    /// 今受けているキーで戻せる，予測で補った読み(キーを受けたときに completedPrediction から移す)
+    private var undoingCompletion: PredictionCompletion?
     /// 確定を取り消した予測の読みと語句．同じ読みのあいだは出し直さない
     private var declinedPrediction: (reading: String, text: String)?
     /// 最後に出した入力中の候補の窓．ローマ字を打ちかけているあいだはこれを出しておく
@@ -239,7 +247,14 @@ public final class InputSession {
         // 確定は，すぐ次のキーでだけ取り消せる
         undoingCommit = undoableCommit
         undoableCommit = nil
-        defer { undoingCommit = nil }
+        undoingCompletion = completedPrediction
+        completedPrediction = nil
+        defer {
+            undoingCommit = nil
+            undoingCompletion = nil
+        }
+        // 打鍵が止まってから予測を出す設定では，キーを受けるたびに待ち直す
+        predictionPauseElapsed = false
         if context.isSecure {
             // パスワード欄では何もしない(docs/dev/SECURITY-MODEL.md)
             return .passThrough
@@ -263,6 +278,8 @@ public final class InputSession {
         trackConversionEdit(from: baseline)
         // 読みを変えたら，読みのまま見せるのをやめる(打ち足した読みはライブ変換で見せる)
         if heldReading != composition { heldReading = nil }
+        // 予測で補った読みを変えたら，予測の語句で見せるのをやめる
+        if acceptedPrediction?.composition != composition { acceptedPrediction = nil }
         typedBeforeEnglishWord = nil
         // 入力文字なしで出した案内(学習の取り消し)は，次のキーで消す
         if hidesNote { result.actions.insert(.hideCandidates, at: 0) }
@@ -588,7 +605,33 @@ public final class InputSession {
         isSettled = true
         let typed = composition
         if freezeWordsReadAsRomaji() == .wholeReading { typedBeforeEnglishWord = typed }
+        refreshRevealedPredictions()
         return render(context: context)
+    }
+
+    /// 打鍵が止まってから予測を出す設定(predictionDisplay が afterPause)で，読みを打っていて，予測をまだ出していないか．
+    /// 待っていれば，最後のキーから設定の時間(predictionDelay)たったときに revealPrediction を呼ぶ．
+    /// 待つのは入力メソッドのタイマーで，キーの処理(handle)の中では待たない
+    public var awaitsPrediction: Bool {
+        settings.current.predictionDisplay == .afterPause && !predictionPauseElapsed && palette == nil
+            && phase == .composing && !composition.isEmpty && readingIsLongEnough
+    }
+
+    /// 打鍵が設定の時間(predictionDelay)止まった．続く語句の予測を求めて予測の窓に出す．
+    /// 待っていなければ(次のキーが来た・確定した・変換を始めた)何もしない
+    public func revealPrediction(context: InputContext) -> [ClientAction] {
+        guard awaitsPrediction else { return [] }
+        predictionPauseElapsed = true
+        refreshRevealedPredictions()
+        return rerender(context: context)
+    }
+
+    /// 打鍵が止まってから予測を出す設定で，もう出しているときに，今の読みの予測を求めておく(打鍵が止まって表示が変わると，予測する読みも変わることがある)．
+    /// ほかの設定では，キーのあとの処理(followUps)が求める
+    private func refreshRevealedPredictions() {
+        guard settings.current.predictionDisplay == .afterPause, predictionPauseElapsed, phase == .composing, predictionsShown else { return }
+        let target = predictionTarget().reading
+        if suggestionPredictions?.reading != target { suggestionPredictions = (target, converter.predictions(for: target)) }
     }
 
     /// 打鍵が止まったあいだに，Space で分岐図を出すときに求める候補を前もって求める手順(LatticeBuilder.warmingSteps)．
@@ -686,6 +729,7 @@ public final class InputSession {
         guard awaitsReview, !(context.profile == .terminal && terminal.state.region == .lineStart) else { return [] }
         reviewReading()
         showsCorrectionNote = true
+        refreshRevealedPredictions()
         return render(context: context)
     }
 
@@ -958,7 +1002,7 @@ public final class InputSession {
             // 予測も出していなければ，出している入力中の候補の窓から選び始める(↓ と同じ)
             guard readingCorrector.acceptSuggestion(&composition) else {
                 if let shown = shownPrediction, shown.reading == composition.conversionReading {
-                    return KeyResult(handled: true, actions: acceptPrediction(shown))
+                    return KeyResult(handled: true, actions: acceptPrediction(shown, context: context))
                 }
                 guard shownSuggestionPanel != nil, suggestionsShown else { return KeyResult(handled: true) }
                 return moveCandidate(.next, context: context)
@@ -1044,6 +1088,11 @@ public final class InputSession {
             // 予測の窓に出している語句を「予測に表示しない語句」に入れ，次の予測に替える
             guard phase == .composing, let shown = shownPrediction, shown.reading == composition.conversionReading,
                   predictionHiding?.hide(shown.prediction.text) == true else { return KeyResult(handled: true) }
+            // 打鍵が止まってから予測を出す設定でも，次の予測は待たずに出す(予測を見て押したキーなので)
+            if settings.current.predictionDisplay == .afterPause {
+                predictionPauseElapsed = true
+                refreshRevealedPredictions()
+            }
             return KeyResult(handled: true, actions: render(context: context) + [.showNote(PanelBuilder.predictionHiddenNote(shown.prediction.text))])
         case .forgetLastCommit:
             guard converter.forgetLastCommit() else { return KeyResult(handled: true) }
@@ -1570,6 +1619,15 @@ public final class InputSession {
             phase = .composing
             return KeyResult(handled: true, actions: render(context: context))
         }
+        if let undo = undoingCompletion, undo.completed == composition {
+            // 予測で読みを補った直後は，補う前の読みに戻す(予測を確定した直後の取り消しと同じ)．戻した予測は，同じ読みのあいだは出し直さない
+            composition = undo.typed
+            acceptedPrediction = nil
+            declinedPrediction = (undo.typed.conversionReading, undo.text)
+            readingCorrector.didEdit(composition)
+            updateCorrection()
+            return KeyResult(handled: true, actions: render(context: context))
+        }
         composition.deleteBackward()
         if composition.isEmpty {
             return KeyResult(handled: true, actions: reset())
@@ -1796,6 +1854,8 @@ public final class InputSession {
         suggestionPredictions = nil
         shownSuggestionPanel = nil
         declinedPrediction = nil
+        acceptedPrediction = nil
+        completedPrediction = nil
         let hidePrediction = predictionUpdate(to: nil)
         composition = newComposition()
         readingCorrector.reset()
@@ -1837,6 +1897,8 @@ public final class InputSession {
                 // 全文を読みに戻したあとは，見せている読みのまま確定する
                 return Candidate(text: composition.displayReading, readingCount: whole, origin: .variant(.hiragana))
             }
+            // 予測で補った読みは，読みを変えるまで予測の語句で確定する
+            if let accepted = acceptedPrediction, accepted.composition == composition { return accepted.candidate }
             if let correction = corrector.active {
                 let following = corrector.followingReading(in: composition).conversionReading
                 return Candidate(text: livePrefix(upTo: correction.kanaStart) + correction.word + following, readingCount: whole, origin: .correction)
@@ -1938,7 +2000,7 @@ public final class InputSession {
         return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
     }
 
-    /// 打っているあいだに窓を出す設定か(display は入力中の候補か入力中の予測の設定)
+    /// 打っているあいだに窓を出す設定か(display は入力中の候補の設定)
     private func shows(_ display: SuggestionDisplay) -> Bool {
         display == .always || (display == .whenLiveConversionOff && !settings.current.liveConversion)
     }
@@ -1946,8 +2008,15 @@ public final class InputSession {
     /// 打っているあいだに，読みを変換した候補の窓を出す設定か
     private var showsSuggestions: Bool { shows(settings.current.suggestionDisplay) }
 
-    /// 打っているあいだに，続く語句の予測の窓を出す設定か
-    private var showsPredictions: Bool { shows(settings.current.predictionDisplay) }
+    /// 打っているあいだに，続く語句の予測の窓を出す設定か．打鍵が止まってから出す設定では，設定の時間止まったあとだけ
+    private var showsPredictions: Bool {
+        switch settings.current.predictionDisplay {
+        case .off: false
+        case .whenLiveConversionOff: !settings.current.liveConversion
+        case .always: true
+        case .afterPause: predictionPauseElapsed
+        }
+    }
 
     /// 打ち間違いを直しているときの，打ったままの読み全体の候補(readingCount は今の読みの文字数にそろえる)．直していなければ空．
     /// listing なら一覧と同じ候補(記号や絵文字などを足したもの)を使う
@@ -2042,6 +2111,18 @@ public final class InputSession {
         var reading: String
         /// 確定する候補(前の文節とつないだ，読み全体の候補)
         var candidate: Candidate
+        /// 予測の語句の読みのうち，打った読みに続く部分．エンジンが読みを教えない・打った読みで始まらないときは nil
+        var readingRest: String?
+    }
+
+    /// 予測を選んで読みを補った記録．すぐ次のキーが Backspace なら，補う前の読みに戻す
+    private struct PredictionCompletion {
+        /// 補ったあとの読み．読みが変わっていたら戻さない
+        var completed: Composition
+        /// 補う前の読み
+        var typed: Composition
+        /// 予測した語句
+        var text: String
     }
 
     /// 予測の窓に出す予測．出さない設定，読みが短いとき，英単語を直しているとき(確定のキーをそちらに使う)，
@@ -2074,7 +2155,9 @@ public final class InputSession {
             let prediction = Prediction(typed: String(characters[..<typedCount]), completion: String(characters[typedCount...]),
                                         key: settings.current.showsKeyHints && !suggesting ? key : nil)
             let committed = prefix.map { $0.joined(with: candidate, readingCount: whole.count) } ?? candidate
-            return ShownPrediction(prediction: prediction, reading: whole, candidate: committed)
+            // 「もしかして」と示しているときは，先に読みを直す(直すと求め直す)ので，続きの読みは持たない
+            let rest = suggesting ? nil : candidate.reading.flatMap { $0.count > reading.count && $0.hasPrefix(reading) ? String($0.dropFirst(reading.count)) : nil }
+            return ShownPrediction(prediction: prediction, reading: whole, candidate: committed, readingRest: rest)
         }
         return nil
     }
@@ -2085,9 +2168,14 @@ public final class InputSession {
         return next?.prediction == shownPrediction?.prediction ? [] : [.showPrediction(next?.prediction)]
     }
 
-    /// 予測の窓の予測を確定する．入力中の候補の窓から選んで確定したのと同じに，読み全体の候補として確定して学ぶ．
+    /// 予測の窓の予測を選ぶ．設定(predictionKeepsComposing)がオンなら，確定せずに読みを予測の読みに補い，入力を続ける
+    /// (続けて打つ・Space で変換する・文節を操作する・Enter で予測の語句のまま確定する)．
+    /// オフか，予測の読みが分からないときは確定する．入力中の候補の窓から選んで確定したのと同じに，読み全体の候補として確定して学ぶ．
     /// すぐ次のキーで取り消せるよう，入れた文字と確定する前の組み立て中の文字を覚える
-    private func acceptPrediction(_ shown: ShownPrediction) -> [ClientAction] {
+    private func acceptPrediction(_ shown: ShownPrediction, context: InputContext) -> [ClientAction] {
+        if settings.current.predictionKeepsComposing, let rest = shown.readingRest {
+            return completePrediction(shown, rest: rest, context: context)
+        }
         let typed = composition
         phase = .selecting(CandidateSelection(candidates: [shown.candidate], annotations: [nil], focus: .candidate(0)))
         let actions = commitAll()
@@ -2095,6 +2183,20 @@ public final class InputSession {
             undoableCommit = UndoableCommit(committed: committed, restore: .prediction(text: shown.prediction.text, typed: typed))
         }
         return actions
+    }
+
+    /// 読みを予測の読みに補い，予測の語句で見せる．確定はしない(学ぶのは確定したとき)．
+    /// 読みを変えるまでは予測の語句のまま確定でき，すぐ次の Backspace で補う前の読みに戻せる
+    private func completePrediction(_ shown: ShownPrediction, rest: String, context: InputContext) -> [ClientAction] {
+        let typed = composition
+        composition.insertKana(rest)
+        // 打ち間違いを直して見せていた読みは，そのまま受け入れたことにする
+        readingCorrector.didInsertLiteral()
+        var candidate = shown.candidate
+        candidate.readingCount = composition.conversionReading.count
+        acceptedPrediction = (composition, candidate)
+        completedPrediction = PredictionCompletion(completed: composition, typed: typed, text: shown.prediction.text)
+        return render(context: context)
     }
 
     /// 確定した直後に取り消すための記録
@@ -3620,6 +3722,10 @@ public final class InputSession {
         if let heldReading, heldReading == composition {
             // 全文を読みに戻したあとは，読みを変えるまで読みのまま見せる
             return MarkedText([.init(composition.displayReading, style: .reading)])
+        }
+        if let accepted = acceptedPrediction, accepted.composition == composition {
+            // 予測で補った読みは，読みを変えるまで予測の語句で見せる(ライブ変換がオフでも，選んだ語句が見える)
+            return MarkedText([.init(accepted.candidate.text, style: .converted)])
         }
         if let correction = corrector.active {
             return MarkedText([

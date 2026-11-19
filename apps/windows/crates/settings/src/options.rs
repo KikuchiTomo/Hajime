@@ -111,6 +111,13 @@ pub const SUGGESTION_DISPLAY: &[Choice] = &[
     ("always", "常に"),
 ];
 
+pub const PREDICTION_DISPLAY: &[Choice] = &[
+    ("off", "オフ"),
+    ("whenLiveConversionOff", "ライブ変換がオフのとき"),
+    ("always", "常に"),
+    ("afterPause", "入力中のタイミングで制御"),
+];
+
 pub const TYPO_CORRECTION: &[Choice] = &[
     ("off", "オフ"),
     ("conservative", "英単語のみ"),
@@ -322,6 +329,7 @@ mod tests {
             PRESENTATIONS,
             INITIAL_FOCUS,
             SUGGESTION_DISPLAY,
+            PREDICTION_DISPLAY,
             TYPO_CORRECTION,
             CORRECTION_SENSITIVITY,
             OKURIGANA,

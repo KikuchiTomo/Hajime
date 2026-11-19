@@ -354,9 +354,22 @@ impl Window {
         unsafe { SetWindowLongPtrW(self.hwnd, GWLP_USERDATA, CLICK_THROUGH) };
     }
 
+    /// 窓を入力位置の上に置いているか(出していない・下に置いているなら false)．予測の窓を候補の窓に重ねずに置くのに使う
+    pub fn is_placed_above(&self) -> bool {
+        self.side.get() == Some(Side::Above)
+    }
+
     /// 本体(scene.body)を anchor(組み立て中の文字)の右端のすぐ右に，縦の中央をそろえて置く．予測の窓に使う．
-    /// 画面の右に入らなければ左へ寄せる．gap は組み立て中の文字とのあいだ(論理ピクセル)
-    pub fn place_beside(&self, anchor: &Rect, scene: &Scene, gap: f32) {
+    /// gap は組み立て中の文字とのあいだ(論理ピクセル)．候補の窓の側(candidates_above なら上，ほかは下)へは，
+    /// 行と候補の窓のあいだ(candidate_gap)までしか出さない．画面の右に入らなければ，組み立て中の文字に重ねず行の外に置く(beside)
+    pub fn place_beside(
+        &self,
+        anchor: &Rect,
+        scene: &Scene,
+        gap: f32,
+        candidates_above: bool,
+        candidate_gap: i32,
+    ) {
         let scale = self.scale();
         let anchor_rect = RECT {
             left: anchor.x,
@@ -372,6 +385,12 @@ impl Window {
             pixels(scene.body.width),
             pixels(scene.body.height),
             pixels(gap),
+            if candidates_above {
+                Side::Above
+            } else {
+                Side::Below
+            },
+            candidate_gap,
         );
         self.show_at(
             x - pixels(scene.body.x),
@@ -624,13 +643,35 @@ fn work_area(anchor: &RECT) -> RECT {
     }
 }
 
-/// 予測の窓の左上．anchor の右端から gap 空けて置き，縦は anchor の中央にそろえる．画面(work)からはみ出す分は内側へ寄せる
-fn beside(anchor: &RECT, work: &RECT, width: i32, height: i32, gap: i32) -> (i32, i32) {
-    let x = (anchor.right + gap).min(work.right - width).max(work.left);
-    let y = (anchor.top + (anchor.bottom - anchor.top - height) / 2)
-        .min(work.bottom - height)
-        .max(work.top);
-    (x, y)
+/// 予測の窓の左上．anchor(組み立て中の文字)の右端から gap 空けて置き，縦は anchor の中央にそろえる．
+/// 行より高い窓は，候補の窓の側(candidates)へは行と候補の窓のあいだ(candidate_gap)までしか出さない(入力中の候補の窓に重ねない)．
+/// 画面の右に入らないときは，左へ寄せると組み立て中の文字に重なるので，画面の右端にそろえて候補の窓と反対の側の行の外に置く
+/// (core の PredictionPlacement と同じ決まり)
+fn beside(
+    anchor: &RECT,
+    work: &RECT,
+    width: i32,
+    height: i32,
+    gap: i32,
+    candidates: Side,
+    candidate_gap: i32,
+) -> (i32, i32) {
+    let right = anchor.right + gap;
+    let (x, y) = if right + width > work.right {
+        let y = match candidates {
+            Side::Below => anchor.top - gap - height,
+            Side::Above => anchor.bottom + gap,
+        };
+        (work.right - width, y)
+    } else {
+        let centered = anchor.top + (anchor.bottom - anchor.top - height) / 2;
+        let y = match candidates {
+            Side::Below => centered.min(anchor.bottom + candidate_gap - height),
+            Side::Above => centered.max(anchor.top - candidate_gap),
+        };
+        (right, y)
+    };
+    (x.max(work.left), y.min(work.bottom - height).max(work.top))
 }
 
 /// held に前の窓を渡すと，候補が並び始める辺(上と左)を動かさない．上に置くときは，入力位置の行が上下に動いていなければ
@@ -760,6 +801,60 @@ mod tests {
     }
 
     #[test]
+    fn 予測の窓は組み立て中の文字の右に置き_候補の窓の側へは隙間までしか出さない() {
+        let work = rect(0, 0, 1920, 1080);
+        // 行より低い窓は，行の中央にそろえる
+        assert_eq!(
+            beside(&rect(100, 100, 160, 140), &work, 120, 28, 8, Side::Below, 2),
+            (168, 106)
+        );
+        // 行より高い窓: 候補の窓が下なら下へは隙間まで，上なら上へは隙間まで
+        assert_eq!(
+            beside(&rect(100, 100, 160, 116), &work, 120, 28, 8, Side::Below, 2),
+            (168, 90)
+        );
+        assert_eq!(
+            beside(&rect(100, 100, 160, 116), &work, 120, 28, 8, Side::Above, 2),
+            (168, 98)
+        );
+    }
+
+    #[test]
+    fn 予測の窓は画面の右に入らないとき_組み立て中の文字に重ねず行の外に置く() {
+        let work = rect(0, 0, 1920, 1080);
+        // 候補の窓が下なら行の上，上なら行の下
+        assert_eq!(
+            beside(
+                &rect(1700, 100, 1880, 120),
+                &work,
+                120,
+                28,
+                8,
+                Side::Below,
+                2
+            ),
+            (1800, 64)
+        );
+        assert_eq!(
+            beside(
+                &rect(1700, 100, 1880, 120),
+                &work,
+                120,
+                28,
+                8,
+                Side::Above,
+                2
+            ),
+            (1800, 128)
+        );
+        // 画面の上下からははみ出さない
+        assert_eq!(
+            beside(&rect(1700, 10, 1880, 30), &work, 120, 28, 8, Side::Below, 2),
+            (1800, 0)
+        );
+    }
+
+    #[test]
     fn 入力位置の下に出す() {
         let work = rect(0, 0, 1920, 1080);
         assert_eq!(
@@ -819,20 +914,6 @@ mod tests {
         // どちらにも入らない(画面より高い窓)なら画面の中に詰める
         let (_, y, _) = position(&rect(100, 500, 102, 520), &work, 200, 1200, 2, None, None);
         assert_eq!(y, 0);
-    }
-
-    #[test]
-    fn 予測の窓は組み立て中の文字の右に縦の中央をそろえて置き_画面の右に入らなければ左へ寄せる() {
-        let work = rect(0, 0, 1920, 1080);
-        assert_eq!(
-            beside(&rect(100, 500, 300, 520), &work, 120, 30, 6),
-            (306, 495)
-        );
-        assert_eq!(
-            beside(&rect(1800, 500, 1900, 520), &work, 120, 30, 6),
-            (1800, 495)
-        );
-        assert_eq!(beside(&rect(100, 0, 300, 10), &work, 120, 30, 6).1, 0);
     }
 
     fn placed(anchor: RECT, (x, y, side): (i32, i32, Side)) -> Placed {
