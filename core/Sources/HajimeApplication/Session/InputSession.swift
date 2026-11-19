@@ -124,6 +124,8 @@ public final class InputSession {
     /// 打鍵が止まったときに読み全体を英単語として確定させる前の読み．止まったところが語の終わりとは限らないので，
     /// 続けてローマ字を打ったら(「san」で止まって「ntannsi」と続けたら)この読みに戻してから足す．次のキーを処理したら捨てる
     private var typedBeforeEnglishWord: Composition?
+    /// 最後に「nn」のあとの母音の読みを選び直したときの読み(resolveSettledNasalReadings)
+    private var nasalSettledReading: String?
     /// 見直した直後の表示か．打ち間違いの案内は見直した直後だけ出し，次のキーで消す
     /// (打つたびに直す前の文も変換すると，1 キーの処理が重くなるため)
     private var showsCorrectionNote = false
@@ -606,7 +608,7 @@ public final class InputSession {
         guard awaitsSettle else { return [] }
         isSettled = true
         let typed = composition
-        if freezeWordsReadAsRomaji() == .wholeReading { typedBeforeEnglishWord = typed }
+        if freezeWordsReadAsRomaji(tentatively: true) == .wholeReading { typedBeforeEnglishWord = typed }
         refreshRevealedPredictions()
         return render(context: context)
     }
@@ -1589,23 +1591,39 @@ public final class InputSession {
         case wordInReading
     }
 
-    /// ローマ字として読めてしまう英単語を英単語にする(「gitwotukau」→「gitを使う」)．打ち間違いを直して見せているときはしない
+    /// ローマ字として読めてしまう英単語を英単語にする(「gitwotukau」→「gitを使う」)．打ち間違いを直して見せているときはしない．
+    /// tentatively は打鍵が止まったとき．止まったところが語の終わりとは限らないので，読みの中の英単語は続きを打ったあとに見分け直す
     @discardableResult
-    private func freezeWordsReadAsRomaji() -> FrozenEnglish? {
+    private func freezeWordsReadAsRomaji(tentatively: Bool = false) -> FrozenEnglish? {
         guard phase == .composing, !readingCorrector.isApplied else { return nil }
+        resolveSettledNasalReadings()
         // 英語にも日本語にも読める語(「make」)は，前が英語のときや利用者が決めた語なら英語にする
         let context = WordLanguageContext.of(precedingText: compositionLeftContext)
         let frozen: FrozenEnglish
         if corrector.freezeEnglishWord(in: &composition, context: context) {
             frozen = .wholeReading
-        } else if corrector.freezeWordReadAsRomaji(in: &composition) {
-            frozen = .wordInReading
         } else {
-            return nil
+            switch corrector.freezeWordReadAsRomaji(in: &composition, tentatively: tentatively) {
+            case .frozen: frozen = .wordInReading
+            case .restored:
+                // 英単語にした語を日本語に戻した．読みが変わったので見直し直す
+                readingCorrector.forgetReview()
+                return nil
+            case .unchanged: return nil
+            }
         }
         readingCorrector.forgetReview()
         usage?.record(.englishCorrected)
         return frozen
+    }
+
+    /// 「nn」のあとの母音の読み(ん+あ行 か ん+な行 か)を，打ち終えた読みで選び直す(打鍵が止まったときと，変換・確定の前)．
+    /// 打っているあいだは母音のすぐあとの数文字しか見ないので，その先で決まる読みを取り違える(「更新お願いします」が「更新の願いします」になる)．
+    /// 同じ読みでは選び直さない
+    private func resolveSettledNasalReadings() {
+        guard !composition.nasalAmbiguities.isEmpty, composition.conversionReading != nasalSettledReading else { return }
+        if NasalReadingResolver(converter: converter).resolveSettled(&composition) { readingCorrector.forgetReview() }
+        nasalSettledReading = composition.conversionReading
     }
 
     /// 日本語の打ち間違いを見直す(「ようですね」→「よいですね」)．英単語を直しているときは見直さない
@@ -1819,6 +1837,9 @@ public final class InputSession {
         builder.scorer = rerankingScorer
         builder.usesPrecomputedScoresOnly = rerankingScorer?.prefersPrecomputedScores ?? false
         builder.emojiPlacement = settings.current.emojiPlacement
+        // 英単語にした語にかかる文節には，打ったキーをローマ字として読んだ日本語の候補を足す(区切りを変えたあとも)
+        let typed = composition
+        builder.romajiReading = { typed.romajiReading(ofReading: $0) }
         return builder
     }
 
@@ -2012,11 +2033,16 @@ public final class InputSession {
         }
         // 英単語にした語(「demo」)を，打ったキーをローマ字として読んだかな(でも)でも変換して後ろに並べる．
         // 前の語から英語と見分けても，日本語のつもりで打ったときに選び直せるようにするため
+        // 日本語として読める読み(「metやくちゃ」→ めちゃくちゃ)なら，上位は第 1 候補のすぐ後ろに置く(英単語の取り違えから戻しやすくする)
         if let romaji = composition.conversionReadingWithFrozenWordsAsKana {
+            let front = romajiReadingReadsAsJapanese(romaji) ? DefaultSettings.typedAlternativeCount : 0
+            var added = 0
             for candidate in converter.listCandidates(for: romaji)
             where candidate.readingCount == romaji.count && candidate.commandID == nil && !candidates.contains(where: { $0.text == candidate.text }) {
-                candidates.append(Candidate(text: candidate.text, readingCount: whole, origin: .romajiReading))
-                annotations.append(nil)
+                let index = added < front ? min(1 + added, candidates.count) : candidates.count
+                candidates.insert(Candidate(text: candidate.text, readingCount: whole, origin: .romajiReading), at: index)
+                annotations.insert(nil, at: index)
+                added += 1
             }
         }
         // 文節を替えた文や打ったままの読みの候補を間に入れたので，絵文字を置き場所に置き直す
@@ -2026,6 +2052,15 @@ public final class InputSession {
             annotations = placed.map(\.1)
         }
         return CandidateSelection(candidates: candidates, annotations: annotations, focus: focus)
+    }
+
+    /// 英単語にした語をローマ字として読んだ読み(romaji)の，今の読みと違う部分が日本語として読めるか
+    private func romajiReadingReadsAsJapanese(_ romaji: String) -> Bool {
+        let reading = composition.conversionReading
+        guard let changed = CorrectedSpan.changedRange(from: romaji, to: reading) else { return false }
+        let end = changed.upperBound + romaji.count - reading.count
+        guard changed.lowerBound < end, end <= romaji.count else { return false }
+        return latticeBuilder.readsAsJapanese(String(Array(romaji)[changed.lowerBound..<end]))
     }
 
     /// 打っているあいだに窓を出す設定か(display は入力中の候補の設定)

@@ -9,7 +9,10 @@ import HajimeDomain
 /// 変換は短い読みでも 1 回 20ms ほどかかるので，比べるのは母音のあとの文字数が
 /// DefaultSettings.nasalEvaluationPoints になったときだけにする(母音を打ったときから 3 文字あとまで)．
 /// 1 文字あとで比べるのは，「hannei」の「い」のように，すぐあとの文字で読みが決まる短い語が多いため．
-/// それ以外のキーでは前に決めた読みを使うので，表示と確定する文字は食い違わない
+/// それ以外のキーでは前に決めた読みを使う．
+///
+/// 母音のあとの 3 文字より先で決まる読みもあるので，打ち終えたとき(打鍵が止まったときと，変換・確定の前)に，
+/// 前後を広く見て選び直す(resolveSettled)
 @MainActor
 struct NasalReadingResolver {
     let converter: any KanaKanjiConverting
@@ -31,14 +34,32 @@ struct NasalReadingResolver {
         }
     }
 
+    /// 打ち終えた読みで選び直す(打鍵が止まったときと，変換・確定の前)．打鍵ごとには呼ばない．
+    ///
+    /// 打っているあいだは母音のあとの 3 文字までしか見ないので，その先で決まる読みを取り違える
+    /// (「kousinnonegaisimasu」の「うしんおねがい」と「うしんのねがい」は後者が勝つが，「します」まで見れば「お願いします」)．
+    /// 母音の前後を広く(DefaultSettings.nasalSettledContextLength)見て比べ直す．読みを変えたら true
+    func resolveSettled(_ composition: inout Composition) -> Bool {
+        let before = composition.conversionReading
+        for position in composition.nasalAmbiguities.indices {
+            let length = DefaultSettings.nasalSettledContextLength
+            let vowel = score(composition, position: position, usesNaRow: false, contextLength: length)
+            let naRow = score(composition, position: position, usesNaRow: true, contextLength: length)
+            composition.setNasalReading(at: position, usesNaRow: naRow > vowel)
+            composition.markNasalEvaluated(at: position, followingText: composition.nasalAmbiguities[position].followingText(in: composition.conversionReading))
+        }
+        return composition.conversionReading != before
+    }
+
     /// 読みを切り替えたときの，母音のまわりの読みのもっともらしさ
-    private func score(_ composition: Composition, position: Int, usesNaRow: Bool) -> Double {
+    private func score(_ composition: Composition, position: Int, usesNaRow: Bool,
+                       contextLength: Int = DefaultSettings.nasalContextLength) -> Double {
         var trial = composition
         trial.setNasalReading(at: position, usesNaRow: usesNaRow)
         let ambiguity = trial.nasalAmbiguities[position]
         let reading = Array(trial.conversionReading)
-        let start = max(0, ambiguity.kanaIndex - DefaultSettings.nasalContextLength)
-        let end = min(reading.count, ambiguity.kanaIndex + ambiguity.currentForm.count + DefaultSettings.nasalContextLength)
+        let start = max(0, ambiguity.kanaIndex - contextLength)
+        let end = min(reading.count, ambiguity.kanaIndex + ambiguity.currentForm.count + contextLength)
         return converter.plausibility(of: String(reading[start..<end]))
     }
 }

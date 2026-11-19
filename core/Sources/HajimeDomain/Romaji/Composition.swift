@@ -19,8 +19,8 @@ public struct Composition: Sendable, Equatable {
     /// 英字として入れた部分(確定させた英単語と，Shift で打った大文字・数字)の終わり(かなの文字数)．
     /// ローマ字として読めずに残った英字(打ち間違い)は含めない
     private var englishKanaEnd = 0
-    /// 確定させた英単語のうち，打ったキーがローマ字としても読めるもの(「demo」→ でも)．
-    /// 英単語にしたあとも，ローマ字として読んだ日本語の候補を選べるようにするため
+    /// 打ったとおりの綴りで確定させた英単語(「demo」「git」)．英単語にしたあとも，打ったキーをローマ字として読んだ日本語の候補を
+    /// 選べるようにするため(「demo」→ でも，「met」+「やく」→ めちゃく)．綴りを直した英単語(「pthon」→「python」)は入れない
     private var frozenWords: [FrozenWord] = []
     /// 「nn」のあとの母音の位置．語によって「ん+あ行」(hannei → はんえい)か「ん+な行」(onna → おんな)かが
     /// 変わるので，どちらの読みにも切り替えられるようにしておく．どちらにするかは変換の点数で決める(NasalReadingResolver)
@@ -69,11 +69,13 @@ public struct Composition: Sendable, Equatable {
         ("や", "にゃ"), ("ゆ", "にゅ"), ("よ", "にょ"),
     ]
 
-    /// 確定させた英単語 1 つ．kanaStart は読みの中で英単語が始まる位置，romajiReading は打ったキーをローマ字として読んだかな
+    /// 確定させた英単語 1 つ．kanaStart は読みの中で英単語が始まる位置，rawStart は打ったキーの中で英単語が始まる位置．
+    /// romajiReading は英単語のキーだけをローマ字として読んだかな．綴りの途中で終わる英単語(「met」+「yaku」の met)は読めないので nil
     private struct FrozenWord: Sendable, Equatable {
         var kanaStart: Int
+        var rawStart: Int
         var word: String
-        var romajiReading: String
+        var romajiReading: String?
 
         var kanaEnd: Int { kanaStart + word.count }
     }
@@ -115,14 +117,52 @@ public struct Composition: Sendable, Equatable {
     public var conversionReading: String { kana + Self.finalize(pending) }
 
     /// 変換エンジンに渡す読みの，確定させた英単語をローマ字として読んだかなに置き換えたもの(「demo」+「は」→「でもは」)．
+    /// 英単語が綴りの途中で終わるとき(「met」+「やくちゃ」)は，後ろのかなも合わせて読み直す(「めちゃくちゃ」)．
     /// ローマ字としても読める英単語が無ければ nil
     public var conversionReadingWithFrozenWordsAsKana: String? {
         guard !frozenWords.isEmpty else { return nil }
-        var characters = Array(conversionReading)
-        for word in frozenWords.reversed() where word.kanaEnd <= characters.count {
-            characters.replaceSubrange(word.kanaStart..<word.kanaEnd, with: Array(word.romajiReading))
+        let original = Array(conversionReading)
+        var characters = original
+        var replaced = false
+        for (index, word) in frozenWords.enumerated().reversed() where word.kanaEnd <= original.count {
+            if let reading = word.romajiReading {
+                characters.replaceSubrange(word.kanaStart..<word.kanaEnd, with: Array(reading))
+                replaced = true
+            } else {
+                // 後ろのかなの区切りを近いものから試し，英単語から区切りまでのキーが読めたところまでを置き換える．次の英単語は越えない
+                let limit = frozenWords.indices.contains(index + 1) ? frozenWords[index + 1].kanaStart : original.count
+                let ends = (boundaries.map(\.kanaCount) + [original.count]).filter { $0 > word.kanaEnd && $0 <= limit }.sorted()
+                for end in ends {
+                    guard let reading = romajiReading(ofReading: word.kanaStart..<end) else { continue }
+                    characters.replaceSubrange(word.kanaStart..<end, with: Array(reading))
+                    replaced = true
+                    break
+                }
+            }
         }
-        return String(characters)
+        return replaced ? String(characters) : nil
+    }
+
+    /// 読みの range の部分を打ったキーを，ローマ字として読み直したかな(「met」+「やくちゃ」→「めちゃくちゃ」，「me」→「め」)．
+    /// 英単語にした語を，文節の区切りを変えたあとも日本語として変換し直せるようにするために使う．
+    /// range が確定させた英単語にかからない・range の端がキーの区切りに合わない・ローマ字として読めないときは nil
+    public func romajiReading(ofReading range: Range<Int>) -> String? {
+        guard let rawKeys, !range.isEmpty,
+            frozenWords.contains(where: { $0.kanaStart < range.upperBound && range.lowerBound < $0.kanaEnd }),
+            let lower = rawIndex(atReading: range.lowerBound), let upper = rawIndex(atReading: range.upperBound),
+            lower < upper, upper <= rawKeys.count else { return nil }
+        let keys = Array(rawKeys)[lower..<upper]
+        guard keys.allSatisfy({ ($0.isASCII && $0.isLetter && $0.isLowercase) || $0 == "-" }) else { return nil }
+        return Self.romajiReading(of: String(keys), table: table)
+    }
+
+    /// 読みの index 文字目が，打ったキーの何番目に当たるか．確定させた英単語の中は 1 文字が 1 キー，ほかはかなの区切りだけが対応する
+    private func rawIndex(atReading index: Int) -> Int? {
+        if let word = frozenWords.first(where: { $0.kanaStart <= index && index <= $0.kanaEnd }) {
+            return word.rawStart + (index - word.kanaStart)
+        }
+        if index == kana.count + Self.finalize(pending).count { return rawKeys?.count }
+        return boundaries.first { $0.kanaCount == index }?.rawCount
     }
 
     /// キーの並びをローマ字として読んだかな．読めない並び(「git」の t)があれば nil
@@ -263,8 +303,8 @@ public struct Composition: Sendable, Equatable {
         resolvedByLastKey = nil
         frozenKanaEnd = kana.count
         frozenWords = frozenWords.filter { $0.kanaEnd <= kanaStart }
-        if word.lowercased() == keys.lowercased(), let reading = Self.romajiReading(of: keys, table: table) {
-            frozenWords.append(FrozenWord(kanaStart: kanaStart, word: word, romajiReading: reading))
+        if word.lowercased() == keys.lowercased() {
+            frozenWords.append(FrozenWord(kanaStart: kanaStart, rawStart: rawStart, word: word, romajiReading: Self.romajiReading(of: keys, table: table)))
         }
         // 打ったとおりの英単語(「python」)は英字として入れたものとみなす．綴りを直した語(「sride」→「bride」)は，
         // 日本語の打ち間違いを英単語と取り違えたことがあるので，日本語の打ち間違いの見直しで読み直せるようにしておく

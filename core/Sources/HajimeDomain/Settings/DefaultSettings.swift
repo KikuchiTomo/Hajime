@@ -244,6 +244,11 @@ public enum DefaultSettings {
     public static let maximumNasalAmbiguities = 2
     /// 「nn」のあとの母音の読みを比べるときに見る，前後の文字数
     public static let nasalContextLength = 3
+    /// 打ち終えた読み(打鍵が止まったときと，変換・確定の前)で「nn」のあとの母音の読みを選び直すときに見る，前後の文字数．
+    /// 打っているあいだ(nasalContextLength)より広く見て，その先で決まる読み(「こうしんおねがいします」の「します」)を取り違えない．
+    /// 文(Tatoeba 1,959 文と AJIMEE-Bench 200 文)の「ん+あ行」を nn で打った 65 か所は，3 文字で 57，6 文字で 60，10 文字で 61 か所が打ったとおりになり，
+    /// 「ん+な行」を n 1 つで打った 225 か所は 205・221・223 か所が な行 になった．読み全体を見ても 10 文字と変わらなかった
+    public static let nasalSettledContextLength = 10
     /// 「nn」のあとの母音の読みを比べ直す時点(母音のあとの文字数)．比べるたびに変換を 2 回するので少なく保つ
     public static let nasalEvaluationPoints: Set<Int> = [0, 1, 2, 3]
     /// Zenzai が 1 回の変換で推論する回数の上限．小さいほど速く，大きいほど精度がよい(azooKey の既定は 10)
