@@ -42,7 +42,9 @@ permissions:
 
 jobs:
   package-windows:
-    runs-on: windows-2025
+    # Visual Studio 2022 の入った環境に固定する．windows-2025 と windows-latest は Visual Studio 2026 の環境で，
+    # その MSVC の STL(14.52)は Clang 22 以上を求めるので，Swift 6.3.3 の clang(21)では llama.cpp と core をビルドできない(STL1000)
+    runs-on: windows-2022
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
