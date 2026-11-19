@@ -90,4 +90,21 @@ public enum PanelPlacement {
         }
         return Placement(frame: Rect(x: x, y: y, width: size.width, height: size.height), caret: caret, side: chosen)
     }
+
+    /// 入力モードの表示を置く．入力モードを切り替えると，OS も入力位置の行のすぐ下に自分の表示を出すことがある(macOS 14 以降)．
+    /// 重ならないよう，入力位置の行の上に置く．上に入らなければ，OS の表示の分(clearance)だけ離して下に置く．
+    /// どちらにも入らなければ画面の中に収める．左右も画面の中に収める．縦書きでも入力位置の字の長方形に同じ規則を当てる
+    /// - Parameters:
+    ///   - caret: 入力位置の行の長方形
+    ///   - size: 表示の大きさ(x と y は使わない)
+    ///   - screen: 入力位置がある画面の，使える範囲
+    ///   - clearance: 入力位置の行の下に OS が出す表示のために空ける高さ．OS が出さなければ 0
+    public static func placeIndicator(caret: Rect, size: Rect, screen: Rect, clearance: Double) -> Placement {
+        let above = caret.maxY + gap
+        let below = caret.y - gap - clearance - size.height
+        let side: Side = above + size.height <= screen.maxY || below < screen.y ? .above : .below
+        let y = min(max(side == .above ? above : below, screen.y), screen.maxY - size.height)
+        let x = min(max(caret.x, screen.x), screen.maxX - size.width)
+        return Placement(frame: Rect(x: x, y: y, width: size.width, height: size.height), caret: caret, side: side)
+    }
 }

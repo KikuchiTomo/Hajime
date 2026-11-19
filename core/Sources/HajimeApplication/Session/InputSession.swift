@@ -2398,8 +2398,9 @@ public final class InputSession {
         panel.keepsWidth = settings.current.branchWindowWidth == .fixed
     }
 
-    /// 文節ごとの一覧で見せるか(分岐図と同じ文節格子を，注目している文節の一覧として見せる)
-    private var isSegmentList: Bool { settings.current.candidatePresentation == .segmentList }
+    /// 文節ごとの一覧で見せるか(分岐図と同じ文節格子を，注目している文節の一覧として見せる)．
+    /// 文全体の一覧でも，文節を移るキーで文節格子に切り替えたあとは文節ごとの一覧で見せる(enterSegmentList)
+    private var isSegmentList: Bool { settings.current.candidatePresentation != .automatic }
 
     /// 文節格子の 1 ページの候補の数．文節ごとの一覧なら一覧の候補数，表に広げていれば表の候補の数
     private var latticePerPage: Int {
@@ -2689,7 +2690,23 @@ public final class InputSession {
         case next, previous, first, last, nextUncertain, previousUncertain, extend, shrink, extendToWord, shrinkToWord, split
     }
 
-    /// 文節を移る・長さを変える・区切る．一覧は文節が 1 つなので，種類の行にいるときの左右だけ字種を移る
+    /// 文全体の一覧から，文節ごとの一覧に切り替える(文節を移るキーを押したとき)．文節は Space で分けるときと同じに分け，同じ文節から始める．
+    /// 英単語の補正を選んでいるあいだは切り替えない(直した語か打ったままかを，文全体の一覧で選ぶ)．切り替えたら true
+    private func enterSegmentList() -> Bool {
+        guard case .selecting = phase, corrector.active == nil else { return false }
+        let lattice = initialLattice(latticeBuilder, quick: true)
+        // 文節が 1 つなら移る先が無いので，文全体の一覧のままにする
+        guard lattice.segments.count > 1 else { return false }
+        phase = .lattice(lattice)
+        trunkLevel = false
+        // このあとすぐ文節を移るので，最初の注目を迷う文節へ置き直す処理(followUps)は動かさない
+        latticeUntouched = false
+        if case .lattice(let lattice) = phase { fillPendingSegments(only: lattice.focusedIndex) }
+        return true
+    }
+
+    /// 文節を移る・長さを変える・区切る．文全体の一覧は文節が 1 つなので，文節を移るキーで文節ごとの一覧に切り替えてから移る．
+    /// 種類の行にいるときの左右は字種を移る
     private func moveSegment(_ move: SegmentMove, event: KeyEvent? = nil, context: InputContext) -> KeyResult {
         if expandedCandidates, move == .next || move == .previous, let moved = moveGridColumn(forward: move == .next, context: context) {
             return moved
@@ -2698,11 +2715,16 @@ public final class InputSession {
         case .composing, .association:
             // 連想の一覧の中の動きは performInAssociation が受け持つ
             return KeyResult(handled: true)
-        case .selecting:
+        case .selecting(let selection):
+            if case .variant = selection.focus, move == .next || move == .previous, event?.key != .tab {
+                // 種類の行は横に並ぶので，左右のキーで字種を移る．Tab は種類の行にいても次の文節へ移る(文節ごとの一覧と同じ)
+                return handleHorizontal(forward: move == .next, context: context)
+            }
             switch move {
-            case .next: return handleHorizontal(forward: true, context: context)
-            case .previous: return handleHorizontal(forward: false, context: context)
-            case .index, .first, .last, .nextUncertain, .previousUncertain, .extend, .shrink, .extendToWord, .shrinkToWord, .split:
+            case .index, .next, .previous, .first, .last, .nextUncertain, .previousUncertain:
+                guard enterSegmentList() else { return KeyResult(handled: true) }
+                return moveSegment(move, event: event, context: context)
+            case .extend, .shrink, .extendToWord, .shrinkToWord, .split:
                 return KeyResult(handled: true)
             }
         case .lattice(var lattice):

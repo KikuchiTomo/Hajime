@@ -167,7 +167,7 @@ pub struct Card {
     pub recommended: bool,
 }
 
-/// 入力モード表示(macOS の InfoCard の枠に入れる文字)
+/// 入力モード表示(macOS の InfoRow の枠に入れる文字)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mark {
     /// 英数(A)
@@ -178,7 +178,7 @@ pub enum Mark {
     Both,
 }
 
-/// 紹介だけのカード(macOS の InfoCard)．どう動くかは左の実演で見せる
+/// 紹介だけの行(macOS の InfoRow)．選択肢ではない．どう動くかは左の実演で見せる
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Info {
     pub mark: Mark,
@@ -212,7 +212,7 @@ pub struct Spot {
 pub enum Item {
     /// 1 つを選ぶカード
     Cards(Field, &'static [Card]),
-    /// 説明だけのカード
+    /// 紹介だけの行(選択肢ではない)
     Info(&'static [Info]),
     /// テーマの見本のカード(THEME_ORDER)
     Themes,
