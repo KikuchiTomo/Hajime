@@ -20,7 +20,7 @@ let package = Package(
         // fork を revision で固定する(docs/dev/UPSTREAM.md)．
         .package(
             url: "https://github.com/KikuchiTomo/AzooKeyKanaKanjiConverter",
-            revision: "6a0147897c68b47808257b1ef79cd0ee72049273",
+            revision: "42e70abbf90d2bb67d437cc626038c1b142191b6",
             traits: [.trait(name: "Zenzai", condition: .when(traits: ["Zenzai"]))]
         ),
     ],
