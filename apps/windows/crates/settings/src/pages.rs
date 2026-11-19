@@ -1157,6 +1157,7 @@ pub enum RangeKind {
     SuggestionSkipCount,
     EnglishSkipLength,
     CorrectionDelay,
+    PredictionDelay,
     ReviewCorrectionTimeout,
     LateCorrectionTimeout,
     ModeIndicatorDuration,
@@ -1170,6 +1171,7 @@ pub enum RangeKind {
     PaletteColumns,
     PaletteRows,
     PaletteCellSize,
+    PaletteScale,
     PaletteFrequentRows,
 }
 
@@ -1184,6 +1186,7 @@ impl RangeKind {
             RangeKind::SuggestionSkipCount => ranges.suggestion_skip_count,
             RangeKind::EnglishSkipLength => ranges.english_skip_length,
             RangeKind::CorrectionDelay => ranges.correction_delay,
+            RangeKind::PredictionDelay => ranges.prediction_delay,
             RangeKind::ReviewCorrectionTimeout => ranges.review_correction_timeout,
             RangeKind::LateCorrectionTimeout => ranges.late_correction_timeout,
             RangeKind::ModeIndicatorDuration => ranges.mode_indicator_duration,
@@ -1197,6 +1200,7 @@ impl RangeKind {
             RangeKind::PaletteColumns => ranges.palette_columns,
             RangeKind::PaletteRows => ranges.palette_rows,
             RangeKind::PaletteCellSize => ranges.palette_cell_size,
+            RangeKind::PaletteScale => ranges.palette_scale,
             RangeKind::PaletteFrequentRows => ranges.palette_frequent_rows,
         }
     }
@@ -1216,6 +1220,7 @@ impl RangeKind {
         match self {
             RangeKind::AssociationLimit => catalog.association_limit_step,
             RangeKind::PaletteCellSize => catalog.palette_cell_size_step,
+            RangeKind::PaletteScale => catalog.palette_scale_step,
             _ => 1.0,
         }
     }
@@ -1489,8 +1494,19 @@ fn conversion() -> Vec<Section> {
                 Row::choice(
                     choice::PREDICTION_DISPLAY,
                     "predictionDisplay",
-                    options::SUGGESTION_DISPLAY,
+                    options::PREDICTION_DISPLAY,
                 ),
+                Row::seconds(
+                    choice::PREDICTION_DELAY,
+                    "predictionDelay",
+                    RangeKind::PredictionDelay,
+                )
+                .enabled_when(Is("predictionDisplay", "afterPause")),
+                Row::toggle(
+                    choice::PREDICTION_KEEPS_COMPOSING,
+                    "predictionKeepsComposing",
+                )
+                .enabled_when(IsNot("predictionDisplay", "off")),
                 Row::toggle(
                     choice::PREDICTION_PREFERS_HISTORY,
                     "predictionPrefersHistory",
@@ -2325,6 +2341,7 @@ fn palette_page() -> Vec<Section> {
                     "paletteCellSize",
                     RangeKind::PaletteCellSize,
                 ),
+                Row::slider(palette::SCALE, "paletteScale", RangeKind::PaletteScale),
                 Row::stepper(
                     palette::FREQUENT_ROWS,
                     "paletteFrequentRows",
@@ -2873,8 +2890,24 @@ mod tests {
             .find(|row| row.path == "predictionDisplay")
             .unwrap();
         assert!(
-            matches!(prediction.control, Control::Choice(choices) if choices == options::SUGGESTION_DISPLAY)
+            matches!(prediction.control, Control::Choice(choices) if choices == options::PREDICTION_DISPLAY)
         );
+        // 予測までの待ち時間は「入力中のタイミングで制御」を選んだときだけ使える
+        let delay = rows
+            .iter()
+            .find(|row| row.path == "predictionDelay")
+            .unwrap();
+        assert!(matches!(
+            delay.control,
+            Control::Seconds(RangeKind::PredictionDelay)
+        ));
+        assert_eq!(
+            RangeKind::PredictionDelay.range(&catalog),
+            crate::catalog::Range(0.1, 2.0)
+        );
+        assert!(rows
+            .iter()
+            .any(|row| row.path == "predictionKeepsComposing"));
         let skip = rows
             .iter()
             .find(|row| row.path == "suggestionSkipCount")
@@ -2924,6 +2957,9 @@ mod tests {
         assert!(rows
             .iter()
             .any(|row| row.control == Control::Slider(RangeKind::PaletteCellSize)));
+        assert!(rows
+            .iter()
+            .any(|row| row.control == Control::Slider(RangeKind::PaletteScale)));
         // 注記は名前の無い行の説明にしない(幅の無い説明にならない)
         assert!(!rows.iter().any(|row| row.control == Control::Note));
     }

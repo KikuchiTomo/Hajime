@@ -95,7 +95,7 @@ pub const YEN_KEY: &[Choice] = &[
 ];
 
 pub const PRESENTATIONS: &[Choice] = &[
-    ("automatic", "分岐図"),
+    ("automatic", "ツリー表示"),
     ("segmentList", "一覧"),
     ("list", "文全体の一覧"),
 ];
@@ -109,6 +109,13 @@ pub const SUGGESTION_DISPLAY: &[Choice] = &[
     ("off", "オフ"),
     ("whenLiveConversionOff", "ライブ変換がオフのとき"),
     ("always", "常に"),
+];
+
+pub const PREDICTION_DISPLAY: &[Choice] = &[
+    ("off", "オフ"),
+    ("whenLiveConversionOff", "ライブ変換がオフのとき"),
+    ("always", "常に"),
+    ("afterPause", "入力中のタイミングで制御"),
 ];
 
 pub const TYPO_CORRECTION: &[Choice] = &[
@@ -322,6 +329,7 @@ mod tests {
             PRESENTATIONS,
             INITIAL_FOCUS,
             SUGGESTION_DISPLAY,
+            PREDICTION_DISPLAY,
             TYPO_CORRECTION,
             CORRECTION_SENSITIVITY,
             OKURIGANA,

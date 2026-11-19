@@ -406,10 +406,10 @@ public struct RoutedActions: Sendable, Equatable {
     }
 
     /// composition は組み立て中の文字全体の位置(予測の窓を置く基準)．知らせない DLL では nil．
-    /// hints と listHints は分岐図と一覧の足元のキーの案内(FooterHints)．paletteCellSize は設定のパレットのマスの大きさ(パレットを出すときに添える)
+    /// hints と listHints は分岐図と一覧の足元のキーの案内(FooterHints)．paletteCellSize は設定のパレットのマスの大きさ，paletteScale は倍率(パレットを出すときに添える)
     public init(_ actions: [ClientAction], anchor: WireRect?, composition: WireRect? = nil, hints: (LatticePanel) -> [WireKeyHint] = { _ in [] },
                 listHints: (CandidatePanel) -> [WireKeyHint] = { _ in [] }, placedHints: (LatticePanel) -> WireBranchHints? = { _ in nil },
-                paletteCellSize: Double = DefaultSettings.paletteCellSize) {
+                paletteCellSize: Double = DefaultSettings.paletteCellSize, paletteScale: Double = DefaultSettings.paletteScale) {
         // 次の組み立て中の文字で置き換える，入力位置の前の文字の長さ(予測の確定の取り消し)
         var replacedLength: UInt32?
         for action in actions {
@@ -464,7 +464,7 @@ public struct RoutedActions: Sendable, Equatable {
             case .showHandwriting:
                 host.append(.showHandwriting)
             case .showPalette(let panel):
-                ui.append(.showPalette(panel: WirePalettePanel(panel, cellSize: paletteCellSize), anchor: anchor))
+                ui.append(.showPalette(panel: WirePalettePanel(panel, cellSize: paletteCellSize, scale: paletteScale), anchor: anchor))
             case .hidePalette:
                 ui.append(.hidePalette)
             case .runCommand(let command):

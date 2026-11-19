@@ -68,10 +68,52 @@ public final class FakeConverter: KanaKanjiConverting {
         onDeferredConversion?()
     }
 
+    /// 打鍵の経路で変換を待たせない作り(setDeferring)をまねるか．true なら，待たない設定のあいだ，まだ届いていない読みには
+    /// 空(読みのもっともらしさは -∞)を返し，deliverDeferred で届ける
+    public var supportsDeferring = false
+    private var deferring = false
+    private var deferredMiss = false
+    private var delivered: Set<String> = []
+    /// 待たずに裏へ回した読み(届ける前)．もっともらしさは「p:読み」
+    public private(set) var pendingDeferred: [String] = []
+    private var arrivalObserver: (@MainActor () -> Void)?
+
+    public func setDeferring(_ deferring: Bool) { self.deferring = deferring && supportsDeferring }
+    public func consumeDeferredMiss() -> Bool {
+        defer { deferredMiss = false }
+        return deferredMiss
+    }
+    public func setArrivalObserver(_ observer: (@MainActor () -> Void)?) { arrivalObserver = observer }
+
+    /// 裏へ回した読みを届ける(届いたものがあれば，届いたときの処理を呼ぶ)
+    public func deliverDeferred() {
+        guard !pendingDeferred.isEmpty else { return }
+        delivered.formUnion(pendingDeferred)
+        pendingDeferred = []
+        arrivalObserver?()
+    }
+
+    /// 待たずに裏へ回すなら true．待って求めたものは届いたことにする
+    private func defers(_ key: String) -> Bool {
+        guard supportsDeferring else { return false }
+        guard deferring, !delivered.contains(key) else {
+            delivered.insert(key)
+            pendingDeferred.removeAll { $0 == key }
+            return false
+        }
+        deferredMiss = true
+        if !pendingDeferred.contains(key) { pendingDeferred.append(key) }
+        return true
+    }
+
     public func candidates(for reading: String) -> [Candidate] {
-        requests.append((reading, typing))
         // 本物と同じく，空の読みには空の配列を返す
-        guard !reading.isEmpty else { return [] }
+        guard !reading.isEmpty else {
+            requests.append((reading, typing))
+            return []
+        }
+        if defers(reading) { return [] }
+        requests.append((reading, typing))
         return (table[reading] ?? []).enumerated().map { index, entry in
             Candidate(text: entry.text, readingCount: entry.readingCount ?? reading.count, origin: .engine(id: index), score: scores[reading] ?? 0,
                       trailingWord: trailingWords[entry.text], words: candidateWords[entry.text] ?? [])
@@ -86,16 +128,22 @@ public final class FakeConverter: KanaKanjiConverting {
     public func languageModelScores(forKeys keys: [String]) -> [Double?] { keys.map { languageModelScores[$0] } }
     /// 確定した履歴(学習)にある予測の語句
     public var learnedPredictions: Set<String> = []
+    /// 予測の語句の読み(語句ごと)．無い語句は読みを教えない
+    public var predictionReadings: [String: String] = [:]
     /// 予測をエンジンの候補(確定すると学ぶ)にするか．既定は学ばない候補
     public var predictionsAreLearnable = false
     public func predictions(for reading: String) -> [Candidate] {
         (predictionTexts[reading] ?? []).enumerated().map { index, text in
             var candidate = Candidate(text: text, readingCount: reading.count, origin: predictionsAreLearnable ? .engine(id: 2000 + index) : .variant(.hiragana))
             candidate.isLearned = learnedPredictions.contains(text)
+            candidate.reading = predictionReadings[text]
             return candidate
         }
     }
-    public func plausibility(of reading: String) -> Double { scores[reading] ?? (table[reading] == nil ? -.infinity : 0) }
+    public func plausibility(of reading: String) -> Double {
+        if defers("p:" + reading) { return -.infinity }
+        return scores[reading] ?? (table[reading] == nil ? -.infinity : 0)
+    }
     /// 打ったキーごとの，打ち間違いを直した読みの候補
     public var corrections: [String: [ReadingCorrection]] = [:]
     public func typoCorrections(forKeys keys: String) -> [ReadingCorrection] { corrections[keys] ?? [] }
@@ -112,6 +160,8 @@ public final class FakeConverter: KanaKanjiConverting {
     public func setAuxiliaryWords(_ words: [AuxiliaryWord]) { auxiliaryWords = words }
     public func endComposition() {
         endCount += 1
+        delivered = []
+        pendingDeferred = []
         learningSuspended = false
         // 本物と同じく，学ばなかった入力も最後の確定にする
         if committedAnyInComposition { lastCommitted = committedInComposition }

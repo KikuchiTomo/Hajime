@@ -1,0 +1,7 @@
+{{- /*
+ドキュメントの本文に置く説明用の画像．src は static からのパス(トップページの機能の画像を使う)，alt はその説明
+@example {{< hajime/figure src="images/features/meaning.webp" alt="…" >}}
+*/ -}}
+<figure class="hajime-figure not-prose">
+  <img src="{{ .Get "src" | relURL }}" alt="{{ .Get "alt" }}" width="2000" height="1250" loading="lazy" decoding="async" />
+</figure>

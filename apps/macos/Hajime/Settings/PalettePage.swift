@@ -11,13 +11,15 @@ struct PalettePage: View {
     @Environment(SettingsNavigation.self) private var navigation: SettingsNavigation?
     /// 動かしているあいだのマスの大きさ．手を離したときに保存し，1 段ごとに設定のファイルを書き直さない
     @State private var cellSize: Double?
+    /// 動かしているあいだの倍率．マスの大きさと同じく，手を離したときに保存する
+    @State private var scale: Double?
     /// 使った文字の記録を消してよいかを尋ねているか
     @State private var confirmingClear = false
 
     var body: some View {
         Form {
             Section {
-                PaletteSample(model: model, cellSize: cellSize)
+                PaletteSample(model: model, cellSize: cellSize, scale: scale)
                     .padding(DesignTokens.Size.Settings.previewPadding)
                     .frame(maxWidth: .infinity)
             }
@@ -57,6 +59,16 @@ struct PalettePage: View {
                             }
                         }
                     }
+                    ResettableRow(model: model, keyPath: \.paletteScale) {
+                        LabeledContent(UIStrings.Palette.scaleValue(Int(((scale ?? model.settings.paletteScale) * 100).rounded()))) {
+                            Slider(value: Binding(get: { scale ?? model.settings.paletteScale }, set: { scale = $0 }),
+                                   in: DefaultSettings.paletteScaleRange, step: DefaultSettings.paletteScaleStep) { isEditing in
+                                guard !isEditing, let value = scale else { return }
+                                model.update { $0.paletteScale = value }
+                                scale = nil
+                            }
+                        }
+                    }
                     ResettableStepper(model: model, title: UIStrings.Palette.frequentRows, keyPath: \.paletteFrequentRows, range: DefaultSettings.paletteFrequentRowsRange)
                         .disabled(model, unless: \.paletteRecordsHistory)
                     ResettableToggle(model: model, title: UIStrings.Palette.showsPreview, keyPath: \.paletteShowsPreview)
@@ -90,8 +102,9 @@ private struct PaletteKeyRow: View {
 /// 設定のとおりの列数・行数・説明の項目で並べたパレットの見本．見本にかかわる項目はこの部品が読む
 private struct PaletteSample: View {
     @ObservedObject var model: SettingsModel
-    /// マスの大きさを動かしているあいだの値(無ければ設定の値)
+    /// マスの大きさと倍率を動かしているあいだの値(無ければ設定の値)
     let cellSize: Double?
+    let scale: Double?
 
     var body: some View {
         let settings = model.settings
@@ -100,7 +113,7 @@ private struct PaletteSample: View {
                                            showsPreview: settings.paletteShowsPreview,
                                            previewFields: PalettePanel.PreviewFields(unicodeName: settings.paletteShowsUnicodeName, readings: settings.paletteShowsReadings,
                                                                                      shortcodes: settings.paletteShowsShortcodes, codePoints: settings.paletteShowsCodePoints))
-        PalettePreview(choice: ThemeChoice(settings), panel: panel, cellSize: cellSize ?? settings.paletteCellSize)
+        PalettePreview(choice: ThemeChoice(settings), panel: panel, cellSize: cellSize ?? settings.paletteCellSize, scale: scale ?? settings.paletteScale)
     }
 }
 
@@ -109,6 +122,7 @@ struct PalettePreview: NSViewRepresentable {
     let choice: ThemeChoice
     let panel: PalettePanel
     let cellSize: Double
+    let scale: Double
 
     func makeNSView(context: Context) -> ScaledPalette {
         ScaledPalette()
@@ -117,12 +131,14 @@ struct PalettePreview: NSViewRepresentable {
     func updateNSView(_ view: ScaledPalette, context: Context) {
         view.palette.theme = ResolvedTheme.resolve(choice, appearance: view.effectiveAppearance)
         view.palette.cellSize = CGFloat(cellSize)
+        view.palette.scale = CGFloat(scale)
         view.palette.panel = panel
         view.natural = view.palette.fittingSize(for: panel)
     }
 
     func sizeThatFits(_ proposal: ProposedViewSize, nsView view: ScaledPalette, context: Context) -> CGSize? {
         view.palette.cellSize = CGFloat(cellSize)
+        view.palette.scale = CGFloat(scale)
         let natural = view.palette.fittingSize(for: panel)
         guard natural.width > 0 else { return natural }
         let width = min(natural.width, proposal.width ?? natural.width)

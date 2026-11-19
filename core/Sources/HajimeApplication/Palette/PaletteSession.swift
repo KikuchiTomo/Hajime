@@ -304,6 +304,14 @@ final class PaletteSession {
 
     private var selectedItem: PaletteItem? { selection.flatMap(item(at:)) }
 
+    /// 入力先に組み立て中の文字として出す文字(PaletteServices.showsSelectionInClient)．Enter で入れる文字と同じにする．
+    /// 選べる文字が無ければ(探しても見つからない)探す欄の文字
+    var clientText: String {
+        guard let item = selectedItem else { return display }
+        if let picker, !picker.forDefault { return item.text(skinTone: SkinTone.allCases[picker.selected]) }
+        return item.text(skinTone: services.usage.usage.effectiveSkinTone(for: item.text))
+    }
+
     private func item(at position: PalettePanel.Position) -> PaletteItem? {
         guard rows.indices.contains(position.row), position.column >= 0, position.column < rows[position.row].count else { return nil }
         let row = rows[position.row]

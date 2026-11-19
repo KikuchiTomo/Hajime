@@ -53,6 +53,29 @@ final class EnglishWordCorrector {
     private var context = Context()
     /// 利用者が Space で取り消した補正の位置．同じ位置では補正し直さない(Q-01)
     private var dismissedKanaStart: Int?
+    /// 打鍵が止まったときに読みの中から英単語にした語．続きを打ったあとの読みで 1 回だけ見分け直す(freezeWordReadAsRomaji)
+    private var tentative: TentativeWord?
+
+    /// 打鍵が止まったときに英単語にした語と，その前後の読み．止まったところが語の終わりとは限らず，
+    /// 語の途中まで(「めちゃくちゃ」の「metyaku」)を英単語と後ろの日本語(met + 役)に取り違えることがあるため，前の読みを覚えておく
+    private struct TentativeWord {
+        /// 英単語にする前の読み
+        var typed: Composition
+        /// 英単語にしたあとの読み
+        var frozen: Composition
+        var rawStart: Int
+        var keys: String
+    }
+
+    /// 読みの中の英単語を見分けた結果(freezeWordReadAsRomaji)
+    enum RomajiWordOutcome: Equatable {
+        /// 読みを変えていない
+        case unchanged
+        /// 英単語として確定させた
+        case frozen
+        /// 打鍵が止まったときに英単語にした語を，続きを打ったあとの読みで日本語に戻した
+        case restored
+    }
 
     init(lexicon: any EnglishLexicon, settings: any SettingsReading, converter: any KanaKanjiConverting, classifier: WordLanguageClassifier) {
         self.lexicon = lexicon
@@ -63,6 +86,12 @@ final class EnglishWordCorrector {
 
     /// 読みの末尾から英単語を探して，補正を求め直す．
     /// - Parameter context: 入力先の文脈．プログラミング用のアプリでは日本語の文の中の英単語だけを直す(R-06)
+    /// 見つけた補正をいったん取り下げる．手がかり(読みのもっともらしさ)を待たずに探したときに，そろうまで補正を見せないために使う．
+    /// そろったら update を呼び直す
+    func withhold() {
+        active = nil
+    }
+
     func update(for composition: Composition, context: Context = Context()) {
         self.context = context
         guard settings.current.correction.english else {
@@ -139,12 +168,63 @@ final class EnglishWordCorrector {
     }
 
     /// ローマ字として読めてしまう英単語を読みの中から探し，見つけたら英単語として確定させる(「gitwotukau」→「gitを使う」)．
-    /// 変換を使うので，打鍵ごとには呼ばず，打鍵が止まったときと変換・確定の前に呼ぶ．確定させたら true
-    func freezeWordReadAsRomaji(in composition: inout Composition) -> Bool {
-        guard active == nil, let found = wordReadAsRomaji(in: composition, onlyUnreadable: false) else { return false }
+    /// 変換を使うので，打鍵ごとには呼ばず，打鍵が止まったときと変換・確定の前に呼ぶ．
+    ///
+    /// 打鍵が止まったとき(tentatively)に英単語にした語は，続きを打ったあとに呼ばれたとき，英単語にする前の読みに続きを足して見分け直す．
+    /// 同じ語を英単語と見分ければそのままにし，見分けなければ日本語に戻す(「metyaku」で止まり「tya」と続けた「めちゃくちゃ」)．
+    /// 見分け直すのは 1 回だけ(続きを打って確かめた語は，それ以上は戻さない)
+    func freezeWordReadAsRomaji(in composition: inout Composition, tentatively: Bool = false) -> RomajiWordOutcome {
+        guard active == nil else { return .unchanged }
+        var base = composition
+        var found: Correction?
+        var restored = false
+        if let previous = tentative, let typed = typedBeforeTentativeWord(previous, in: composition) {
+            tentative = nil
+            found = wordReadAsRomaji(in: typed, onlyUnreadable: false)
+            if found?.rawStart == previous.rawStart, found?.keys == previous.keys {
+                // 同じ語だった．今の読みのまま，後ろに別の英単語が無いかを探す
+                found = wordReadAsRomaji(in: composition, onlyUnreadable: false)
+            } else {
+                base = typed
+                restored = true
+            }
+        } else {
+            found = wordReadAsRomaji(in: composition, onlyUnreadable: false)
+        }
+        guard let found else {
+            if restored { composition = base }
+            return restored ? .restored : .unchanged
+        }
+        composition = base
         active = found
         commit(into: &composition)
-        return true
+        tentative = tentatively ? TentativeWord(typed: base, frozen: composition, rawStart: found.rawStart, keys: found.keys) : nil
+        return .frozen
+    }
+
+    /// 打鍵が止まったときに英単語にした語(word)を英単語にしなかった読みに，そのあとに打ったキーを足したもの．
+    /// 英単語にしたあとに打ったのがローマ字だけで，打ち終えていて(打ちかけのローマ字が無い)，
+    /// ほかに読みが変わっていない(別の英単語の補正・打ち間違いの訂正・消した文字が無い)ときだけ返す
+    private func typedBeforeTentativeWord(_ word: TentativeWord, in composition: Composition) -> Composition? {
+        guard let keys = composition.rawKeys, let frozenKeys = word.frozen.rawKeys, keys.count > frozenKeys.count, keys.hasPrefix(frozenKeys),
+            composition.pending.isEmpty || composition.pending == "n" else { return nil }
+        let following = keys.dropFirst(frozenKeys.count)
+        guard following.allSatisfy({ ($0.isASCII && $0.isLetter && $0.isLowercase) || $0 == "-" }),
+            replaying(following, onto: word.frozen).conversionReading == composition.conversionReading else { return nil }
+        return replaying(following, onto: word.typed)
+    }
+
+    /// 打ったときと同じ順にキーを足す．「nn」のあとの母音の読みも，打つときと同じ決まりで選び，打ち終えた読みで選び直す
+    /// (呼ばれるのは打鍵が止まったときと変換・確定の前で，今の読みも選び直してある．InputSession.resolveSettledNasalReadings)
+    private func replaying(_ keys: Substring, onto base: Composition) -> Composition {
+        var composition = base
+        let resolver = NasalReadingResolver(converter: converter)
+        for key in keys {
+            composition.insertRomaji(key)
+            resolver.resolve(&composition)
+        }
+        _ = resolver.resolveSettled(&composition)
+        return composition
     }
 
     /// 英単語の終わりがローマ字の綴りの途中にかかり，かなとしては読めてしまう英単語を探す．
@@ -262,6 +342,7 @@ final class EnglishWordCorrector {
     func reset() {
         active = nil
         dismissedKanaStart = nil
+        tentative = nil
         context = Context()
     }
 

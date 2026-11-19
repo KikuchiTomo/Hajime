@@ -219,6 +219,7 @@ enum DesignTokens {
             static let fontSize: CGFloat = 14
             static let paddingX: CGFloat = 8
             static let paddingY: CGFloat = 4
+            static let systemIndicatorClearance: CGFloat = 32
         }
         enum Branch {
             static let trunkGap: CGFloat = 12

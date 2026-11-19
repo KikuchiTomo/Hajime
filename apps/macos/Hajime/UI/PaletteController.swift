@@ -28,12 +28,13 @@ final class PaletteController {
 
     var isVisible: Bool { window.isVisible }
 
-    func show(_ panel: PalettePanel, caret: NSRect, theme: ThemeChoice, cellSize: Double) {
+    func show(_ panel: PalettePanel, caret: NSRect, theme: ThemeChoice, cellSize: Double, scale: Double) {
         let resolved = ResolvedTheme.resolve(theme)
         view.theme = resolved
         view.cellSize = CGFloat(cellSize)
+        view.scale = CGFloat(scale)
         view.panel = panel
-        backdrop.cornerRadius = resolved.cornerRadius
+        backdrop.cornerRadius = resolved.cornerRadius * CGFloat(scale)
         let wasVisible = window.isVisible
         _ = FloatingPanel.attach(view, to: window, backdrop: resolved.isRounded ? backdrop : nil)
         let size = view.fittingSize(for: panel)

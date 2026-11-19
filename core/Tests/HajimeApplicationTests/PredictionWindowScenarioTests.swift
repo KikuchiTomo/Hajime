@@ -78,7 +78,7 @@ struct PredictionWindowScenarioTests {
 
     @Test("入力中の予測を出さない設定，ライブ変換がオンで「ライブ変換がオフのときだけ」の設定では予測を出さず，Tab は予測を確定しない")
     func respectsSetting() {
-        for display in [SuggestionDisplay.off, .whenLiveConversionOff] {
+        for display in [PredictionDisplay.off, .whenLiveConversionOff] {
             let harness = Harness(converter: Self.converter(), settings: Self.settings { $0.predictionDisplay = display })
             harness.type("epi")
             #expect(harness.prediction == nil)
@@ -389,5 +389,370 @@ struct PredictionSettingTests {
         #expect(DefaultSettings.settings.suggestionSkipCount == 0)
         #expect(DefaultSettings.settings.predictionPrefersHistory)
         #expect(DefaultSettings.settings.predictionFromCorrection)
+    }
+}
+
+/// 打鍵が設定の時間止まってから予測を出す設定(入力中の予測「入力中のタイミングで制御」)．待つのは入力メソッドのタイマーで，
+/// 止まったときに revealPrediction を呼ぶ
+@Suite("予測を出すタイミング")
+@MainActor
+struct PredictionTimingScenarioTests {
+    private static func settings(_ change: (inout Settings) -> Void = { _ in }) -> Settings {
+        var settings = DefaultSettings.settings
+        settings.predictionDisplay = .afterPause
+        change(&settings)
+        return settings
+    }
+
+    private static func converter() -> FakeConverter {
+        let converter = FakeConverter(["えぴ": [("エピ", nil), ("えぴ", nil)], "えぴそ": [("エピソ", nil)]])
+        converter.predictionTexts["えぴ"] = ["エピ", "エピソード", "エピローグ"]
+        converter.predictionTexts["えぴそ"] = ["エピソード"]
+        return converter
+    }
+
+    private static func reveal(_ harness: Harness) -> [ClientAction] {
+        harness.session.revealPrediction(context: harness.context)
+    }
+
+    private static func shown(_ actions: [ClientAction]) -> Prediction?? {
+        actions.compactMap { action -> Prediction?? in
+            if case .showPrediction(let prediction) = action { .some(prediction) } else { nil }
+        }.last
+    }
+
+    @Test("打っているあいだは予測を出さず(求めもせず)，打鍵が止まったら出す．ライブ変換がオンでもオフでも同じ", arguments: [true, false])
+    func showsAfterPause(live: Bool) {
+        let converter = Self.converter()
+        let harness = Harness(converter: converter, settings: Self.settings { $0.liveConversion = live })
+        harness.type("epi")
+        #expect(harness.prediction == nil)
+        #expect(harness.session.awaitsPrediction)
+        #expect(Self.shown(Self.reveal(harness)) == .some(Prediction(typed: "エピ", completion: "ソード", key: "Tab")))
+        // 出したあとは待たない(同じ打鍵の止まりで 2 回出さない)
+        #expect(!harness.session.awaitsPrediction)
+        #expect(Self.reveal(harness).isEmpty)
+    }
+
+    @Test("次のキーで予測を消し，また止まるのを待つ")
+    func hidesOnNextKey() {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings())
+        harness.type("epi")
+        _ = Self.reveal(harness)
+        harness.press(.character("s"))
+        #expect(harness.lastResult.actions.contains(.showPrediction(nil)))
+        #expect(harness.prediction == nil)
+        harness.press(.character("o"))
+        #expect(harness.prediction == nil)
+        #expect(harness.session.awaitsPrediction)
+        #expect(Self.shown(Self.reveal(harness)) == .some(Prediction(typed: "エピソ", completion: "ード", key: "Tab")))
+    }
+
+    @Test("出した予測は Tab で選べる")
+    func acceptsRevealed() {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings())
+        harness.type("epi")
+        _ = Self.reveal(harness)
+        harness.press(.tab)
+        #expect(harness.committed == "エピソード")
+    }
+
+    @Test("確定した・変換を始めた・読みが短い・ほかの設定のときは待たず，遅れて届いた知らせでは何も出さない")
+    func ignoresStaleTimer() {
+        let committed = Harness(converter: Self.converter(), settings: Self.settings())
+        committed.type("epi")
+        committed.press(.enter)
+        #expect(!committed.session.awaitsPrediction)
+        #expect(Self.reveal(committed).isEmpty)
+
+        let converting = Harness(converter: Self.converter(), settings: Self.settings())
+        converting.type("epi")
+        converting.press(.space)
+        #expect(!converting.session.awaitsPrediction)
+        #expect(Self.reveal(converting).isEmpty)
+
+        let left = Harness(converter: Self.converter(), settings: Self.settings())
+        left.type("epi")
+        _ = left.session.deactivate()
+        #expect(Self.reveal(left).isEmpty)
+
+        let short = Harness(converter: Self.converter(), settings: Self.settings())
+        short.type("e")
+        #expect(!short.session.awaitsPrediction)
+
+        for display in [PredictionDisplay.off, .whenLiveConversionOff, .always] {
+            let other = Harness(converter: Self.converter(), settings: Self.settings { $0.predictionDisplay = display })
+            other.type("epi")
+            #expect(!other.session.awaitsPrediction)
+            #expect(Self.reveal(other).isEmpty)
+        }
+    }
+
+    @Test("予測を「予測に表示しない語句」に入れたら，次の予測は待たずに出す")
+    func hidingShowsNext() {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings())
+        harness.type("epi")
+        _ = Self.reveal(harness)
+        harness.press(.backspace, .control)
+        #expect(harness.settings.current.hiddenPredictions == ["エピソード"])
+        #expect(harness.lastResult.actions.contains(.showPrediction(Prediction(typed: "エピ", completion: "ローグ", key: "Tab"))))
+    }
+
+    @Test("待ち時間は 0.1 秒から 2 秒までに収め，既定は入力を継続する設定がオン")
+    func clampsDelay() throws {
+        #expect(DefaultSettings.predictionDelayRange == 0.1...2.0)
+        var settings = DefaultSettings.settings
+        settings.predictionDelay = 9
+        settings.clampToValidRanges()
+        #expect(settings.predictionDelay == 2.0)
+        settings.predictionDelay = 0
+        settings.clampToValidRanges()
+        #expect(settings.predictionDelay == 0.1)
+        settings.predictionDelay = .nan
+        settings.clampToValidRanges()
+        #expect(settings.predictionDelay == DefaultSettings.predictionDelay)
+        #expect(DefaultSettings.settings.predictionKeepsComposing)
+        let read = try JSONDecoder().decode(Settings.self, from: Data(#"{"predictionDisplay": "afterPause", "predictionDelay": 1.2, "predictionKeepsComposing": false}"#.utf8))
+        #expect(read.predictionDisplay == .afterPause)
+        #expect(read.predictionDelay == 1.2)
+        #expect(!read.predictionKeepsComposing)
+        #expect(try JSONDecoder().decode(Settings.self, from: JSONEncoder().encode(read)) == read)
+    }
+}
+
+/// 予測を選んだあとも入力を続ける設定(既定でオン)．Tab で予測の語句を確定せず，読みを予測の読みに補う
+@Suite("予測を選んだあとの入力の継続")
+@MainActor
+struct PredictionCompletionScenarioTests {
+    private static func settings(_ change: (inout Settings) -> Void = { _ in }) -> Settings {
+        var settings = DefaultSettings.settings
+        settings.predictionDisplay = .always
+        change(&settings)
+        return settings
+    }
+
+    private static func converter() -> FakeConverter {
+        let converter = FakeConverter([
+            "えぴ": [("エピ", nil), ("えぴ", nil)],
+            "えぴそーど": [("エピソード", nil), ("挿話", nil)],
+            "えぴそーどを": [("エピソードを", nil)],
+        ])
+        converter.predictionTexts["えぴ"] = ["エピ", "エピソード", "エピローグ"]
+        converter.predictionReadings = ["エピソード": "えぴそーど", "エピローグ": "えぴろーぐ"]
+        converter.predictionsAreLearnable = true
+        return converter
+    }
+
+    @Test("Tab で予測を選ぶと確定せず，予測の語句を未確定のまま見せ，Enter でその語句を確定して学ぶ", arguments: [true, false])
+    func keepsComposing(live: Bool) {
+        let converter = Self.converter()
+        let harness = Harness(converter: converter, settings: Self.settings { $0.liveConversion = live })
+        harness.type("epi")
+        harness.press(.tab)
+        #expect(harness.committed.isEmpty)
+        #expect(harness.marked.text == "エピソード")
+        #expect(harness.session.isComposing)
+        #expect(converter.committed.isEmpty)
+        harness.press(.enter)
+        #expect(harness.committed == "エピソード")
+        #expect(converter.committed.map(\.text) == ["エピソード"])
+        #expect(harness.marked.isEmpty)
+    }
+
+    @Test("選んだあと，Space で補った読みを変換でき，候補を選び直せる")
+    func convertsAfterCompletion() {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings { $0.candidatePresentation = .list })
+        harness.type("epi")
+        harness.press(.tab)
+        harness.press(.space)
+        #expect(harness.panel?.entries.map(\.text).contains("挿話") == true)
+        harness.press(.space)
+        harness.press(.enter)
+        #expect(harness.committed == "挿話")
+    }
+
+    @Test("選んだあと，続けて打つと補った読みに足す")
+    func typesAfterCompletion() {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings())
+        harness.type("epi")
+        harness.press(.tab)
+        harness.type("wo")
+        harness.settle()
+        #expect(harness.committed.isEmpty)
+        #expect(harness.marked.text == "エピソードを")
+        harness.press(.enter)
+        #expect(harness.committed == "エピソードを")
+    }
+
+    @Test("選んだ直後の Backspace で補う前の読みに戻し，同じ読みのあいだは戻した予測を出さない．直後でなければ 1 文字消す")
+    func undoesCompletion() {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings { $0.liveConversion = false })
+        harness.type("epi")
+        harness.press(.tab)
+        harness.press(.backspace)
+        #expect(harness.marked.text == "えぴ")
+        #expect(harness.committed.isEmpty)
+        #expect(harness.prediction?.completion == "ローグ")
+
+        let later = Harness(converter: Self.converter(), settings: Self.settings { $0.liveConversion = false })
+        later.type("epi")
+        later.press(.tab)
+        later.press(.left, .shift)
+        later.press(.backspace)
+        #expect(later.marked.text != "えぴ")
+    }
+
+    @Test("ライブ変換で文が見えているときは，最後の文節の予測の読みを補い，前の文節とつないだ語句で見せる")
+    func completesLastClause() {
+        let converter = FakeConverter(["きょうはあめ": [("今日は雨", nil)], "あめ": [("雨", nil), ("飴", nil)], "きょうはあまぐ": [("今日は雨具", nil)]])
+        converter.candidateWords["今日は雨"] = [
+            Candidate.Word(text: "今日", readingCount: 3, startsWithNoun: true),
+            Candidate.Word(text: "は", readingCount: 1, startsWithParticle: true),
+            Candidate.Word(text: "雨", readingCount: 2, startsWithNoun: true),
+        ]
+        converter.predictionTexts["あめ"] = ["雨", "雨雲"]
+        converter.predictionReadings = ["雨雲": "あめぐも"]
+        let harness = Harness(converter: converter, settings: Self.settings())
+        harness.type("kyouhaame")
+        harness.press(.tab)
+        #expect(harness.committed.isEmpty)
+        #expect(harness.marked.text == "今日は雨雲")
+        harness.press(.enter)
+        #expect(harness.committed == "今日は雨雲")
+    }
+
+    @Test("設定をオフにすると，今までどおり Tab で予測の語句を確定する．予測の読みが分からないとき・打った読みの続きでないときも確定する")
+    func commitsWhenOff() {
+        let off = Harness(converter: Self.converter(), settings: Self.settings { $0.predictionKeepsComposing = false })
+        off.type("epi")
+        off.press(.tab)
+        #expect(off.committed == "エピソード")
+        #expect(off.marked.isEmpty)
+
+        let unknown = Self.converter()
+        unknown.predictionReadings = [:]
+        let withoutReading = Harness(converter: unknown, settings: Self.settings())
+        withoutReading.type("epi")
+        withoutReading.press(.tab)
+        #expect(withoutReading.committed == "エピソード")
+
+        let other = Self.converter()
+        other.predictionReadings = ["エピソード": "そうわ"]
+        let unrelated = Harness(converter: other, settings: Self.settings())
+        unrelated.type("epi")
+        unrelated.press(.tab)
+        #expect(unrelated.committed == "エピソード")
+    }
+
+    @Test("オフにして確定した予測は，今までどおり直後の Backspace で取り消せる")
+    func undoStillWorksWhenOff() {
+        let converter = Self.converter()
+        let harness = Harness(converter: converter, settings: Self.settings { $0.predictionKeepsComposing = false })
+        harness.type("epi")
+        harness.press(.tab)
+        harness.context.precedingText = harness.committed
+        harness.press(.backspace)
+        #expect(harness.committed.isEmpty)
+        #expect(harness.marked.text == "えぴ")
+        #expect(converter.forgotten.map(\.text) == ["エピソード"])
+    }
+
+    @Test("選んだ予測も「予測に表示しない語句」に入れられ，入れた語句は次から出さない")
+    func hidingStillWorks() {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings())
+        harness.type("epi")
+        harness.press(.backspace, .control)
+        #expect(harness.settings.current.hiddenPredictions == ["エピソード"])
+        harness.press(.tab)
+        #expect(harness.marked.text == "エピローグ")
+    }
+}
+
+/// 入力中の候補の窓と予測の窓を，確定・入力先の切り替え・Esc・英数への切り替えのあとに残さない．
+/// あとから求めて出し直す処理(followUps)やタイマー(settle・review・訂正・予測)が遅れて届いても，古い内容で窓を出し直さない
+@Suite("入力中の窓を残さない")
+@MainActor
+struct SuggestionWindowClosingScenarioTests {
+    private static func settings(_ change: (inout Settings) -> Void = { _ in }) -> Settings {
+        var settings = DefaultSettings.settings
+        settings.suggestionDisplay = .always
+        settings.predictionDisplay = .always
+        change(&settings)
+        return settings
+    }
+
+    private static func converter() -> FakeConverter {
+        let converter = FakeConverter(["えぴ": [("エピ", nil), ("えぴ", nil), ("絵ピ", nil)]])
+        converter.predictionTexts["えぴ"] = ["エピ", "エピソード"]
+        return converter
+    }
+
+    /// 窓を出す操作(候補・分岐図・案内・予測)
+    private static func shows(_ actions: [ClientAction]) -> Bool {
+        actions.contains { action in
+            switch action {
+            case .showCandidates, .showLattice, .showNote: true
+            case .showPrediction(let prediction): prediction != nil
+            default: false
+            }
+        }
+    }
+
+    /// 入力を終える操作．どれも候補の窓と予測の窓を消す
+    enum Ending: String, CaseIterable, Sendable {
+        case 入力先を離れる, OSのメニューで英数にする, 手書きの窓で選んだ文字を入れる, Enter, Esc, 英数キー, アプリのショートカット
+
+        @MainActor
+        func end(_ harness: Harness) -> [ClientAction] {
+            switch self {
+            case .入力先を離れる: harness.session.deactivate()
+            case .OSのメニューで英数にする: harness.session.setMode(.direct)
+            case .手書きの窓で選んだ文字を入れる: harness.session.insert("字")
+            case .Enter: harness.session.handle(KeyEvent(.enter), context: harness.context).actions
+            case .Esc: harness.session.handle(KeyEvent(.escape), context: harness.context).actions
+            case .英数キー: harness.session.handle(KeyEvent(.eisu), context: harness.context).actions
+            case .アプリのショートカット: harness.session.handle(KeyEvent(.character("s"), modifiers: .command), context: harness.context).actions
+            }
+        }
+    }
+
+    @Test("入力を終えると候補の窓と予測の窓を消し，遅れて届いた処理では出し直さない", arguments: Ending.allCases)
+    func closesAndStaysClosed(ending: Ending) {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings())
+        harness.runsFollowUps = false
+        harness.type("epi")
+        #expect(harness.panel != nil, "\(ending.rawValue)")
+        // キーのあとの処理(予測を求めて出し直す)を，動かす前に入力を終える
+        let pending = harness.session.followUps(context: harness.context)
+        #expect(!pending.isEmpty)
+        let actions = ending.end(harness)
+        #expect(actions.contains(.hideCandidates), "\(ending.rawValue)")
+        #expect(!Self.shows(actions), "\(ending.rawValue)")
+        #expect(!harness.session.isComposing)
+        // 遅れて届いた処理
+        for step in pending { #expect(!Self.shows(step()), "\(ending.rawValue)") }
+        #expect(!Self.shows(harness.session.settle(context: harness.context)))
+        #expect(!Self.shows(harness.session.review(context: harness.context)))
+        #expect(!Self.shows(harness.session.revealPrediction(context: harness.context)))
+        #expect(!Self.shows(harness.session.applyLateCorrections([:], context: harness.context)))
+        #expect(harness.session.followUps(context: harness.context).isEmpty)
+    }
+
+    @Test("予測を出していたら，入力を終えるときに予測の窓も消す", arguments: Ending.allCases)
+    func closesPrediction(ending: Ending) {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings())
+        harness.type("epi")
+        #expect(harness.prediction != nil)
+        #expect(ending.end(harness).contains(.showPrediction(nil)), "\(ending.rawValue)")
+    }
+
+    @Test("同じ読みを打ち直しても，前の入力のあとの処理では窓を出し直さない(次のキーで前の処理を捨てなくても)")
+    func staleFollowUpAfterRetyping() {
+        let harness = Harness(converter: Self.converter(), settings: Self.settings())
+        harness.runsFollowUps = false
+        harness.type("epi")
+        let pending = harness.session.followUps(context: harness.context)
+        _ = harness.session.deactivate()
+        for step in pending { #expect(step().isEmpty) }
     }
 }

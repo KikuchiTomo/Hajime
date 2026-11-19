@@ -66,6 +66,20 @@ final class Harness {
         for character in text { press(.character(character)) }
     }
 
+    /// 打っているあいだの変換を裏で求める作りにする(アプリと同じ)．求めた変換は deliverConversions を呼ぶまで届かない
+    func deferConversions() {
+        converter.supportsDeferring = true
+        session.setConversionArrivalHandler { [weak self] in
+            guard let self else { return }
+            self.apply(self.session.conversionDidArrive(context: self.context))
+        }
+    }
+
+    /// 裏で求めていた変換を届ける
+    func deliverConversions() {
+        converter.deliverDeferred()
+    }
+
     /// 打鍵が止まり，さらに長く止まったときの処理(ライブ変換の表示と打ち間違いの見直し)
     func settle() {
         for action in session.settle(context: context) + session.review(context: context) {
@@ -755,6 +769,39 @@ struct InputSessionScenarioTests {
         harness.press(.enter)
         harness.type("hannei")
         #expect(harness.marked.text == "反映")
+    }
+
+    /// 母音のあと 3 文字まででは な行(更新の願い)が勝ち，「します」まで見ると あ行(更新お願いします)が勝つ読みの点数
+    private func requestConverter() -> FakeConverter {
+        let converter = FakeConverter([
+            "こうしんおねがいします": [("更新お願いします", nil)], "こうしんのねがいします": [("更新の願いします", nil)],
+        ])
+        converter.scores = [
+            "うしんお": -26, "うしんの": -19, "うしんおね": -37, "うしんのね": -29, "うしんおねが": -36, "うしんのねが": -33,
+            "うしんおねがい": -29, "うしんのねがい": -28, "こうしんおねがいします": -28, "こうしんのねがいします": -39,
+        ]
+        return converter
+    }
+
+    @Test("nn のあとの母音は，打鍵が止まったときに前後を広く見て選び直す(kousinnonegaisimasu → 更新お願いします)")
+    func nasalReadingResolvedWhenSettled() {
+        let harness = Harness(converter: requestConverter())
+        harness.type("kousinnonegaisimasu")
+        // 打っているあいだは母音のあとの 3 文字までで決める
+        #expect(harness.marked.text == "更新の願いします")
+        harness.settle()
+        #expect(harness.marked.text == "更新お願いします")
+        harness.press(.enter)
+        #expect(harness.committed == "更新お願いします")
+    }
+
+    @Test("nn のあとの母音は，打鍵が止まる前に確定・変換しても，前後を広く見て選び直す", arguments: [KeyEvent.Key.enter, .space])
+    func nasalReadingResolvedBeforeCommit(key: KeyEvent.Key) {
+        let harness = Harness(converter: requestConverter())
+        harness.type("kousinnonegaisimasu")
+        harness.press(key)
+        if key == .space { harness.press(.enter) }
+        #expect(harness.committed == "更新お願いします")
     }
 
     @Test("Escape で組み立て中の文字を消す")
@@ -1477,6 +1524,8 @@ struct ReadingCorrectionScenarioTests {
             func corrections(forKeys keys: [String], leftContext: String?) async -> [String: [ReadingCorrection]] { [:] }
         }
         let converter = FakeConverter(["ほんのよんでください": [("本の読んでください", nil)]])
+        // 打っているあいだ(母音のあと 3 文字まで)も，「nn」のあとを な行 で読む
+        converter.scores = ["ほんのよんで": 0]
         let session = InputSession(converter: converter, lexicon: FakeLexicon(), settings: FakeSettings(), typoService: Service())
         for key in "honnoyondekudasai" { _ = session.handle(KeyEvent(.character(key)), context: InputContext()) }
         #expect(session.correctionRequest == nil)

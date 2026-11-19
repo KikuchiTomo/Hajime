@@ -78,6 +78,13 @@ public protocol KanaKanjiConverting: AnyObject {
     /// 打鍵が止まる前の入力中の表示(ライブ変換)を求めているあいだは true．文脈を見る変換(Zenzai)が 1 キーの時間に
     /// 収まらない環境(GPU の無い Windows など)では，そのあいだ Zenzai を使わずに求め，打鍵が止まったときや Space では使う
     func setTyping(_ typing: Bool)
+    /// 打鍵の経路で，手元に無い変換を待たずに裏で求めるか．true のあいだ，まだ求めていない読みの candidates(for:) は空を返し，
+    /// 裏で求め終えたら setArrivalObserver の処理を呼ぶ．変換を裏で求められない変換器では何もしない(今までどおり待って求める)
+    func setDeferring(_ deferring: Bool)
+    /// 前に呼んでから，待たずに裏へ回した変換があったか(返した候補が空でも「候補が無い」とは限らない)
+    func consumeDeferredMiss() -> Bool
+    /// 裏で求めていた変換が届いたときに呼ぶ処理を入れる
+    func setArrivalObserver(_ observer: (@MainActor () -> Void)?)
     /// 入力中の表示を Zenzai なしで求めたため，打鍵の合間に Zenzai で求めておく読みがあるか
     var hasDeferredConversion: Bool { get }
     /// 打鍵の合間に，Zenzai なしで済ませた読みを Zenzai で求めておく(打鍵が止まったときや Space ですぐ使えるように)
@@ -86,6 +93,9 @@ public protocol KanaKanjiConverting: AnyObject {
 
 extension KanaKanjiConverting {
     public func setTyping(_ typing: Bool) {}
+    public func setDeferring(_ deferring: Bool) {}
+    public func consumeDeferredMiss() -> Bool { false }
+    public func setArrivalObserver(_ observer: (@MainActor () -> Void)?) {}
     public func listCandidates(for reading: String) -> [Candidate] { candidates(for: reading) }
     public var hasDeferredConversion: Bool { false }
     public func performDeferredConversion() {}

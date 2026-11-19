@@ -57,6 +57,8 @@ public final class EngineService {
         /// 打鍵の合間の Zenzai の変換(performDeferredConversion)が打鍵の間隔より長くかかったか．
         /// true のあいだは合間に求めず，打鍵が止まったときに求める(次の打鍵を待たせない)．入力を終えたら戻す
         var deferredIsSlow = false
+        /// 裏で求めていた変換が届いたか(InputSession.setConversionArrivalHandler)．次の wake で表示を出し直す
+        var conversionArrived = false
     }
 
     /// 打ち間違いの訂正を裏で求めている途中の仕事．求め終わったら result が入り，次の wake で使う
@@ -122,6 +124,8 @@ public final class EngineService {
     private var shownCandidates: UInt32?
     /// 候補ウィンドウでマウスで押した候補(押したときに出ていたセッションと対象)
     private var chosen: (session: UInt32, target: WirePointerTarget)?
+    /// 予測の窓を出しているセッション．予測の窓は候補の窓を消す指示(hide)では消えないので，セッションが無くなったときに消す
+    private var shownPrediction: UInt32?
     /// パレット(R-26)を出しているセッション．候補ウィンドウでパレットを操作した対象は，このセッションの次の wake で行う
     private var shownPalette: UInt32?
     /// 候補ウィンドウでパレットを操作した対象(届いた順)．ポインタを動かした・ホイールを回したものも順に渡す
@@ -129,6 +133,8 @@ public final class EngineService {
 
     /// 学んだことと使い方の記録をファイルに書き出す(AzooKeyConverterEngine.flushLearning と UsageStore の flush)
     private let flushLearning: () -> Void
+    /// 打っているあいだの変換を裏で求め，キーの処理では待たないか．届いた変換は DLL の次の wake で渡す
+    private let defersConversion: Bool
 
     public init(makeSession: @escaping () -> InputSession, settings: any SettingsStoring, ui: @escaping (WireUiCommand) -> Void,
                 openSettings: @escaping (_ arguments: [String]) -> Void, hints: @escaping (LatticePanel, Settings) -> [WireKeyHint] = { _, _ in [] },
@@ -137,7 +143,8 @@ public final class EngineService {
                 typoService: (any TypoCorrecting)? = nil, now: @escaping () -> ContinuousClock.Instant = { ContinuousClock.now },
                 sync: (any SyncControlling)? = nil, files: (any SettingsFileHandling)? = nil,
                 services: SettingsServices = SettingsServices(), runCommand: @escaping (LauncherCommand) -> Void = { _ in },
-                flushLearning: @escaping () -> Void = {}, log: @escaping (String) -> Void = { _ in }) {
+                flushLearning: @escaping () -> Void = {}, log: @escaping (String) -> Void = { _ in }, defersConversion: Bool = false) {
+        self.defersConversion = defersConversion
         self.runCommand = runCommand
         self.flushLearning = flushLearning
         self.services = services
@@ -170,6 +177,7 @@ public final class EngineService {
             removed?.prefetch?.cancel()
             closeHandwriting(ofSession: session)
             closePalette(ofSession: session)
+            closeWindows(ofSession: session)
         }
         if !connection.sessions.isEmpty { ui(.hide) }
     }
@@ -236,6 +244,9 @@ public final class EngineService {
             nextSession &+= 1
             if nextSession == 0 { nextSession = 1 }
             let input = makeSession()
+            if defersConversion {
+                input.setConversionArrivalHandler { [weak self] in self?.sessions[session]?.conversionArrived = true }
+            }
             sessions[session] = Session(owner: id, input: input)
             connection.sessions.insert(session)
             connections[id] = connection
@@ -249,6 +260,7 @@ public final class EngineService {
             connections[id] = connection
             closeHandwriting(ofSession: session)
             closePalette(ofSession: session)
+            closeWindows(ofSession: session)
             return .done
         case .key(let session, let input, let context):
             guard let current = owned(session, by: id) else { return .error(code: .unknownSession) }
@@ -584,10 +596,20 @@ public final class EngineService {
             actions += current.input.choose(PointerTarget(choice.target), context: context)
             sessions[session]?.followUps = current.input.followUps(context: context)
         }
+        if current.conversionArrived {
+            // 裏で求めていた変換が届いた．打っている途中なら，届いた変換で表示を出し直す
+            sessions[session]?.conversionArrived = false
+            actions += current.input.conversionDidArrive(context: context)
+            // 変換を待っていて求められなかった予測は，届いたいま求める
+            if current.input.needsFollowUpsAfterArrival { sessions[session]?.followUps = current.input.followUps(context: context) }
+        }
         if let step = sessions[session]?.followUps.first {
             // 画面を出したあとで求めて足す処理を，1 回の wake に 1 つずつ動かす(macOS の HajimeInputController と同じ)
             sessions[session]?.followUps.removeFirst()
             actions += step()
+        } else if current.input.awaitsPrediction, predictionDelay(of: current) == 0 {
+            // 打鍵が設定の時間止まったので，予測を出す(打鍵が止まってから出す設定)．訂正や分岐図の下見より先に出す
+            actions += current.input.revealPrediction(context: context)
         } else if let work = current.correction {
             switch work.purpose {
             case .conversion(let deadline):
@@ -690,7 +712,7 @@ public final class EngineService {
         let current = settings.current
         let routed = RoutedActions(actions, anchor: anchor, composition: lastComposition, hints: { [hints] in hints($0, current) },
                                    listHints: { [listHints] in listHints($0, current) }, placedHints: { [placedHints] in placedHints($0, current) },
-                                   paletteCellSize: current.paletteCellSize)
+                                   paletteCellSize: current.paletteCellSize, paletteScale: current.paletteScale)
         routed.ui.forEach(ui)
         for command in routed.ui {
             switch command {
@@ -698,6 +720,12 @@ public final class EngineService {
             case .hide where shownCandidates == session:
                 shownCandidates = nil
                 chosen = nil
+            case .showPrediction(let prediction, _):
+                if prediction != nil {
+                    shownPrediction = session
+                } else if shownPrediction == session {
+                    shownPrediction = nil
+                }
             case .showPalette: shownPalette = session
             case .hidePalette where shownPalette == session:
                 shownPalette = nil
@@ -728,9 +756,18 @@ public final class EngineService {
         return min(interval ?? .max, Self.handwritingPollMilliseconds)
     }
 
+    /// 打っているあいだの続きの処理のために来てもらうまでの時間．予測を出す時機(打鍵が止まってから出す設定)にも来てもらう
     private func typingWakeAfter(_ session: UInt32) -> UInt32? {
         guard let current = sessions[session] else { return nil }
+        let other = otherTypingWakeAfter(current)
+        guard current.input.awaitsPrediction else { return other }
+        return min(other ?? .max, Self.milliseconds(predictionDelay(of: current)))
+    }
+
+    private func otherTypingWakeAfter(_ current: Session) -> UInt32? {
         if !current.followUps.isEmpty { return Self.followUpPollMilliseconds }
+        // 裏で求めている変換を待っているあいだは，届いたらすぐ出せるよう短い間隔で来てもらう
+        if current.conversionArrived || current.input.awaitsConversion { return Self.deferredConversionPollMilliseconds }
         if current.correction != nil { return Self.correctionPollMilliseconds }
         let delays = settings.current
         if current.input.awaitsDeferredConversion {
@@ -759,6 +796,15 @@ public final class EngineService {
         return max(delay - seconds, 0)
     }
 
+    /// 予測を出すまでの残りの時間(秒)．打鍵から predictionDelay たつまで待つ
+    private func predictionDelay(of current: Session) -> Double {
+        let delay = settings.current.predictionDelay
+        guard let stoppedAt = current.stoppedAt else { return delay }
+        let elapsed = now() - stoppedAt
+        let seconds = Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18
+        return max(delay - seconds, 0)
+    }
+
     /// 打鍵が止まったとみなすまでの残りの時間(秒)．打鍵から liveConversionDelay たつまで待つ
     /// (打鍵の合間に Zenzai の変換を求めて wake が挟まっても，止まったとみなす時機は変えない)
     private func settleDelay(of current: Session) -> Double {
@@ -781,6 +827,20 @@ public final class EngineService {
         handwriting = Handwriting(session: session)
         ui(.showHandwriting(anchor: anchor, recognitionDelayMilliseconds: Self.milliseconds(DefaultSettings.handwritingRecognitionDelay),
                             recognitionTimeoutMilliseconds: Self.milliseconds(DefaultSettings.handwritingRecognitionTimeout)))
+    }
+
+    /// セッションが無くなったら，そのセッションが出していた候補の窓と予測の窓を消す．DLL は入力欄から外れるときに deactivate を送るが，
+    /// 送らずに(または答えを待てずに)セッションを閉じることがあり，消す指示が無いと窓が残る(InputSession ごと無くなるので，あとから消す操作も出ない)
+    private func closeWindows(ofSession session: UInt32) {
+        if shownCandidates == session {
+            shownCandidates = nil
+            chosen = nil
+            ui(.hide)
+        }
+        if shownPrediction == session {
+            shownPrediction = nil
+            ui(.showPrediction(prediction: nil, anchor: nil))
+        }
     }
 
     /// セッションが無くなったら，そのセッションが出していたパレットを閉じる

@@ -20,6 +20,8 @@ final class CandidatePanelController {
     private var shownLattice: LatticePanel?
     /// 窓を入力位置の上と下のどちらに置いているか．出しているあいだは同じ側に保ち，隠したら決め直す
     private var side: PanelPlacement.Side?
+    /// 窓を出していれば，入力位置の上と下のどちらに置いているか(予測の窓を，候補の窓に重ねずに置くのに使う)
+    var placedSide: PanelPlacement.Side? { window.isVisible ? side : nil }
     /// 候補を選んでいるときに置いた窓．続けて選んでいるあいだは，候補が並び始める辺をこの窓から動かさない
     private var held: PanelPlacement.Placement?
     /// 窓の枠線を動かしている途中か
@@ -335,6 +337,19 @@ enum FloatingPanel {
     static func origin(for size: NSSize, caret: NSRect) -> NSPoint {
         let frame = place(size, caret: caret, keeping: nil, holding: nil).frame
         return NSPoint(x: frame.x, y: frame.y)
+    }
+
+    /// 入力モードの表示の左下の座標．macOS が入力位置の行のすぐ下に出す入力ソースの表示と重ならない位置にする(PanelPlacement.placeIndicator)
+    static func indicatorOrigin(for size: NSSize, caret: NSRect) -> NSPoint {
+        let anchor = anchor(for: caret)
+        let visible = visibleFrame(for: caret)
+        let frame = PanelPlacement.placeIndicator(
+            caret: Rect(x: anchor.minX, y: anchor.minY, width: anchor.width, height: anchor.height),
+            size: Rect(x: 0, y: 0, width: size.width, height: size.height),
+            screen: Rect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height),
+            clearance: DesignTokens.Size.ModeIndicator.systemIndicatorClearance
+        ).frame
+        return NSPoint(x: frame.x.rounded(), y: frame.y.rounded())
     }
 
     /// 入力位置を教えないアプリでは，マウスの位置の近くに出す

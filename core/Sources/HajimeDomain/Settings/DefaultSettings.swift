@@ -244,6 +244,11 @@ public enum DefaultSettings {
     public static let maximumNasalAmbiguities = 2
     /// 「nn」のあとの母音の読みを比べるときに見る，前後の文字数
     public static let nasalContextLength = 3
+    /// 打ち終えた読み(打鍵が止まったときと，変換・確定の前)で「nn」のあとの母音の読みを選び直すときに見る，前後の文字数．
+    /// 打っているあいだ(nasalContextLength)より広く見て，その先で決まる読み(「こうしんおねがいします」の「します」)を取り違えない．
+    /// 文(Tatoeba 1,959 文と AJIMEE-Bench 200 文)の「ん+あ行」を nn で打った 65 か所は，3 文字で 57，6 文字で 60，10 文字で 61 か所が打ったとおりになり，
+    /// 「ん+な行」を n 1 つで打った 225 か所は 205・221・223 か所が な行 になった．読み全体を見ても 10 文字と変わらなかった
+    public static let nasalSettledContextLength = 10
     /// 「nn」のあとの母音の読みを比べ直す時点(母音のあとの文字数)．比べるたびに変換を 2 回するので少なく保つ
     public static let nasalEvaluationPoints: Set<Int> = [0, 1, 2, 3]
     /// Zenzai が 1 回の変換で推論する回数の上限．小さいほど速く，大きいほど精度がよい(azooKey の既定は 10)
@@ -349,6 +354,9 @@ public enum DefaultSettings {
     /// 英単語にしない読みの長さを選べる範囲(文字)．0 は長さで区別しない
     public static let englishSkipLengthRange = 0...10
     public static let correctionDelayRange = 0.4...3.0
+    /// 入力中の予測を，打鍵が止まってから出すまでの時間(秒)と，選べる範囲(Settings.predictionDelay)
+    public static let predictionDelay = 0.5
+    public static let predictionDelayRange = 0.1...2.0
     public static let modeIndicatorDurationRange = 0.3...3.0
     /// 候補の文字の大きさ(pt)を選べる範囲
     public static let candidateFontSizeRange = 12.0...24.0
@@ -524,6 +532,11 @@ public enum DefaultSettings {
     public static let paletteCellSizeRange = 28.0...64.0
     /// 設定の画面でパレットのマスの大きさを変える刻み(pt)
     public static let paletteCellSizeStep = 2.0
+    /// パレット全体(マス・文字・探す欄・見出し・説明・余白・角丸)に掛ける倍率と，選べる範囲．マスの大きさ・列数・行数で決めた窓にそのまま掛ける
+    public static let paletteScale = 1.0
+    public static let paletteScaleRange = 0.5...1.5
+    /// 設定の画面でパレットの倍率を変える刻み
+    public static let paletteScaleStep = 0.1
     /// パレットのよく使う文字の行の数と，選べる範囲(0 は出さない)
     public static let paletteFrequentRows = 1
     public static let paletteFrequentRowsRange = 0...4

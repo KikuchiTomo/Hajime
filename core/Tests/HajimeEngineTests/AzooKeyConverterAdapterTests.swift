@@ -26,6 +26,8 @@ struct AzooKeyConverterAdapterTests {
         let predictions = session.predictions(for: "ありがと")
         #expect(predictions.contains { $0.text.hasPrefix("ありがとう") || $0.text.hasPrefix("有難う") })
         #expect(predictions.allSatisfy { $0.readingCount == 4 })
+        // 予測を選んで読みを補えるよう，語句全体の読みも返す(打った読みで始まる)
+        #expect(predictions.contains { $0.reading?.hasPrefix("ありがと") == true && ($0.reading?.count ?? 0) > 4 })
         #expect(predictions.count <= DefaultSettings.suggestionCount)
     }
 

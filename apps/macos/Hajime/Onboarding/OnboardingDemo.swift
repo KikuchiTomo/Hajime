@@ -29,7 +29,7 @@ enum DemoScripts {
     private static var keystroke: TimeInterval { DesignTokens.Motion.Onboarding.keystroke / 1000 }
     private static var hold: TimeInterval { DesignTokens.Motion.Onboarding.hold / 1000 }
 
-    /// appMode は，アプリごとの入力モードのページでポインタを置いたカード(そのモードの動きを見せる)
+    /// appMode は，アプリごとの入力モードのページでポインタを置いた行(そのモードの動きを見せる)
     static func frames(for page: OnboardingPage, settings: Settings, spotlight: OnboardingSpotlight? = nil,
                        appMode: AppProfile = .imeOff, now: Date = Date()) -> [DemoFrame] {
         // 機能のページでは，ポインタを置いた機能だけを(オフでも)見せる

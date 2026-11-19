@@ -30,11 +30,12 @@ struct EnginePaletteTests {
         var initial = DefaultSettings.settings
         initial.liveConversion = false
         initial.paletteCellSize = 40
+        initial.paletteScale = 1.2
         let settings = FakeSettings(initial)
         let sent = Box<[WireUiCommand]>([])
         let catalog = FakePaletteCatalog(Self.table)
         let usage = FakePaletteUsageStore()
-        let palette = PaletteServices(catalog: catalog, usage: usage, now: { Date(timeIntervalSince1970: 1_800_000_000) })
+        let palette = PaletteServices(catalog: catalog, usage: usage, now: { Date(timeIntervalSince1970: 1_800_000_000) }, showsSelectionInClient: false)
         self.settings = settings
         self.sent = sent
         self.usage = usage
@@ -97,8 +98,28 @@ struct EnginePaletteTests {
         #expect(state.wakeAfterMilliseconds.map { $0 <= EngineService.candidateClickPollMilliseconds } == true)
         let panel = try #require(shownPanel)
         #expect(panel.cellSize == 40)
+        #expect(panel.scale == 1.2)
         #expect(panel.rows.first?.cells.map(\.text) == ["🙇", "👍"])
         #expect(panel.hints.first?.keys == "Enter")
+    }
+
+    @Test("R-26: パレットの倍率は範囲に収めて刻みの端数を落とし，等倍なら通信に添えない")
+    func paletteScale() {
+        var settings = DefaultSettings.settings
+        settings.paletteScale = 0.7 + 0.1
+        settings.clampToValidRanges()
+        #expect(settings.paletteScale == 0.8)
+        settings.paletteScale = 3
+        settings.clampToValidRanges()
+        #expect(settings.paletteScale == DefaultSettings.paletteScaleRange.upperBound)
+        settings.paletteScale = .nan
+        settings.clampToValidRanges()
+        #expect(settings.paletteScale == DefaultSettings.paletteScale)
+        let panel = PalettePanel(modes: [], query: "", placeholder: "", tabs: [], heading: "", rows: [], rowCount: 0, firstRow: 0, columns: 9,
+                                 visibleRows: 6, cellsPerRow: 9, selection: nil, preview: nil, showsPreview: false,
+                                 previewFields: PalettePanel.PreviewFields(), skinTone: .none, skinTonePicker: nil, message: nil, hints: [])
+        #expect(WirePalettePanel(panel, cellSize: 36, scale: DefaultSettings.paletteScale).scale == nil)
+        #expect(WirePalettePanel(panel, cellSize: 36, scale: 0.5).scale == 0.5)
     }
 
     @Test("R-26: 説明は見出しの名前・Unicode の名前・名前を定めたところを送り，出す項目の設定も添える")

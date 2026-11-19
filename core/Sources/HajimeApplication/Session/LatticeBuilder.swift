@@ -19,6 +19,9 @@ struct LatticeBuilder {
     /// 絵文字の候補の置き場所．文節の候補を作ったり並べ替えたりしたあとに置き直す(並べ替えで見えない位置に押し下げられないように)．
     /// nil なら置き直さない(絵文字に変換しない設定)
     var emojiPlacement: EmojiPlacement?
+    /// 読み全体の中の範囲を，打ったキーをローマ字として読み直したかな．英単語にした語(「demo」「met」+「やく」)にかかる範囲だけ返す
+    /// (Composition.romajiReading(ofReading:))．その文節に日本語の候補を足し，区切りを変えても日本語に戻せるようにする．nil なら足さない
+    var romajiReading: ((Range<Int>) -> String?)?
 
     /// 文節の前後にある文字(幹で見えている文字)．文節の候補を文の中で採点するのに使う
     struct SegmentContext: Equatable {
@@ -101,6 +104,8 @@ struct LatticeBuilder {
         // 利用者が候補を動かしたあとなら，選んでいる候補とそれより前は動かさない(あとから並べ替えるとき)
         var fixed = 1
         if case .candidate(let selected) = segment.choice { fixed = max(1, selected + 1) }
+        // 英単語にした語をローマ字として読んだ候補(2 番目から並べたもの)は，文脈の候補で押し下げない(日本語に戻す候補を見える所に残す)
+        fixed = max(fixed, 1 + segment.candidates.dropFirst().prefix { $0.origin == .romajiReading }.count)
         let ranked = contextRanker?.ranked(segment.candidates, start: segment.readingStart, length: segment.readingLength, reading: reading, fixed: fixed)
             ?? segment.candidates
         // 上の枝(字種)と同じ表記は除いてから採点する(あとから採点するときと同じ問いにし，打鍵の合間に求めた点数を使えるようにする)
@@ -190,20 +195,22 @@ struct LatticeBuilder {
         let slice = String(reading.dropFirst(plan.start).prefix(plan.length))
         let trunk = plan.preferred.map { Candidate(text: $0, readingCount: plan.length, origin: .sentencePart) }
             ?? Candidate(text: slice, readingCount: plan.length, origin: .variant(.hiragana))
+        let typedKana = romajiReading?(plan.start..<(plan.start + plan.length))
         return SegmentLattice.Segment(readingStart: plan.start, readingLength: plan.length, candidates: [trunk],
-                                      variants: variants(of: slice), isConfident: true, isPending: true)
+                                      variants: variants(of: typedKana ?? slice, readingCount: plan.length), isConfident: true, isPending: true)
     }
 
     /// 語の並びで文節に分ける．区切りは Zenzai を使わない変換の語の並びから決め(Zenzai が書き換えた候補は語の区切りを持たないことがある)，
     /// 文節ごとに見せる文字は，ライブ変換で見えている文(sentence)と合うものを選ぶ．文節が 1 つにしかならなければ nil
-    private func clauseSegments(of reading: String, sentence: Candidate?) -> [SegmentLattice.Segment]? {
-        clauseSegmentMakers(of: reading, sentence: sentence)?.map { $0() }
+    /// - Parameter offset: reading の先頭が読み全体の何文字目か(makeSegment)
+    private func clauseSegments(of reading: String, sentence: Candidate?, offset: Int? = 0) -> [SegmentLattice.Segment]? {
+        clauseSegmentMakers(of: reading, sentence: sentence, offset: offset)?.map { $0() }
     }
 
     /// 文節ごとに，その文節を作る手順．文節が 1 つにしかならなければ nil
-    private func clauseSegmentMakers(of reading: String, sentence: Candidate?) -> [() -> SegmentLattice.Segment]? {
+    private func clauseSegmentMakers(of reading: String, sentence: Candidate?, offset: Int? = 0) -> [() -> SegmentLattice.Segment]? {
         clausePlan(of: reading, sentence: sentence)?.map { plan in
-            { [self] in makeSegment(start: plan.start, length: plan.length, reading: reading, preferred: plan.preferred) }
+            { [self] in makeSegment(start: plan.start, length: plan.length, reading: reading, preferred: plan.preferred, offset: offset) }
         }
     }
 
@@ -334,21 +341,30 @@ struct LatticeBuilder {
 
     /// 英単語にした語(「demo」)を含む文節の 2 番目から，打ったキーをローマ字として読んだかな(でも)の候補を入れる．
     /// 前の語から英語と見分けても，日本語のつもりで打ったときに選び直せるようにするため．かなの字種は上の枝にあるので入れない
+    /// ローマ字として読んだかなが日本語らしくないとき(「git」+「を」→ ぎとぉ)は入れない(文節もまとめない)．
+    /// その候補は，文節を作るとき(makeSegment)に末尾に並べてある
     func addingRomajiReading(_ lattice: SegmentLattice, romajiReading: String, reading: String) -> SegmentLattice {
         addingAlternatives(lattice, otherReading: romajiReading, reading: reading, origin: .romajiReading,
-                           count: DefaultSettings.romajiReadingCandidateCount, includesKana: false)
+                           count: DefaultSettings.romajiReadingCandidateCount, includesKana: false, onlyJapanese: true)
+    }
+
+    /// かなが日本語として読めるか(変換のもっともらしさ)．英語か日本語かを見分けるときと同じ下限を使う(WordLanguageJudge)
+    func readsAsJapanese(_ kana: String) -> Bool {
+        !kana.isEmpty && converter.plausibility(of: kana) / Double(kana.count) >= DefaultSettings.minimumJapanesePlausibilityPerCharacter
     }
 
     /// 読みの一部が違う別の読み(otherReading)の候補を，違う部分を含む文節に入れる．
     /// 違う部分は別の読みの語の区切りまで広げ(「うぶんと」の「と」を直す前の「うぶんつ」全体)，複数の文節にまたがるときは 1 つにまとめる．
     /// 別の読みの候補は，上から count 個を 2 番目から入れ，残りは末尾に並べる．どちらの読みにするかは利用者が選ぶので，候補を絞らない．
-    /// includesKana なら別の読みのかなそのものも入れる
+    /// includesKana なら別の読みのかなそのものも入れる．onlyJapanese なら，別の読みの違う部分が日本語として読めるときだけ入れる
     private func addingAlternatives(_ lattice: SegmentLattice, otherReading: String, reading: String, origin: CandidateOrigin,
-                                    count: Int = DefaultSettings.typedAlternativeCount, includesKana: Bool = true) -> SegmentLattice {
+                                    count: Int = DefaultSettings.typedAlternativeCount, includesKana: Bool = true,
+                                    onlyJapanese: Bool = false) -> SegmentLattice {
         let typed = Array(otherReading), corrected = Array(reading)
         guard let changed = CorrectedSpan.changedRange(from: otherReading, to: reading) else { return lattice }
         let delta = typed.count - corrected.count
         let word = wordRange(in: otherReading, covering: changed.lowerBound..<(changed.upperBound + delta))
+        if onlyJapanese, word.upperBound <= typed.count, !readsAsJapanese(String(typed[word])) { return lattice }
         let prefix = word.lowerBound, changedEnd = max(word.upperBound - delta, changed.upperBound)
         guard let first = lattice.segments.firstIndex(where: { $0.readingStart + $0.readingLength > prefix }),
             let last = lattice.segments.lastIndex(where: { $0.readingStart < changedEnd }) else { return lattice }
@@ -417,7 +433,8 @@ struct LatticeBuilder {
         var replaced: [SegmentLattice.Segment] = []
         if !slice.isEmpty {
             let sentence = converter.candidates(for: slice).first { $0.readingCount == slice.count }
-            replaced = (clauseSegments(of: slice, sentence: sentence) ?? segments(of: slice, from: 0, sentence: sentence?.text)).map { segment in
+            // 打ち直した読みは，打ったキーと対応しないので，ローマ字として読み直した候補は足さない(offset: nil)
+            replaced = (clauseSegments(of: slice, sentence: sentence, offset: nil) ?? segments(of: slice, from: 0, sentence: sentence?.text, offset: nil)).map { segment in
                 var segment = segment
                 segment.readingStart += old.readingStart
                 return segment
@@ -489,7 +506,7 @@ struct LatticeBuilder {
         let rest = String(reading.dropFirst(start))
         guard !rest.isEmpty else { return [] }
         let sentence = (usesZenzai ? converter.candidates(for: rest) : converter.segmentCandidates(for: rest)).first { $0.readingCount == rest.count }
-        guard let clauses = clauseSegments(of: rest, sentence: sentence) else {
+        guard let clauses = clauseSegments(of: rest, sentence: sentence, offset: start) else {
             return segments(of: reading, from: start, sentence: sentence?.text)
         }
         return clauses.map { clause in
@@ -501,7 +518,7 @@ struct LatticeBuilder {
 
     /// - Parameter sentence: 読み全体の第 1 候補のうち，start より後ろに当たる文字列．
     ///   これを先頭から文節に切っていくので，格子の 1 段目はライブ変換の表示と同じになる
-    private func segments(of reading: String, from start: Int, sentence: String?) -> [SegmentLattice.Segment] {
+    private func segments(of reading: String, from start: Int, sentence: String?, offset: Int? = 0) -> [SegmentLattice.Segment] {
         var result: [SegmentLattice.Segment] = []
         var position = start
         var sentence = sentence
@@ -517,7 +534,7 @@ struct LatticeBuilder {
                 .filter { ClauseSplitter.canStartClause(with: restCharacters[$0.readingCount]) }
                 .min { $0.readingCount < $1.readingCount }
             let length = clause?.readingCount ?? rest.count
-            result.append(makeSegment(start: position, length: length, reading: reading, preferred: clause?.text ?? expected))
+            result.append(makeSegment(start: position, length: length, reading: reading, preferred: clause?.text ?? expected, offset: offset))
             position += length
             sentence = clause.flatMap { clause in expected.map { String($0.dropFirst(clause.text.count)) } }
         }
@@ -525,9 +542,12 @@ struct LatticeBuilder {
     }
 
     /// reading の start から length 文字を 1 つの文節とし，同じ長さの候補を集める．preferred があれば先頭に置く
-    private func makeSegment(start: Int, length: Int, reading: String, preferred: String?) -> SegmentLattice.Segment {
+    /// - Parameter offset: reading の先頭が読み全体の何文字目か．英単語にした語にかかる文節に，打ったキーをローマ字として読んだ候補を足すのに使う
+    ///   (romajiReading)．reading が読み全体と対応しないとき(その場で打ち直した読み)は nil
+    private func makeSegment(start: Int, length: Int, reading: String, preferred: String?, offset: Int? = 0) -> SegmentLattice.Segment {
         let rest = String(reading.dropFirst(start))
         let slice = String(rest.prefix(length))
+        let typedKana = offset.flatMap { romajiReading?(($0 + start)..<($0 + start + length)) }.flatMap { $0 == slice ? nil : $0 }
         var candidates: [Candidate] = []
         func append(_ candidate: Candidate) {
             if !candidates.contains(where: { $0.text == candidate.text }) { candidates.append(candidate) }
@@ -553,7 +573,21 @@ struct LatticeBuilder {
             append(Candidate(text: slice, readingCount: length, origin: .variant(.hiragana)))
         }
         // 上の枝(ひらがな・カタカナ・半角カタカナ)にあるものは，下の枝に重ねて出さない．第 1 候補(幹)は残す
-        let variantTexts = variants(of: slice).map(\.text)
+        let variants = variants(of: typedKana ?? slice, readingCount: length)
+        let variantTexts = variants.map(\.text)
+        if let typedKana {
+            // 英単語にした語にかかる文節は，打ったキーをローマ字として読んだかなの変換も候補にする(「metやくちゃ」に 滅茶苦茶)．
+            // 上位は 2 番目から，残りは末尾に並べる．かなそのものは上の枝に出る(variants)
+            let existing = Set(candidates.map(\.text))
+            let japanese = converter.segmentCandidates(for: typedKana)
+                .filter { $0.readingCount == typedKana.count && $0.commandID == nil && $0.origin != .emoji }
+                .filter { !variantTexts.contains($0.text) && !existing.contains($0.text) }
+                .map { Candidate(text: $0.text, readingCount: length, origin: .romajiReading) }
+            // 日本語らしくない読み(「git」+「を」→ ぎとぉ)の候補は，英単語の候補を押し下げないよう末尾にだけ並べる
+            let front = readsAsJapanese(typedKana) ? DefaultSettings.romajiReadingCandidateCount : 0
+            candidates.insert(contentsOf: japanese.prefix(front), at: min(1, candidates.count))
+            candidates += japanese.dropFirst(front)
+        }
         candidates = candidates.enumerated().filter { $0.offset == 0 || !variantTexts.contains($0.element.text) }.map(\.element)
         // 先頭の語を選び直した候補には，崩れた書き方(はっ再の・ソの)があるので，除く
         candidates = BrokenSpellings.cleaned(candidates)
@@ -565,7 +599,7 @@ struct LatticeBuilder {
         // 絵文字を置き場所に置き直す
         if let emojiPlacement { candidates = emojiPlacement.placed(converter.keepingRelevantEmoji(candidates, reading: slice)) }
         return SegmentLattice.Segment(readingStart: start, readingLength: length, candidates: candidates,
-                                      variants: variants(of: slice), isConfident: confident, confidenceGap: gap)
+                                      variants: variants, isConfident: confident, confidenceGap: gap)
     }
 
     /// 文節の先頭の語を別の候補に変え，残りの部分はそのままつないだ候補(ごくでしょうが → 語句でしょうが・極でしょうが)．
@@ -591,13 +625,15 @@ struct LatticeBuilder {
     /// 上の枝に出す字種．エンジンが出さなくても選べるようにする
     /// 上の枝(ひらがな・カタカナ・半角カタカナ)．英語と判定して英字のまま読みに入れた語(「no」)は，
     /// ローマ字としてかなにしてから作る(上の枝で「の」「ノ」に直せるように)
-    func variants(of slice: String) -> [Candidate] {
+    /// readingCount は文節の読みの文字数．slice が文節の読みそのものでないとき(打ったキーを読み直したかな)に渡す
+    func variants(of slice: String, readingCount: Int? = nil) -> [Candidate] {
         let hiragana = Self.kana(of: slice, table: romajiTable)
         let katakana = KanaWidth.katakana(from: hiragana)
+        let count = readingCount ?? slice.count
         return [
-            Candidate(text: hiragana, readingCount: slice.count, origin: .variant(.hiragana)),
-            Candidate(text: katakana, readingCount: slice.count, origin: .variant(.katakana)),
-            Candidate(text: KanaWidth.halfwidthKatakana(from: katakana), readingCount: slice.count, origin: .variant(.halfwidthKatakana)),
+            Candidate(text: hiragana, readingCount: count, origin: .variant(.hiragana)),
+            Candidate(text: katakana, readingCount: count, origin: .variant(.katakana)),
+            Candidate(text: KanaWidth.halfwidthKatakana(from: katakana), readingCount: count, origin: .variant(.halfwidthKatakana)),
         ]
     }
 

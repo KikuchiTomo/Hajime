@@ -509,6 +509,7 @@
     "paletteFrequentRows": 1,
     "paletteRecordsHistory": true,
     "paletteRows": 6,
+    "paletteScale": 1,
     "paletteShowsCodePoints": true,
     "termDictionary": true,
     "termFields": {
@@ -726,6 +727,8 @@
     "zenzaiModel": "accurate",
     "predictionPrefersHistory": true,
     "predictionFromCorrection": true,
+    "predictionDelay": 0.5,
+    "predictionKeepsComposing": true,
     "hiddenPredictions": []
   },
   "changes": {

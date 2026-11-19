@@ -26,6 +26,15 @@ final class PaletteView: NSView {
     var theme = ResolvedTheme.resolveStatic { didSet { needsDisplay = true } }
     /// マスの一辺(設定のパレットのマスの大きさ)
     var cellSize = CGFloat(DefaultSettings.paletteCellSize) { didSet { needsDisplay = true } }
+    /// 全体の倍率(設定のパレットの倍率)．部品の位置と大きさは等倍のまま求め，描く座標(bounds)を枠(frame)の 1/scale にして全体をまとめて拡大・縮小する．
+    /// 押した位置も同じ座標で受けるので，等倍のときと同じに当たる
+    var scale = CGFloat(DefaultSettings.paletteScale) {
+        didSet {
+            guard scale != oldValue else { return }
+            applyScale()
+            needsDisplay = true
+        }
+    }
     /// glass の面を自分で塗るか．ぼかしの背景(GlassBackdrop)の無いところ(画像への書き出し)で使う
     var fillsSurface = false { didSet { needsDisplay = true } }
     /// 押した対象を知らせる先
@@ -55,10 +64,22 @@ final class PaletteView: NSView {
 
     // MARK: - 大きさと位置
 
-    /// 窓の大きさ．列数・行数・マスの大きさ・説明の項目と種類で決まり，選んでいる文字では変えない
+    /// 窓の大きさ．列数・行数・マスの大きさ・説明の項目と種類で決めた大きさに倍率を掛ける．選んでいる文字では変えない
     func fittingSize(for panel: PalettePanel) -> NSSize {
         let layout = windowLayout(for: panel)
-        return NSSize(width: CGFloat(layout.width).rounded(.up), height: CGFloat(layout.height).rounded(.up))
+        return NSSize(width: (CGFloat(layout.width) * scale).rounded(.up), height: (CGFloat(layout.height) * scale).rounded(.up))
+    }
+
+    override func setFrameSize(_ newSize: NSSize) {
+        super.setFrameSize(newSize)
+        applyScale()
+    }
+
+    /// 描く座標を枠の 1/scale にする．枠の大きさが変わると OS が座標の比を保って bounds を変えるので，そのたびに合わせ直す
+    private func applyScale() {
+        guard scale > 0, frame.width > 0, frame.height > 0 else { return }
+        let size = NSSize(width: frame.width / scale, height: frame.height / scale)
+        if bounds.size != size { setBoundsSize(size) }
     }
 
     private func windowLayout(for panel: PalettePanel) -> PaletteWindowLayout {
@@ -455,7 +476,8 @@ final class PaletteView: NSView {
 
     /// panel のマス目(線・選択の枠・文字)を，area の大きさの透明な画像に描く．画面と同じ細かさ(Retina なら 2 倍)で描く
     private func cellsImage(_ panel: PalettePanel, layout: Layout, area: NSRect) -> NSImage? {
-        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        // 倍率の分も細かく描く(拡大したときに画像がぼやけない)
+        let scale = (window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2) * max(self.scale, 1)
         guard area.width > 0, area.height > 0,
               let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: Int((area.width * scale).rounded(.up)), pixelsHigh: Int((area.height * scale).rounded(.up)),
                                          bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB,

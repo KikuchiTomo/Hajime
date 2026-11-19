@@ -58,7 +58,11 @@ public struct Settings: Sendable, Equatable {
     /// 打っているあいだに，読みを変換した候補の窓を出すか
     public var suggestionDisplay = SuggestionDisplay.whenLiveConversionOff
     /// 打っているあいだに，打っている語句に続く予測を，変換の候補とは別の小さな窓に出すか
-    public var predictionDisplay = SuggestionDisplay.whenLiveConversionOff
+    public var predictionDisplay = PredictionDisplay.whenLiveConversionOff
+    /// 入力中の予測を，打鍵が止まってから出すまでの時間(秒)．predictionDisplay が afterPause のときだけ使う
+    public var predictionDelay = DefaultSettings.predictionDelay
+    /// 予測を選ぶキー(Tab)で，予測の語句を確定せず，読みを予測の読みに補って入力を続けるか．オフなら予測の語句を確定する
+    public var predictionKeepsComposing = true
     /// 入力中の候補がこの件数以下なら窓を出さない．0 なら候補があれば出す
     public var suggestionSkipCount = 0
     /// 入力中の予測で，確定した履歴(学習)にある語句を先に出すか
@@ -244,6 +248,8 @@ public struct Settings: Sendable, Equatable {
     public var paletteRows = DefaultSettings.paletteRows
     /// パレットのマスの一辺(pt)．文字の大きさはこれに合わせる
     public var paletteCellSize = DefaultSettings.paletteCellSize
+    /// パレット全体に掛ける倍率(1 が等倍)．マスの大きさ・列数・行数で決めた窓にそのまま掛ける
+    public var paletteScale = DefaultSettings.paletteScale
     /// パレットの下に，選んでいる文字の名前・読み・ショートコードを出す
     public var paletteShowsPreview = DefaultSettings.paletteShowsPreview
     /// パレットの説明に，Unicode の名前(並びの絵文字は CLDR の英語の名前)を出す
@@ -313,6 +319,7 @@ public struct Settings: Sendable, Equatable {
         suggestionSkipCount = clamp(suggestionSkipCount, DefaultSettings.suggestionSkipCountRange)
         englishSkipLength = clamp(englishSkipLength, DefaultSettings.englishSkipLengthRange)
         liveConversionDelay = clamp(liveConversionDelay.isFinite ? liveConversionDelay : DefaultSettings.liveConversionSettleDelay, DefaultSettings.liveConversionDelayRange)
+        predictionDelay = clamp(predictionDelay.isFinite ? predictionDelay : DefaultSettings.predictionDelay, DefaultSettings.predictionDelayRange)
         correctionDelay = clamp(correctionDelay.isFinite ? correctionDelay : DefaultSettings.liveCorrectionDelay, DefaultSettings.correctionDelayRange)
         correctionDelay = max(correctionDelay, liveConversionDelay)
         reviewCorrectionTimeout = clamp(reviewCorrectionTimeout.isFinite ? reviewCorrectionTimeout : DefaultSettings.reviewCorrectionTimeout, DefaultSettings.reviewCorrectionTimeoutRange)
@@ -322,6 +329,8 @@ public struct Settings: Sendable, Equatable {
         paletteColumns = clamp(paletteColumns, DefaultSettings.paletteColumnsRange)
         paletteRows = clamp(paletteRows, DefaultSettings.paletteRowsRange)
         paletteCellSize = clamp(paletteCellSize.isFinite ? paletteCellSize : DefaultSettings.paletteCellSize, DefaultSettings.paletteCellSizeRange)
+        // 刻みを重ねた端数(1.2000000000000002 など)を落とす
+        paletteScale = clamp(paletteScale.isFinite ? (paletteScale * 100).rounded() / 100 : DefaultSettings.paletteScale, DefaultSettings.paletteScaleRange)
         paletteFrequentRows = clamp(paletteFrequentRows, DefaultSettings.paletteFrequentRowsRange)
         var themeIDs = Set<String>()
         customThemes = Array(customThemes.filter { $0.isValid && themeIDs.insert($0.id).inserted }.prefix(DefaultSettings.maximumCustomThemes))
@@ -434,7 +443,7 @@ extension Settings: Codable {
         case alphabetWidth, shiftStartsAlphabet, numberSeparators, alphanumericHyphen, listCandidatesPerPage, branchCandidatesPerPage, candidateGridColumns, expandsGridOnPaging, liveConversionDelay, liveConversionSkipLength, englishSkipLength, correctionDelay
         case correctionSensitivity, showsSuggestions, modeIndicatorDuration, customThemes, customThemeID, terminalCommands
         case reviewCorrectionTimeout, lateCorrectionTimeout, remembersRejectedCorrections
-        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, alwaysShowsBranchHints, showsFewerItems, branchSegmentsPerGroup, branchWindowWidth, branchStartsOnTrunk, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
+        case typoCorrection, candidatePresentation, initialFocus, suggestionDisplay, predictionDisplay, predictionDelay, predictionKeepsComposing, suggestionSkipCount, predictionPrefersHistory, predictionFromCorrection, hiddenPredictions, showsVariantRow, showsKeyHints, alwaysShowsBranchHints, showsFewerItems, branchSegmentsPerGroup, branchWindowWidth, branchStartsOnTrunk, numberKeySelection, dateConversion, homophoneNotes, meaningPlacement, meaningSenseLimit, showsPartOfSpeech, showsUsageExamples, showsHomophones, misuseNotes, proofreading, symbolConversion, emojiConversion, emojiWordConversion, emojiCandidatePosition, emojiCandidateCount, showsEmojiNames, latexConversion
         case numberFormConversion, numberFormCircled, numberFormParenthesized, numberFormKanji, numberFormRoman
         case association, associationLimit, showsAssociationHint, zenzaiModel, contextualSegmentCandidates, listSegmentAlternatives, candidateReranking,
              jinenModel
@@ -445,6 +454,7 @@ extension Settings: Codable {
         case englishTermCandidates, englishTerms
         case palette, paletteClosesAfterInsert, paletteRecordsHistory, paletteColumns, paletteRows, paletteCellSize, paletteShowsPreview, paletteFrequentRows
         case paletteShowsUnicodeName, paletteShowsReadings, paletteShowsShortcodes, paletteShowsCodePoints
+        case paletteScale
     }
 
     /// 項目を足しても古い設定ファイルを読めるよう，無い項目と読めない項目は既定値のままにする
@@ -521,8 +531,10 @@ extension Settings: Codable {
         read(.initialFocus, into: \.initialFocus)
         read(.suggestionDisplay, into: \.suggestionDisplay)
         // 予測を別の窓に分ける前の設定のファイルには無い．それまでは入力中の候補の窓に予測を混ぜていたので，同じ設定にする
-        settings.predictionDisplay = settings.suggestionDisplay
+        settings.predictionDisplay = PredictionDisplay(settings.suggestionDisplay)
         read(.predictionDisplay, into: \.predictionDisplay)
+        read(.predictionDelay, into: \.predictionDelay)
+        read(.predictionKeepsComposing, into: \.predictionKeepsComposing)
         read(.suggestionSkipCount, into: \.suggestionSkipCount)
         read(.predictionPrefersHistory, into: \.predictionPrefersHistory)
         read(.predictionFromCorrection, into: \.predictionFromCorrection)
@@ -596,6 +608,7 @@ extension Settings: Codable {
         read(.paletteColumns, into: \.paletteColumns)
         read(.paletteRows, into: \.paletteRows)
         read(.paletteCellSize, into: \.paletteCellSize)
+        read(.paletteScale, into: \.paletteScale)
         read(.paletteShowsPreview, into: \.paletteShowsPreview)
         read(.paletteFrequentRows, into: \.paletteFrequentRows)
         read(.paletteShowsUnicodeName, into: \.paletteShowsUnicodeName)
@@ -669,6 +682,8 @@ extension Settings: Codable {
         try container.encode(initialFocus, forKey: .initialFocus)
         try container.encode(suggestionDisplay, forKey: .suggestionDisplay)
         try container.encode(predictionDisplay, forKey: .predictionDisplay)
+        try container.encode(predictionDelay, forKey: .predictionDelay)
+        try container.encode(predictionKeepsComposing, forKey: .predictionKeepsComposing)
         try container.encode(suggestionSkipCount, forKey: .suggestionSkipCount)
         try container.encode(predictionPrefersHistory, forKey: .predictionPrefersHistory)
         try container.encode(predictionFromCorrection, forKey: .predictionFromCorrection)
@@ -740,6 +755,7 @@ extension Settings: Codable {
         try container.encode(paletteColumns, forKey: .paletteColumns)
         try container.encode(paletteRows, forKey: .paletteRows)
         try container.encode(paletteCellSize, forKey: .paletteCellSize)
+        try container.encode(paletteScale, forKey: .paletteScale)
         try container.encode(paletteShowsPreview, forKey: .paletteShowsPreview)
         try container.encode(paletteFrequentRows, forKey: .paletteFrequentRows)
         try container.encode(paletteShowsUnicodeName, forKey: .paletteShowsUnicodeName)

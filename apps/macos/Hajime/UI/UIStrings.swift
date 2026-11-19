@@ -56,11 +56,11 @@ enum UIStrings {
         static let phoneticSpellingExample = DefaultSettings.phoneticSpellingExample
         static let handShiftExample = DefaultSettings.handShiftExample
         static let englishTermCandidatesExample = DefaultSettings.englishTermCandidatesExample
-        static let handShiftNote = "片手か両手が 1 キー横にずれたまま打った文を修正します。"
+        static let handShiftNote = "片手か両手が 1 キー横にずれた状態で入力した文を修正します。"
         static let looseReadings = "うろ覚えのカタカナ語の候補"
-        static let looseReadingsNote = "「\(looseReadingsExample.reading)」から「\(looseReadingsExample.candidate)」のように、読みを少し違えて覚えている単語を候補に表示します。"
+        static let looseReadingsNote = "「\(looseReadingsExample.reading)」から「\(looseReadingsExample.candidate)」のように、読みを誤って覚えている単語を候補に表示します。"
         static let phoneticSpelling = "発音どおりに綴った英単語の候補"
-        static let phoneticSpellingNote = "「\(phoneticSpellingExample.reading)」から「\(phoneticSpellingExample.candidate)」のように、音のとおりに綴った英単語の正しい綴りを候補に表示します。"
+        static let phoneticSpellingNote = "「\(phoneticSpellingExample.reading)」から「\(phoneticSpellingExample.candidate)」のように、発音どおりに綴った英単語の正しい綴りを候補に表示します。"
         static let englishTermCandidates = "英単語辞書を使用"
         static let englishTerms = "追加した単語"
         static let englishTermsSection = "英単語辞書"
@@ -435,7 +435,7 @@ enum UIStrings {
             case .lastCandidate: "末尾の候補"
             case .associate: "連想変換"
             case .expandCandidates: "候補を表に展開"
-            case .enterBranch: "候補の先の枝へ移動"
+            case .enterBranch: "意味・連想・マクロへ移動"
             case .nextSegment: "右の文節"
             case .previousSegment: "左の文節"
             case .firstSegment: "先頭の文節"
@@ -455,7 +455,7 @@ enum UIStrings {
             case .extendSegmentToWord: "文節を単語単位で伸ばす"
             case .shrinkSegmentToWord: "文節を単語単位で縮める"
             case .splitSegment: "文節を区切る"
-            case .editSegment: "文節を打ち直す"
+            case .editSegment: "文節を再入力"
             case .commit: "確定"
             case .commitFirstSegment: "先頭の文節だけ確定"
             case .cancel: "取り消し"
@@ -487,35 +487,35 @@ enum UIStrings {
             case .insertAlternateSpace: "「スペース幅」と逆の幅の空白を入力します"
             case .convert: "英単語を修正した直後は、修正前に戻します"
             case .convertWithoutLearning: "学習を使わずに変換し、学習もしません"
-            case .insertBoundary: "今の位置で文節を区切ります"
+            case .insertBoundary: "現在の位置で文節を区切ります"
             case .acceptSuggestion: "「もしかして」の読みに修正します"
-            case .reconvert: "確定した文字を変換し直します"
+            case .reconvert: "確定した文字を再変換します"
             case .switchKanaType: "ひらがな → 全角カタカナ → 半角カタカナ"
-            case .nextCandidate: "入力中は変換を始めます"
-            case .previousCandidate: "入力中は変換を始め、文字種を選択します"
+            case .nextCandidate: "入力中は変換を開始します"
+            case .previousCandidate: "入力中は変換を開始し、文字種を選択します"
             case .nextUncertainSegment, .previousUncertainSegment: "誤変換の多い文節に移動します"
-            case .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8: "分岐図の，その位置の文節に移動します"
-            case .extendSegmentToWord, .shrinkSegmentToWord: "文節の終わりを単語の切れ目まで動かします"
-            case .splitSegment: "切れ目の番号を数字キーで選んで区切ります"
-            case .editSegment: "選択中の文節の読みを打ち直します"
-            case .commitFirstSegment: "先頭の文節だけを確定します"
+            case .jumpToSegment1, .jumpToSegment2, .jumpToSegment3, .jumpToSegment4, .jumpToSegment5, .jumpToSegment6, .jumpToSegment7, .jumpToSegment8: "ツリー表示のその位置の文節に移動します"
+            case .extendSegmentToWord, .shrinkSegmentToWord: "文節の末尾を単語の区切りまで移動します"
+            case .splitSegment: "区切りの番号を数字キーで選択して分割します"
+            case .editSegment: "選択中の文節の読みを再入力します"
+            case .commitFirstSegment: "先頭の文節のみ確定します"
             case .cancel: "変換中は読みに戻し、入力中は読みを削除します"
             case .backToReading: "全文を読みに戻します"
-            case .resumeEditing: "読みに戻り、末尾から入力を続けます"
-            case .undoConversionEdit: "直前の候補と区切りの変更を戻します"
-            case .undoPrediction: "確定した予測を取り消し、補う前の読みに戻します"
+            case .resumeEditing: "読みに戻り、末尾から入力を継続します"
+            case .undoConversionEdit: "直前の候補と区切りの変更を取り消します"
+            case .undoPrediction: "確定した予測を取り消し、補完前の読みに戻します"
             case .undoCommit: "確定を取り消し、確定前の変換に戻します"
-            case .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: "選択中の文節だけを変換します"
+            case .segmentToHiragana, .segmentToKatakana, .segmentToHalfwidthKatakana: "選択中の文節のみ変換します"
             case .forgetCandidate: "選択中の候補を学習から削除します"
             case .forgetLastCommit: "最後に確定した語句の学習を取り消します"
             case .hidePrediction: "表示中の予測を「予測に表示しない語句」に追加します"
-            case .handwriting: "「手書き入力」がオンのときに使えます"
-            case .emojiPalette, .symbolPalette, .kaomojiPalette: "「絵文字と記号のパレット」がオンのときに使えます"
-            case .associate: "選択中の文節を似た意味の単語の一覧にします"
+            case .handwriting: "「手書き入力」がオンのときに使用可能です"
+            case .emojiPalette, .symbolPalette, .kaomojiPalette: "「絵文字と記号のパレット」がオンのときに使用可能です"
+            case .associate: "選択中の文節の類義語と関連語を一覧表示します"
             case .registerWord: "選択中の文字でユーザー辞書の登録を開きます"
             case .openMenu: "入力メニューを入力位置に表示します"
             case .expandCandidates: "候補を表に展開します"
-            case .enterBranch: "選んでいる候補の意味・連想・変換マクロへ移動します"
+            case .enterBranch: "選択中の候補の意味・連想・変換マクロへ移動します"
             case .englishAutoStyle: "zoom dekaigi → zoom で会議"
             case .romajiStyle, .kanaStyle, .englishStyle: nil
             case .japaneseMode, .directMode, .toggleMode, .cancelAndDirectMode, .insertHalfwidthSpace, .insertFullwidthSpace, .deleteBackward,
@@ -545,10 +545,10 @@ enum UIStrings {
         static let searchPrompt = "コマンドやキーで検索"
         static let searchByKey = "キーで検索"
         static let searchByKeyHelp = "押したキーで絞り込み"
-        static let presetMenu = "ひな形を読み込む"
+        static let presetMenu = "プリセットを読み込む"
         static let customPreset = "カスタム"
-        static func currentPreset(_ name: String) -> String { "ひな形: \(name)" }
-        static let loadPresetTitle = "ひな形を読み込みますか？"
+        static func currentPreset(_ name: String) -> String { "プリセット: \(name)" }
+        static let loadPresetTitle = "プリセットを読み込みますか？"
         static func loadPresetMessage(_ name: String) -> String { "現在のキー設定を「\(name)」で置き換えます。" }
         static let load = "読み込む"
         static let cancel = "キャンセル"
@@ -657,7 +657,7 @@ enum UIStrings {
         static let firstCandidateRate = "第 1 候補のまま確定した割合"
         static let commits = "確定回数"
         static let conversionsOpened = "Space で変換した回数"
-        static let segmentsChanged = "選び直した文節の数"
+        static let segmentsChanged = "再選択した文節数"
         static let readingCorrections = "タイプミスを修正した回数 / 取り消した回数"
         static let englishCorrections = "英単語を修正した回数 / 取り消した回数"
         static let resetUsage = "統計を消去"
@@ -680,12 +680,12 @@ enum UIStrings {
         static let conversion = "変換"
         static let specialConversion = "特殊変換"
         static let dateConversion = "日付と時刻に変換"
-        static let homophoneNotes = "語の意味と使い分けを表示"
-        static let meaning = "語の意味"
+        static let homophoneNotes = "意味と同音語を表示"
+        static let meaning = "意味の表示"
         static let meaningPlacement = "意味の位置"
         static let meaningSenseLimit = "意味の数"
         static let showsPartOfSpeech = "品詞を表示"
-        static let showsUsageExamples = "使い方の例を表示"
+        static let showsUsageExamples = "用例を表示"
         static let showsHomophones = "同音語を表示"
         static let misuseNotes = "誤用の注釈を表示"
         static let proofreading = "校正支援"
@@ -727,7 +727,7 @@ enum UIStrings {
         static let wordClass = "品詞"
         static let personNameGroup = "人名"
         static let otherWordClasses = "その他"
-        static let abbreviationNote = "読みだけを変換したときに出ます"
+        static let abbreviationNote = "読みのみを変換したときに表示します"
 
         static func label(for wordClass: WordClass) -> String {
             switch wordClass {
@@ -827,7 +827,7 @@ enum UIStrings {
 
         // アプリごとの入力モード
         static let appModesTitle = "アプリごとの入力モード"
-        static let appModesDetail = "除外設定でアプリを追加して選びます。"
+        static let appModesDetail = "除外設定でアプリを追加して選択します。"
         /// 実演でアプリを切り替えるときに出す名前
         static let demoNotes = "メモ"
         static let demoTerminal = "ターミナル"
@@ -840,7 +840,7 @@ enum UIStrings {
         static let correctionOff = "修正しない"
         static func detail(for sensitivity: CorrectionSensitivity) -> String {
             switch sensitivity {
-            case .cautious: "確実なときだけ修正し、迷うときは「もしかして」を表示します。"
+            case .cautious: "確実な場合のみ修正し、確度が低い場合は「もしかして」を表示します。"
             case .standard: "よくあるタイプミスを修正します。"
             case .aggressive: "タイプミスの可能性があれば修正します。"
             }
@@ -848,7 +848,7 @@ enum UIStrings {
 
         // c. 外観
         static let themeTitle = "外観"
-        static let themeDetail = "色やフォントは、あとから設定で変更できます。"
+        static let themeDetail = "色やフォントは、あとから設定で変更可能です。"
 
         // d. ライブ変換
         static let liveTitle = "ライブ変換"
@@ -860,9 +860,9 @@ enum UIStrings {
         static let presentationTitle = "候補の表示"
         static func detail(for presentation: CandidatePresentation) -> String {
             switch presentation {
-            case .automatic: "文節ごとに候補を枝分かれさせます。"
-            case .segmentList: "選択中の文節の候補を縦に並べます。"
-            case .list: "文全体の候補を縦に並べます。"
+            case .automatic: "文節ごとの候補をツリー表示します。"
+            case .segmentList: "選択中の文節の候補を一覧表示します。"
+            case .list: "文全体の候補を一覧表示します。"
             }
         }
         static let initialFocus = "最初に選択する文節"
@@ -876,14 +876,14 @@ enum UIStrings {
         static let macros = "変換マクロ"
         static let macrosDetail = "連想変換と同じ Shift + Space で、選択中の単語を「」で囲む・ルビを付けるなどして表示します。"
         static let dynamicDictionary = "書式の展開"
-        static let dynamicDictionaryDetail = "単語に {datetime:YYYY/MM/DD} などを書くと、入力時の値に置換します。"
+        static let dynamicDictionaryDetail = "単語に {datetime:YYYY/MM/DD} などを記述すると、入力時の値に置換します。"
         static let commands = "コマンド"
-        static let commandsDetail = "読みでアプリや Web ページを開きます。候補から選んだときだけ実行します。設定の「コマンド」で登録します。"
+        static let commandsDetail = "読みでアプリや Web ページを起動します。候補から選択した場合のみ実行します。設定の「コマンド」で登録します。"
         static let commandsExample = "Claude を開く"
         static let association = "連想変換"
-        static let associationDetail = "Shift + Space で、似た意味の単語を表示します。"
+        static let associationDetail = "Shift + Space で、類義語と関連語を表示します。"
         static let calculation = "計算"
-        static let calculationDetail = "「1+2*3=」と打つと、計算結果を候補に表示します。"
+        static let calculationDetail = "「1+2*3=」と入力すると、計算結果を候補に表示します。"
         static let postalCode = "郵便番号"
         static let postalCodeDetail = "郵便番号を住所に変換します。"
         static let date = "日付と時刻"
@@ -932,11 +932,11 @@ enum UIStrings {
         static let variantRow = "候補の上に文字種の行を表示"
         static let keyHints = "キーの案内を表示"
         static let fewerItems = "表示項目を減らす"
-        static let branchHintsAlways = "分岐図のキーの案内を常に表示"
+        static let branchHintsAlways = "ツリー表示のキーの案内を常に表示"
         static let branchStartsOnTrunk = "変換の直後に文節を選択"
-        static let branchSegments = "分岐図に一度に表示する文節数"
+        static let branchSegments = "ツリー表示に一度に表示する文節数"
         static func branchSegmentCount(_ value: Int) -> String { value == 0 ? "すべて" : "\(value) 文節" }
-        static let branchWindowWidth = "分岐図の窓の幅"
+        static let branchWindowWidth = "ツリー表示のウィンドウ幅"
 
         static func label(for width: BranchWindowWidth) -> String {
             switch width {
@@ -953,6 +953,8 @@ enum UIStrings {
         static let predictionDisplay = "入力中の予測"
         static let predictionPrefersHistory = "入力履歴の予測を優先"
         static let predictionFromCorrection = "タイプミス修正後の読みからも予測"
+        static let predictionDelay = "予測までの待ち時間"
+        static let predictionKeepsComposing = "予測の選択後も入力を継続"
         static let hiddenPredictions = "予測に表示しない語句"
         static let hiddenPredictionPlaceholder = "語句"
         static let hiddenPredictionsEmpty = "予測に表示しない語句はありません"
@@ -966,6 +968,15 @@ enum UIStrings {
             }
         }
 
+        static func label(for display: PredictionDisplay) -> String {
+            switch display {
+            case .off: "オフ"
+            case .whenLiveConversionOff: "ライブ変換がオフのとき"
+            case .always: "常に"
+            case .afterPause: "入力中のタイミングで制御"
+            }
+        }
+
         static func label(for focus: InitialFocus) -> String {
             switch focus {
             case .start: "先頭"
@@ -976,7 +987,7 @@ enum UIStrings {
 
         static func label(for presentation: CandidatePresentation) -> String {
             switch presentation {
-            case .automatic: "分岐図"
+            case .automatic: "ツリー表示"
             case .segmentList: "一覧"
             case .list: "文全体の一覧"
             }
@@ -1027,6 +1038,7 @@ enum UIStrings {
         static let columns = "パレットの列数"
         static let rows = "パレットの行数"
         static let cellSize = "パレットのマスの大きさ"
+        static let scale = "パレットの倍率"
         static let showsPreview = "パレットに文字の説明を表示"
         static let showsUnicodeName = "説明に Unicode の名前を表示"
         static let showsReadings = "説明に読みを表示"
@@ -1051,6 +1063,7 @@ enum UIStrings {
         static let clearHistoryNote = "ピン留めと肌の色の設定は残ります"
         static let openKeys = "キー設定を開く"
         static func cellSizeValue(_ size: Int) -> String { "\(cellSize): \(size) pt" }
+        static func scaleValue(_ percent: Int) -> String { "\(scale): \(percent)%" }
     }
 
     enum Features {
@@ -1154,7 +1167,7 @@ enum UIStrings {
 
         // 変換
         static let candidates = "候補"
-        static let branchCandidates = "分岐図の候補数"
+        static let branchCandidates = "ツリー表示の候補数"
         static let listCandidates = "一覧の候補数"
         static let gridColumns = "表の列数"
         static let expandsGridOnPaging = "ページ送りで表に展開"
@@ -1214,10 +1227,10 @@ enum UIStrings {
         static let selection = "選択"
         static let selectionText = "選択中の文字"
         static let correction = "修正の下線"
-        static let line = "枠線と分岐図の線"
+        static let line = "枠線とツリーの線"
         static let shape = "形"
         static let cornerRadius = "角の丸み"
-        static let branchStyle = "分岐図の線"
+        static let branchStyle = "ツリーの線"
         static let font = "フォント"
         static let themeFont = "テーマに合わせる"
         static let fontStyle = "スタイル"
@@ -1308,6 +1321,7 @@ extension UIStrings {
             "typoCorrection": Choice.typoCorrection, "candidatePresentation": Choice.presentation, "initialFocus": Choice.initialFocus,
             "suggestionDisplay": Choice.suggestionDisplay, "predictionDisplay": Choice.predictionDisplay, "predictionPrefersHistory": Choice.predictionPrefersHistory,
             "predictionFromCorrection": Choice.predictionFromCorrection, "hiddenPredictions": Choice.hiddenPredictions, "suggestionSkipCount": More.suggestionSkipCount,
+            "predictionDelay": Choice.predictionDelay, "predictionKeepsComposing": Choice.predictionKeepsComposing,
             "listCandidatesPerPage": More.listCandidates, "branchCandidatesPerPage": More.branchCandidates, "candidateGridColumns": More.gridColumns, "expandsGridOnPaging": More.expandsGridOnPaging,
             "contextualSegmentCandidates": More.contextualSegmentCandidates, "listSegmentAlternatives": More.listSegmentAlternatives,
             "liveConversionDelay": More.liveConversionDelay, "liveConversionSkipLength": More.liveConversionSkipLength, "englishSkipLength": More.englishSkipLength, "correctionDelay": More.correctionDelay, "reviewCorrectionTimeout": More.reviewCorrectionTimeout,
@@ -1344,7 +1358,7 @@ extension UIStrings {
             "launcherCommands": Extras.launcherCommands, "commands": Extras.commandsPage,
             "englishTermCandidates": Extras.englishTermCandidates, "englishTerms": Extras.englishTerms,
             "palette": Palette.enabled, "paletteClosesAfterInsert": Palette.closesAfterInsert, "paletteRecordsHistory": Palette.recordsHistory,
-            "paletteColumns": Palette.columns, "paletteRows": Palette.rows, "paletteCellSize": Palette.cellSize,
+            "paletteColumns": Palette.columns, "paletteRows": Palette.rows, "paletteCellSize": Palette.cellSize, "paletteScale": Palette.scale,
             "paletteShowsPreview": Palette.showsPreview, "paletteFrequentRows": Palette.frequentRows,
             "paletteShowsUnicodeName": Palette.showsUnicodeName, "paletteShowsReadings": Palette.showsReadings,
             "paletteShowsShortcodes": Palette.showsShortcodes, "paletteShowsCodePoints": Palette.showsCodePoints,

@@ -35,6 +35,7 @@ pub struct Ranges {
     pub suggestion_skip_count: Range,
     pub english_skip_length: Range,
     pub correction_delay: Range,
+    pub prediction_delay: Range,
     pub review_correction_timeout: Range,
     pub late_correction_timeout: Range,
     pub mode_indicator_duration: Range,
@@ -48,6 +49,7 @@ pub struct Ranges {
     pub palette_columns: Range,
     pub palette_rows: Range,
     pub palette_cell_size: Range,
+    pub palette_scale: Range,
     pub palette_frequent_rows: Range,
 }
 
@@ -132,6 +134,8 @@ pub struct Catalog {
     pub association_limit_step: f64,
     /// パレットのマスの大きさを選ぶ刻み(DefaultSettings.paletteCellSizeStep)
     pub palette_cell_size_step: f64,
+    /// パレットの倍率を選ぶ刻み(DefaultSettings.paletteScaleStep)
+    pub palette_scale_step: f64,
     pub limits: Limits,
     pub timing: Timing,
     /// 一覧を書き出すファイルの既定の名前(RuleList の名前ごと)

@@ -57,16 +57,19 @@ menu:
       url: https://github.com/KikuchiTomo/Hajime
       params:
         icon: github
-  # ドキュメントの横の一覧の下に出す．ページはサイトの直下(/privacy/)
+  # ドキュメントの横の一覧の下に出す．ページはサイトの直下(/privacy/，/code-signing-policy/)
   sidebar:
     - name: プライバシーポリシー
       pageRef: /privacy
       weight: 1
+    - name: Code signing policy
+      pageRef: /code-signing-policy
+      weight: 2
 
 params:
   images:
     - images/ogp.jpg
-  description: macOS・Windows 向けの日本語入力システムです．ライブ変換も打ち間違いの補正も，すべてパソコンの中で処理します．
+  description: macOS・Windows 向けの日本語 IME です．ライブ変換と打ち間違い補正を，すべて端末内で処理します．
 
   navbar:
     displayTitle: false

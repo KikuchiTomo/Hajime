@@ -96,6 +96,7 @@
     "paletteFrequentRows",
     "paletteRecordsHistory",
     "paletteRows",
+    "paletteScale",
     "paletteShowsCodePoints",
     "paletteShowsPreview",
     "paletteShowsReadings",
@@ -103,8 +104,10 @@
     "paletteShowsUnicodeName",
     "phoneticSpelling",
     "postalCodeConversion",
+    "predictionDelay",
     "predictionDisplay",
     "predictionFromCorrection",
+    "predictionKeepsComposing",
     "predictionPrefersHistory",
     "prefersKatakana",
     "profileRules",
@@ -488,6 +491,7 @@
     "wordLanguageWordLength" : 32
   },
   "paletteCellSizeStep" : 2,
+  "paletteScaleStep" : 0.1,
   "ranges" : {
     "associationLimit" : [
       10,
@@ -564,6 +568,14 @@
     "paletteRows" : [
       3,
       12
+    ],
+    "paletteScale" : [
+      0.5,
+      1.5
+    ],
+    "predictionDelay" : [
+      0.1,
+      2
     ],
     "reviewCorrectionTimeout" : [
       5,

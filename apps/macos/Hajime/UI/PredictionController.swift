@@ -1,5 +1,6 @@
 import AppKit
 import HajimeApplication
+import HajimeDomain
 
 /// 打っているあいだの続く語句の予測を，組み立て中の文字のすぐ右に出す小さな窓．
 /// 予測は読みの変換とは体験が違うので，変換の候補の窓には混ぜずに別の窓にする．
@@ -15,15 +16,19 @@ final class PredictionController {
         window = FloatingPanel.make(contentView: view)
     }
 
-    /// end は組み立て中の文字の最後の字の行の長方形
-    func show(_ prediction: Prediction, end: NSRect, theme: ThemeChoice, fontSize: Double) {
+    /// 最後に置いたときの，最後の字の長方形と候補の窓の側
+    private var placed: (tail: NSRect, candidates: PanelPlacement.Side?)?
+
+    /// tail は組み立て中の文字の最後の字の長方形(横は字の幅，縦は行の高さ)，candidates は候補の窓を置いている側(出していなければ nil)
+    func show(_ prediction: Prediction, tail: NSRect, candidates: PanelPlacement.Side?, theme: ThemeChoice, fontSize: Double) {
         view.theme = ResolvedTheme.resolve(theme)
         view.fontSize = CGFloat(fontSize)
         view.prediction = prediction
         backdrop.cornerRadius = view.theme.cornerRadius
         _ = FloatingPanel.attach(view, to: window, backdrop: view.theme.isRounded ? backdrop : nil)
         isVisible = true
-        move(end: end)
+        placed = nil
+        move(tail: tail, candidates: candidates)
         if view.theme.isRounded { window.invalidateShadow() }
         window.orderFrontRegardless()
         // VoiceOver が動いているときは，予測した語句を読み上げる(予測が変わったときだけ呼ばれる)
@@ -35,28 +40,34 @@ final class PredictionController {
         }
     }
 
-    /// 組み立て中の文字が変わったときに，右端に合わせて置き直す
-    func move(end: NSRect) {
+    /// 組み立て中の文字か候補の窓の側が変わったときに，最後の字の右に合わせて置き直す
+    func move(tail: NSRect, candidates: PanelPlacement.Side?) {
         guard isVisible else { return }
+        if let placed, placed.tail == tail, placed.candidates == candidates { return }
+        placed = (tail, candidates)
         let size = view.fittingSize
-        window.setFrame(NSRect(origin: Self.origin(for: size, end: end), size: size), display: true)
+        window.setFrame(NSRect(origin: Self.origin(for: size, tail: tail, candidates: candidates), size: size), display: true)
     }
 
     func hide() {
         isVisible = false
+        placed = nil
         window.orderOut(nil)
     }
 
-    /// 組み立て中の文字の右端のすぐ右に，行の高さの中央をそろえて置く．アプリが位置を教えなければマウスの位置．
-    /// 画面の右に入らなければ，入るところまで左へ寄せる
-    static func origin(for size: NSSize, end: NSRect) -> NSPoint {
-        let anchor = end == .zero ? NSRect(origin: NSEvent.mouseLocation, size: .zero) : end
-        var x = anchor.maxX + DesignTokens.Size.Prediction.gap
-        let screen = NSScreen.screens.first { $0.frame.contains(anchor.origin) } ?? NSScreen.main
-        if let visible = screen?.visibleFrame {
-            x = max(visible.minX, min(x, visible.maxX - size.width))
-        }
-        return NSPoint(x: x.rounded(), y: (anchor.midY - size.height / 2).rounded())
+    /// 最後の字のすぐ右に，行の高さの中央をそろえて置く(規則は core の PredictionPlacement)．アプリが位置を教えなければマウスの位置．
+    /// 候補の窓を出していなければ，下に出るものとして置く(候補の窓があとから出ても，予測の窓を動かさない)
+    static func origin(for size: NSSize, tail: NSRect, candidates: PanelPlacement.Side?) -> NSPoint {
+        let anchor = tail == .zero ? NSRect(origin: NSEvent.mouseLocation, size: .zero) : tail
+        let visible = FloatingPanel.visibleFrame(for: tail)
+        let origin = PredictionPlacement.origin(
+            tail: Rect(x: anchor.minX, y: anchor.minY, width: anchor.width, height: anchor.height),
+            size: Rect(x: 0, y: 0, width: size.width, height: size.height),
+            screen: Rect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height),
+            gap: DesignTokens.Size.Prediction.gap,
+            candidates: candidates ?? .below
+        )
+        return NSPoint(x: origin.x.rounded(), y: origin.y.rounded())
     }
 }
 

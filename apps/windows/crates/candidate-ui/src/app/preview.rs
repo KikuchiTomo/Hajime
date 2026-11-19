@@ -124,11 +124,20 @@ impl Preview {
         }
     }
 
+    /// パレットの全体の倍率(設定のパレットの倍率)．ほかの窓は等倍
+    fn zoom(shown: Shown) -> f32 {
+        match shown {
+            Shown::Palette(panel) => crate::palette::layout::zoom(panel),
+            _ => 1.0,
+        }
+    }
+
     /// shown を等倍で描いたときの大きさ(96dpi のピクセル．置き方が TopLeft・Fit のとき)
     pub fn size(&self, theme: &ResolvedTheme, font_size: f32, shown: Shown) -> Result<(f32, f32)> {
         let measure = self.measure_for(shown, theme, font_size)?;
         let scene = Self::scene(shown, theme, font_size, &measure);
-        Ok((scene.width, scene.height))
+        let zoom = Self::zoom(shown);
+        Ok((scene.width * zoom, scene.height * zoom))
     }
 
     /// hdc の rect(デバイスのピクセル)に，候補の窓 shown を描く．scale は画面の DPI の倍率．
@@ -147,6 +156,8 @@ impl Preview {
     ) -> Result<()> {
         let measure = self.measure_for(shown, theme, font_size)?;
         let scene = Self::scene(shown, theme, font_size, &measure);
+        // パレットは設定の倍率を DPI の倍率に掛けて，全体をまとめて拡大・縮小する(パレットの窓と同じ)
+        let scale = scale * Self::zoom(shown);
         // 外観の見本は下地の上に置き，実演はウィザードの背景にそのまま置く(画像は不透明なので影は付けない)
         let surround = match placement {
             Placement::Center { .. } => Surround::Snapshot { dark },

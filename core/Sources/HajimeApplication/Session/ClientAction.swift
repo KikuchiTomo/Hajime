@@ -316,7 +316,7 @@ public struct LatticePanel: Sendable, Equatable {
     /// 出している範囲の前と後ろに，文節が続いているか(shownGroup() が入れる)．描く側は幹の線を窓の端まで伸ばし，山形を付ける
     public var continuesBefore = false
     public var continuesAfter = false
-    /// 窓の幅を幹の幅のまま変えないか(設定の「分岐図の窓の幅」が固定)．枝が右に入らなければ，左右に反転して左へ出す
+    /// 窓の幅を幹の幅のまま変えないか(設定の「ツリー表示のウィンドウ幅」が固定)．枝が右に入らなければ，左右に反転して左へ出す
     public var keepsWidth = false
     /// 矢印キーで木をたどっていて，今いる所が幹の上(文節)か．描く側は，文節を強い選択にし，選んでいる候補を控えめにする
     public var trunkFocused = false
@@ -324,7 +324,7 @@ public struct LatticePanel: Sendable, Equatable {
     public var pageSize = 0
     /// 選んでいる候補の先の枝(語の意味・連想・変換マクロ)．先の枝を別々の丸として出す作り(InputSession の branchStations)のときだけ入る
     public var detail: BranchDetail?
-    /// キーの案内を，修飾キーを押し続けているあいだだけ出すか(設定の「分岐図のキーの案内を常に表示」がオフ)．
+    /// キーの案内を，修飾キーを押し続けているあいだだけ出すか(設定の「ツリー表示のキーの案内を常に表示」がオフ)．
     /// 描く側は，案内の場所を空けておき，押し続けている修飾キーを使うキーの案内だけを出す．false なら常に出す
     public var hintsOnHold = false
     /// 表示項目を減らす設定で，注目している文節の文字種の枝を畳んでいるか．畳んでいる枝は中身(Column.variants)を入れない．

@@ -232,11 +232,12 @@ pub fn emoji() -> PalettePanel {
         cells_per_row: None,
         motion: None,
         preview_fields: None,
+        scale: None,
     }
 }
 
 /// 設定の画面の見本(macOS の SamplePalettes.preview)．列数・行数・よく使う文字の行数・説明の有無と説明に出す項目・
-/// マスの大きさは設定のとおりにし，絵文字は見本の並びを繰り返して埋める
+/// マスの大きさ・倍率は設定のとおりにし，絵文字は見本の並びを繰り返して埋める
 pub fn settings(
     columns: u32,
     rows: u32,
@@ -244,6 +245,7 @@ pub fn settings(
     shows_preview: bool,
     fields: PalettePreviewFields,
     cell_size: f64,
+    scale: f64,
 ) -> PalettePanel {
     let columns = columns.max(1);
     let rows = rows.max(1);
@@ -330,6 +332,7 @@ pub fn settings(
         });
     panel.preview_fields = Some(fields);
     panel.cell_size = cell_size;
+    panel.scale = Some(scale);
     panel
 }
 
@@ -376,6 +379,7 @@ pub fn search() -> PalettePanel {
         cells_per_row: None,
         motion: None,
         preview_fields: None,
+        scale: None,
     }
 }
 
@@ -411,6 +415,7 @@ pub fn flag() -> PalettePanel {
         cells_per_row: None,
         motion: None,
         preview_fields: None,
+        scale: None,
     }
 }
 
@@ -498,6 +503,7 @@ pub fn symbol() -> PalettePanel {
         cells_per_row: None,
         motion: None,
         preview_fields: None,
+        scale: None,
     }
 }
 
@@ -555,6 +561,7 @@ pub fn kaomoji() -> PalettePanel {
         cells_per_row: Some(KAOMOJI_CELLS_PER_ROW),
         motion: None,
         preview_fields: None,
+        scale: None,
     }
 }
 
