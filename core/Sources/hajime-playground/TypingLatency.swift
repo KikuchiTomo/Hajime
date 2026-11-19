@@ -231,9 +231,14 @@ final class TypingLatencyProbe {
     }
 
     private static func loadAverage() -> String {
+        #if os(Windows)
+        // Windows には負荷の平均を返す関数が無い
+        return "不明"
+        #else
         var loads = [Double](repeating: 0, count: 3)
         guard getloadavg(&loads, 3) == 3 else { return "不明" }
         return String(format: "%.1f", loads[0])
+        #endif
     }
 
     /// キーを決まった時刻にメインスレッドへ届ける．届ける側はメインスレッドの外で待つので，メインスレッドが塞がっていれば届くのが遅れる
