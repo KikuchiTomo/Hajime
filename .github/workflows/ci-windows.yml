@@ -79,6 +79,53 @@ jobs:
             apps/windows/target
           key: cargo-${{ runner.os }}-${{ hashFiles('apps/windows/Cargo.lock', 'apps/windows/rust-toolchain.toml') }}-${{ github.run_id }}
 
+  signing-windows:
+    # 配布物の署名の道具(tools/windows/sign*.ps1)を，Certum の証明書なしで確かめる．
+    # Certum の SimplySign Desktop を取得して入れるので，手で動かしたときだけ動かす
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: windows-2025
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: tools/windows/sign_totp.ps1 -Check
+        shell: pwsh
+      # SimplySign Desktop のインストーラーが決めたハッシュと署名のままで，入れられること(ログインはしない)
+      - run: tools/windows/sign_connect.ps1 -Provider certum -InstallOnly
+        shell: pwsh
+      # 使い捨ての証明書で，署名して確かめるところまでを通す
+      - name: 使い捨ての証明書で署名する
+        shell: pwsh
+        run: |
+          $work = Join-Path $env:RUNNER_TEMP 'sign-test'
+          New-Item -ItemType Directory -Force $work | Out-Null
+          # 署名の無い実行ファイルを作る
+          $unsigned = Join-Path $work 'sign-test.exe'
+          Set-Content -Path (Join-Path $work 'main.rs') -Value 'fn main() {}'
+          rustc --edition 2021 -o $unsigned (Join-Path $work 'main.rs')
+          if ($LASTEXITCODE -ne 0) { throw '確認用の実行ファイルを作れませんでした' }
+          # ほかの発行元(Microsoft)の署名がある実行ファイルも並べる
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\10.*\x64\signtool.exe" | Select-Object -Last 1
+          $foreign = Join-Path $work 'signed-by-microsoft.exe'
+          Copy-Item $signtool.FullName $foreign
+          $publisher = (Get-AuthenticodeSignature -LiteralPath $foreign).SignerCertificate.Thumbprint
+          if (-not $publisher) { throw '確認用の署名のある実行ファイルを用意できませんでした' }
+
+          tools/windows/sign_connect.ps1 -Provider test
+          tools/windows/sign.ps1 -Path $work -Include exe
+          $signature = Get-AuthenticodeSignature -LiteralPath $unsigned
+          if ($signature.Status -ne 'Valid' -or $signature.SignerCertificate.Thumbprint -ne $env:HAJIME_SIGN_THUMBPRINT) { throw '署名の無い実行ファイルに署名が付いていません' }
+          # ほかの発行元の署名には触らない
+          if ((Get-AuthenticodeSignature -LiteralPath $foreign).SignerCertificate.Thumbprint -ne $publisher) { throw 'ほかの発行元の署名を書き換えました' }
+          # もう一度動かしても，署名し直さない
+          $before = (Get-FileHash -LiteralPath $unsigned).Hash
+          tools/windows/sign.ps1 -Path $work -Include exe
+          if ((Get-FileHash -LiteralPath $unsigned).Hash -ne $before) { throw '署名のあるファイルを署名し直しました' }
+      - if: always()
+        run: tools/windows/sign_disconnect.ps1 -Provider test
+        shell: pwsh
+
   core-windows:
     # 持ち主の PR は結果を待たずにマージするので動かさない(費用を抑える)．まとめて確かめるときは手で動かす．ほかの人の PR では動かす
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.user.login != github.repository_owner

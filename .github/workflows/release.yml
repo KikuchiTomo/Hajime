@@ -59,6 +59,12 @@ jobs:
     uses: ./.github/workflows/package-windows.yml
     with:
       ref: ${{ needs.prepare.outputs.tag }}
+      # リポジトリの変数 WINDOWS_CODE_SIGNING を certum にすると，Certum の証明書で署名する．それまでは署名しない
+      sign: ${{ vars.WINDOWS_CODE_SIGNING == 'certum' && 'certum' || 'none' }}
+    # 署名に使う Secrets だけを渡す
+    secrets:
+      CERTUM_EMAIL: ${{ secrets.CERTUM_EMAIL }}
+      CERTUM_OTPAUTH: ${{ secrets.CERTUM_OTPAUTH }}
 
   publish:
     # 両方の OS の配布物と SHA-256 の一覧を 1 つのリリースに置く．書き込みの権限はこの仕事にだけ渡す
