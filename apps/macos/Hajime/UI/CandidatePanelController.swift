@@ -337,6 +337,19 @@ enum FloatingPanel {
         return NSPoint(x: frame.x, y: frame.y)
     }
 
+    /// 入力モードの表示の左下の座標．macOS が入力位置の行のすぐ下に出す入力ソースの表示と重ならない位置にする(PanelPlacement.placeIndicator)
+    static func indicatorOrigin(for size: NSSize, caret: NSRect) -> NSPoint {
+        let anchor = anchor(for: caret)
+        let visible = visibleFrame(for: caret)
+        let frame = PanelPlacement.placeIndicator(
+            caret: Rect(x: anchor.minX, y: anchor.minY, width: anchor.width, height: anchor.height),
+            size: Rect(x: 0, y: 0, width: size.width, height: size.height),
+            screen: Rect(x: visible.minX, y: visible.minY, width: visible.width, height: visible.height),
+            clearance: DesignTokens.Size.ModeIndicator.systemIndicatorClearance
+        ).frame
+        return NSPoint(x: frame.x.rounded(), y: frame.y.rounded())
+    }
+
     /// 入力位置を教えないアプリでは，マウスの位置の近くに出す
     private static func anchor(for caret: NSRect) -> NSRect {
         caret == .zero ? NSRect(origin: NSEvent.mouseLocation, size: .zero) : caret

@@ -8,6 +8,9 @@ struct ExclusionsPage: View {
     @State private var selection = Set<ProfileRule>()
     @State private var newProfile = AppProfile.direct
 
+    /// 表に出す決まり．Windows のアプリ(実行ファイルの名前)の決まりは出さずに残す(設定は同期で Windows と同じものを読む)
+    private var rules: [ProfileRule] { model.settings.profileRules.shown(on: .macOS) }
+
     var body: some View {
         Form {
             Section {
@@ -18,7 +21,7 @@ struct ExclusionsPage: View {
                           leadingInset: DesignTokens.Size.Settings.tablePopupTextInset),
                 ])
                 FormTableHost {
-                    Table(model.settings.profileRules, selection: $selection) {
+                    Table(rules, selection: $selection) {
                         TableColumn(UIStrings.More.apps) { rule in
                             Text(rule.applicationPrefix).lineLimit(1).truncationMode(.middle)
                         }
@@ -42,7 +45,7 @@ struct ExclusionsPage: View {
                         }
                     }
                     .overlay {
-                        if model.settings.profileRules.isEmpty {
+                        if rules.isEmpty {
                             EmptyListLabel(text: UIStrings.More.exclusionsEmpty)
                         }
                     }
@@ -92,15 +95,12 @@ struct ExclusionsPage: View {
     /// 選んだ 1 つの決まりを上か下へ 1 つ動かす
     private func move(by offset: Int) {
         guard canMove(by: offset), let rule = selection.first else { return }
-        model.update { current in
-            guard let index = current.profileRules.firstIndex(of: rule) else { return }
-            current.profileRules.swapAt(index, index + offset)
-        }
+        model.update { $0.profileRules.move(rule, by: offset, shownOn: .macOS) }
     }
 
     private func canMove(by offset: Int) -> Bool {
-        guard selection.count == 1, let rule = selection.first, let index = model.settings.profileRules.firstIndex(of: rule) else { return false }
-        return model.settings.profileRules.indices.contains(index + offset)
+        guard selection.count == 1, let rule = selection.first else { return false }
+        return model.settings.profileRules.canMove(rule, by: offset, shownOn: .macOS)
     }
 
     private func removeSelected() {
