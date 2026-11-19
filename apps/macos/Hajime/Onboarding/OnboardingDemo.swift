@@ -15,6 +15,10 @@ struct DemoFrame: Equatable {
     var panel: Panel?
     /// 入力欄の横に出すモード表示(「あ」「A」)
     var mode: String?
+    /// モード表示を，本物と同じく入力位置の行の上に出すか(macOS の表示と並べて見せるコマ)
+    var modeAbove = false
+    /// 入力位置の下に出す，macOS の入力ソースの表示の模型(「あ」「A」)
+    var systemMode: String?
     /// 入力欄の上に出すアプリの名前．アプリを切り替える実演で使う
     var application: String?
     /// このコマで押したキー(「かな」「英数」)．入力欄の右上にキーキャップで出す
@@ -30,12 +34,14 @@ enum DemoScripts {
     private static var hold: TimeInterval { DesignTokens.Motion.Onboarding.hold / 1000 }
 
     /// appMode は，アプリごとの入力モードのページでポインタを置いた行(そのモードの動きを見せる)
+    /// hidesSystemIndicator は，入力モードの表示のページで macOS の表示を止めたあとの見え方を見せるか
     static func frames(for page: OnboardingPage, settings: Settings, spotlight: OnboardingSpotlight? = nil,
-                       appMode: AppProfile = .imeOff, now: Date = Date()) -> [DemoFrame] {
+                       appMode: AppProfile = .imeOff, hidesSystemIndicator: Bool = false, now: Date = Date()) -> [DemoFrame] {
         // 機能のページでは，ポインタを置いた機能だけを(オフでも)見せる
         if let spotlight, spotlight.page == page { return frames(for: spotlight, now: now) }
         return switch page {
         case .modeSwitch: modeSwitch(settings)
+        case .modeIndicator: modeIndicator(settings, hidesSystemIndicator: hidesSystemIndicator)
         case .appModes: appModes(appMode)
         case .correction: correction(settings)
         case .theme: theme()
@@ -129,6 +135,21 @@ enum DemoScripts {
         frames.append(DemoFrame(committed: english + "日本語", mode: japanese, duration: hold / 2))
         frames.append(DemoFrame(committed: english + "日本語", mode: direct, key: back, duration: hold))
         return frames
+    }
+
+    /// 入力モードを切り替えたときに出る表示．macOS は入力位置の下に入力ソースの表示を出す．
+    /// Hajime IME の表示を使う設定では，Hajime IME の表示(行の上)と macOS の表示(行の下)の両方が出るのを見せ，
+    /// macOS の表示を止めたあと(hidesSystemIndicator)は Hajime IME の表示だけを見せる．
+    /// Hajime IME の表示を使わない設定では，macOS の表示だけを見せる
+    private static func modeIndicator(_ settings: Settings, hidesSystemIndicator: Bool) -> [DemoFrame] {
+        modeSwitch(settings).map { frame in
+            var frame = frame
+            let label = frame.mode
+            frame.mode = settings.showsModeIndicator ? label : nil
+            frame.modeAbove = true
+            frame.systemMode = settings.showsModeIndicator && hidesSystemIndicator ? nil : label
+            return frame
+        }
     }
 
     private static func correction(_ settings: Settings) -> [DemoFrame] {

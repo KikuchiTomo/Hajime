@@ -48,7 +48,8 @@ struct OnboardingView: View {
                            startRadius: 0, endRadius: Size.height * 0.8)
             RadialGradient(colors: [Color(nsColor: .systemPink).opacity(Opacity.stageGlowSecondary), .clear], center: .bottomTrailing,
                            startRadius: 0, endRadius: Size.height * 0.7)
-            OnboardingStage(page: model.page, settings: model.draft, spotlight: model.spotlight, appMode: model.appMode)
+            OnboardingStage(page: model.page, settings: model.draft, spotlight: model.spotlight, appMode: model.appMode,
+                            hidesSystemIndicator: model.hidesSystemIndicator)
                 .id(model.page)
                 .transition(.opacity)
             if let spotlight = model.spotlight {
@@ -89,6 +90,7 @@ struct OnboardingView: View {
     @ViewBuilder private var content: some View {
         switch model.page {
         case .modeSwitch: modeSwitch
+        case .modeIndicator: modeIndicator
         case .appModes: appModes
         case .correction: correction
         case .theme: theme
@@ -109,6 +111,27 @@ struct OnboardingView: View {
                 }
             }
         }
+    }
+
+    /// 入力モードを切り替えたときの表示を選ぶ．Hajime IME の表示を使うときは，macOS が入力位置の下に出す表示の止め方を添える
+    /// (macOS の設定は利用者が自分で変える．ここからは変えない)
+    private var modeIndicator: some View {
+        VStack(spacing: Size.cardGap) {
+            OptionCard(title: UIStrings.Onboarding.indicatorHajime, detail: nil, recommended: true, selected: model.draft.showsModeIndicator) {
+                model.draft.showsModeIndicator = true
+            }
+            OptionCard(title: UIStrings.Onboarding.indicatorSystem, detail: nil, recommended: false, selected: !model.draft.showsModeIndicator) {
+                model.draft.showsModeIndicator = false
+            }
+            if model.draft.showsModeIndicator {
+                CommandCard(title: UIStrings.Onboarding.hideSystemIndicator, command: UIStrings.Onboarding.hideSystemIndicatorCommand,
+                            note: UIStrings.Onboarding.hideSystemIndicatorNote, highlighted: model.hidesSystemIndicator) { inside in
+                    model.hidesSystemIndicator = inside
+                }
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeOut(duration: DesignTokens.Motion.Onboarding.page / 1000), value: model.draft.showsModeIndicator)
     }
 
     /// 除外設定で選べる，アプリを切り替えたときのモード．ここでは紹介だけで，選ぶのは設定の画面．
@@ -408,6 +431,70 @@ private struct InfoRow: View {
         .onHover { inside in if inside { focus() } }
         .animation(.easeOut(duration: DesignTokens.Motion.Onboarding.page / 1000), value: shown)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// 利用者がターミナルで実行するコマンドを案内するカード．題・コマンド(コピーのボタン付き)・反映のしかたの 1 行．
+/// ポインタを置くと，左の舞台に実行したあとの見え方を見せる
+private struct CommandCard: View {
+    private typealias Size = DesignTokens.Size.Onboarding
+    private typealias Opacity = DesignTokens.Opacity.Onboarding
+
+    let title: String
+    let command: String
+    let note: String
+    let highlighted: Bool
+    let hover: (Bool) -> Void
+    @State private var copied = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Space.group) {
+            HStack(spacing: Size.cardGap) {
+                // 選択肢のカード(OptionCard)の丸と同じ幅をとり，題の左端をそろえる
+                Image(systemName: "circle")
+                    .font(.title3)
+                    .hidden()
+                    .overlay(Image(systemName: "terminal").foregroundStyle(highlighted ? Color.accentColor : Color.secondary))
+                    .accessibilityHidden(true)
+                Text(title).font(.headline)
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: Space.inline) {
+                Text(command)
+                    .font(.callout.monospaced())
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                Spacer(minLength: Space.inline)
+                Button {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(command, forType: .string)
+                    copied = true
+                } label: {
+                    Label(copied ? UIStrings.Onboarding.copied : UIStrings.Onboarding.copy, systemImage: copied ? "checkmark" : "doc.on.doc")
+                        .labelStyle(.iconOnly)
+                        .contentTransition(.symbolEffect(.replace))
+                }
+                .buttonStyle(.borderless)
+                .help(copied ? UIStrings.Onboarding.copied : UIStrings.Onboarding.copy)
+            }
+            .padding(.horizontal, Part.fieldPaddingX)
+            .padding(.vertical, Space.group)
+            .background(RoundedRectangle(cornerRadius: Size.cardRadius / 2, style: .continuous).fill(Color(nsColor: .textBackgroundColor).opacity(Opacity.field)))
+            .overlay(RoundedRectangle(cornerRadius: Size.cardRadius / 2, style: .continuous).strokeBorder(Color(nsColor: .separatorColor), lineWidth: 1))
+            Text(note)
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(Size.cardPadding)
+        .background(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
+            .fill(highlighted ? Color.accentColor.opacity(Opacity.cardSelected) : Color.primary.opacity(Opacity.cardIdle)))
+        .overlay(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous)
+            .strokeBorder(highlighted ? Color.accentColor : Color.clear, lineWidth: 1.5))
+        .contentShape(RoundedRectangle(cornerRadius: Size.cardRadius, style: .continuous))
+        .onHover(perform: hover)
+        .animation(.easeOut(duration: DesignTokens.Motion.Onboarding.page / 1000), value: highlighted)
     }
 }
 
