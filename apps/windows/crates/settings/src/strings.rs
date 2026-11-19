@@ -50,12 +50,12 @@ pub mod settings {
     pub const CONVERSION: &str = "変換";
     pub const SPECIAL_CONVERSION: &str = "特殊変換";
     pub const DATE_CONVERSION: &str = "日付と時刻に変換";
-    pub const HOMOPHONE_NOTES: &str = "語の意味と使い分けを表示";
-    pub const MEANING: &str = "語の意味";
+    pub const HOMOPHONE_NOTES: &str = "意味と同音語を表示";
+    pub const MEANING: &str = "意味の表示";
     pub const MEANING_PLACEMENT: &str = "意味の位置";
     pub const MEANING_SENSE_LIMIT: &str = "意味の数";
     pub const SHOWS_PART_OF_SPEECH: &str = "品詞を表示";
-    pub const SHOWS_USAGE_EXAMPLES: &str = "使い方の例を表示";
+    pub const SHOWS_USAGE_EXAMPLES: &str = "用例を表示";
     pub const SHOWS_HOMOPHONES: &str = "同音語を表示";
     pub const MISUSE_NOTES: &str = "誤用の注釈を表示";
     pub const PROOFREADING: &str = "校正支援";
@@ -91,7 +91,7 @@ pub mod settings {
     pub const FIRST_CANDIDATE_RATE: &str = "第 1 候補のまま確定した割合";
     pub const COMMITS: &str = "確定回数";
     pub const CONVERSIONS_OPENED: &str = "Space で変換した回数";
-    pub const SEGMENTS_CHANGED: &str = "選び直した文節の数";
+    pub const SEGMENTS_CHANGED: &str = "再選択した文節数";
     pub const READING_CORRECTIONS: &str = "タイプミスを修正した回数 / 取り消した回数";
     pub const ENGLISH_CORRECTIONS: &str = "英単語を修正した回数 / 取り消した回数";
     pub const RESET_USAGE: &str = "統計を消去";
@@ -103,7 +103,7 @@ pub mod settings {
     pub const OTHER_WORD_CLASSES: &str = "その他";
     pub const COMMENT: &str = "コメント";
     pub const COMMENT_PROMPT: &str = "コメント(省略可)";
-    pub const ABBREVIATION_NOTE: &str = "読みだけを変換したときに出ます";
+    pub const ABBREVIATION_NOTE: &str = "読みのみを変換したときに表示します";
 
     /// 絵文字の位置の値(macOS の UIStrings.Settings.emojiCandidatePositionValue)
     pub fn emoji_candidate_position(value: f64) -> String {
@@ -142,9 +142,9 @@ pub mod choice {
     pub const KEY_HINTS: &str = "キーの案内を表示";
     pub const FEWER_ITEMS: &str = "表示項目を減らす";
     pub const BRANCH_STARTS_ON_TRUNK: &str = "変換の直後に文節を選択";
-    pub const BRANCH_HINTS_ALWAYS: &str = "分岐図のキーの案内を常に表示";
-    pub const BRANCH_SEGMENTS: &str = "分岐図に一度に表示する文節数";
-    pub const BRANCH_WINDOW_WIDTH: &str = "分岐図の窓の幅";
+    pub const BRANCH_HINTS_ALWAYS: &str = "ツリー表示のキーの案内を常に表示";
+    pub const BRANCH_SEGMENTS: &str = "ツリー表示に一度に表示する文節数";
+    pub const BRANCH_WINDOW_WIDTH: &str = "ツリー表示のウィンドウ幅";
 
     /// 分岐図に一度に出す文節の数の表示．0 は区切らずにすべて出す
     pub fn branch_segment_count(value: f64) -> String {
@@ -227,9 +227,10 @@ pub mod features {
 /// UIStrings.Extras
 pub mod extras {
     pub const HAND_SHIFT: &str = "手の位置のずれを修正(試験的)";
-    pub const HAND_SHIFT_NOTE: &str = "片手か両手が 1 キー横にずれたまま打った文を修正します。";
+    pub const HAND_SHIFT_NOTE: &str = "片手か両手が 1 キー横にずれた状態で入力した文を修正します。";
     pub const LOOSE_READINGS: &str = "うろ覚えのカタカナ語の候補";
-    pub const LOOSE_READINGS_NOTE: &str = "「しゃんぶー」から「シャンプー」のように、読みを少し違えて覚えている単語を候補に表示します。";
+    pub const LOOSE_READINGS_NOTE: &str =
+        "「しゃんぶー」から「シャンプー」のように、読みを誤って覚えている単語を候補に表示します。";
     pub const PHONETIC_SPELLING: &str = "発音どおりに綴った英単語の候補";
     /// 項目名の横に出す，その設定で出る候補の見本(打った文字と候補)．core の DefaultSettings の同じ名前の見本と同じ値(make check で比べる)
     pub const LOOSE_READINGS_EXAMPLE: (&str, &str) = ("しゃんぶー", "シャンプー");
@@ -238,7 +239,7 @@ pub mod extras {
     pub const HAND_SHIFT_EXAMPLE: (&str, &str) = ("stohsypi", "ありがとう");
     pub const ENGLISH_TERM_CANDIDATES_EXAMPLE: (&str, &str) = ("api", "API");
     pub const PHONETIC_SPELLING_NOTE: &str =
-        "「ここあ」から「cocoa」のように、音のとおりに綴った英単語の正しい綴りを候補に表示します。";
+        "「ここあ」から「cocoa」のように、発音どおりに綴った英単語の正しい綴りを候補に表示します。";
     pub const ENGLISH_TERM_CANDIDATES: &str = "英単語辞書を使用";
     pub const ENGLISH_TERMS: &str = "追加した単語";
     pub const ENGLISH_TERMS_SECTION: &str = "英単語辞書";
@@ -616,7 +617,7 @@ pub mod more {
     pub const RESTRAINS_LIVE_CONVERSION_IN_CODE: &str = "エディタとターミナルでライブ変換を控える";
     pub const BEHAVIOR: &str = "動作";
     pub const APPS: &str = "アプリ";
-    pub const BRANCH_CANDIDATES: &str = "分岐図の候補数";
+    pub const BRANCH_CANDIDATES: &str = "ツリー表示の候補数";
     pub const LIST_CANDIDATES: &str = "一覧の候補数";
     pub const GRID_COLUMNS: &str = "表の列数";
     pub const EXPANDS_GRID_ON_PAGING: &str = "ページ送りで表に展開";
@@ -650,10 +651,10 @@ pub mod more {
     pub const SELECTION: &str = "選択";
     pub const SELECTION_TEXT: &str = "選択中の文字";
     pub const CORRECTION: &str = "修正の下線";
-    pub const LINE: &str = "枠線と分岐図の線";
+    pub const LINE: &str = "枠線とツリーの線";
     pub const SHAPE: &str = "形";
     pub const CORNER_RADIUS: &str = "角の丸み";
-    pub const BRANCH_STYLE: &str = "分岐図の線";
+    pub const BRANCH_STYLE: &str = "ツリーの線";
     pub const THEME_FONT: &str = "テーマに合わせる";
     pub const FONT_STYLE: &str = "スタイル";
     pub const DUPLICATE_THEME: &str = "複製";
@@ -746,10 +747,10 @@ pub mod keys {
     /// 押したキーで絞り込んでいるあいだのチップ(押すと外す．UIStrings.Keys.clearKeyFilter)
     pub const CLEAR_KEY_FILTER: &str = "絞り込みを解除";
     pub const TAB: &str = "キー設定";
-    pub const PRESET_MENU: &str = "ひな形を読み込む";
+    pub const PRESET_MENU: &str = "プリセットを読み込む";
     pub const CUSTOM_PRESET: &str = "カスタム";
     pub fn current_preset(name: &str) -> String {
-        format!("ひな形: {name}")
+        format!("プリセット: {name}")
     }
     pub const STATE: &str = "状態";
     pub const KEY: &str = "キー";
@@ -771,7 +772,7 @@ pub mod keys {
             format!("{name} を付ける")
         }
     }
-    pub const LOAD_PRESET_TITLE: &str = "ひな形を読み込みますか？";
+    pub const LOAD_PRESET_TITLE: &str = "プリセットを読み込みますか？";
     pub const RESTORE_TITLE: &str = "既定の表に戻しますか？";
     pub const RESTORE_MESSAGE: &str = "追加した行と変更した行は削除されます。";
     pub const ALL_STATES: &str = "すべての状態";
@@ -878,7 +879,7 @@ pub mod keys {
         ("extendSegmentToWord", "文節を単語単位で伸ばす"),
         ("shrinkSegmentToWord", "文節を単語単位で縮める"),
         ("splitSegment", "文節を区切る"),
-        ("editSegment", "文節を打ち直す"),
+        ("editSegment", "文節を再入力"),
         ("commit", "確定"),
         ("commitFirstSegment", "先頭の文節だけ確定"),
         ("cancel", "取り消し"),
@@ -903,7 +904,7 @@ pub mod keys {
         ("reconvert", "再変換"),
         ("associate", "連想変換"),
         ("expandCandidates", "候補を表に展開"),
-        ("enterBranch", "候補の先の枝へ移動"),
+        ("enterBranch", "意味・連想・マクロへ移動"),
     ];
     /// コマンドの説明(UIStrings.Keys.help(for:))．名前で分かるコマンドは並べない
     pub const COMMAND_HELP: &[(&str, &str)] = &[
@@ -919,74 +920,77 @@ pub mod keys {
             "convertWithoutLearning",
             "学習を使わずに変換し、学習もしません",
         ),
-        ("insertBoundary", "今の位置で文節を区切ります"),
+        ("insertBoundary", "現在の位置で文節を区切ります"),
         ("acceptSuggestion", "「もしかして」の読みに修正します"),
         ("switchKanaType", "ひらがな → 全角カタカナ → 半角カタカナ"),
-        ("nextCandidate", "入力中は変換を始めます"),
+        ("nextCandidate", "入力中は変換を開始します"),
         (
             "previousCandidate",
-            "入力中は変換を始め、文字種を選択します",
+            "入力中は変換を開始し、文字種を選択します",
         ),
         ("nextUncertainSegment", "誤変換の多い文節に移動します"),
         ("previousUncertainSegment", "誤変換の多い文節に移動します"),
-        ("jumpToSegment1", "分岐図の，その位置の文節に移動します"),
-        ("jumpToSegment2", "分岐図の，その位置の文節に移動します"),
-        ("jumpToSegment3", "分岐図の，その位置の文節に移動します"),
-        ("jumpToSegment4", "分岐図の，その位置の文節に移動します"),
-        ("jumpToSegment5", "分岐図の，その位置の文節に移動します"),
-        ("jumpToSegment6", "分岐図の，その位置の文節に移動します"),
-        ("jumpToSegment7", "分岐図の，その位置の文節に移動します"),
-        ("jumpToSegment8", "分岐図の，その位置の文節に移動します"),
+        ("jumpToSegment1", "ツリー表示のその位置の文節に移動します"),
+        ("jumpToSegment2", "ツリー表示のその位置の文節に移動します"),
+        ("jumpToSegment3", "ツリー表示のその位置の文節に移動します"),
+        ("jumpToSegment4", "ツリー表示のその位置の文節に移動します"),
+        ("jumpToSegment5", "ツリー表示のその位置の文節に移動します"),
+        ("jumpToSegment6", "ツリー表示のその位置の文節に移動します"),
+        ("jumpToSegment7", "ツリー表示のその位置の文節に移動します"),
+        ("jumpToSegment8", "ツリー表示のその位置の文節に移動します"),
         (
             "extendSegmentToWord",
-            "文節の終わりを単語の切れ目まで動かします",
+            "文節の末尾を単語の区切りまで移動します",
         ),
         (
             "shrinkSegmentToWord",
-            "文節の終わりを単語の切れ目まで動かします",
+            "文節の末尾を単語の区切りまで移動します",
         ),
-        ("splitSegment", "切れ目の番号を数字キーで選んで区切ります"),
-        ("editSegment", "選択中の文節の読みを打ち直します"),
-        ("commitFirstSegment", "先頭の文節だけを確定します"),
+        ("splitSegment", "区切りの番号を数字キーで選択して分割します"),
+        ("editSegment", "選択中の文節の読みを再入力します"),
+        ("commitFirstSegment", "先頭の文節のみ確定します"),
         ("cancel", "変換中は読みに戻し、入力中は読みを削除します"),
         ("backToReading", "全文を読みに戻します"),
-        ("resumeEditing", "読みに戻り、末尾から入力を続けます"),
-        ("undoConversionEdit", "直前の候補と区切りの変更を戻します"),
+        ("resumeEditing", "読みに戻り、末尾から入力を継続します"),
+        (
+            "undoConversionEdit",
+            "直前の候補と区切りの変更を取り消します",
+        ),
         (
             "undoPrediction",
-            "確定した予測を取り消し、補う前の読みに戻します",
+            "確定した予測を取り消し、補完前の読みに戻します",
         ),
         ("undoCommit", "確定を取り消し、確定前の変換に戻します"),
-        ("segmentToHiragana", "選択中の文節だけを変換します"),
-        ("segmentToKatakana", "選択中の文節だけを変換します"),
-        ("segmentToHalfwidthKatakana", "選択中の文節だけを変換します"),
+        ("segmentToHiragana", "選択中の文節のみ変換します"),
+        ("segmentToKatakana", "選択中の文節のみ変換します"),
+        ("segmentToHalfwidthKatakana", "選択中の文節のみ変換します"),
         ("forgetCandidate", "選択中の候補を学習から削除します"),
         ("forgetLastCommit", "最後に確定した語句の学習を取り消します"),
         (
             "hidePrediction",
             "表示中の予測を「予測に表示しない語句」に追加します",
         ),
-        ("handwriting", "「手書き入力」がオンのときに使えます"),
+        ("handwriting", "「手書き入力」がオンのときに使用可能です"),
         (
             "emojiPalette",
-            "「絵文字と記号のパレット」がオンのときに使えます",
+            "「絵文字と記号のパレット」がオンのときに使用可能です",
         ),
         (
             "symbolPalette",
-            "「絵文字と記号のパレット」がオンのときに使えます",
+            "「絵文字と記号のパレット」がオンのときに使用可能です",
         ),
         (
             "kaomojiPalette",
-            "「絵文字と記号のパレット」がオンのときに使えます",
+            "「絵文字と記号のパレット」がオンのときに使用可能です",
         ),
-        ("reconvert", "確定した文字を変換し直します"),
-        ("associate", "選択中の文節を似た意味の単語の一覧にします"),
+        ("reconvert", "確定した文字を再変換します"),
+        ("associate", "選択中の文節の類義語と関連語を一覧表示します"),
         ("registerWord", "選択中の文字でユーザー辞書の登録を開きます"),
         ("openMenu", "入力メニューを入力位置に表示します"),
         ("expandCandidates", "候補を表に展開します"),
         (
             "enterBranch",
-            "選んでいる候補の意味・連想・変換マクロへ移動します",
+            "選択中の候補の意味・連想・変換マクロへ移動します",
         ),
     ];
 }
@@ -1211,7 +1215,7 @@ pub mod sync {
         ("predictionKeepsComposing", "予測の選択後も入力を継続"),
         ("suggestionSkipCount", "入力中の候補を省略する件数"),
         ("listCandidatesPerPage", "一覧の候補数"),
-        ("branchCandidatesPerPage", "分岐図の候補数"),
+        ("branchCandidatesPerPage", "ツリー表示の候補数"),
         ("candidateGridColumns", "表の列数"),
         ("expandsGridOnPaging", "ページ送りで表に展開"),
         ("contextualSegmentCandidates", "文脈で候補を並べ替え"),
@@ -1230,11 +1234,11 @@ pub mod sync {
         ("calculation", "計算"),
         ("postalCodeConversion", "郵便番号から住所に変換"),
         ("handwriting", "手書き入力"),
-        ("homophoneNotes", "語の意味と使い分けを表示"),
+        ("homophoneNotes", "意味と同音語を表示"),
         ("meaningPlacement", "意味の位置"),
         ("meaningSenseLimit", "意味の数"),
         ("showsPartOfSpeech", "品詞を表示"),
-        ("showsUsageExamples", "使い方の例を表示"),
+        ("showsUsageExamples", "用例を表示"),
         ("showsHomophones", "同音語を表示"),
         ("misuseNotes", "誤用の注釈を表示"),
         ("proofreading", "校正支援"),
@@ -1243,10 +1247,10 @@ pub mod sync {
         ("showsVariantRow", "候補の上に文字種の行を表示"),
         ("showsKeyHints", "キーの案内を表示"),
         ("showsFewerItems", "表示項目を減らす"),
-        ("alwaysShowsBranchHints", "分岐図のキーの案内を常に表示"),
+        ("alwaysShowsBranchHints", "ツリー表示のキーの案内を常に表示"),
         ("branchStartsOnTrunk", "変換の直後に文節を選択"),
-        ("branchSegmentsPerGroup", "分岐図に一度に表示する文節数"),
-        ("branchWindowWidth", "分岐図の窓の幅"),
+        ("branchSegmentsPerGroup", "ツリー表示に一度に表示する文節数"),
+        ("branchWindowWidth", "ツリー表示のウィンドウ幅"),
         ("numberKeySelection", "数字キーで候補を選択"),
         ("dateConversion", "日付と時刻に変換"),
         ("symbolConversion", "記号に変換"),
@@ -1410,12 +1414,12 @@ pub mod wizard {
 
     pub const MODE_TITLE: &str = "英数とかなの切り替え";
     pub const APP_MODES_TITLE: &str = "アプリごとの入力モード";
-    pub const APP_MODES_DETAIL: &str = "除外設定でアプリを追加して選びます。";
+    pub const APP_MODES_DETAIL: &str = "除外設定でアプリを追加して選択します。";
     pub const DEMO_TERMINAL: &str = "ターミナル";
     pub const CORRECTION_TITLE: &str = "自動補正";
     pub const CORRECTION_OFF: &str = "修正しない";
     pub const THEME_TITLE: &str = "外観";
-    pub const THEME_DETAIL: &str = "色やフォントは、あとから設定で変更できます。";
+    pub const THEME_DETAIL: &str = "色やフォントは、あとから設定で変更可能です。";
     pub const LIVE_TITLE: &str = "ライブ変換";
     pub const LIVE_ON: &str = "ライブ変換を使う";
     pub const LIVE_OFF: &str = "使わない";
@@ -1430,14 +1434,14 @@ pub mod wizard {
         "連想変換と同じ Shift + Space で、選択中の単語を「」で囲む・ルビを付けるなどして表示します。";
     pub const DYNAMIC_DICTIONARY: &str = "書式の展開";
     pub const DYNAMIC_DICTIONARY_DETAIL: &str =
-        "単語に {datetime:YYYY/MM/DD} などを書くと、入力時の値に置換します。";
+        "単語に {datetime:YYYY/MM/DD} などを記述すると、入力時の値に置換します。";
     pub const COMMANDS: &str = "コマンド";
-    pub const COMMANDS_DETAIL: &str = "読みでアプリや Web ページを開きます。候補から選んだときだけ実行します。設定の「コマンド」で登録します。";
+    pub const COMMANDS_DETAIL: &str = "読みでアプリや Web ページを起動します。候補から選択した場合のみ実行します。設定の「コマンド」で登録します。";
     pub const COMMANDS_EXAMPLE: &str = "Claude を開く";
     pub const ASSOCIATION: &str = "連想変換";
-    pub const ASSOCIATION_DETAIL: &str = "Shift + Space で、似た意味の単語を表示します。";
+    pub const ASSOCIATION_DETAIL: &str = "Shift + Space で、類義語と関連語を表示します。";
     pub const CALCULATION: &str = "計算";
-    pub const CALCULATION_DETAIL: &str = "「1+2*3=」と打つと、計算結果を候補に表示します。";
+    pub const CALCULATION_DETAIL: &str = "「1+2*3=」と入力すると、計算結果を候補に表示します。";
     pub const POSTAL_CODE: &str = "郵便番号";
     pub const POSTAL_CODE_DETAIL: &str = "郵便番号を住所に変換します。";
     pub const DATE: &str = "日付と時刻";
@@ -1453,14 +1457,14 @@ pub mod windows_wizard {
 
     /// 補正の強さの説明(macOS の UIStrings.Onboarding.detail(for: CorrectionSensitivity))
     pub const CORRECTION_CAUTIOUS_DETAIL: &str =
-        "確実なときだけ修正し、迷うときは「もしかして」を表示します。";
+        "確実な場合のみ修正し、確度が低い場合は「もしかして」を表示します。";
     pub const CORRECTION_STANDARD_DETAIL: &str = "よくあるタイプミスを修正します。";
     pub const CORRECTION_AGGRESSIVE_DETAIL: &str = "タイプミスの可能性があれば修正します。";
 
     /// 候補の出し方の説明(macOS の UIStrings.Onboarding.detail(for: CandidatePresentation))
-    pub const PRESENTATION_AUTOMATIC_DETAIL: &str = "文節ごとに候補を枝分かれさせます。";
-    pub const PRESENTATION_SEGMENT_LIST_DETAIL: &str = "選択中の文節の候補を縦に並べます。";
-    pub const PRESENTATION_LIST_DETAIL: &str = "文全体の候補を縦に並べます。";
+    pub const PRESENTATION_AUTOMATIC_DETAIL: &str = "文節ごとの候補をツリー表示します。";
+    pub const PRESENTATION_SEGMENT_LIST_DETAIL: &str = "選択中の文節の候補を一覧表示します。";
+    pub const PRESENTATION_LIST_DETAIL: &str = "文全体の候補を一覧表示します。";
 
     /// 実演でアプリを切り替えるときに出す名前(macOS は「メモ」)
     pub const DEMO_NOTES: &str = "メモ帳";
@@ -1682,12 +1686,12 @@ mod examples {
         let (reading, candidate) = extras::LOOSE_READINGS_EXAMPLE;
         assert_eq!(
             extras::LOOSE_READINGS_NOTE,
-            format!("「{reading}」から「{candidate}」のように、読みを少し違えて覚えている単語を候補に表示します。")
+            format!("「{reading}」から「{candidate}」のように、読みを誤って覚えている単語を候補に表示します。")
         );
         let (reading, candidate) = extras::PHONETIC_SPELLING_EXAMPLE;
         assert_eq!(
             extras::PHONETIC_SPELLING_NOTE,
-            format!("「{reading}」から「{candidate}」のように、音のとおりに綴った英単語の正しい綴りを候補に表示します。")
+            format!("「{reading}」から「{candidate}」のように、発音どおりに綴った英単語の正しい綴りを候補に表示します。")
         );
     }
 }

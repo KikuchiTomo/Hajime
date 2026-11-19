@@ -313,7 +313,7 @@ const LIVE_CARDS: &[Card] = &[
 const PRESENTATION_CARDS: &[Card] = &[
     Card {
         value: "automatic",
-        title: "分岐図",
+        title: "ツリー表示",
         detail: Some(notes::PRESENTATION_AUTOMATIC_DETAIL),
         recommended: true,
     },
