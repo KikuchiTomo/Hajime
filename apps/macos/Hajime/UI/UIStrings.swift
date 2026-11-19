@@ -818,6 +818,17 @@ enum UIStrings {
 
         // a. 英数とかなの切り替え
         static let modeTitle = "英数とかなの切り替え"
+
+        // 入力モードの表示(macOS だけ)
+        static let indicatorTitle = "入力モードの表示"
+        static let indicatorHajime = "Hajime IME の表示"
+        static let indicatorSystem = "macOS の表示"
+        static let hideSystemIndicator = "macOS の表示を非表示"
+        /// ターミナルで実行するコマンド．macOS が入力位置の下に出す入力ソースの表示を止める(利用者が自分で実行する)
+        static let hideSystemIndicatorCommand = "defaults write -g TSMLanguageIndicatorEnabled -bool false"
+        static let hideSystemIndicatorNote = "ターミナルで実行後、再ログインで反映されます。"
+        static let copy = "コピー"
+        static let copied = "コピーしました"
         static func label(for style: ModeSwitchStyle) -> String {
             switch style {
             case .separate: "英数キーとかなキーで分ける"

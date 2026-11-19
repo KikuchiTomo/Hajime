@@ -8,12 +8,18 @@ import SwiftUI
 final class OnboardingModel: ObservableObject {
     @Published var draft: HajimeDomain.Settings
     @Published var page = OnboardingPage.allCases[0] {
-        didSet { if page != oldValue { spotlight = OnboardingSpotlight.items(on: page).first } }
+        didSet {
+            guard page != oldValue else { return }
+            spotlight = OnboardingSpotlight.items(on: page).first
+            hidesSystemIndicator = false
+        }
     }
     /// 機能のページで，左の実演と説明に見せている機能(項目の上にポインタを置いたもの)．ほかのページでは nil
     @Published var spotlight: OnboardingSpotlight?
     /// アプリごとの入力モードのページで，左の実演に動きを見せているモード(行の上にポインタを置いたもの)
     @Published var appMode = AppProfile.imeOff
+    /// 入力モードの表示のページで，左の実演に macOS の表示を止めたあとの見え方を見せているか(止め方のカードの上にポインタを置いたとき)
+    @Published var hidesSystemIndicator = false
 
     private let store: any SettingsStoring
     private let logger = Logger(subsystem: AppIdentity.bundleIdentifier, category: "onboarding")
@@ -65,6 +71,7 @@ final class OnboardingModel: ObservableObject {
     /// 初期設定が受け持つ項目だけを写す．開いているあいだに設定の画面で変えたほかの項目は上書きしない
     static func apply(_ draft: HajimeDomain.Settings, to settings: inout HajimeDomain.Settings) {
         if let style = ModeSwitchStyle.current(in: draft.keymap) { settings.keymap = style.applied(to: settings.keymap) }
+        settings.showsModeIndicator = draft.showsModeIndicator
         settings.typoCorrection = draft.typoCorrection
         settings.correctionSensitivity = draft.correctionSensitivity
         settings.theme = draft.theme

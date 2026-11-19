@@ -1,8 +1,11 @@
 import HajimeDomain
 
-/// 初期設定のページ．並びは Windows 版と同じ
+/// 初期設定のページ．並びは Windows 版と同じ(modeIndicator は macOS だけ)
 enum OnboardingPage: Int, CaseIterable, Identifiable {
     case modeSwitch
+    /// 入力モードを切り替えたときの表示を，Hajime IME のものにするか macOS のものにするか．
+    /// macOS は入力位置の下に入力ソースの表示を出すので，Hajime IME の表示を使うなら macOS の表示を止める方法を案内する
+    case modeIndicator
     /// アプリごとの入力モード(除外設定の IME をオフ・オン・オンオフを記憶)の紹介
     case appModes
     case correction
@@ -19,6 +22,7 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .modeSwitch: UIStrings.Onboarding.modeTitle
+        case .modeIndicator: UIStrings.Onboarding.indicatorTitle
         case .appModes: UIStrings.Onboarding.appModesTitle
         case .correction: UIStrings.Onboarding.correctionTitle
         case .theme: UIStrings.Onboarding.themeTitle
@@ -35,7 +39,7 @@ enum OnboardingPage: Int, CaseIterable, Identifiable {
         switch self {
         case .appModes: UIStrings.Onboarding.appModesDetail
         case .theme: UIStrings.Onboarding.themeDetail
-        case .modeSwitch, .correction, .liveConversion, .presentation, .characters, .features, .extras: nil
+        case .modeSwitch, .modeIndicator, .correction, .liveConversion, .presentation, .characters, .features, .extras: nil
         }
     }
 
