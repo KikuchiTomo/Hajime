@@ -1,7 +1,7 @@
 #!/bin/sh
 # 作った macOS と Windows の配布物を，GitHub の 1 つのリリースに置く．配布物の SHA-256 の一覧(SHA256SUMS.txt)も一緒に置く．
 # 説明は，CHANGELOG.md のそのバージョンの節(変更点)，前のリリースのタグからマージした PR の一覧(GitHub が作る What's Changed．畳んでおく)，
-# コントリビューター(その間のコミットの作者．ボットを除く)をメンションした一覧にする．
+# コントリビューター(その間のコミットの作者．ボットを除く)をメンションした一覧，コード署名ポリシーへのリンクにする．
 # 使い方: tools/release/publish.sh <タグ> <バージョン> <配布物の置き場所>
 # GH_TOKEN が要る(GitHub Actions の github.token)
 set -eu
@@ -24,6 +24,8 @@ mentions=$(printf '%s\n' "$logins" | grep -v '\[bot\]$' | grep -v '^$' | sort -u
 section=$(python3 -I "$root/tools/release/changelog.py" section "$version")
 notes=$(printf '%s\n\n<details>\n<summary>マージした PR</summary>\n\n%s\n\n</details>\n' "$section" "$changes")
 if [ -n "$mentions" ]; then notes=$(printf '%s\n\n## コントリビューター\n\n%s\n' "$notes" "$mentions"); fi
+# 配布物の署名の方針は，配布のページから辿れるようにする(SignPath Foundation の条件)
+notes=$(printf '%s\n\n[コード署名ポリシー(Code signing policy)](https://haji.men/code-signing-policy/)\n' "$notes")
 # shellcheck disable=SC2086
 gh release create "$tag" --verify-tag --latest \
   --title "v$version" --notes "$notes" \

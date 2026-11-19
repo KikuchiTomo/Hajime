@@ -39,6 +39,18 @@ Hajime IME is under active development, and its behavior may change.
 
 We recommend restarting your PC after installation.
 
+## Code signing policy
+
+macOS releases are signed with an Apple Developer ID certificate and notarized by Apple. The Windows installer is currently unsigned. Once our application to the SignPath Foundation program for open source projects is approved, Windows releases will be signed as follows.
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org)
+
+- Committers and reviewers: [KikuchiTomo](https://github.com/KikuchiTomo)
+- Approvers: [KikuchiTomo](https://github.com/KikuchiTomo)
+- Privacy policy: This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. See the [privacy policy](https://haji.men/privacy/) (in Japanese).
+
+The full policy is on the [code signing policy](https://haji.men/code-signing-policy/#code-signing-policy) page.
+
 ## License
 
 MIT License ([LICENSE](LICENSE)).

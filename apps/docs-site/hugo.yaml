@@ -57,11 +57,14 @@ menu:
       url: https://github.com/KikuchiTomo/Hajime
       params:
         icon: github
-  # ドキュメントの横の一覧の下に出す．ページはサイトの直下(/privacy/)
+  # ドキュメントの横の一覧の下に出す．ページはサイトの直下(/privacy/，/code-signing-policy/)
   sidebar:
     - name: プライバシーポリシー
       pageRef: /privacy
       weight: 1
+    - name: コード署名ポリシー
+      pageRef: /code-signing-policy
+      weight: 2
 
 params:
   images:
