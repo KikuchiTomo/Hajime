@@ -179,14 +179,47 @@ struct NasalAmbiguityTests {
         #expect(composition.conversionReadingWithFrozenWordsAsKana == nil)
     }
 
-    @Test("R-02: ローマ字として読めない英単語(「git」)と，綴りを直した英単語は置き換えない")
+    @Test("R-02: 後ろのかなと合わせてもローマ字として読めない英単語(「python」)と，綴りを直した英単語は置き換えない")
     func frozenWordsNotReadable() {
-        var git = compose("gitwo")
-        git.freeze(rawStart: 0, kanaStart: 0, keys: "git", as: "git", replaying: "wo")
-        #expect(git.conversionReadingWithFrozenWordsAsKana == nil)
+        var python = compose("pythonha")
+        python.freeze(rawStart: 0, kanaStart: 0, keys: "python", as: "python", replaying: "ha")
+        #expect(python.conversionReadingWithFrozenWordsAsKana == nil)
+        #expect(python.romajiReading(ofReading: 0..<7) == nil)
         var corrected = compose("sride")
         corrected.freeze(rawStart: 0, kanaStart: 0, keys: "sride", as: "bride", replaying: "")
         #expect(corrected.conversionReadingWithFrozenWordsAsKana == nil)
+    }
+
+    @Test("R-02: 綴りの途中で終わる英単語(「met」+「やくちゃ」)は，後ろのかなと合わせて読み直す(めちゃくちゃ)")
+    func frozenWordEndingInsideSpelling() {
+        var composition = compose("kyouhametyakutya")
+        composition.freeze(rawStart: 6, kanaStart: 4, keys: "met", as: "met", replaying: "yakutya")
+        #expect(composition.conversionReading == "きょうはmetやくちゃ")
+        #expect(composition.conversionReadingWithFrozenWordsAsKana == "きょうはめちゃくちゃ")
+        var git = compose("gitwotukau")
+        git.freeze(rawStart: 0, kanaStart: 0, keys: "git", as: "git", replaying: "wotukau")
+        #expect(git.conversionReadingWithFrozenWordsAsKana == "ぎとぉつかう")
+    }
+
+    @Test("R-02: 読みの範囲を，打ったキーをローマ字として読み直す．英単語にかからない範囲と，キーの区切りに合わない範囲は読み直さない")
+    func romajiReadingOfRange() {
+        var composition = compose("metyakutya")
+        composition.freeze(rawStart: 0, kanaStart: 0, keys: "met", as: "met", replaying: "yakutya")
+        #expect(composition.conversionReading == "metやくちゃ")
+        // 読み全体・英単語と後ろのかな・英単語の途中まで
+        #expect(composition.romajiReading(ofReading: 0..<7) == "めちゃくちゃ")
+        #expect(composition.romajiReading(ofReading: 0..<4) == "めちゃ")
+        #expect(composition.romajiReading(ofReading: 0..<2) == "め")
+        #expect(composition.romajiReading(ofReading: 2..<4) == "ちゃ")
+        // 「met」だけでは読めない(めt)
+        #expect(composition.romajiReading(ofReading: 0..<3) == nil)
+        // 英単語にかからない
+        #expect(composition.romajiReading(ofReading: 4..<7) == nil)
+        // かなの途中(「ちゃ」の「ち」と「ゃ」のあいだ)はキーの区切りに合わない
+        #expect(composition.romajiReading(ofReading: 0..<6) == nil)
+        // 途中を消すと，打ったキーと読みが対応しなくなるので読み直さない
+        composition.deleteBackward()
+        #expect(composition.romajiReading(ofReading: 0..<4) == nil)
     }
 
     @Test("R-02: 読みの先頭を確定したら，確定させた英単語の位置をずらす")

@@ -59,6 +59,113 @@ struct EnglishMixedScenarioTests {
         #expect(column?.variants == ["でも", "デモ", "ﾃﾞﾓ"])
     }
 
+    /// 「めちゃくちゃ」を語の途中(metyaku)で止まると，「met」+「やく」に取り違える読みの点数
+    private func mechakuchaConverter() -> FakeConverter {
+        let converter = FakeConverter([
+            "めちゃくちゃ": [("めちゃくちゃ", nil), ("滅茶苦茶", nil)],
+            "めちゃく": [("目着", nil)],
+            "めちゃ": [("目茶", nil)],
+        ])
+        converter.scores = ["めちゃく": -27, "やく": -10, "めちゃくちゃ": -10, "やくちゃ": -22, "めちゃ": -11]
+        return converter
+    }
+
+    @Test("R-02: 語の途中で打鍵が止まって英単語にした語は，続きを打ったあとに見分け直して日本語に戻す(metyaku + tya → めちゃくちゃ)",
+          arguments: [true, false])
+    func tentativeWordIsReconsidered(settles: Bool) {
+        let harness = Harness(converter: mechakuchaConverter(), lexicon: FakeLexicon(words: ["met"]))
+        harness.type("metyaku")
+        harness.settle()
+        #expect(harness.marked.text == "metやく")
+        harness.type("tya")
+        #expect(harness.marked.text == "metやくちゃ")
+        // 打鍵が止まったときも，止まる前に確定したときも見分け直す
+        if settles {
+            harness.settle()
+            #expect(harness.marked.text == "めちゃくちゃ")
+        }
+        harness.press(.enter)
+        #expect(harness.committed == "めちゃくちゃ")
+    }
+
+    @Test("R-02: 打鍵が止まって英単語にした語は，続きを打ったあとも英単語と見分ければ英単語のまま(gitwo + tukau → gitを使う)")
+    func tentativeWordStaysEnglish() {
+        let converter = FakeConverter(["gitをつかう": [("gitを使う", nil)]])
+        converter.scores = ["ぎとぉ": -35, "を": -9, "ぎとぉつかう": -52, "をつかう": -16]
+        let harness = Harness(converter: converter, lexicon: FakeLexicon(words: ["git"]))
+        harness.type("gitwo")
+        harness.settle()
+        #expect(harness.marked.text == "gitを")
+        harness.type("tukau")
+        #expect(harness.marked.text == "gitを使う")
+        harness.settle()
+        #expect(harness.marked.text == "gitを使う")
+        harness.press(.enter)
+        #expect(harness.committed == "gitを使う")
+    }
+
+    @Test("R-02: 綴りの途中で終わる英単語にした文節にも，打ったキーをローマ字として読んだ日本語の候補を出す．かなは上の枝に出す")
+    func wordEndingInsideSpellingKeepsJapaneseInLattice() {
+        let harness = Harness(converter: mechakuchaConverter(), lexicon: FakeLexicon(words: ["met"]))
+        harness.type("metyaku")
+        harness.settle()
+        harness.press(.space)
+        let column = harness.lattice?.columns.first
+        #expect(column?.text == "metやく")
+        #expect(column?.alternatives == ["metやく", "目着"])
+        #expect(column?.variants == ["めちゃく", "メチャク", "ﾒﾁｬｸ"])
+    }
+
+    @Test("R-02: 英単語にした文節の区切りを変えても，新しい区切りの読みで日本語の候補を出す")
+    func resizedSegmentKeepsJapanese() {
+        let harness = Harness(converter: mechakuchaConverter(), lexicon: FakeLexicon(words: ["met"]))
+        harness.type("metyaku")
+        harness.settle()
+        harness.press(.space)
+        // 「metや」｜「く」
+        harness.press(.left, .shift)
+        var column = harness.lattice?.columns.first
+        #expect(column?.text == "metや")
+        #expect(column?.alternatives == ["metや", "目茶"])
+        #expect(column?.variants == ["めちゃ", "メチャ", "ﾒﾁｬ"])
+        // 「met」だけではローマ字として読めないので，日本語の候補は無い
+        harness.press(.left, .shift)
+        column = harness.lattice?.columns.first
+        #expect(column?.text == "met")
+        #expect(column?.alternatives == ["met"])
+        // 「me」は「め」
+        harness.press(.left, .shift)
+        column = harness.lattice?.columns.first
+        #expect(column?.text == "me")
+        #expect(column?.variants == ["め", "メ", "ﾒ"])
+        // 元の長さに戻しても候補は残る
+        for _ in 0..<3 { harness.press(.right, .shift) }
+        #expect(harness.lattice?.columns.first?.alternatives == ["metやく", "目着"])
+    }
+
+    @Test("R-02: 綴りの途中で終わる英単語にした語も，一覧でローマ字として読んだ日本語を第 1 候補のすぐ後ろから選べる")
+    func wordEndingInsideSpellingKeepsJapaneseInList() {
+        let harness = Harness(converter: mechakuchaConverter(), lexicon: FakeLexicon(words: ["met"]), settings: .listPresentation)
+        harness.type("metyaku")
+        harness.settle()
+        harness.press(.space)
+        #expect(harness.panel?.entries.prefix(2).map(\.text) == ["metやく", "目着"])
+        harness.type("2")
+        #expect(harness.committed == "目着")
+    }
+
+    @Test("R-02: 日本語として読めない読み(「git」+「を」→ ぎとぉ)の候補は，英単語の候補の後ろに並べる")
+    func implausibleJapaneseGoesLast() {
+        let converter = FakeConverter(["gitを": [("gitを", nil), ("GITを", nil)], "ぎとぉ": [("義とぉ", nil)]])
+        converter.scores = ["ぎとぉ": -35, "を": -9]
+        let harness = Harness(converter: converter, lexicon: FakeLexicon(words: ["git"]))
+        harness.type("gitwo")
+        harness.press(.space)
+        let column = harness.lattice?.columns.first
+        #expect(column?.text == "gitを")
+        #expect(column?.alternatives == ["gitを", "GITを", "義とぉ"])
+    }
+
     @Test("R-02: 英単語より後ろの日本語の打ち間違いは直し，Esc で打ったままに戻せる")
     func reviewsJapaneseAfterEnglish() {
         let converter = FakeConverter()
