@@ -481,7 +481,7 @@ public enum DefaultSettings {
     /// 入力中の表示を Zenzai なしで求めたとき，打鍵の合間に Zenzai の変換を求めるまでの間(秒)．Windows では DLL に来てもらう(wake)間隔
     public static let deferredConversionPollInterval = 0.005
     /// 打鍵が止まったあとの処理(止まったときの表示・分岐図の下見)に使う変換を裏で求めているあいだ，届いたかを確かめる間隔(秒)．
-    /// 待つあいだメインスレッドは空いていて，次のキーが来ればそちらを先に処理する．Windows では DLL に来てもらう(wake)間隔
+    /// 待つあいだメインスレッドは空いていて，次のキーが来ればそちらを先に処理する
     public static let idlePreparationPollInterval = 0.002
     /// 打鍵の合間の Zenzai の変換にかけてよい時間(秒．Windows)．これより長くかかったら，その入力のあいだは打鍵の合間に求めず，
     /// 打鍵が止まったとき(liveConversionDelay)に求める．CPU で推論すると，読みが長いほど 1 回の変換が打鍵の間隔より長くなり(120 字で約 0.5 秒)，
