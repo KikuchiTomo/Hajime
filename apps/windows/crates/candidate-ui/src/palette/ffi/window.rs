@@ -63,6 +63,10 @@ pub type Handler = fn(Event);
 
 static HANDLER: std::sync::OnceLock<Handler> = std::sync::OnceLock::new();
 
+/// 全体の倍率(設定のパレットの倍率．f32 のビット列)．DPI の倍率に掛けて，窓の大きさ・描く細かさ・押した位置をまとめて変える．
+/// 窓はプロセスに 1 つで，窓の手続き(押した位置を DIP にするところ)からも読むので，窓の外に置く
+static ZOOM: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0x3F80_0000);
+
 pub struct Window {
     hwnd: HWND,
     target: Option<ID2D1HwndRenderTarget>,
@@ -129,9 +133,14 @@ impl Window {
         Ok(Self { hwnd, target: None })
     }
 
-    /// 1 DIP のデバイスピクセル数
+    /// 1 DIP のデバイスピクセル数．画面の DPI の倍率に，設定のパレットの倍率を掛けたもの
     pub fn scale(&self) -> f32 {
         scale_of(self.hwnd)
+    }
+
+    /// 設定のパレットの倍率を変える(次に scale を読むところから効く)
+    pub fn set_zoom(&self, zoom: f32) {
+        ZOOM.store(zoom.to_bits(), std::sync::atomic::Ordering::Relaxed);
     }
 
     /// caret(ピクセル)のある画面の作業領域
@@ -306,10 +315,11 @@ impl Window {
 fn scale_of(hwnd: HWND) -> f32 {
     // SAFETY: 窓の DPI を尋ねるだけ
     let dpi = unsafe { GetDpiForWindow(hwnd) };
+    let zoom = f32::from_bits(ZOOM.load(std::sync::atomic::Ordering::Relaxed));
     if dpi == 0 {
-        1.0
+        zoom
     } else {
-        dpi as f32 / BASE_DPI
+        dpi as f32 / BASE_DPI * zoom
     }
 }
 

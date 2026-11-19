@@ -50,10 +50,12 @@ struct SettingsCatalogTests {
                 "paletteColumns": range(DefaultSettings.paletteColumnsRange),
                 "paletteRows": range(DefaultSettings.paletteRowsRange),
                 "paletteCellSize": range(DefaultSettings.paletteCellSizeRange),
+                "paletteScale": range(DefaultSettings.paletteScaleRange),
                 "paletteFrequentRows": range(DefaultSettings.paletteFrequentRowsRange),
             ]),
             "associationLimitStep": .number(Double(DefaultSettings.associationLimitStep)),
             "paletteCellSizeStep": .number(DefaultSettings.paletteCellSizeStep),
+            "paletteScaleStep": .number(DefaultSettings.paletteScaleStep),
             "secondsStep": .number(DefaultSettings.secondsStep),
             "correctionTimeoutStep": .number(DefaultSettings.correctionTimeoutStep),
             "limits": .object([

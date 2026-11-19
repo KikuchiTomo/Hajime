@@ -248,6 +248,8 @@ public struct Settings: Sendable, Equatable {
     public var paletteRows = DefaultSettings.paletteRows
     /// パレットのマスの一辺(pt)．文字の大きさはこれに合わせる
     public var paletteCellSize = DefaultSettings.paletteCellSize
+    /// パレット全体に掛ける倍率(1 が等倍)．マスの大きさ・列数・行数で決めた窓にそのまま掛ける
+    public var paletteScale = DefaultSettings.paletteScale
     /// パレットの下に，選んでいる文字の名前・読み・ショートコードを出す
     public var paletteShowsPreview = DefaultSettings.paletteShowsPreview
     /// パレットの説明に，Unicode の名前(並びの絵文字は CLDR の英語の名前)を出す
@@ -327,6 +329,8 @@ public struct Settings: Sendable, Equatable {
         paletteColumns = clamp(paletteColumns, DefaultSettings.paletteColumnsRange)
         paletteRows = clamp(paletteRows, DefaultSettings.paletteRowsRange)
         paletteCellSize = clamp(paletteCellSize.isFinite ? paletteCellSize : DefaultSettings.paletteCellSize, DefaultSettings.paletteCellSizeRange)
+        // 刻みを重ねた端数(1.2000000000000002 など)を落とす
+        paletteScale = clamp(paletteScale.isFinite ? (paletteScale * 100).rounded() / 100 : DefaultSettings.paletteScale, DefaultSettings.paletteScaleRange)
         paletteFrequentRows = clamp(paletteFrequentRows, DefaultSettings.paletteFrequentRowsRange)
         var themeIDs = Set<String>()
         customThemes = Array(customThemes.filter { $0.isValid && themeIDs.insert($0.id).inserted }.prefix(DefaultSettings.maximumCustomThemes))
@@ -450,6 +454,7 @@ extension Settings: Codable {
         case englishTermCandidates, englishTerms
         case palette, paletteClosesAfterInsert, paletteRecordsHistory, paletteColumns, paletteRows, paletteCellSize, paletteShowsPreview, paletteFrequentRows
         case paletteShowsUnicodeName, paletteShowsReadings, paletteShowsShortcodes, paletteShowsCodePoints
+        case paletteScale
     }
 
     /// 項目を足しても古い設定ファイルを読めるよう，無い項目と読めない項目は既定値のままにする
@@ -603,6 +608,7 @@ extension Settings: Codable {
         read(.paletteColumns, into: \.paletteColumns)
         read(.paletteRows, into: \.paletteRows)
         read(.paletteCellSize, into: \.paletteCellSize)
+        read(.paletteScale, into: \.paletteScale)
         read(.paletteShowsPreview, into: \.paletteShowsPreview)
         read(.paletteFrequentRows, into: \.paletteFrequentRows)
         read(.paletteShowsUnicodeName, into: \.paletteShowsUnicodeName)
@@ -749,6 +755,7 @@ extension Settings: Codable {
         try container.encode(paletteColumns, forKey: .paletteColumns)
         try container.encode(paletteRows, forKey: .paletteRows)
         try container.encode(paletteCellSize, forKey: .paletteCellSize)
+        try container.encode(paletteScale, forKey: .paletteScale)
         try container.encode(paletteShowsPreview, forKey: .paletteShowsPreview)
         try container.encode(paletteFrequentRows, forKey: .paletteFrequentRows)
         try container.encode(paletteShowsUnicodeName, forKey: .paletteShowsUnicodeName)

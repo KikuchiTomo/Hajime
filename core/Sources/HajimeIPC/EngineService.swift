@@ -697,7 +697,7 @@ public final class EngineService {
         let current = settings.current
         let routed = RoutedActions(actions, anchor: anchor, composition: lastComposition, hints: { [hints] in hints($0, current) },
                                    listHints: { [listHints] in listHints($0, current) }, placedHints: { [placedHints] in placedHints($0, current) },
-                                   paletteCellSize: current.paletteCellSize)
+                                   paletteCellSize: current.paletteCellSize, paletteScale: current.paletteScale)
         routed.ui.forEach(ui)
         for command in routed.ui {
             switch command {

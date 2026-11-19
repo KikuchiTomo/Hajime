@@ -1102,6 +1102,7 @@ pub mod palette {
     pub const COLUMNS: &str = "パレットの列数";
     pub const ROWS: &str = "パレットの行数";
     pub const CELL_SIZE: &str = "パレットのマスの大きさ";
+    pub const SCALE: &str = "パレットの倍率";
     pub const SHOWS_PREVIEW: &str = "パレットに文字の説明を表示";
     pub const SHOWS_UNICODE_NAME: &str = "説明に Unicode の名前を表示";
     pub const SHOWS_READINGS: &str = "説明に読みを表示";
@@ -1120,6 +1121,11 @@ pub mod palette {
     /// UIStrings.Palette.cellSizeValue(スライダーの名前に今の値を付ける)
     pub fn cell_size_value(size: f64) -> String {
         format!("{CELL_SIZE}: {} pt", size.round() as i64)
+    }
+
+    /// UIStrings.Palette.scaleValue(スライダーの名前に今の倍率を % で付ける)
+    pub fn scale_value(scale: f64) -> String {
+        format!("{SCALE}: {}%", (scale * 100.0).round() as i64)
     }
 }
 
@@ -1293,6 +1299,7 @@ pub mod sync {
         ("paletteColumns", "パレットの列数"),
         ("paletteRows", "パレットの行数"),
         ("paletteCellSize", "パレットのマスの大きさ"),
+        ("paletteScale", "パレットの倍率"),
         ("paletteShowsPreview", "パレットに文字の説明を表示"),
         ("paletteShowsUnicodeName", "説明に Unicode の名前を表示"),
         ("paletteShowsReadings", "説明に読みを表示"),

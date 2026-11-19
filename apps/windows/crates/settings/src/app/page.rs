@@ -861,6 +861,9 @@ impl RowState {
             (Control::Slider(RangeKind::PaletteCellSize), Some(value)) => {
                 crate::strings::palette::cell_size_value(value)
             }
+            (Control::Slider(RangeKind::PaletteScale), Some(value)) => {
+                crate::strings::palette::scale_value(value)
+            }
             // カスタムテーマの行は利用者の付けた名前
             (Control::CustomTheme(_), _) => self.text.clone(),
             _ => self.row.title.to_string(),

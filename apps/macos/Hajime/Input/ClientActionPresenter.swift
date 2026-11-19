@@ -141,7 +141,8 @@ final class ClientActionPresenter {
                     guard let self, let client = client as? any IMKTextInput else { return }
                     self.apply(self.session.palette(target, context: self.context), to: client)
                 }
-                palette.show(shown, caret: caretRect(of: client), theme: ThemeChoice(settings.current), cellSize: settings.current.paletteCellSize)
+                palette.show(shown, caret: caretRect(of: client), theme: ThemeChoice(settings.current), cellSize: settings.current.paletteCellSize,
+                             scale: settings.current.paletteScale)
             case .hidePalette:
                 palette.hide()
             case .toggleLiveConversion:

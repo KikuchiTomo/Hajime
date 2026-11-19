@@ -261,7 +261,8 @@
         "skinTonePicker": { "options": ["🙇", "🙇🏻", "🙇🏼", "🙇🏽", "🙇🏾", "🙇🏿"], "selected": 2 },
         "hints": [{ "keys": "Enter", "label": "入力" }],
         "cellSize": 36.5,
-        "previewFields": { "unicodeName": true, "readings": true, "shortcodes": false, "codePoints": true }
+        "previewFields": { "unicodeName": true, "readings": true, "shortcodes": false, "codePoints": true },
+        "scale": 1.2
       },
       "anchor": { "x": 1, "y": 2, "width": 3, "height": 4 }
     },

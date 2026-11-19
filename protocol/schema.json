@@ -2660,6 +2660,10 @@
         {
           "name": "previewFields",
           "type": "PalettePreviewFields?"
+        },
+        {
+          "name": "scale",
+          "type": "f64?"
         }
       ]
     },

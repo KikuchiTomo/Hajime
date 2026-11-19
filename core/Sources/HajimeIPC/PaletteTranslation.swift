@@ -74,8 +74,8 @@ extension SkinTone {
 }
 
 extension WirePalettePanel {
-    /// cellSize は設定のパレットのマスの大きさ(macOS は窓が設定を読むが，Windows の候補ウィンドウは設定を読まないので添える)
-    public init(_ panel: PalettePanel, cellSize: Double) {
+    /// cellSize は設定のパレットのマスの大きさ，scale は設定のパレットの倍率(macOS は窓が設定を読むが，Windows の候補ウィンドウは設定を読まないので添える)
+    public init(_ panel: PalettePanel, cellSize: Double, scale: Double = DefaultSettings.paletteScale) {
         self.init(
             modes: panel.modes.map { WirePaletteMode(kind: WirePaletteKind($0.kind), title: $0.title, isSelected: $0.isSelected) },
             query: panel.query,
@@ -110,7 +110,9 @@ extension WirePalettePanel {
             // 動くものが無ければ送らない
             motion: panel.motion.isEmpty ? nil : WirePaletteMotion(panel.motion),
             previewFields: WirePalettePreviewFields(unicodeName: panel.previewFields.unicodeName, readings: panel.previewFields.readings,
-                                                    shortcodes: panel.previewFields.shortcodes, codePoints: panel.previewFields.codePoints)
+                                                    shortcodes: panel.previewFields.shortcodes, codePoints: panel.previewFields.codePoints),
+            // 等倍なら省く(倍率を知らない候補ウィンドウにも同じ形で送る)
+            scale: scale == DefaultSettings.paletteScale ? nil : scale
         )
     }
 }

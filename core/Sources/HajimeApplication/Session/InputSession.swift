@@ -199,6 +199,8 @@ public final class InputSession {
     private let paletteServices: PaletteServices?
     /// 開いているパレット．開いているあいだのキーはパレットが受ける
     private var palette: PaletteSession?
+    /// パレットを開いているあいだ，入力先に組み立て中の文字として出している文字(PaletteServices.showsSelectionInClient)．出していなければ nil
+    private var paletteClientText: String?
 
     /// - Parameters:
     ///   - typoService: 打ち間違いの訂正を別のところで求めるもの．nil なら変換器で求める(テストと Zenzai の無いとき)
@@ -873,7 +875,7 @@ public final class InputSession {
         let session = PaletteSession(kind: kind ?? paletteServices.usage.usage.lastKind ?? .emoji, inputMode: mode, services: paletteServices,
                                      settings: settings, keyNames: keyNames, makeComposition: { [unowned self] in newComposition() })
         palette = session
-        return actions + [.hideCandidates, .showPalette(session.panel())]
+        return actions + [.hideCandidates] + showPalette(session)
     }
 
     /// パレットの窓をマウスで操作した
@@ -894,7 +896,9 @@ public final class InputSession {
                 // 日本語入力と英数入力の切り替えは効かせ，探す欄の見せ方を合わせる
                 let result = perform(command, event: event, context: context)
                 palette.inputMode = mode
-                return KeyResult(handled: true, actions: result.actions + [.showPalette(palette.panel())])
+                // モードの切り替えが組み立て中の文字を消していても，出し直す
+                paletteClientText = nil
+                return KeyResult(handled: true, actions: result.actions + showPalette(palette))
             case _ where command.isTool:
                 // 設定を開く・手書きなどは，パレットを閉じてから行う
                 let closing = closePalette()
@@ -910,17 +914,41 @@ public final class InputSession {
 
     private func paletteActions(_ outcome: PaletteSession.Outcome, palette: PaletteSession) -> [ClientAction] {
         switch outcome {
-        case .render: [.showPalette(palette.panel())]
-        case .insert(let text, let keepsOpen): [.commit(text)] + (keepsOpen ? [.showPalette(palette.panel())] : closePalette())
-        case .close, .closeAndPassThrough: closePalette()
-        case .none: []
+        case .render:
+            return showPalette(palette)
+        case .insert(let text, let keepsOpen):
+            // 確定は入力先の組み立て中の文字(選んでいた文字)を置き換える
+            paletteClientText = nil
+            return [.commit(text)] + (keepsOpen ? showPalette(palette) : closePalette())
+        case .close, .closeAndPassThrough:
+            return closePalette()
+        case .none:
+            return []
         }
+    }
+
+    /// パレットを出す(出し直す)．入力先に組み立て中の文字を持たせる作りなら，選んでいる文字を組み立て中の文字として出す．
+    /// 組み立て中の文字があるあいだ，入力先のアプリは ⌫ や矢印を自分では処理しない．
+    /// 窓を置く場所は組み立て中の文字を出す前の入力位置で決めるので，窓を先に出す
+    private func showPalette(_ palette: PaletteSession) -> [ClientAction] {
+        var actions: [ClientAction] = [.showPalette(palette.panel())]
+        guard paletteServices?.showsSelectionInClient == true else { return actions }
+        // 出す文字が無い(表を読み込んでいるあいだ)ときは nil にして，出していた文字を消す
+        let text = palette.clientText.isEmpty ? nil : palette.clientText
+        if text != paletteClientText {
+            paletteClientText = text
+            actions.append(.setMarkedText(text.map { MarkedText([.init($0, style: .converted)]) } ?? .empty))
+        }
+        return actions
     }
 
     private func closePalette() -> [ClientAction] {
         guard palette != nil else { return [] }
         palette = nil
-        return [.hidePalette]
+        // 入力先に出していた文字は入れずに消す
+        let clearing: [ClientAction] = paletteClientText == nil ? [] : [.setMarkedText(.empty)]
+        paletteClientText = nil
+        return clearing + [.hidePalette]
     }
 
     private func perform(_ command: KeymapCommand, event: KeyEvent, context: InputContext) -> KeyResult {

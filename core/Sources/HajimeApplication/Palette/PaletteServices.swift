@@ -25,10 +25,15 @@ public final class PaletteServices {
     let catalog: any PaletteCatalogProviding
     let usage: any PaletteUsageStoring
     let now: () -> Date
+    /// パレットを開いているあいだ，選んでいる文字を組み立て中の文字として入力先に出すか．
+    /// macOS では出す．入力先のアプリは IME がキーを受けたかを知らされず，組み立て中の文字の有無で判断するので，
+    /// 無いと ⌫ や矢印がアプリにも効く(Chromium 系のアプリ・ターミナル)．Windows は TSF がキーを受けたことをアプリに伝えるので出さない
+    let showsSelectionInClient: Bool
 
-    public init(catalog: any PaletteCatalogProviding, usage: any PaletteUsageStoring, now: @escaping () -> Date) {
+    public init(catalog: any PaletteCatalogProviding, usage: any PaletteUsageStoring, now: @escaping () -> Date, showsSelectionInClient: Bool) {
         self.catalog = catalog
         self.usage = usage
         self.now = now
+        self.showsSelectionInClient = showsSelectionInClient
     }
 }

@@ -55,7 +55,7 @@ RESTORE_ALL = ("バックアップ", "すべての設定を既定に戻す")
 # 範囲の名前が項目の名前と違うもの
 RANGE_NAMES = {"listCandidatesPerPage": "candidatesPerPage", "branchCandidatesPerPage": "candidatesPerPage"}
 STEP_NAMES = {"reviewCorrectionTimeout": "correctionTimeoutStep", "lateCorrectionTimeout": "correctionTimeoutStep",
-              "associationLimit": "associationLimitStep", "paletteCellSize": "paletteCellSizeStep"}
+              "associationLimit": "associationLimitStep", "paletteCellSize": "paletteCellSizeStep", "paletteScale": "paletteScaleStep"}
 SECONDS = {"liveConversionDelay", "predictionDelay", "correctionDelay", "reviewCorrectionTimeout", "lateCorrectionTimeout", "modeIndicatorDuration"}
 ROLE_NAMES = {"AXCheckBox": "スイッチ", "AXPopUpButton": "選択肢", "AXIncrementor": "ステッパー", "AXSlider": "スライダー", "AXButton": "ボタン"}
 

@@ -42,7 +42,7 @@ public enum SyncGroup: String, Sendable, Equatable, Codable, CaseIterable, Codin
         case .importedDictionaries: ["importedDictionaries"]
         case .associationDictionaries: ["associationDictionaries"]
         case .appearance: ["theme", "candidateFontSize", "showsModeIndicator", "modeIndicatorDuration", "customThemes", "customThemeID",
-                           "paletteColumns", "paletteRows", "paletteCellSize", "paletteShowsPreview", "paletteFrequentRows",
+                           "paletteColumns", "paletteRows", "paletteCellSize", "paletteScale", "paletteShowsPreview", "paletteFrequentRows",
                            "paletteShowsUnicodeName", "paletteShowsReadings", "paletteShowsShortcodes", "paletteShowsCodePoints"]
         case .exclusions: ["escapeSwitchesToDirect", "terminalCommands", "restrainsLiveConversionInCode", "profileRules"]
         case .usage: ["recordsUsage"]
