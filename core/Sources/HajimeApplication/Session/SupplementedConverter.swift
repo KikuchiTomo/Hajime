@@ -215,6 +215,9 @@ public final class SupplementedConverter: KanaKanjiConverting {
         base.setLeftContext(text)
     }
     public func setTyping(_ typing: Bool) { base.setTyping(typing) }
+    public func setDeferring(_ deferring: Bool) { base.setDeferring(deferring) }
+    public func consumeDeferredMiss() -> Bool { base.consumeDeferredMiss() }
+    public func setArrivalObserver(_ observer: (@MainActor () -> Void)?) { base.setArrivalObserver(observer) }
     public var hasDeferredConversion: Bool { base.hasDeferredConversion }
     public func performDeferredConversion() { base.performDeferredConversion() }
     public func didCommit(_ candidate: Candidate) {

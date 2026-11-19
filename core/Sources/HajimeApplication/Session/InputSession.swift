@@ -27,7 +27,7 @@ public final class InputSession {
     private let scorer: (any CandidateScoring)?
     /// 別のモデルとの合議(ADR 0016 の案 2)．使うかは設定の jinenModel で決める(activeFusing)
     private let fusing: (any CandidateFusing)?
-    private let lexicon: any EnglishLexicon
+    private let lexicon: CachingLexicon
     private let usageDictionary: (any UsageDictionaryProviding)?
     private let settings: any SettingsReading
 
@@ -99,6 +99,17 @@ public final class InputSession {
     }
     /// 前に打鍵が止まったときにライブ変換で見せた文と読み．打っている途中の文の先頭をこれに合わせ，ちらつかせない(LiveConversionRule.stabilized)
     private var settledLive: (candidate: Candidate, reading: String)?
+    /// 打っているあいだの変換を待たずに裏で求めるか(setConversionArrivalHandler で届いたときの処理を入れたアプリだけ)．
+    /// 待たないあいだは，前に見せた文にあとから打ったかなを足して見せ，届いたら出し直す(conversionDidArrive)
+    private var defersLiveConversion = false
+    /// 今の表示を作るあいだに，待たずに裏へ回した変換があったか
+    private var renderAwaitsConversion = false
+    /// 「nn」のあとの母音の読みを，点数を待たずに裏で求めているか．届いたときか，次のキーの前に決める
+    private var nasalPending = false
+    /// 英単語の補正を，読みのもっともらしさを待たずに裏で求めているか．届いたときか，次のキーの前に決める
+    private var correctionPending = false
+    /// 最後にライブ変換で見せた文と，その読み．変換を待つあいだの表示の土台にする
+    private var lastLive: (shown: String, reading: String)?
     /// Shift を押して英字を打ち始め，英字のまま入れているところか(設定 shiftStartsAlphabet)
     private var alphabetRun = false
     /// 読みの先頭の「:」から打ったキー(「:bow」)．「:」で閉じたショートコードを絵文字にするのに使う(R-26)．
@@ -229,6 +240,7 @@ public final class InputSession {
         self.groupsBranchSegments = groupsBranchSegments
         self.rejections = rejections
         self.converter = converter
+        let lexicon = CachingLexicon(lexicon)
         self.lexicon = lexicon
         self.settings = settings
         self.usage = usage
@@ -244,6 +256,68 @@ public final class InputSession {
     }
 
     public var isComposing: Bool { !composition.isEmpty || !composingStyles.isEmpty }
+
+    /// 打っているあいだの変換を裏で求め，届いたときに handler を呼ぶようにする．handler は conversionDidArrive を呼んで表示を出し直す．
+    /// nil なら今までどおり，キーの処理の中で変換を待つ
+    public func setConversionArrivalHandler(_ handler: (@MainActor () -> Void)?) {
+        defersLiveConversion = handler != nil
+        converter.setArrivalObserver(handler)
+    }
+
+    /// 裏で求めていた変換が届いた．打っている途中なら，届いた変換で表示を出し直す(変わらなければ何も返さない)．
+    /// 呼んだあとは followUps も呼び直す(変換を待っていて求められなかった予測を求める)
+    public func conversionDidArrive(context: InputContext) -> [ClientAction] {
+        guard defersLiveConversion, phase == .composing, !composition.isEmpty else { return [] }
+        if nasalPending { resolveNasalReading(waits: false) }
+        if correctionPending { updateCorrection(waits: false) }
+        return rerender(context: context)
+    }
+
+    /// 変換が届いたあとに，followUps を呼び直すものがあるか(変換を待っていて求められなかった予測)
+    public var needsFollowUpsAfterArrival: Bool {
+        guard defersLiveConversion, phase == .composing, !composition.isEmpty, !isSettled, predictionsShown else { return false }
+        converter.setDeferring(true)
+        defer {
+            converter.setDeferring(false)
+            _ = converter.consumeDeferredMiss()
+        }
+        return suggestionPredictions?.reading != predictionTarget().reading
+    }
+
+    /// 「nn」のあとの母音の読みを決める．waits が false なら，まだ求めていない点数は待たずに裏で求め，届いてから決める
+    private func resolveNasalReading(waits: Bool) {
+        converter.setDeferring(!waits && defersLiveConversion)
+        defer { converter.setDeferring(false) }
+        nasalPending = NasalReadingResolver(converter: converter).resolve(&composition)
+    }
+
+    /// 前のキーで待たずに裏へ回した調べもの(「nn」のあとの読み・英単語の補正)を，待って済ませる．
+    /// 次のキーは前のキーまでの結果を前提に進めるので，キーを処理する前に必ず呼ぶ(結果は待って求めたときと同じになる)．
+    /// 調べものは軽い変換で，ふつうは次のキーの前に届いている．届いていないときだけ，ここで待つ
+    private func settleDeferredLookups() {
+        if nasalPending { resolveNasalReading(waits: true) }
+        if correctionPending { updateCorrection(waits: true) }
+    }
+
+    /// 今の表示が，裏で求めている変換を待っているか(届いたら conversionDidArrive で出し直す)
+    public var awaitsConversion: Bool { phase == .composing && renderAwaitsConversion }
+
+    /// 待たずに裏へ回した変換があったか．確かめた結果は，今の表示を作り終えるまで覚えておく
+    private func missedConversion() -> Bool {
+        if converter.consumeDeferredMiss() { renderAwaitsConversion = true }
+        return renderAwaitsConversion
+    }
+
+    /// 変換を待つあいだに見せる文．前に見せた文に，あとから打ったかなを足す
+    private func pendingLiveText(for reading: String) -> String {
+        if let last = lastLive, reading.hasPrefix(last.reading) {
+            return last.shown + reading.dropFirst(last.reading.count)
+        }
+        if let settled = settledLive, reading.hasPrefix(settled.reading) {
+            return settled.candidate.text + reading.dropFirst(settled.reading.count)
+        }
+        return reading
+    }
 
     // MARK: - 外からの操作
 
@@ -277,6 +351,7 @@ public final class InputSession {
         lateCorrection = nil
         let hidesNote = showsTransientNote
         showsTransientNote = false
+        settleDeferredLookups()
         let baseline = editBaseline(command: phase == .composing ? nil : lookUp(event))
         var result = route(event, context: context)
         trackConversionEdit(from: baseline)
@@ -410,6 +485,15 @@ public final class InputSession {
     /// 入力中の候補の窓の予測．入力メソッドは次のキーに譲りながら 1 つずつ動かし，返した表示を出す．次のキーが来たら残りはやめる．
     /// 求めるあいだに状態が変わっていたら(次のキーで変換を変えたなど)何もせず空を返す
     public func followUps(context: InputContext) -> [@MainActor () -> [ClientAction]] {
+        if phase == .composing, defersLiveConversion, !isSettled, predictionsShown {
+            // 予測する読み(最後の文節)は変換から決める．変換がまだ届いていなければ待たず，届いたあとに呼び直してもらう
+            converter.setDeferring(true)
+            _ = converter.consumeDeferredMiss()
+            _ = predictionTarget()
+            let awaiting = converter.consumeDeferredMiss()
+            converter.setDeferring(false)
+            if awaiting { return [] }
+        }
         switch phase {
         case .lattice(let lattice) where inlineEdit == nil && !splitMode:
             let reading = composition.conversionReading
@@ -606,6 +690,7 @@ public final class InputSession {
     public func settle(context: InputContext) -> [ClientAction] {
         if let english = settlingEnglishInput { return english.settle() }
         guard awaitsSettle else { return [] }
+        settleDeferredLookups()
         isSettled = true
         let typed = composition
         if freezeWordsReadAsRomaji(tentatively: true) == .wholeReading { typedBeforeEnglishWord = typed }
@@ -1367,7 +1452,7 @@ public final class InputSession {
                 readingCorrector.forgetReview()
             }
             composition.insertRomaji(character)
-            NasalReadingResolver(converter: converter).resolve(&composition)
+            resolveNasalReading(waits: false)
             readingCorrector.didType(character)
             if corrector.active != nil, corrector.handleFollowingRomaji(in: &composition) == .waiting {
                 return KeyResult(handled: true, actions: actions + render(context: context))
@@ -1407,7 +1492,7 @@ public final class InputSession {
                 return KeyResult(handled: true, actions: actions + commitAll())
             }
         }
-        updateCorrection()
+        updateCorrection(waits: false)
         return KeyResult(handled: true, actions: actions + render(context: context))
     }
 
@@ -1421,7 +1506,7 @@ public final class InputSession {
         corrector.commitAsTyped(into: &composition)
         readingCorrector.didInsertLiteral()
         composition.insertLiteral(String(character), rawKey: character.isNumber ? character : nil)
-        updateCorrection()
+        updateCorrection(waits: false)
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -1435,7 +1520,7 @@ public final class InputSession {
         corrector.commit(into: &composition)
         readingCorrector.didInsertLiteral()
         composition.insertLiteral(text, rawKey: rawKey)
-        updateCorrection()
+        updateCorrection(waits: false)
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -1680,10 +1765,10 @@ public final class InputSession {
         }
         // Shift で始めた英字を消し切ったら，英字の続きを終える(続けて打つキーはローマ字にする)
         if alphabetRun, !(composition.conversionReading.last.map { $0.isASCII && $0.isLetter } ?? false) { alphabetRun = false }
-        NasalReadingResolver(converter: converter).resolve(&composition)
+        resolveNasalReading(waits: false)
         forcedBoundaries.removeAll { $0 >= composition.kana.count }
         readingCorrector.didEdit(composition)
-        updateCorrection()
+        updateCorrection(waits: false)
         return KeyResult(handled: true, actions: render(context: context))
     }
 
@@ -1763,6 +1848,7 @@ public final class InputSession {
 
     /// 組み立て中の読みを，今の表示のとおりに確定する．確定した語を学んだら learned を true にする
     private func commitCompositionText(learned: inout Bool) -> [ClientAction] {
+        settleDeferredLookups()
         // 連想の一覧で選んでいる語は，元の変換の文節に入れてから確定する
         resolveAssociation()
         // 候補を求めていない文節は，学習に使うエンジンの候補にするため求めてから確定する
@@ -1899,6 +1985,10 @@ public final class InputSession {
         splitMode = false
         inlineEdit = nil
         settledLive = nil
+        lastLive = nil
+        nasalPending = false
+        correctionPending = false
+        lexicon.forget()
         resizePreviews = [:]
         suggestionPredictions = nil
         shownSuggestionPanel = nil
@@ -2392,7 +2482,16 @@ public final class InputSession {
         return panel
     }
 
-    private func updateCorrection() {
+    /// - Parameter waits: false なら，まだ求めていない読みのもっともらしさは待たずに裏で求め，届いてから求め直す(conversionDidArrive)
+    private func updateCorrection(waits: Bool = true) {
+        converter.setDeferring(!waits && defersLiveConversion)
+        _ = converter.consumeDeferredMiss()
+        defer {
+            correctionPending = converter.consumeDeferredMiss()
+            converter.setDeferring(false)
+            // 手がかりがそろうまでは補正を見せない(そろわないうちの判断で，語が英単語と日本語で入れ替わって見えないように)
+            if correctionPending { corrector.withhold() }
+        }
         let before = corrector.active
         // プログラミング用のアプリでは，日本語の文の中にある英単語だけを直す(R-06)
         let context = EnglishWordCorrector.Context(correctsOnlyInJapanese: profile.prefersHalfwidthSymbols,
@@ -2435,13 +2534,26 @@ public final class InputSession {
             expandedCandidates = false
             // 打鍵が止まる前の表示だけを入力中として求める(Space の分岐図や，止まったときの表示は Zenzai を使う)
             converter.setTyping(!isSettled)
-            defer { converter.setTyping(false) }
+            // 打鍵が止まる前は変換を待たない(裏で求め，届いたら出し直す)．止まったときは待って求める
+            converter.setDeferring(defersLiveConversion && !isSettled)
+            _ = converter.consumeDeferredMiss()
+            renderAwaitsConversion = false
+            defer {
+                converter.setTyping(false)
+                converter.setDeferring(false)
+            }
             let marked = composingMarkedText()
             // 予測の窓は，ローマ字を打ちかけているあいだは前の予測を出しておく
             let keepsPrediction = showsPredictions && readingIsLongEnough && !readingIsSettled
-            let nextPrediction = keepsPrediction ? shownPrediction : makePrediction(marked: marked)
+            var nextPrediction = keepsPrediction ? shownPrediction : makePrediction(marked: marked)
+            let suggested = suggestionPanel(predicting: nextPrediction != nil)
+            // 変換を待っているあいだは，前の予測と候補の窓をそのまま出しておく(届いたら出し直す)
+            let awaiting = missedConversion()
+            if awaiting { nextPrediction = shownPrediction }
             let panel: ClientAction
-            if let shown = suggestionPanel(predicting: nextPrediction != nil) {
+            if awaiting, let shown = shownSuggestionPanel {
+                panel = .showCandidates(shown)
+            } else if let shown = suggested {
                 shownSuggestionPanel = shown
                 panel = .showCandidates(shown)
             } else if suggestionsEnabled, !composition.pending.isEmpty, let shown = shownSuggestionPanel {
@@ -3853,6 +3965,12 @@ public final class InputSession {
         }
         let rule = LiveConversionRule()
         var best = bestWholeCandidate(for: reading)
+        if missedConversion() {
+            return MarkedText([
+                .init(pendingLiveText(for: reading), style: .converted),
+                .init(composition.pending, style: .reading),
+            ])
+        }
         if isSettled {
             settledLive = best.map { ($0, reading) }
         } else if let candidate = best {
@@ -3861,6 +3979,7 @@ public final class InputSession {
         // 前に止まったときに変換して見せた読み(今の読みの先頭)は，打ち続けてもかなに戻さない
         let converted = settledLive.flatMap { reading.hasPrefix($0.reading) ? $0.reading.count : nil } ?? 0
         let shown = best.map { rule.display(of: $0, reading: reading, settled: isSettled, convertedLength: converted) } ?? reading
+        lastLive = (shown, reading)
         // 打ち間違いを直した読みは，直した語句だけを点線の下線にする．どこを直したかが分かるように
         if readingCorrector.isApplied {
             let candidate = best ?? Candidate(text: reading, readingCount: reading.count, origin: .variant(.hiragana))

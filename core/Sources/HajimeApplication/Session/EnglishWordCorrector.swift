@@ -86,6 +86,12 @@ final class EnglishWordCorrector {
 
     /// 読みの末尾から英単語を探して，補正を求め直す．
     /// - Parameter context: 入力先の文脈．プログラミング用のアプリでは日本語の文の中の英単語だけを直す(R-06)
+    /// 見つけた補正をいったん取り下げる．手がかり(読みのもっともらしさ)を待たずに探したときに，そろうまで補正を見せないために使う．
+    /// そろったら update を呼び直す
+    func withhold() {
+        active = nil
+    }
+
     func update(for composition: Composition, context: Context = Context()) {
         self.context = context
         guard settings.current.correction.english else {

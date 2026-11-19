@@ -17,9 +17,12 @@ import HajimeDomain
 struct NasalReadingResolver {
     let converter: any KanaKanjiConverting
 
-    func resolve(_ composition: inout Composition) {
+    /// - Returns: 点数を待たずに裏へ回したため(KanaKanjiConverting.setDeferring)，まだ決めていない読みがあるか．あれば，届いたあとに呼び直す
+    @discardableResult
+    func resolve(_ composition: inout Composition) -> Bool {
         let count = composition.nasalAmbiguities.count
-        guard count > 0 else { return }
+        guard count > 0 else { return false }
+        var pending = false
         for position in max(0, count - DefaultSettings.maximumNasalAmbiguities)..<count {
             let ambiguity = composition.nasalAmbiguities[position]
             let following = ambiguity.followingCount(in: composition.conversionReading)
@@ -27,11 +30,18 @@ struct NasalReadingResolver {
             // 数が同じでも，打ちかけのローマ字がかなになって文字が変わったら比べ直す(「ふんにk」→「ふんにき」)
             guard DefaultSettings.nasalEvaluationPoints.contains(following),
                 ambiguity.evaluatedFollowingText != followingText else { continue }
+            _ = converter.consumeDeferredMiss()
             let vowel = score(composition, position: position, usesNaRow: false)
             let naRow = score(composition, position: position, usesNaRow: true)
+            if converter.consumeDeferredMiss() {
+                // 点数がまだ無い．前に決めた読みのままにして，届いてから決める
+                pending = true
+                continue
+            }
             composition.setNasalReading(at: position, usesNaRow: naRow > vowel)
             composition.markNasalEvaluated(at: position, followingText: followingText)
         }
+        return pending
     }
 
     /// 打ち終えた読みで選び直す(打鍵が止まったときと，変換・確定の前)．打鍵ごとには呼ばない．
