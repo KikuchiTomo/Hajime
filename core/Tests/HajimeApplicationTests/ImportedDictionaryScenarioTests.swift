@@ -60,6 +60,50 @@ struct ImportedDictionaryConverterTests {
         #expect(converter.sourceName(of: "電圧を", reading: "でんあつを") == "電気")
     }
 
+    @Test("読みを 1 文字ずつ打ち足して引いても，読み全体を一度に引いたときと同じ語を渡す",
+          arguments: ["でんあつをはかるでんりゅうをはかる", "でんあつでんあつでんあつ", "あああああああああああああああああああああああああああああああああああああああああ", "きょうはでんあつけいでていこうをはかります"])
+    func incrementalLookupMatchesWhole(reading: String) {
+        func build() -> (SupplementedConverter, FakeConverter) {
+            let primary = ImportedDictionary(id: "e", name: "電気", wordCount: 4)
+            let secondary = ImportedDictionary(id: "g", name: "一般", wordCount: 2)
+            let (converter, base, lookup) = make([primary, secondary])
+            lookup.words["e"] = [
+                "でんあつ": [DictionaryWord(reading: "でんあつ", word: "電圧")], "でんりゅう": [DictionaryWord(reading: "でんりゅう", word: "電流")],
+                "でんあつけい": [DictionaryWord(reading: "でんあつけい", word: "電圧計")], "ていこう": [DictionaryWord(reading: "ていこう", word: "抵抗")],
+                "ああ": [DictionaryWord(reading: "ああ", word: "嗚呼")],
+            ]
+            // 同じ語が優先度の低い辞書にもある
+            lookup.words["g"] = ["でんあつ": [DictionaryWord(reading: "でんあつ", word: "電圧")], "はかる": [DictionaryWord(reading: "はかる", word: "測る")]]
+            return (converter, base)
+        }
+        let (whole, wholeBase) = build()
+        _ = whole.candidates(for: reading)
+        let (typed, typedBase) = build()
+        var prefix = ""
+        for character in reading {
+            prefix.append(character)
+            _ = typed.candidates(for: prefix)
+            // 打っている途中も，その読みを一度に引いたときと同じ
+            let (fresh, freshBase) = build()
+            _ = fresh.candidates(for: prefix)
+            #expect(typedBase.auxiliaryWords == freshBase.auxiliaryWords)
+            #expect(typed.sourceName(of: "電圧", reading: "でんあつ") == fresh.sourceName(of: "電圧", reading: "でんあつ"))
+        }
+        #expect(typedBase.auxiliaryWords == wholeBase.auxiliaryWords)
+        #expect(!wholeBase.auxiliaryWords.isEmpty)
+    }
+
+    @Test("打ち足したあとに消して打ち直しても，その読みを一度に引いたときと同じ語を渡す")
+    func incrementalLookupAfterDeleting() {
+        let dictionary = ImportedDictionary(id: "e", name: "電気", wordCount: 2)
+        let (typed, typedBase, lookup) = make([dictionary])
+        lookup.words["e"] = ["でんあつ": [DictionaryWord(reading: "でんあつ", word: "電圧")], "でんりゅう": [DictionaryWord(reading: "でんりゅう", word: "電流")]]
+        for reading in ["でん", "でんあ", "でんあつ", "でんあ", "でん", "でんり", "でんりゅ", "でんりゅう"] {
+            _ = typed.candidates(for: reading)
+        }
+        #expect(typedBase.auxiliaryWords.map(\.word.word) == ["電流"])
+    }
+
     @Test("読み全体と一致する語は，エンジンがたどれない読みでも 2 番目に足す")
     func wholeReading() {
         let dictionary = ImportedDictionary(id: "e", name: "電気", wordCount: 1)

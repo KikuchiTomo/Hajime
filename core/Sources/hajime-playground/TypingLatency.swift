@@ -175,7 +175,7 @@ final class TypingLatencyProbe {
     /// file の各行(ローマ字)を，intervals の間隔(ミリ秒)ごとに打ち，届いてから処理し終えるまでの時間をまとめて出す．
     /// 行の中の空白は Space(変換)，行の終わりで Enter を押す
     static func run(file: String, intervals: [Double], engine: AzooKeyConverterEngine, service: ZenzaiTypoService?,
-                    terms: (any TermDictionaryLookup)?, usesFusion: Bool, trace: Bool, defers: Bool, pause: Double, printsText: Bool) throws {
+                    terms: (any TermDictionaryLookup)?, usesFusion: Bool, trace: Bool, traceThreshold: Double = 16, defers: Bool, pause: Double, printsText: Bool) throws {
         let lines = try String(contentsOfFile: file, encoding: .utf8).split(whereSeparator: \.isNewline)
             .filter { !$0.hasPrefix("#") && !$0.isEmpty }.map(String.init)
         var settings = DefaultSettings.settings
@@ -202,7 +202,7 @@ final class TypingLatencyProbe {
                 handle += results.map(\.handle)
                 latency += results.map(\.latency)
                 if trace {
-                    for (index, result) in results.enumerated() where result.latency > 16 {
+                    for (index, result) in results.enumerated() where result.latency > traceThreshold {
                         print(String(format: "  間隔 %.0f ms  キー %d  処理 %.1f ms  遅れ %.1f ms", interval, index + 1, result.handle, result.latency))
                     }
                 }

@@ -72,6 +72,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private var auxiliarySources: [DictionaryWord: Source] = [:]
     /// 読みごとに引いた語と，その語の辞書．効いている辞書か専門用語の分野が変わったときと，入力を終えたときに捨てる
     private var auxiliaryCache: (active: [DictionaryActivation.Active], fields: Set<TermField>, lookups: [String: Lookup]) = ([], [], [:])
+    /// 最後に引いた読み．次の読みがその続きなら，打ち足した分だけを引く(長い読みで，打鍵ごとに読み全体を引き直さない)
+    private var lastAuxiliaryReading: String?
 
     private struct Source {
         /// 取り込んだ辞書の id．専門用語の辞書なら nil(文脈の条件に数えない)
@@ -92,6 +94,8 @@ public final class SupplementedConverter: KanaKanjiConverting {
     private struct Lookup {
         var words: [AuxiliaryWord]
         var sources: [DictionaryWord: Source]
+        /// 語ごとの，いちばん優先度の高い辞書の値．読みを打ち足したときに，足した分だけを引いて重ねるのに使う
+        var best: [DictionaryWord: Float] = [:]
     }
 
     public init(_ base: any KanaKanjiConverting, settings: any SettingsReading, calendar: any CalendarReading,
@@ -152,9 +156,22 @@ public final class SupplementedConverter: KanaKanjiConverting {
         let hits = Dictionary(recentDictionaryCommits.map { ($0, 1) }, uniquingKeysWith: +)
         let active = lookup == nil ? [] : DictionaryActivation.active(current.importedDictionaries, applicationID: applicationID, recentHits: hits)
         let fields = terms != nil && current.termDictionary ? current.termFields.enabledFields : []
-        if active != auxiliaryCache.active || fields != auxiliaryCache.fields { auxiliaryCache = (active, fields, [:]) }
-        let found = auxiliaryCache.lookups[reading] ?? Self.lookUp(reading, in: active, lookup: lookup, fields: fields, terms: terms)
-        auxiliaryCache.lookups[reading] = found
+        if active != auxiliaryCache.active || fields != auxiliaryCache.fields {
+            auxiliaryCache = (active, fields, [:])
+            lastAuxiliaryReading = nil
+        }
+        let found: Lookup
+        if let cached = auxiliaryCache.lookups[reading] {
+            found = cached
+        } else {
+            // 前に引いた読みの続きなら，その結果に打ち足した分を重ねる
+            let previous = lastAuxiliaryReading.flatMap { last in
+                reading.hasPrefix(last) ? auxiliaryCache.lookups[last].map { (count: last.count, lookup: $0) } : nil
+            }
+            found = Self.lookUp(reading, extending: previous, in: active, lookup: lookup, fields: fields, terms: terms)
+            auxiliaryCache.lookups[reading] = found
+        }
+        lastAuxiliaryReading = reading
         auxiliarySources = found.sources
         guard found.words != auxiliary else { return }
         auxiliary = found.words
@@ -162,23 +179,30 @@ public final class SupplementedConverter: KanaKanjiConverting {
     }
 
     /// reading の中の部分(長さ DefaultSettings.maximumImportedReadingLength まで)を，効いている辞書と専門用語の辞書の使う分野で引く．
-    /// 同じ語が複数の辞書にあれば，優先度の高い方を使う(専門用語の辞書は取り込んだ辞書より低い)
-    private static func lookUp(_ reading: String, in active: [DictionaryActivation.Active], lookup: (any DictionaryLookup)?,
-                               fields: Set<TermField>, terms: (any TermDictionaryLookup)?) -> Lookup {
+    /// 同じ語が複数の辞書にあれば，優先度の高い方を使う(専門用語の辞書は取り込んだ辞書より低い)．
+    ///
+    /// previous は，reading の先頭 count 文字を引いた結果．渡すと，その先に打ち足した文字で終わる部分だけを引いて重ねる．
+    /// 語は読み(部分の文字列)から決まり，同じ部分を何度引いても結果は変わらないので，読み全体を引いたときと同じ結果になる
+    private static func lookUp(_ reading: String, extending previous: (count: Int, lookup: Lookup)? = nil, in active: [DictionaryActivation.Active],
+                               lookup: (any DictionaryLookup)?, fields: Set<TermField>, terms: (any TermDictionaryLookup)?) -> Lookup {
         let terms = fields.isEmpty ? nil : terms
         guard (!active.isEmpty && lookup != nil) || terms != nil else { return Lookup(words: [], sources: [:]) }
         let characters = Array(reading)
-        var best: [DictionaryWord: Float] = [:]
-        var sources: [DictionaryWord: Source] = [:]
-        for start in characters.indices {
-            for length in 1...min(DefaultSettings.maximumImportedReadingLength, characters.count - start) {
-                let part = String(characters[start..<(start + length)])
+        var best = previous?.lookup.best ?? [:]
+        var sources = previous?.lookup.sources ?? [:]
+        var changed = previous == nil
+        let maximum = DefaultSettings.maximumImportedReadingLength
+        // 前の読みの中だけで終わる部分は引いてあるので，その先で終わる部分だけを引く
+        for end in ((previous?.count ?? 0) + 1)...max(characters.count, (previous?.count ?? 0) + 1) where end <= characters.count {
+            for start in max(0, end - maximum)..<end {
+                let part = String(characters[start..<end])
                 if let lookup {
                     for entry in active {
                         for word in lookup.words(reading: part, in: entry.dictionary) where best[word].map({ entry.costOffset > $0 }) ?? true {
                             best[word] = entry.costOffset
                             sources[word] = Source(id: entry.dictionary.id, name: entry.dictionary.displayName,
                                                    wholeReadingOffset: DefaultSettings.importedWordCandidateOffset)
+                            changed = true
                         }
                     }
                 }
@@ -187,12 +211,15 @@ public final class SupplementedConverter: KanaKanjiConverting {
                     best[term.word] = cost - DefaultSettings.importedWordCost
                     sources[term.word] = Source(id: nil, name: term.field.name,
                                                 wholeReadingOffset: term.overlap == .sameReading ? nil : DefaultSettings.termWordCandidateOffset)
+                    changed = true
                 }
             }
         }
+        // 語が増えも変わりもしなければ，並べ直さずに前の並びを使う
+        guard changed else { return Lookup(words: previous?.lookup.words ?? [], sources: sources, best: best) }
         let words = best.map { AuxiliaryWord(word: $0.key, costOffset: $0.value) }
             .sorted { ($0.word.reading, $0.word.word) < ($1.word.reading, $1.word.word) }
-        return Lookup(words: words, sources: sources)
+        return Lookup(words: words, sources: sources, best: best)
     }
 
     /// 確定した候補に取り込んだ辞書の語があれば，その辞書を最近使ったものとして数える
@@ -234,6 +261,7 @@ public final class SupplementedConverter: KanaKanjiConverting {
     public func setAuxiliaryWords(_ words: [AuxiliaryWord]) { base.setAuxiliaryWords(words) }
     public func endComposition() {
         auxiliaryCache.lookups = [:]
+        lastAuxiliaryReading = nil
         listExtrasCache = [:]
         emojiSources = [:]
         emojiFirstCandidates = [:]
